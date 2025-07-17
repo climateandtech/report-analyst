@@ -638,10 +638,10 @@ Output only the scores, one per line, in order:""")
             logger.error(f"[ANALYSIS] Error processing document: {str(e)}", exc_info=True)
             yield {"error": f"Error processing document: {str(e)}"}
 
-    def _create_chunks(self, file_path: str) -> List[Dict[str, Any]]:
-        """Create document chunks with embeddings"""
+    def _create_chunks(self, file_path: str, compute_embeddings: bool = True) -> List[Dict[str, Any]]:
+        """Create document chunks with optional embeddings computation"""
         try:
-            logger.info(f"Creating chunks for {file_path}")
+            logger.info(f"Creating chunks for {file_path}, compute_embeddings={compute_embeddings}")
             reader = PyMuPDFReader()
             docs = reader.load(file_path=file_path)
             logger.info(f"Loaded {len(docs)} pages from document")
@@ -661,84 +661,514 @@ Output only the scores, one per line, in order:""")
             
             logger.info(f"Created {len(text_chunks)} chunks")
             
-            # Compute embeddings in batches
-            BATCH_SIZE = 100  # Process 100 chunks at a time
+            # Create chunk dictionaries
             chunks_data = []
             
-            for i in range(0, len(text_chunks), BATCH_SIZE):
-                batch = text_chunks[i:i + BATCH_SIZE]
-                logger.info(f"Computing embeddings for batch {i//BATCH_SIZE + 1}/{(len(text_chunks)-1)//BATCH_SIZE + 1}")
+            if compute_embeddings:
+                # Compute embeddings in batches
+                BATCH_SIZE = 100  # Process 100 chunks at a time
                 
-                # Get text from batch and clean it
-                batch_texts = []
-                for chunk in batch:
-                    # Clean and validate text
-                    text = chunk.text.strip()
-                    if text and len(text) > 0:
-                        # Remove any null characters and normalize whitespace
-                        text = ' '.join(text.replace('\x00', '').split())
-                        batch_texts.append(text)
-                    else:
-                        logger.warning(f"Skipping empty or invalid chunk")
-                        continue
-                
-                try:
-                    # Only compute embeddings if we have valid texts
-                    if batch_texts:
-                        logger.info(f"Computing embeddings for {len(batch_texts)} texts in batch")
-                        batch_embeddings = self.embeddings.get_text_embedding_batch(batch_texts)
-                        logger.info(f"Successfully computed {len(batch_embeddings)} embeddings")
-                        
-                        # Create chunk dictionaries with embeddings
-                        for chunk, embedding in zip(batch, batch_embeddings):
-                            if embedding is not None:  # Only add chunks with valid embeddings
-                                chunk_dict = {
-                                    "text": chunk.text,
-                                    "metadata": chunk.metadata,
-                                    "embedding": np.array(embedding, dtype=np.float32),
-                                    "similarity": 0.0,  # Will be populated during analysis
-                                    "computed_score": 0.0  # Will be populated during analysis
-                                }
-                                chunks_data.append(chunk_dict)
-                                logger.debug(f"Added chunk with text length {len(chunk.text)}")
-                            else:
-                                logger.warning(f"Skipping chunk - embedding is None")
-                            
-                except Exception as e:
-                    logger.error(f"Error computing embeddings for batch: {str(e)}", exc_info=True)
-                    # Continue with next batch, storing chunks without embeddings
+                for i in range(0, len(text_chunks), BATCH_SIZE):
+                    batch = text_chunks[i:i + BATCH_SIZE]
+                    logger.info(f"Computing embeddings for batch {i//BATCH_SIZE + 1}/{(len(text_chunks)-1)//BATCH_SIZE + 1}")
+                    
+                    # Get text from batch and clean it
+                    batch_texts = []
                     for chunk in batch:
-                        chunk_dict = {
-                            "text": chunk.text,
-                            "metadata": chunk.metadata,
-                            "embedding": None,
-                            "similarity": 0.0,
-                            "computed_score": 0.0
-                        }
-                        chunks_data.append(chunk_dict)
-                        logger.warning(f"Added chunk without embedding due to error")
-            
-            # Log embedding statistics
-            chunks_with_embeddings = sum(1 for c in chunks_data if c["embedding"] is not None)
-            logger.info(f"Created {len(chunks_data)} chunks, {chunks_with_embeddings} with embeddings")
-            
-            # Only save chunks that have valid embeddings
-            valid_chunks = [c for c in chunks_data if c["embedding"] is not None]
-            if valid_chunks:
-                logger.info(f"Saving {len(valid_chunks)} valid chunks to cache")
-                try:
-                    self.cache_manager.save_vectors(file_path, valid_chunks)
-                    logger.info(f"Successfully saved chunks and vectors to cache")
-                except Exception as e:
-                    logger.error(f"Failed to save vectors to cache: {str(e)}", exc_info=True)
+                        # Clean and validate text
+                        text = chunk.text.strip()
+                        if text and len(text) > 0:
+                            # Remove any null characters and normalize whitespace
+                            text = ' '.join(text.replace('\x00', '').split())
+                            batch_texts.append(text)
+                        else:
+                            logger.warning(f"Skipping empty or invalid chunk")
+                            continue
+                    
+                    try:
+                        # Only compute embeddings if we have valid texts
+                        if batch_texts:
+                            logger.info(f"Computing embeddings for {len(batch_texts)} texts in batch")
+                            batch_embeddings = self.embeddings.get_text_embedding_batch(batch_texts)
+                            logger.info(f"Successfully computed {len(batch_embeddings)} embeddings")
+                            
+                            # Create chunk dictionaries with embeddings
+                            for chunk, embedding in zip(batch, batch_embeddings):
+                                if embedding is not None:  # Only add chunks with valid embeddings
+                                    chunk_dict = {
+                                        "text": chunk.text,
+                                        "metadata": chunk.metadata,
+                                        "embedding": np.array(embedding, dtype=np.float32),
+                                        "similarity": 0.0,  # Will be populated during analysis
+                                        "computed_score": 0.0  # Will be populated during analysis
+                                    }
+                                    chunks_data.append(chunk_dict)
+                                    logger.debug(f"Added chunk with text length {len(chunk.text)}")
+                                else:
+                                    logger.warning(f"Skipping chunk - embedding is None")
+                                    
+                    except Exception as e:
+                        logger.error(f"Error computing embeddings for batch: {str(e)}", exc_info=True)
+                        # Continue with next batch, storing chunks without embeddings
+                        for chunk in batch:
+                            chunk_dict = {
+                                "text": chunk.text,
+                                "metadata": chunk.metadata,
+                                "embedding": None,
+                                "similarity": 0.0,
+                                "computed_score": 0.0
+                            }
+                            chunks_data.append(chunk_dict)
+                            logger.warning(f"Added chunk without embedding due to error")
+                
+                # Log embedding statistics
+                chunks_with_embeddings = sum(1 for c in chunks_data if c["embedding"] is not None)
+                logger.info(f"Created {len(chunks_data)} chunks, {chunks_with_embeddings} with embeddings")
+                
+                # Save chunks with embeddings
+                valid_chunks = [c for c in chunks_data if c["embedding"] is not None]
+                if valid_chunks:
+                    logger.info(f"Saving {len(valid_chunks)} valid chunks to cache")
+                    try:
+                        self.cache_manager.save_document_chunks(
+                            file_path=file_path,
+                            chunks=valid_chunks,
+                            chunk_size=self.chunk_params['chunk_size'],
+                            chunk_overlap=self.chunk_params['chunk_overlap']
+                        )
+                        logger.info(f"Successfully saved chunks and vectors to cache")
+                    except Exception as e:
+                        logger.error(f"Failed to save vectors to cache: {str(e)}", exc_info=True)
+                else:
+                    logger.warning("No valid chunks to save to cache")
             else:
-                logger.warning("No valid chunks to save to cache")
+                # Create chunks without embeddings
+                for chunk in text_chunks:
+                    chunk_dict = {
+                        "text": chunk.text,
+                        "metadata": chunk.metadata,
+                        "embedding": None,
+                        "similarity": 0.0,
+                        "computed_score": 0.0
+                    }
+                    chunks_data.append(chunk_dict)
+                
+                logger.info(f"Created {len(chunks_data)} chunks without embeddings")
+                
+                # Save chunks without embeddings using new cache manager method
+                try:
+                    self.cache_manager.save_chunks_without_embeddings(
+                        file_path=file_path,
+                        chunks=chunks_data,
+                        chunk_size=self.chunk_params['chunk_size'],
+                        chunk_overlap=self.chunk_params['chunk_overlap']
+                    )
+                    logger.info(f"Successfully saved chunks without embeddings to cache")
+                except Exception as e:
+                    logger.error(f"Failed to save chunks without embeddings: {str(e)}", exc_info=True)
             
             return chunks_data
             
         except Exception as e:
             logger.error(f"Error creating chunks: {str(e)}", exc_info=True)
             raise
+
+    # New step-specific methods for 4-step process
+    def create_chunks_only(self, file_path: str) -> List[Dict[str, Any]]:
+        """Step 1: Create chunks without embeddings"""
+        try:
+            logger.info(f"[STEP 1] Creating chunks only for {file_path}")
+            
+            # Check if chunks already exist
+            existing_chunks = self.cache_manager.get_chunks_without_embeddings(
+                file_path=file_path,
+                chunk_size=self.chunk_params['chunk_size'],
+                chunk_overlap=self.chunk_params['chunk_overlap']
+            )
+            
+            if existing_chunks:
+                logger.info(f"[STEP 1] Found {len(existing_chunks)} existing chunks")
+                return existing_chunks
+            
+            # Create new chunks without embeddings
+            chunks = self._create_chunks(file_path, compute_embeddings=False)
+            logger.info(f"[STEP 1] Created {len(chunks)} chunks without embeddings")
+            
+            return chunks
+            
+        except Exception as e:
+            logger.error(f"[STEP 1] Error creating chunks: {str(e)}", exc_info=True)
+            raise
+
+    def add_embeddings_to_chunks(self, file_path: str) -> List[Dict[str, Any]]:
+        """Step 2: Add embeddings to existing chunks"""
+        try:
+            logger.info(f"[STEP 2] Adding embeddings to chunks for {file_path}")
+            
+            # Check if chunks with embeddings already exist
+            existing_chunks = self.cache_manager.get_document_chunks(
+                file_path=file_path,
+                chunk_size=self.chunk_params['chunk_size'],
+                chunk_overlap=self.chunk_params['chunk_overlap']
+            )
+            
+            if existing_chunks and any(c.get('embedding') is not None for c in existing_chunks):
+                logger.info(f"[STEP 2] Found {len(existing_chunks)} chunks with embeddings")
+                return existing_chunks
+            
+            # Get chunks without embeddings
+            chunks_without_embeddings = self.cache_manager.get_chunks_without_embeddings(
+                file_path=file_path,
+                chunk_size=self.chunk_params['chunk_size'],
+                chunk_overlap=self.chunk_params['chunk_overlap']
+            )
+            
+            if not chunks_without_embeddings:
+                logger.error(f"[STEP 2] No chunks found without embeddings. Run Step 1 first.")
+                raise ValueError("No chunks found. Please run Step 1 (Create Chunks) first.")
+            
+            logger.info(f"[STEP 2] Computing embeddings for {len(chunks_without_embeddings)} chunks")
+            
+            # Compute embeddings for chunks
+            chunks_with_embeddings = []
+            BATCH_SIZE = 100
+            
+            for i in range(0, len(chunks_without_embeddings), BATCH_SIZE):
+                batch = chunks_without_embeddings[i:i + BATCH_SIZE]
+                logger.info(f"Computing embeddings for batch {i//BATCH_SIZE + 1}/{(len(chunks_without_embeddings)-1)//BATCH_SIZE + 1}")
+                
+                # Get text from batch
+                batch_texts = [chunk['text'] for chunk in batch]
+                
+                try:
+                    # Compute embeddings
+                    batch_embeddings = self.embeddings.get_text_embedding_batch(batch_texts)
+                    
+                    # Add embeddings to chunks
+                    for chunk, embedding in zip(batch, batch_embeddings):
+                        if embedding is not None:
+                            chunk_with_embedding = chunk.copy()
+                            chunk_with_embedding['embedding'] = np.array(embedding, dtype=np.float32)
+                            chunks_with_embeddings.append(chunk_with_embedding)
+                        else:
+                            logger.warning(f"Skipping chunk - embedding is None")
+                            
+                except Exception as e:
+                    logger.error(f"Error computing embeddings for batch: {str(e)}", exc_info=True)
+                    # Add chunks without embeddings
+                    for chunk in batch:
+                        chunk_copy = chunk.copy()
+                        chunk_copy['embedding'] = None
+                        chunks_with_embeddings.append(chunk_copy)
+            
+            # Save chunks with embeddings
+            valid_chunks = [c for c in chunks_with_embeddings if c.get('embedding') is not None]
+            if valid_chunks:
+                logger.info(f"[STEP 2] Saving {len(valid_chunks)} chunks with embeddings")
+                self.cache_manager.save_document_chunks(
+                    file_path=file_path,
+                    chunks=valid_chunks,
+                    chunk_size=self.chunk_params['chunk_size'],
+                    chunk_overlap=self.chunk_params['chunk_overlap']
+                )
+                logger.info(f"[STEP 2] Successfully saved chunks with embeddings")
+            
+            return chunks_with_embeddings
+            
+        except Exception as e:
+            logger.error(f"[STEP 2] Error adding embeddings: {str(e)}", exc_info=True)
+            raise
+
+    async def score_chunks_for_questions(self, file_path: str, selected_questions: List[str], 
+                                       use_llm_scoring: bool = False, single_call: bool = True) -> Dict[str, List[Dict]]:
+        """Step 3: Score chunks for selected questions"""
+        try:
+            logger.info(f"[STEP 3] Scoring chunks for {len(selected_questions)} questions")
+            
+            # Get chunks with embeddings
+            chunks = self.cache_manager.get_document_chunks(
+                file_path=file_path,
+                chunk_size=self.chunk_params['chunk_size'],
+                chunk_overlap=self.chunk_params['chunk_overlap']
+            )
+            
+            if not chunks:
+                logger.error(f"[STEP 3] No chunks found with embeddings. Run Step 2 first.")
+                raise ValueError("No chunks found with embeddings. Please run Step 2 (Generate Embeddings) first.")
+            
+            if not any(c.get('embedding') is not None for c in chunks):
+                logger.error(f"[STEP 3] No chunks have embeddings. Run Step 2 first.")
+                raise ValueError("No chunks have embeddings. Please run Step 2 (Generate Embeddings) first.")
+            
+            # Store current file path for similarity search
+            self.current_file_path = file_path
+            
+            # Score chunks for each question
+            question_chunk_scores = {}
+            
+            for question_id in selected_questions:
+                try:
+                    # Extract question number from question_id
+                    question_number = int(question_id.split('_')[1])
+                    question_data = self.get_question_by_number(question_number)
+                    
+                    if not question_data:
+                        logger.warning(f"[STEP 3] Question {question_number} not found")
+                        continue
+                    
+                    logger.info(f"[STEP 3] Scoring chunks for question {question_id}")
+                    
+                    # Get similar chunks using vector similarity
+                    similar_chunks = await self._get_similar_chunks(
+                        question_data['text'],
+                        chunks,
+                        self.chunk_params['top_k']
+                    )
+                    
+                    # Apply LLM scoring if enabled
+                    if use_llm_scoring:
+                        logger.info(f"[STEP 3] Applying LLM scoring for question {question_id}")
+                        try:
+                            llm_scores = await self.score_chunk_relevance_batch(
+                                question_data['text'],
+                                similar_chunks,
+                                single_call=single_call
+                            )
+                            
+                            # Apply LLM scores to chunks
+                            for i, chunk in enumerate(similar_chunks):
+                                if i < len(llm_scores):
+                                    chunk['llm_score'] = llm_scores[i]
+                                else:
+                                    chunk['llm_score'] = 0.0
+                                    
+                        except Exception as e:
+                            logger.error(f"[STEP 3] Error applying LLM scores: {str(e)}")
+                            # Set default scores if LLM scoring fails
+                            for chunk in similar_chunks:
+                                chunk['llm_score'] = 0.0
+                    else:
+                        # Ensure llm_score is set to None when not using LLM scoring
+                        for chunk in similar_chunks:
+                            chunk['llm_score'] = None
+                    
+                    # Store scored chunks for this question
+                    question_chunk_scores[question_id] = similar_chunks
+                    
+                    # Save chunk scoring to cache
+                    config = {
+                        'chunk_size': self.chunk_params['chunk_size'],
+                        'chunk_overlap': self.chunk_params['chunk_overlap'],
+                        'top_k': self.chunk_params['top_k'],
+                        'model': self.llm.model,
+                        'question_set': self.question_set
+                    }
+                    
+                    self.cache_manager.save_chunk_scoring_only(
+                        file_path=file_path,
+                        question_id=question_id,
+                        chunk_scores=similar_chunks,
+                        config=config
+                    )
+                    
+                    logger.info(f"[STEP 3] Completed scoring for question {question_id}")
+                    
+                except Exception as e:
+                    logger.error(f"[STEP 3] Error scoring question {question_id}: {str(e)}")
+                    continue
+            
+            logger.info(f"[STEP 3] Completed scoring for {len(question_chunk_scores)} questions")
+            return question_chunk_scores
+            
+        except Exception as e:
+            logger.error(f"[STEP 3] Error scoring chunks: {str(e)}", exc_info=True)
+            raise
+
+    async def analyze_questions_with_scored_chunks(self, file_path: str, selected_questions: List[str]) -> Dict[str, Dict]:
+        """Step 4: Analyze questions using pre-scored chunks"""
+        try:
+            logger.info(f"[STEP 4] Analyzing {len(selected_questions)} questions with scored chunks")
+            
+            # Get configuration
+            config = {
+                'chunk_size': self.chunk_params['chunk_size'],
+                'chunk_overlap': self.chunk_params['chunk_overlap'],
+                'top_k': self.chunk_params['top_k'],
+                'model': self.llm.model,
+                'question_set': self.question_set
+            }
+            
+            question_analyses = {}
+            
+            for question_id in selected_questions:
+                try:
+                    # Extract question number from question_id
+                    question_number = int(question_id.split('_')[1])
+                    question_data = self.get_question_by_number(question_number)
+                    
+                    if not question_data:
+                        logger.warning(f"[STEP 4] Question {question_number} not found")
+                        continue
+                    
+                    logger.info(f"[STEP 4] Analyzing question {question_id}")
+                    
+                    # Get scored chunks for this question
+                    scored_chunks = self.cache_manager.get_chunk_scoring_only(
+                        file_path=file_path,
+                        question_id=question_id,
+                        config=config
+                    )
+                    
+                    if not scored_chunks:
+                        logger.error(f"[STEP 4] No scored chunks found for question {question_id}. Run Step 3 first.")
+                        raise ValueError(f"No scored chunks found for question {question_id}. Please run Step 3 (Score Chunks) first.")
+                    
+                    # Analyze chunks using LLM
+                    result = await self._analyze_chunks(
+                        question_data,
+                        scored_chunks,
+                        use_llm_scoring=any(c.get('llm_score') is not None for c in scored_chunks)
+                    )
+                    
+                    # Save complete analysis
+                    self.cache_manager.save_analysis(
+                        file_path=file_path,
+                        question_id=question_id,
+                        result=result,
+                        config=config
+                    )
+                    
+                    question_analyses[question_id] = result
+                    logger.info(f"[STEP 4] Completed analysis for question {question_id}")
+                    
+                except Exception as e:
+                    logger.error(f"[STEP 4] Error analyzing question {question_id}: {str(e)}")
+                    continue
+            
+            logger.info(f"[STEP 4] Completed analysis for {len(question_analyses)} questions")
+            return question_analyses
+            
+        except Exception as e:
+            logger.error(f"[STEP 4] Error analyzing questions: {str(e)}", exc_info=True)
+            raise
+
+    def check_step_completion(self, file_path: str) -> Dict[str, bool]:
+        """Check which steps are completed for a file with current configuration"""
+        try:
+            config = {
+                'chunk_size': self.chunk_params['chunk_size'],
+                'chunk_overlap': self.chunk_params['chunk_overlap'],
+                'top_k': self.chunk_params['top_k'],
+                'model': self.llm.model,
+                'question_set': self.question_set
+            }
+            
+            # Check step 1: Chunks without embeddings
+            chunks_without_embeddings = self.cache_manager.get_chunks_without_embeddings(
+                file_path=file_path,
+                chunk_size=config['chunk_size'],
+                chunk_overlap=config['chunk_overlap']
+            )
+            step1_complete = len(chunks_without_embeddings) > 0
+            
+            # Check step 2: Chunks with embeddings
+            chunks_with_embeddings = self.cache_manager.get_document_chunks(
+                file_path=file_path,
+                chunk_size=config['chunk_size'],
+                chunk_overlap=config['chunk_overlap']
+            )
+            step2_complete = len(chunks_with_embeddings) > 0 and any(c.get('embedding') is not None for c in chunks_with_embeddings)
+            
+            # Check step 3: Chunk scoring (check if any questions have been scored)
+            step3_complete = self.cache_manager.has_chunk_scoring(file_path, config)
+            
+            # Check step 4: Full analysis (check if any questions have been analyzed)
+            step4_complete = len(self.cache_manager.get_analysis(file_path, config)) > 0
+            
+            return {
+                'chunks': step1_complete,
+                'embeddings': step2_complete,
+                'scoring': step3_complete,
+                'analysis': step4_complete
+            }
+            
+        except Exception as e:
+            logger.error(f"Error checking step completion: {str(e)}")
+            return {
+                'chunks': False,
+                'embeddings': False,
+                'scoring': False,
+                'analysis': False
+            }
+
+    async def process_document_steps(self, file_path: str, selected_questions: List[str], 
+                                   steps: Dict[str, bool], use_llm_scoring: bool = False, 
+                                   single_call: bool = True) -> AsyncGenerator[Dict, None]:
+        """Process document with configurable steps"""
+        try:
+            logger.info(f"[PROCESS] Starting step-by-step processing for {file_path}")
+            logger.info(f"[PROCESS] Selected steps: {steps}")
+            logger.info(f"[PROCESS] Selected questions: {selected_questions}")
+            
+            # Step 1: Create chunks
+            if steps.get('chunks', False):
+                yield {"status": "Step 1: Creating chunks..."}
+                try:
+                    chunks = self.create_chunks_only(file_path)
+                    yield {"step_complete": "chunks", "count": len(chunks)}
+                except Exception as e:
+                    yield {"error": f"Step 1 failed: {str(e)}"}
+                    return
+            
+            # Step 2: Add embeddings
+            if steps.get('embeddings', False):
+                yield {"status": "Step 2: Adding embeddings..."}
+                try:
+                    chunks = self.add_embeddings_to_chunks(file_path)
+                    yield {"step_complete": "embeddings", "count": len(chunks)}
+                except Exception as e:
+                    yield {"error": f"Step 2 failed: {str(e)}"}
+                    return
+            
+            # Step 3: Score chunks
+            if steps.get('scoring', False):
+                yield {"status": "Step 3: Scoring chunks for questions..."}
+                try:
+                    question_scores = await self.score_chunks_for_questions(
+                        file_path, selected_questions, use_llm_scoring, single_call
+                    )
+                    yield {"step_complete": "scoring", "questions": len(question_scores)}
+                except Exception as e:
+                    yield {"error": f"Step 3 failed: {str(e)}"}
+                    return
+            
+            # Step 4: Analyze questions
+            if steps.get('analysis', False):
+                yield {"status": "Step 4: Analyzing questions..."}
+                try:
+                    analyses = await self.analyze_questions_with_scored_chunks(
+                        file_path, selected_questions
+                    )
+                    yield {"step_complete": "analysis", "questions": len(analyses)}
+                    
+                    # Yield individual results for each question
+                    for question_id, result in analyses.items():
+                        question_number = int(question_id.split('_')[1])
+                        yield {
+                            'question_number': question_number,
+                            'question_id': question_id,
+                            'result': result
+                        }
+                        
+                except Exception as e:
+                    yield {"error": f"Step 4 failed: {str(e)}"}
+                    return
+            
+            yield {"status": "All selected steps completed successfully"}
+            
+        except Exception as e:
+            logger.error(f"[PROCESS] Error in step-by-step processing: {str(e)}", exc_info=True)
+            yield {"error": f"Process failed: {str(e)}"}
 
     async def _analyze_chunks(self, question_data: Dict[str, Any], chunks: List[Dict[str, Any]], use_llm_scoring: bool = False) -> Dict[str, Any]:
         """Analyze chunks using LLM to extract evidence and generate answer."""

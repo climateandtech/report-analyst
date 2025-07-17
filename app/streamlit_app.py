@@ -815,65 +815,354 @@ def display_consolidated_results(analyzer, question_set):
             if selected_config:
                 logger.info(f"Getting results for {Path(file_path).name} with config: {selected_config['config']}")
                 
-                # Get cached results
-                cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                    file_path=file_path,
-                    config=selected_config['config']
+                # Check step completion status
+                step_status = analyzer.analyzer.check_step_completion(file_path)
+                
+                # Display step status - vertically aligned
+                st.markdown("**Processing Status:**")
+                
+                # Step 1: Chunks
+                if step_status.get('chunks', False):
+                    st.success("✓ 1. Chunks Generated")
+                else:
+                    st.info("○ 1. Chunks Not Generated")
+                
+                # Step 2: Embeddings
+                if step_status.get('embeddings', False):
+                    st.success("✓ 2. Embeddings Generated")
+                else:
+                    st.info("○ 2. Embeddings Not Generated")
+                
+                # Step 3: Scoring
+                if step_status.get('scoring', False):
+                    st.success("✓ 3. Chunks Scored")
+                else:
+                    st.info("○ 3. Chunks Not Scored")
+                
+                # Step 4: Analysis
+                if step_status.get('analysis', False):
+                    st.success("✓ 4. Questions Answered")
+                else:
+                    st.info("○ 4. Questions Not Answered")
+                
+
+                
+                # Chunk display options
+                st.subheader("Document Chunks")
+                
+                chunk_view_option = st.radio(
+                    "Choose chunk view:",
+                    options=["All Document Chunks", "Chunks by Question"],
+                    help="All Document Chunks: Shows all chunks in the document. Chunks by Question: Shows chunks with embeddings/scoring for each question."
                 )
                 
-                if cached_results:
-                    # Get questions data
-                    questions = analyzer.analyzer.questions
-                    
-                    # Process results into analysis rows
-                    analysis_rows = []
-                    chunks_rows = []
-                    
-                    for question_id, data in cached_results.items():
-                        try:
-                            # Create analysis row
-                            result = data.get('result', {})
-                            analysis_row = {
-                                'Question ID': question_id,
-                                'Question Text': questions[question_id]['text'] if question_id in questions else question_id,
-                                'Analysis': result.get('ANSWER', ''),
-                                'Score': float(result.get('SCORE', 0)),
-                                'Key Evidence': '\n'.join([e.get('text', '') for e in result.get('EVIDENCE', [])]),
-                                'Gaps': '\n'.join(result.get('GAPS', [])),
-                                'Sources': ', '.join(map(str, result.get('SOURCES', [])))
-                            }
-                            analysis_rows.append(analysis_row)
-                            logger.debug(f"Added analysis row for {question_id}: {json.dumps(analysis_row, indent=2)}")
-                            
-                            # Process chunks if available
-                            if 'chunks' in data:
-                                for chunk in data['chunks']:
-                                    chunk_row = {
-                                        'Question ID': question_id,
-                                        'Text': chunk.get('text', ''),
-                                        'Vector Similarity': chunk.get('similarity_score', 0.0),
-                                        'LLM Score': chunk.get('llm_score', 0.0),
-                                        'Is Evidence': chunk.get('is_evidence', False),
-                                        'Position': chunk.get('chunk_order', 0)
-                                    }
-                                    chunks_rows.append(chunk_row)
-                            
-                        except Exception as e:
-                            logger.error(f"Error processing result for question {question_id}: {str(e)}", exc_info=True)
-                            continue
-                    
-                    # Create DataFrames
-                    if analysis_rows:
-                        analysis_df = pd.DataFrame(analysis_rows)
-                        chunks_df = pd.DataFrame(chunks_rows) if chunks_rows else pd.DataFrame()
+                try:
+                    if chunk_view_option == "All Document Chunks":
+                        # Show ALL chunks in the configuration
+                        raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
+                            file_path=file_path,
+                            chunk_size=selected_config['config']['chunk_size'],
+                            chunk_overlap=selected_config['config']['chunk_overlap']
+                        )
                         
-                        # Display results using the existing display function
-                        file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
-                        display_analysis_results(analysis_df, chunks_df, file_key)
+                        if raw_chunks:
+                            chunks_rows = []
+                            for i, chunk in enumerate(raw_chunks):
+                                chunk_row = {
+                                    'Chunk #': i + 1,
+                                    'Text': chunk.get('text', chunk.get('chunk_text', '')),
+                                    'Has Embedding': chunk.get('embedding') is not None,
+                                    'Chunk Size': chunk.get('chunk_size', 'N/A'),
+                                    'Chunk Overlap': chunk.get('chunk_overlap', 'N/A')
+                                }
+                                chunks_rows.append(chunk_row)
+                            
+                            chunks_df = pd.DataFrame(chunks_rows)
+                            st.dataframe(
+                                data=chunks_df,
+                                use_container_width=True,
+                                hide_index=True,
+                                column_config={
+                                    "Chunk #": st.column_config.NumberColumn(
+                                        "Chunk #",
+                                        width="small",
+                                    ),
+                                    "Text": st.column_config.TextColumn(
+                                        "Text",
+                                        width="large",
+                                    ),
+                                    "Has Embedding": st.column_config.CheckboxColumn(
+                                        "Has Embedding",
+                                    ),
+                                    "Chunk Size": st.column_config.NumberColumn(
+                                        "Chunk Size",
+                                        width="small",
+                                    ),
+                                    "Chunk Overlap": st.column_config.NumberColumn(
+                                        "Chunk Overlap",
+                                        width="small",
+                                    )
+                                }
+                            )
+                            
+                            st.info(f"✓ Found {len(chunks_rows)} total document chunks in this configuration.")
+                        else:
+                            st.warning("No chunks found. Run Step 1 to generate document chunks first.")
+                    
+                    else:  # "Chunks by Question"
+                        # Show chunks with embeddings for each question
+                        questions = analyzer.analyzer.questions
+                        chunks_rows = []
+                        questions_with_analysis = set()
+                        
+                        # First, get chunks from analysis results (if step 4 is completed)
+                        if step_status.get('analysis', False):
+                            cached_results = analyzer.analyzer.cache_manager.get_analysis(
+                                file_path=file_path,
+                                config=selected_config['config']
+                            )
+                            
+                            if cached_results:
+                                for question_id, data in cached_results.items():
+                                    if 'chunks' in data:
+                                        questions_with_analysis.add(question_id)
+                                        for chunk in data['chunks']:
+                                            chunk_row = {
+                                                'Question ID': question_id,
+                                                'Text': chunk.get('text', ''),
+                                                'Vector Similarity': chunk.get('similarity_score', 0.0),
+                                                'LLM Score': chunk.get('llm_score', 0.0),
+                                                'Is Evidence': chunk.get('is_evidence', False),
+                                                'Position': chunk.get('chunk_order', 0)
+                                            }
+                                            chunks_rows.append(chunk_row)
+                        
+                        # Then, get chunks from scoring for questions that don't have analysis results
+                        if step_status.get('scoring', False):
+                            for question_id in questions.keys():
+                                # Skip questions that already have analysis results
+                                if question_id not in questions_with_analysis:
+                                    scored_chunks = analyzer.analyzer.cache_manager.get_chunk_scoring_only(
+                                        file_path=file_path,
+                                        question_id=question_id,
+                                        config=selected_config['config']
+                                    )
+                                    for chunk in scored_chunks:
+                                        chunk_row = {
+                                            'Question ID': question_id,
+                                            'Text': chunk.get('text', ''),
+                                            'Vector Similarity': chunk.get('similarity_score', 0.0),
+                                            'LLM Score': chunk.get('llm_score', 0.0),
+                                            'Is Evidence': chunk.get('is_evidence', False),
+                                            'Position': chunk.get('chunk_order', 0)
+                                        }
+                                        chunks_rows.append(chunk_row)
+                        
+                        # Show chunks table if we have any
+                        if chunks_rows:
+                            chunks_df = pd.DataFrame(chunks_rows)
+                            
+                            st.dataframe(
+                                data=chunks_df,
+                                use_container_width=True,
+                                hide_index=True,
+                                column_config={
+                                    "Question ID": st.column_config.TextColumn(
+                                        "Question ID",
+                                        width="small",
+                                    ),
+                                    "Text": st.column_config.TextColumn(
+                                        "Text",
+                                        width="large",
+                                    ),
+                                    "Vector Similarity": st.column_config.NumberColumn(
+                                        "Vector Similarity",
+                                        format="%.4f",
+                                    ),
+                                    "LLM Score": st.column_config.NumberColumn(
+                                        "LLM Score",
+                                        format="%.4f",
+                                    ),
+                                    "Is Evidence": st.column_config.CheckboxColumn(
+                                        "Is Evidence",
+                                    ),
+                                    "Position": st.column_config.NumberColumn(
+                                        "Position",
+                                        width="small",
+                                    )
+                                }
+                            )
+                            
+                            question_ids = set(chunk['Question ID'] for chunk in chunks_rows)
+                            
+                            # Show more detailed status message
+                            if questions_with_analysis:
+                                analysis_msg = f"{len(questions_with_analysis)} questions with analysis"
+                                scoring_msg = f"{len(question_ids) - len(questions_with_analysis)} questions with scoring only" if len(question_ids) > len(questions_with_analysis) else ""
+                                if scoring_msg:
+                                    status_msg = f"✓ Found {len(chunks_rows)} chunks across {len(question_ids)} questions ({analysis_msg}, {scoring_msg})."
+                                else:
+                                    status_msg = f"✓ Found {len(chunks_rows)} chunks across {len(question_ids)} questions ({analysis_msg})."
+                            else:
+                                status_msg = f"✓ Found {len(chunks_rows)} chunks across {len(question_ids)} questions with scoring only."
+                            
+                            st.success(status_msg)
+                        else:
+                            st.info("No chunks with embeddings/scoring found. Run steps 2-4 to see question-specific chunks.")
+                    
+                except Exception as e:
+                    logger.error(f"Error loading chunks: {str(e)}", exc_info=True)
+                    st.error(f"Error loading chunks: {str(e)}")
+                
+                # Show appropriate results based on completed steps
+                if step_status.get('analysis', False):
+                    # Full analysis completed - show analysis results
+                    cached_results = analyzer.analyzer.cache_manager.get_analysis(
+                        file_path=file_path,
+                        config=selected_config['config']
+                    )
+                    
+                    if cached_results:
+                        # Get questions data
+                        questions = analyzer.analyzer.questions
+                        
+                        # Process results into analysis rows
+                        analysis_rows = []
+                        chunks_rows = []
+                        
+                        for question_id, data in cached_results.items():
+                            try:
+                                # Create analysis row
+                                result = data.get('result', {})
+                                analysis_row = {
+                                    'Question ID': question_id,
+                                    'Question Text': questions[question_id]['text'] if question_id in questions else question_id,
+                                    'Analysis': result.get('ANSWER', ''),
+                                    'Score': float(result.get('SCORE', 0)),
+                                    'Key Evidence': '\n'.join([e.get('text', '') for e in result.get('EVIDENCE', [])]),
+                                    'Gaps': '\n'.join(result.get('GAPS', [])),
+                                    'Sources': ', '.join(map(str, result.get('SOURCES', [])))
+                                }
+                                analysis_rows.append(analysis_row)
+                                
+                                # Process chunks if available
+                                if 'chunks' in data:
+                                    for chunk in data['chunks']:
+                                        chunk_row = {
+                                            'Question ID': question_id,
+                                            'Text': chunk.get('text', ''),
+                                            'Vector Similarity': chunk.get('similarity_score', 0.0),
+                                            'LLM Score': chunk.get('llm_score', 0.0),
+                                            'Is Evidence': chunk.get('is_evidence', False),
+                                            'Position': chunk.get('chunk_order', 0)
+                                        }
+                                        chunks_rows.append(chunk_row)
+                                
+                            except Exception as e:
+                                logger.error(f"Error processing result for question {question_id}: {str(e)}", exc_info=True)
+                                continue
+                        
+                        # Create DataFrames and display analysis results only (chunks shown above)
+                        if analysis_rows:
+                            analysis_df = pd.DataFrame(analysis_rows)
+                            
+                            # Show only analysis results table (chunks already shown above)
+                            st.subheader("Analysis Results")
+                            st.dataframe(
+                                data=analysis_df,
+                                use_container_width=True,
+                                hide_index=True,
+                                column_config={
+                                    "Question ID": st.column_config.TextColumn(
+                                        "Question ID",
+                                        width="small",
+                                    ),
+                                    "Analysis": st.column_config.TextColumn(
+                                        "Analysis",
+                                        width="large",
+                                    ),
+                                    "Score": st.column_config.NumberColumn(
+                                        "Score",
+                                        format="%.1f",
+                                    ),
+                                    "Key Evidence": st.column_config.TextColumn(
+                                        "Key Evidence",
+                                        width="medium",
+                                    ),
+                                    "Gaps": st.column_config.TextColumn(
+                                        "Gaps",
+                                        width="medium",
+                                    ),
+                                    "Sources": st.column_config.TextColumn(
+                                        "Sources",
+                                        width="small",
+                                    )
+                                }
+                            )
+                            
+                            # Add download button
+                            file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
+                            st.download_button(
+                                "Download Analysis Results",
+                                analysis_df.to_csv(index=False),
+                                f"analysis_results_{file_key}.csv",
+                                "text/csv",
+                                key=f"download_analysis_{file_key}"
+                            )
+                        else:
+                            st.warning("No analysis results found")
                     else:
-                        st.warning("No results found in cache for this configuration")
+                        st.warning("No cached analysis results found")
+                
+                elif step_status.get('scoring', False):
+                    # Only scoring completed - show scoring results
+                    st.subheader("Chunk Scoring Results")
+                    st.info("Chunk scoring completed but no final analysis yet. Run Step 4 to generate answers.")
+                
+                elif step_status.get('embeddings', False):
+                    # Only embeddings completed - show embeddings status
+                    st.subheader("Embeddings Status")
+                    st.info("Embeddings generated but no scoring or analysis yet. Run Steps 3 and 4 to continue.")
+                    
+                    # Get chunks with embeddings
+                    chunks = analyzer.analyzer.cache_manager.get_document_chunks(
+                        file_path=file_path,
+                        chunk_size=selected_config['config']['chunk_size'],
+                        chunk_overlap=selected_config['config']['chunk_overlap']
+                    )
+                    
+                    if chunks:
+                        chunks_with_embeddings = sum(1 for c in chunks if c.get('embedding') is not None)
+                        st.success(f"✓ {chunks_with_embeddings} chunks with embeddings out of {len(chunks)} total")
+                    else:
+                        st.warning("No chunks found with embeddings")
+                
+                elif step_status.get('chunks', False):
+                    # Only chunks completed - show chunks status
+                    st.subheader("Chunks Status")
+                    st.info("Chunks created but no embeddings yet. Run Steps 2, 3, and 4 to continue.")
+                    
+                    # Get chunks without embeddings
+                    chunks = analyzer.analyzer.cache_manager.get_chunks_without_embeddings(
+                        file_path=file_path,
+                        chunk_size=selected_config['config']['chunk_size'],
+                        chunk_overlap=selected_config['config']['chunk_overlap']
+                    )
+                    
+                    if chunks:
+                        st.success(f"✓ {len(chunks)} chunks created")
+                        
+                        # Show sample chunks
+                        if st.checkbox("Show sample chunks"):
+                            sample_chunks = chunks[:5]  # Show first 5 chunks
+                            for i, chunk in enumerate(sample_chunks):
+                                with st.expander(f"Chunk {i+1} (Length: {len(chunk['text'])} chars)"):
+                                    st.text(chunk['text'])
+                    else:
+                        st.warning("No chunks found")
+                
                 else:
-                    st.warning("No cached results found for this configuration")
+                    st.warning("No processing steps completed for this configuration")
     
     except Exception as e:
         logger.error(f"Error displaying consolidated results: {str(e)}", exc_info=True)
@@ -992,115 +1281,62 @@ def update_analyzer_parameters():
     except Exception as e:
         st.error(f"Error updating parameters: {str(e)}")
 
-async def run_analysis(analyzer, file_path, selected_questions, progress_text):
-    """Run analysis and update the UI with progress"""
+async def run_step_by_step_analysis(analyzer, file_path, selected_questions, steps, progress_text, force_recompute=False):
+    """Run step-by-step analysis and update the UI with progress"""
     try:
-        # Get current configuration
-        config = {
-            'chunk_size': st.session_state.chunk_size,
-            'chunk_overlap': st.session_state.chunk_overlap,
-            'top_k': st.session_state.top_k,
-            'model': st.session_state.llm_model,
-            'question_set': st.session_state.question_set
-        }
-        logger.info(f"[ANALYSIS] User triggered analysis for file: {file_path}")
-        logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
-        if 'questions' in st.session_state:
-            logger.info(f"[ANALYSIS] Selected question texts: {[st.session_state.questions[q]['text'] for q in selected_questions if q in st.session_state.questions]}")
-        logger.info(f"[CACHE] Looking up cache for file: {file_path} with config: {config} and questions: {selected_questions}")
-        # Check if we have cached results first
-        cached_results = analyzer.cache_manager.get_analysis(
+        logger.info(f"[STEP-BY-STEP] Starting analysis for file: {file_path}")
+        logger.info(f"[STEP-BY-STEP] Selected questions: {selected_questions}")
+        logger.info(f"[STEP-BY-STEP] Selected steps: {steps}")
+        
+        # Run the step-by-step process
+        async for result in analyzer.analyzer.process_document_steps(
             file_path=file_path,
-            config=config,
-            question_ids=[f"{config['question_set']}_{q}" for q in selected_questions]
-        )
-        if cached_results and not st.session_state.get('force_recompute', False):
-            logger.info(f"[CACHE] Cache HIT for config: {config}")
-            progress_text.success("Found cached results!")
-            st.session_state.results = cached_results
-            logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
-            logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
-            return
-        else:
-            logger.info(f"[CACHE] Cache MISS for config: {config}")
-        # If no cached results or force recompute, run analysis
-        progress_text.info("Starting analysis...")
-        
-        # Log the LLM scoring setting
-        llm_scoring_enabled = st.session_state.get('new_llm_scoring', False)
-        progress_text.info(f"LLM scoring: {'Enabled' if llm_scoring_enabled else 'Disabled'}")
-        logger.info(f"Starting analysis with LLM scoring: {llm_scoring_enabled}")
-        
-        # Track results
-        all_results = {}
-        
-        # Convert selected_questions from full IDs (e.g., "tcfd_1") to just numbers (e.g., 1)
-        question_numbers = []
-        for q_id in selected_questions:
-            # Extract the number part from the question ID
-            parts = q_id.split('_')
-            if len(parts) > 1:
-                try:
-                    question_numbers.append(int(parts[1]))
-                except ValueError:
-                    progress_text.warning(f"Invalid question ID format: {q_id}")
-            else:
-                progress_text.warning(f"Invalid question ID format: {q_id}")
-        
-        # First update the analyzer's process_document method to use progress_text instead of yielding status
-        async for result in analyzer.process_document(
-            file_path=file_path,
-            selected_questions=question_numbers,  # Pass just the numbers
-            use_llm_scoring=st.session_state.get('new_llm_scoring', False),  # Use the checkbox value directly
-            force_recompute=st.session_state.get('force_recompute', False)
+            selected_questions=selected_questions,
+            steps=steps,
+            use_llm_scoring=st.session_state.get('new_llm_scoring', False),
+            single_call=st.session_state.get('new_batch_scoring', True)
         ):
-            # Handle errors by displaying them but not storing them
+            # Handle errors
             if "error" in result:
                 progress_text.error(f"Error: {result['error']}")
                 continue
                 
-            # Handle status updates by displaying them but not storing them
+            # Handle status updates
             if "status" in result:
                 progress_text.info(result["status"])
                 continue
                 
-            # Process actual analysis results
-            question_id = result.get('question_id')
-            if not question_id:
-                # Try to construct question_id from question_number
-                question_number = result.get('question_number')
-                if question_number:
-                    question_id = f"{st.session_state.question_set}_{question_number}"
-                else:
-                    # Skip results without question_id or question_number
-                    continue
-                    
-            progress_text.info(f"Completed analysis for question {question_id}")
-            
-            # Store only the actual result data
-            result_data = result.get('result', result)
-            all_results[question_id] = result_data
+            # Handle step completion
+            if "step_complete" in result:
+                step_name = result["step_complete"]
+                if step_name == "chunks":
+                    progress_text.success(f"✓ Step 1 Complete: Created {result.get('count', 0)} chunks")
+                elif step_name == "embeddings":
+                    progress_text.success(f"✓ Step 2 Complete: Generated embeddings for {result.get('count', 0)} chunks")
+                elif step_name == "scoring":
+                    progress_text.success(f"✓ Step 3 Complete: Scored chunks for {result.get('questions', 0)} questions")
+                elif step_name == "analysis":
+                    progress_text.success(f"✓ Step 4 Complete: Analyzed {result.get('questions', 0)} questions")
+                continue
+                
+            # Handle individual question results (from step 4)
+            if 'question_number' in result and 'question_id' in result:
+                question_id = result['question_id']
+                progress_text.info(f"Completed analysis for question {question_id}")
+                
+                # Store results in session state
+                if 'results' not in st.session_state:
+                    st.session_state.results = {}
+                if 'answers' not in st.session_state.results:
+                    st.session_state.results['answers'] = {}
+                
+                st.session_state.results['answers'][question_id] = result.get('result', result)
         
-        # After all questions are processed, get the complete results with chunks
-        final_results = analyzer.cache_manager.get_analysis(
-            file_path=file_path,
-            config=config,
-            question_ids=list(all_results.keys())
-        )
-        
-        if not final_results:
-            # If no results from cache, use the ones we just processed
-            final_results = all_results
-            
-        # When writing results to session state
-        logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
-        st.session_state.results = final_results
-        logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
-        progress_text.success("Analysis complete!")
+        progress_text.success("Step-by-step processing complete!")
         
     except Exception as e:
-        progress_text.error(f"Error during analysis: {str(e)}")
-        logger.error(f"Error during analysis: {str(e)}", exc_info=True)
+        progress_text.error(f"Error during step-by-step analysis: {str(e)}")
+        logger.error(f"Error during step-by-step analysis: {str(e)}", exc_info=True)
 
 def main():
     """Main function for the Streamlit app"""
@@ -1183,6 +1419,77 @@ def main():
                 if 'results' in st.session_state:
                     del st.session_state.results
                 st.session_state.last_question_set = selected_set
+            
+            # 4-Step Processing Configuration
+            st.subheader("Step-by-Step Processing")
+            
+            # Check current step completion status
+            current_file = st.session_state.get('current_file')
+            step_status = {'chunks': False, 'embeddings': False, 'scoring': False, 'analysis': False}
+            
+            if current_file and 'analyzer' in st.session_state:
+                try:
+                    step_status = analyzer.analyzer.check_step_completion(current_file)
+                except Exception as e:
+                    logger.warning(f"Error checking step completion: {str(e)}")
+            
+            # 4 checkboxes for steps - vertically aligned on the left
+            st.markdown("**Processing Steps:**")
+            
+            # Step 1: Generate Chunks
+            step1_col1, step1_col2 = st.columns([3, 1])
+            with step1_col1:
+                step1_chunks = st.checkbox(
+                    "1. Generate Chunks", 
+                    value=step_status.get('chunks', False),
+                    key="step1_chunks",
+                    help="Create text chunks from the document"
+                )
+            with step1_col2:
+                if step_status.get('chunks', False):
+                    st.success("✓ Completed")
+            
+            # Step 2: Generate Embeddings
+            step2_col1, step2_col2 = st.columns([3, 1])
+            with step2_col1:
+                step2_embeddings = st.checkbox(
+                    "2. Generate Embeddings", 
+                    value=step_status.get('embeddings', False),
+                    disabled=not step1_chunks,
+                    key="step2_embeddings",
+                    help="Compute vector embeddings for chunks"
+                )
+            with step2_col2:
+                if step_status.get('embeddings', False):
+                    st.success("✓ Completed")
+            
+            # Step 3: Score Chunks
+            step3_col1, step3_col2 = st.columns([3, 1])
+            with step3_col1:
+                step3_scoring = st.checkbox(
+                    "3. Score Chunks", 
+                    value=step_status.get('scoring', False),
+                    disabled=not step2_embeddings,
+                    key="step3_scoring",
+                    help="Score chunks for relevance to questions"
+                )
+            with step3_col2:
+                if step_status.get('scoring', False):
+                    st.success("✓ Completed")
+            
+            # Step 4: Answer Questions
+            step4_col1, step4_col2 = st.columns([3, 1])
+            with step4_col1:
+                step4_analysis = st.checkbox(
+                    "4. Answer Questions", 
+                    value=step_status.get('analysis', False),
+                    disabled=not step3_scoring,
+                    key="step4_analysis",
+                    help="Generate final answers using scored chunks"
+                )
+            with step4_col2:
+                if step_status.get('analysis', False):
+                    st.success("✓ Completed")
             
             # LLM settings
             col1, col2, col3 = st.columns(3)
@@ -1294,19 +1601,64 @@ def main():
                         # Analysis button and results
                         col1, col2 = st.columns([2, 1])
                         with col1:
-                            analyze_clicked = st.button("Analyze Selected Questions", key="analyze_button")
+                            # Determine which steps to run based on checkboxes
+                            steps_to_run = {
+                                'chunks': st.session_state.get('step1_chunks', False),
+                                'embeddings': st.session_state.get('step2_embeddings', False),
+                                'scoring': st.session_state.get('step3_scoring', False),
+                                'analysis': st.session_state.get('step4_analysis', False)
+                            }
+                            
+                            # Only enable button if at least one step is selected
+                            any_steps_selected = any(steps_to_run.values())
+                            
+                            analyze_clicked = st.button(
+                                "Execute Selected Steps", 
+                                key="analyze_button",
+                                disabled=not any_steps_selected
+                            )
                         with col2:
-                            reanalyze_clicked = st.button("🔄 Reanalyze", key="reanalyze_button")
+                            reanalyze_clicked = st.button("🔄 Force Recompute", key="reanalyze_button")
                         
                         if analyze_clicked or reanalyze_clicked:
-                            if not selected_questions:
-                                st.warning("Please select at least one question to analyze.")
+                            if not selected_questions and (steps_to_run['scoring'] or steps_to_run['analysis']):
+                                st.warning("Please select at least one question for scoring/analysis steps.")
                             else:
                                 try:
-                                    # Set force_recompute based on which button was clicked
-                                    st.session_state.force_recompute = reanalyze_clicked
+                                    # Initialize progress display
+                                    progress_text = st.empty()
                                     
-                                    # Get current configuration
+                                    if reanalyze_clicked:
+                                        # Force recompute all selected steps
+                                        progress_text.info("Force recomputing all selected steps...")
+                                        
+                                        # Clear existing data for force recompute
+                                        if 'results' in st.session_state:
+                                            del st.session_state.results
+                                        
+                                        # Run all selected steps
+                                        asyncio.run(run_step_by_step_analysis(
+                                            analyzer,
+                                            file_path=str(file_path),
+                                            selected_questions=selected_questions,
+                                            steps=steps_to_run,
+                                            progress_text=progress_text,
+                                            force_recompute=True
+                                        ))
+                                    else:
+                                        # Normal step-by-step processing
+                                        progress_text.info("Starting step-by-step processing...")
+                                        
+                                        asyncio.run(run_step_by_step_analysis(
+                                            analyzer,
+                                            file_path=str(file_path),
+                                            selected_questions=selected_questions,
+                                            steps=steps_to_run,
+                                            progress_text=progress_text,
+                                            force_recompute=False
+                                        ))
+                                    
+                                    # Get final results and display
                                     config = {
                                         'chunk_size': st.session_state.new_chunk_size,
                                         'chunk_overlap': st.session_state.new_overlap,
@@ -1315,78 +1667,37 @@ def main():
                                         'question_set': st.session_state.new_question_set
                                     }
                                     
-                                    # Initialize progress display
-                                    progress_text = st.empty()
-                                    
-                                    if reanalyze_clicked:
-                                        # For reanalysis, skip cache check and analyze all selected questions
-                                        progress_text.info(f"Reanalyzing {len(selected_questions)} questions...")
-                                        asyncio.run(run_analysis(
-                                            analyzer,
-                                            file_path=str(file_path),
-                                            selected_questions=selected_questions,
-                                            progress_text=progress_text
-                                        ))
-                                    else:
-                                        # For normal analysis, check cache first
-                                        cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                                            file_path=str(file_path),
-                                            config=config,
-                                            question_ids=selected_questions
-                                        )
-                                        
-                                        if cached_results:
-                                            # Process cached results
-                                            for question_id, result in cached_results.items():
-                                                st.session_state.results["answers"][question_id] = result
-                                            
-                                            # Generate file key for display
-                                            file_key = generate_file_key(str(file_path), st)
-                                            
-                                            # Update display
-                                            analysis_df, chunks_df = create_analysis_dataframes(
-                                                st.session_state.results["answers"], 
-                                                file_key
-                                            )
-                                            st.session_state.analysis_df = analysis_df
-                                            st.session_state.chunks_df = chunks_df
-                                            st.session_state.analysis_complete = True
-                                        else:
-                                            # Run analysis for uncached questions
-                                            progress_text.info(f"Processing {len(selected_questions)} questions...")
-                                            
-                                            try:
-                                                # Run analysis for uncached questions
-                                                asyncio.run(analyze_document_and_display(
-                                                    analyzer,
-                                                    file_path=str(file_path),  # Use the actual file path
-                                                    questions=questions,
-                                                    selected_questions=selected_questions,
-                                                    use_llm_scoring=st.session_state.new_llm_scoring,
-                                                    single_call=st.session_state.new_batch_scoring
-                                                ))
-                                                
-                                                progress_text.success("Analysis complete!")
-                                                
-                                            except Exception as e:
-                                                st.error(f"Error during analysis: {str(e)}")
-                                                st.exception(e)
-                                        
-                                        # Get final results
+                                    # Display results based on completed steps
+                                    if steps_to_run['analysis']:
+                                        # Full analysis completed - show analysis results
                                         all_results = analyzer.analyzer.cache_manager.get_analysis(
                                             file_path=str(file_path),
                                             config=config,
                                             question_ids=selected_questions
                                         )
                                         
-                                        # Process all results into dataframes
                                         if all_results:
                                             analysis_df, chunks_df = create_analysis_dataframes(all_results)
                                             file_key = Path(file_path).stem
                                             display_analysis_results(analysis_df, chunks_df, file_key)
                                             progress_text.success(f"✓ Analysis complete for {len(selected_questions)} questions")
                                         else:
-                                            progress_text.error("No results found after analysis")
+                                            progress_text.warning("No analysis results found")
+                                    
+                                    elif steps_to_run['scoring']:
+                                        # Scoring completed - show scoring results
+                                        progress_text.success("✓ Chunk scoring completed")
+                                        st.info("Chunk scoring completed. Select 'Answer Questions' to generate final answers.")
+                                    
+                                    elif steps_to_run['embeddings']:
+                                        # Embeddings completed - show embeddings status
+                                        progress_text.success("✓ Embeddings generated")
+                                        st.info("Embeddings generated. Select 'Score Chunks' to score chunks for questions.")
+                                    
+                                    elif steps_to_run['chunks']:
+                                        # Chunks completed - show chunks status
+                                        progress_text.success("✓ Chunks created")
+                                        st.info("Chunks created. Select 'Generate Embeddings' to compute vector embeddings.")
                                         
                                 except Exception as e:
                                     logger.error(f"Error during analysis: {str(e)}", exc_info=True)
@@ -1411,8 +1722,132 @@ def main():
                         del st.session_state.results
                     logger.info(f"[UPLOAD] Added file to session state: {uploaded_file.name}")
                     st.success(f"File uploaded successfully: {uploaded_file.name}")
-                    logger.info(f"[UPLOAD] Displaying cache selector for file: {file_path}")
+                    
+                    # Load questions for the uploaded file
+                    question_set_data = analyzer.load_question_set(st.session_state.new_question_set)
+                    questions = question_set_data["questions"]
+                    
+                    if question_set_data["description"]:
+                        st.write(question_set_data["description"])
+                    
+                    # Add cache selector
                     display_cache_selector(file_path)
+                    
+                    # Add question selection UI
+                    st.subheader("Select Questions")
+                    selected_questions = []
+                    for q_id, q_data in questions.items():
+                        if st.checkbox(
+                            f"{q_id}: {q_data['text']}", 
+                            key=f"upload_question_{q_id}"
+                        ):
+                            selected_questions.append(q_id)
+                    
+                    # Step-by-step analysis buttons
+                    col1, col2 = st.columns([2, 1])
+                    with col1:
+                        # Determine which steps to run based on checkboxes
+                        steps_to_run = {
+                            'chunks': st.session_state.get('step1_chunks', False),
+                            'embeddings': st.session_state.get('step2_embeddings', False),
+                            'scoring': st.session_state.get('step3_scoring', False),
+                            'analysis': st.session_state.get('step4_analysis', False)
+                        }
+                        
+                        # Only enable button if at least one step is selected
+                        any_steps_selected = any(steps_to_run.values())
+                        
+                        analyze_clicked = st.button(
+                            "Execute Selected Steps", 
+                            key="upload_analyze_button",
+                            disabled=not any_steps_selected
+                        )
+                    with col2:
+                        reanalyze_clicked = st.button("🔄 Force Recompute", key="upload_reanalyze_button")
+                    
+                    if analyze_clicked or reanalyze_clicked:
+                        if not selected_questions and (steps_to_run['scoring'] or steps_to_run['analysis']):
+                            st.warning("Please select at least one question for scoring/analysis steps.")
+                        else:
+                            try:
+                                # Initialize progress display
+                                progress_text = st.empty()
+                                
+                                if reanalyze_clicked:
+                                    # Force recompute all selected steps
+                                    progress_text.info("Force recomputing all selected steps...")
+                                    
+                                    # Clear existing data for force recompute
+                                    if 'results' in st.session_state:
+                                        del st.session_state.results
+                                    
+                                    # Run all selected steps
+                                    asyncio.run(run_step_by_step_analysis(
+                                        analyzer,
+                                        file_path=str(file_path),
+                                        selected_questions=selected_questions,
+                                        steps=steps_to_run,
+                                        progress_text=progress_text,
+                                        force_recompute=True
+                                    ))
+                                else:
+                                    # Normal step-by-step processing
+                                    progress_text.info("Starting step-by-step processing...")
+                                    
+                                    asyncio.run(run_step_by_step_analysis(
+                                        analyzer,
+                                        file_path=str(file_path),
+                                        selected_questions=selected_questions,
+                                        steps=steps_to_run,
+                                        progress_text=progress_text,
+                                        force_recompute=False
+                                    ))
+                                
+                                # Get final results and display
+                                config = {
+                                    'chunk_size': st.session_state.new_chunk_size,
+                                    'chunk_overlap': st.session_state.new_overlap,
+                                    'top_k': st.session_state.new_top_k,
+                                    'model': st.session_state.new_llm_model,
+                                    'question_set': st.session_state.new_question_set
+                                }
+                                
+                                # Display results based on completed steps
+                                if steps_to_run['analysis']:
+                                    # Full analysis completed - show analysis results
+                                    all_results = analyzer.analyzer.cache_manager.get_analysis(
+                                        file_path=str(file_path),
+                                        config=config,
+                                        question_ids=selected_questions
+                                    )
+                                    
+                                    if all_results:
+                                        analysis_df, chunks_df = create_analysis_dataframes(all_results)
+                                        file_key = Path(file_path).stem
+                                        display_analysis_results(analysis_df, chunks_df, file_key)
+                                        progress_text.success(f"✓ Analysis complete for {len(selected_questions)} questions")
+                                    else:
+                                        progress_text.warning("No analysis results found")
+                                
+                                elif steps_to_run['scoring']:
+                                    # Scoring completed - show scoring results
+                                    progress_text.success("✓ Chunk scoring completed")
+                                    st.info("Chunk scoring completed. Select 'Answer Questions' to generate final answers.")
+                                
+                                elif steps_to_run['embeddings']:
+                                    # Embeddings completed - show embeddings status
+                                    progress_text.success("✓ Embeddings generated")
+                                    st.info("Embeddings generated. Select 'Score Chunks' to score chunks for questions.")
+                                
+                                elif steps_to_run['chunks']:
+                                    # Chunks completed - show chunks status
+                                    progress_text.success("✓ Chunks created")
+                                    st.info("Chunks created. Select 'Generate Embeddings' to compute vector embeddings.")
+                                    
+                            except Exception as e:
+                                logger.error(f"Error during analysis: {str(e)}", exc_info=True)
+                                st.error(f"Error during analysis: {str(e)}")
+                    
                     if not st.session_state.get('file_processed'):
                         st.session_state.file_processed = True
                         st.rerun()

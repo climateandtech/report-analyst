@@ -769,4 +769,253 @@ class CacheManager:
                 
         except Exception as e:
             logger.error(f"Error getting document chunks: {str(e)}", exc_info=True)
-            return [] 
+            return []
+
+    # New methods for step-by-step processing
+    def save_chunks_without_embeddings(self, file_path: str, chunks: List[Dict], chunk_size: int, chunk_overlap: int) -> None:
+        """Save chunks without embeddings to document_chunks table with embedding=NULL"""
+        try:
+            logger.info(f"Saving {len(chunks)} chunks without embeddings for {file_path}")
+            logger.info(f"Chunk parameters: size={chunk_size}, overlap={chunk_overlap}")
+            
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("BEGIN TRANSACTION")
+                timestamp = datetime.now().isoformat()
+                
+                for i, chunk in enumerate(chunks):
+                    logger.debug(f"Processing chunk {i+1}/{len(chunks)}")
+                    
+                    metadata_json = json.dumps(chunk.get('metadata', {}))
+                    
+                    cursor = conn.execute("""
+                        INSERT OR REPLACE INTO document_chunks
+                        (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                        VALUES (?, ?, ?, ?, NULL, ?, ?)
+                    """, (
+                        str(file_path),
+                        chunk['text'],
+                        chunk_size,
+                        chunk_overlap,
+                        metadata_json,
+                        timestamp
+                    ))
+                    
+                    logger.debug(f"Inserted chunk with ID: {cursor.lastrowid}")
+                
+                conn.execute("COMMIT")
+                logger.info(f"Successfully saved {len(chunks)} chunks without embeddings")
+                
+        except Exception as e:
+            logger.error(f"Error saving chunks without embeddings: {str(e)}", exc_info=True)
+            raise
+
+    def get_chunks_without_embeddings(self, file_path: str, chunk_size: int = None, chunk_overlap: int = None) -> List[Dict]:
+        """Get chunks without embeddings (where embedding IS NULL)"""
+        try:
+            logger.info(f"Retrieving chunks without embeddings for {file_path}")
+            logger.info(f"Filters: chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
+            
+            with sqlite3.connect(self.db_path) as conn:
+                query = """
+                    SELECT id, chunk_text, metadata, chunk_size, chunk_overlap
+                    FROM document_chunks
+                    WHERE file_path = ? AND embedding IS NULL
+                """
+                params = [str(file_path)]
+                
+                if chunk_size is not None:
+                    query += " AND chunk_size = ?"
+                    params.append(chunk_size)
+                    
+                if chunk_overlap is not None:
+                    query += " AND chunk_overlap = ?"
+                    params.append(chunk_overlap)
+                    
+                logger.debug(f"Executing query: {query}")
+                logger.debug(f"Query parameters: {params}")
+                
+                cursor = conn.execute(query, params)
+                rows = cursor.fetchall()
+                
+                chunks = []
+                for row in rows:
+                    chunk_id, chunk_text, metadata_json, chunk_size, chunk_overlap = row
+                    
+                    # Parse metadata JSON
+                    metadata = {}
+                    if metadata_json:
+                        metadata = json.loads(metadata_json)
+                    
+                    chunks.append({
+                        'id': chunk_id,
+                        'text': chunk_text,
+                        'embedding': None,
+                        'metadata': metadata,
+                        'chunk_size': chunk_size,
+                        'chunk_overlap': chunk_overlap
+                    })
+                    
+                logger.info(f"Retrieved {len(chunks)} chunks without embeddings")
+                return chunks
+                
+        except Exception as e:
+            logger.error(f"Error getting chunks without embeddings: {str(e)}", exc_info=True)
+            return []
+
+    def save_chunk_scoring_only(self, file_path: str, question_id: str, chunk_scores: List[Dict], config: Dict) -> None:
+        """Save chunk scoring results without full analysis"""
+        try:
+            logger.info(f"Saving chunk scoring for {question_id} with {len(chunk_scores)} chunks")
+            
+            with sqlite3.connect(self.db_path) as conn:
+                # First, ensure question exists in questions table
+                question_set = question_id.split('_')[0]
+                cursor = conn.execute("""
+                    SELECT id FROM questions 
+                    WHERE question_id = ? AND question_set = ?
+                """, (question_id, question_set))
+                row = cursor.fetchone()
+                
+                if row:
+                    question_db_id = row[0]
+                else:
+                    # Insert question if it doesn't exist
+                    cursor = conn.execute("""
+                        INSERT INTO questions (question_id, question_set, question_text, guidelines)
+                        VALUES (?, ?, ?, ?)
+                        RETURNING id
+                    """, (question_id, question_set, f"Question {question_id}", ""))
+                    question_db_id = cursor.fetchone()[0]
+                
+                # Create a dummy question_analysis entry for scoring
+                cursor = conn.execute("""
+                    INSERT OR REPLACE INTO question_analysis
+                    (file_path, question_id, model, top_k, analysis_result, version, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id
+                """, (
+                    str(file_path),
+                    question_db_id,
+                    config['model'],
+                    config['top_k'],
+                    json.dumps({"status": "scoring_only", "timestamp": datetime.now().isoformat()}),
+                    1,
+                    datetime.now().isoformat()
+                ))
+                analysis_id = cursor.fetchone()[0]
+                
+                # Save chunk scores
+                for chunk in chunk_scores:
+                    # Get chunk ID from document_chunks table
+                    cursor = conn.execute("""
+                        SELECT id FROM document_chunks 
+                        WHERE file_path = ? AND chunk_text = ?
+                    """, (str(file_path), chunk['text']))
+                    row = cursor.fetchone()
+                    
+                    if row:
+                        chunk_id = row[0]
+                        
+                        # Save chunk relevance
+                        conn.execute("""
+                            INSERT OR REPLACE INTO chunk_relevance
+                            (question_analysis_id, document_chunk_id, chunk_order, similarity_score, llm_score, is_evidence, evidence_order, metadata)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            analysis_id,
+                            chunk_id,
+                            chunk.get('chunk_order', 0),
+                            chunk.get('similarity_score', chunk.get('score', 0.0)),
+                            chunk.get('llm_score'),
+                            False,  # Not evidence yet, just scoring
+                            None,
+                            json.dumps(chunk.get('metadata', {}))
+                        ))
+                
+                logger.info(f"Successfully saved chunk scoring for {question_id}")
+                
+        except Exception as e:
+            logger.error(f"Error saving chunk scoring: {str(e)}", exc_info=True)
+            raise
+
+    def get_chunk_scoring_only(self, file_path: str, question_id: str, config: Dict) -> List[Dict]:
+        """Get chunk scoring results without full analysis"""
+        try:
+            logger.info(f"Retrieving chunk scoring for {question_id}")
+            
+            with sqlite3.connect(self.db_path) as conn:
+                # Get chunk scoring data
+                query = """
+                    SELECT 
+                        dc.id as chunk_id,
+                        dc.chunk_text,
+                        dc.metadata as chunk_metadata,
+                        cr.chunk_order,
+                        cr.similarity_score,
+                        cr.llm_score,
+                        cr.is_evidence,
+                        cr.evidence_order,
+                        cr.metadata as relevance_metadata
+                    FROM questions q
+                    JOIN question_analysis qa ON qa.question_id = q.id
+                    JOIN chunk_relevance cr ON cr.question_analysis_id = qa.id
+                    JOIN document_chunks dc ON cr.document_chunk_id = dc.id
+                    WHERE q.question_id = ? AND qa.file_path = ?
+                    AND qa.model = ? AND qa.top_k = ?
+                    ORDER BY cr.chunk_order
+                """
+                
+                cursor = conn.execute(query, (
+                    question_id,
+                    str(file_path),
+                    config['model'],
+                    config['top_k']
+                ))
+                rows = cursor.fetchall()
+                
+                chunks = []
+                for row in rows:
+                    chunk_id, chunk_text, chunk_metadata, chunk_order, similarity_score, llm_score, is_evidence, evidence_order, relevance_metadata = row
+                    
+                    chunk_info = {
+                        'id': chunk_id,
+                        'text': chunk_text,
+                        'metadata': json.loads(chunk_metadata) if chunk_metadata else {},
+                        'chunk_order': chunk_order,
+                        'similarity_score': similarity_score,
+                        'llm_score': llm_score,
+                        'is_evidence': is_evidence,
+                        'evidence_order': evidence_order,
+                        'relevance_metadata': json.loads(relevance_metadata) if relevance_metadata else {}
+                    }
+                    chunks.append(chunk_info)
+                
+                logger.info(f"Retrieved {len(chunks)} scored chunks for {question_id}")
+                return chunks
+                
+        except Exception as e:
+            logger.error(f"Error getting chunk scoring: {str(e)}", exc_info=True)
+            return []
+
+    def has_chunk_scoring(self, file_path: str, config: Dict) -> bool:
+        """Check if any questions have been scored for this file/config"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute("""
+                    SELECT COUNT(DISTINCT q.question_id)
+                    FROM questions q
+                    JOIN question_analysis qa ON qa.question_id = q.id
+                    JOIN chunk_relevance cr ON cr.question_analysis_id = qa.id
+                    WHERE qa.file_path = ? AND qa.model = ? AND qa.top_k = ?
+                """, (
+                    str(file_path),
+                    config['model'],
+                    config['top_k']
+                ))
+                
+                count = cursor.fetchone()[0]
+                return count > 0
+                
+        except Exception as e:
+            logger.error(f"Error checking chunk scoring: {str(e)}")
+            return False 
