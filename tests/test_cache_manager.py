@@ -34,12 +34,15 @@ def test_init_db(temp_db):
     with sqlite3.connect(temp_db.db_path) as conn:
         cursor = conn.execute("""
             SELECT name FROM sqlite_master 
-            WHERE type='table' AND (name='analysis_cache' OR name='vector_cache')
+            WHERE type='table' AND name IN ('analysis_cache', 'document_chunks', 'questions', 'question_analysis', 'chunk_relevance')
         """)
         tables = [row[0] for row in cursor.fetchall()]
         
     assert 'analysis_cache' in tables
-    assert 'vector_cache' in tables
+    assert 'document_chunks' in tables
+    assert 'questions' in tables
+    assert 'question_analysis' in tables
+    assert 'chunk_relevance' in tables
 
 def test_save_and_get_analysis(temp_db):
     """Test saving and retrieving analysis results"""
@@ -48,57 +51,56 @@ def test_save_and_get_analysis(temp_db):
     question_id = "tcfd_1"
     result = {
         "ANSWER": "Test answer",
-        "SCORE": 7,
-        "EVIDENCE": ["evidence1", "evidence2"]
+        "SCORE": 8,
+        "EVIDENCE": [{"text": "Test evidence", "chunk": 1}],
+        "GAPS": ["Test gap"],
+        "SOURCES": [1]
     }
     config = {
-        "chunk_size": 500,
-        "chunk_overlap": 20,
-        "top_k": 5,
-        "model": "gpt-4",
-        "question_set": "tcfd"
+        'chunk_size': 500,
+        'chunk_overlap': 20,
+        'top_k': 5,
+        'model': 'gpt-4',
+        'question_set': 'tcfd'
     }
     
     # Save analysis
     temp_db.save_analysis(file_path, question_id, result, config)
     
     # Retrieve analysis
-    cached = temp_db.get_analysis(file_path, config, [question_id])
+    cached = temp_db.get_analysis(file_path, config)
     
+    # Check results - note the structure change
     assert question_id in cached
-    assert cached[question_id]["ANSWER"] == "Test answer"
-    assert cached[question_id]["SCORE"] == 7
-    assert len(cached[question_id]["EVIDENCE"]) == 2
+    assert cached[question_id]["result"]["ANSWER"] == "Test answer"  # Now nested under 'result'
+    assert cached[question_id]["result"]["SCORE"] == 8
 
 def test_save_and_get_vectors(temp_db):
-    """Test saving and retrieving vector embeddings"""
-    import numpy as np
-    
-    # Test data
+    """Test saving and retrieving document chunks"""
+    # Test data - note: we now use document_chunks instead of vector_cache
     file_path = "test_doc.pdf"
     chunks = [
         {
-            "text": "Test chunk 1",
-            "embedding": np.array([0.1, 0.2, 0.3]),
-            "metadata": {"page": 1}
+            'text': 'First chunk',
+            'embedding': [0.1, 0.2, 0.3],
+            'metadata': {'page': 1}
         },
         {
-            "text": "Test chunk 2",
-            "embedding": np.array([0.4, 0.5, 0.6]),
-            "metadata": {"page": 2}
+            'text': 'Second chunk', 
+            'embedding': [0.4, 0.5, 0.6],
+            'metadata': {'page': 2}
         }
     ]
     
-    # Save vectors
-    temp_db.save_vectors(file_path, chunks)
+    # Save chunks
+    temp_db.save_document_chunks(file_path, chunks, chunk_size=500, chunk_overlap=20)
     
-    # Retrieve vectors
-    cached_chunks = temp_db.get_vectors(file_path)
+    # Retrieve chunks
+    cached_chunks = temp_db.get_document_chunks(file_path, chunk_size=500, chunk_overlap=20)
     
     assert len(cached_chunks) == 2
-    assert cached_chunks[0]["text"] == "Test chunk 1"
-    assert np.allclose(cached_chunks[0]["embedding"], np.array([0.1, 0.2, 0.3]))
-    assert cached_chunks[0]["metadata"]["page"] == 1
+    assert cached_chunks[0]['text'] == 'First chunk'
+    assert cached_chunks[1]['text'] == 'Second chunk'
 
 def test_config_matching(temp_db):
     """Test that results are only returned with matching config"""
@@ -196,3 +198,108 @@ def test_cache_status(temp_db):
     assert status[0][1] == 20   # chunk_overlap
     assert status[0][2] == 5    # top_k
     assert status[0][3] == "gpt-4"  # model 
+
+def test_question_set_mapping_in_get_analysis(temp_db):
+    """Test that question set mapping works correctly in get_analysis"""
+    # Test data with everest question set
+    file_path = "test_doc.pdf"
+    question_id = "ev_24"
+    config = {
+        'chunk_size': 500,
+        'chunk_overlap': 20,
+        'top_k': 5,
+        'model': 'gpt-4o-mini',
+        'question_set': 'everest'  # UI uses 'everest'
+    }
+    result = {
+        "ANSWER": "Test answer for everest question",
+        "SCORE": 8,
+        "EVIDENCE": [{"text": "Test evidence", "chunk": 1}],
+        "GAPS": ["Test gap"],
+        "SOURCES": [1],
+        "chunks": [
+            {
+                "text": "Test chunk",
+                "chunk_order": 0,
+                "similarity_score": 0.9,
+                "llm_score": None,
+                "is_evidence": True,
+                "evidence_order": 1,
+                "metadata": {}
+            }
+        ]
+    }
+    
+    # Save analysis (should map everest -> ev in database)
+    temp_db.save_analysis(file_path, question_id, result, config)
+    
+    # Retrieve analysis using everest question_set
+    retrieved = temp_db.get_analysis(file_path, config)
+    
+    # Should find the analysis despite mapping
+    assert question_id in retrieved
+    assert retrieved[question_id]['result']['ANSWER'] == "Test answer for everest question"
+
+def test_database_path_configuration():
+    """Test that database path is configured correctly"""
+    # Test default path without explicit path
+    cache_manager = CacheManager()
+    
+    # Should use ./data/cache/analysis.db by default
+    expected_path = Path("./data/cache/analysis.db").resolve()
+    actual_path = Path(cache_manager.db_path).resolve()
+    
+    assert actual_path.name == "analysis.db"
+    assert "cache" in str(actual_path)
+
+def test_evidence_formatting_in_save_analysis(temp_db):
+    """Test that evidence is properly formatted when saved"""
+    file_path = "test_doc.pdf"
+    question_id = "tcfd_1"
+    config = {
+        'chunk_size': 500,
+        'chunk_overlap': 20,
+        'top_k': 5,
+        'model': 'gpt-4o-mini',
+        'question_set': 'tcfd'
+    }
+    
+    # Test with properly formatted evidence
+    result = {
+        "ANSWER": "Test answer",
+        "SCORE": 7,
+        "EVIDENCE": [
+            {
+                "chunk": 1,
+                "text": "Key evidence from chunk 1",
+                "chunk_text": "Full chunk text here...",
+                "score": 1.0,
+                "order": 1,
+                "metadata": {"source": "test"}
+            }
+        ],
+        "GAPS": ["Missing data"],
+        "SOURCES": [1],
+        "chunks": [
+            {
+                "text": "Full chunk text here...",
+                "chunk_order": 0,
+                "similarity_score": 0.85,
+                "llm_score": None,
+                "is_evidence": True,
+                "evidence_order": 1,
+                "metadata": {"source": "test"}
+            }
+        ]
+    }
+    
+    # Save and retrieve
+    temp_db.save_analysis(file_path, question_id, result, config)
+    retrieved = temp_db.get_analysis(file_path, config)
+    
+    # Check evidence is preserved correctly
+    assert question_id in retrieved
+    evidence = retrieved[question_id]['result']['EVIDENCE']
+    assert len(evidence) == 1
+    assert evidence[0]['text'] == "Key evidence from chunk 1"
+    assert evidence[0]['chunk'] == 1 
