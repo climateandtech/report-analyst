@@ -780,7 +780,7 @@ def display_consolidated_results(analyzer, question_set):
                         'chunk_overlap': chunk_overlap,
                         'top_k': top_k,
                         'model': model,
-                        'question_set': qs
+                        'question_set': question_set  # Use the UI question set name, not database identifier
                     })
         
         if not file_configs:
@@ -814,6 +814,10 @@ def display_consolidated_results(analyzer, question_set):
             
             if selected_config:
                 logger.info(f"Getting results for {Path(file_path).name} with config: {selected_config['config']}")
+                
+                # Make sure analyzer is using the correct question set BEFORE checking step completion
+                if analyzer.analyzer.question_set != question_set:
+                    analyzer.analyzer.update_question_set(question_set)
                 
                 # Check step completion status
                 step_status = analyzer.analyzer.check_step_completion(file_path)
@@ -866,23 +870,152 @@ def display_consolidated_results(analyzer, question_set):
                         )
                         
                         if raw_chunks:
-                            chunks_rows = []
-                            for i, chunk in enumerate(raw_chunks):
-                                chunk_row = {
-                                    'Chunk #': i + 1,
-                                    'Text': chunk.get('text', chunk.get('chunk_text', '')),
-                                    'Has Embedding': chunk.get('embedding') is not None,
-                                    'Chunk Size': chunk.get('chunk_size', 'N/A'),
-                                    'Chunk Overlap': chunk.get('chunk_overlap', 'N/A')
-                                }
-                                chunks_rows.append(chunk_row)
+                            # Add similarity search controls
+                            st.subheader("Similarity Search")
                             
+                            # Get questions for the current question set
+                            # Make sure analyzer is using the correct question set
+                            if analyzer.analyzer.question_set != question_set:
+                                analyzer.analyzer.update_question_set(question_set)
+                            questions = analyzer.analyzer.questions
+                            
+                            col1, col2 = st.columns([1, 1])
+                            with col1:
+                                # Question dropdown with shorter, cleaner options
+                                question_options = ["None"] + [f"{q_id}" for q_id in questions.keys()]
+                                selected_question_id = st.selectbox(
+                                    "Select a question to sort by similarity:",
+                                    options=question_options,
+                                    key="chunk_similarity_question",
+                                    help="Choose a question from the current question set"
+                                )
+                                
+                                # Show selected question text below dropdown
+                                if selected_question_id != "None" and selected_question_id in questions:
+                                    st.caption(f"**{selected_question_id}:** {questions[selected_question_id]['text'][:100]}...")
+                                selected_question = selected_question_id
+                            
+                            with col2:
+                                # Free text input
+                                custom_question = st.text_input(
+                                    "Or enter custom question:",
+                                    placeholder="Enter your own question to compare chunks against...",
+                                    key="chunk_similarity_custom"
+                                )
+                            
+                            # Determine which question to use
+                            query_text = None
+                            if custom_question.strip():
+                                query_text = custom_question.strip()
+                                st.info(f"Using custom question: {query_text[:100]}...")
+                            elif selected_question != "None":
+                                if selected_question in questions:
+                                    query_text = questions[selected_question]['text']
+                                    st.info(f"Using question {selected_question}: {query_text[:100]}...")
+                            
+                            # Process chunks
+                            chunks_rows = []
+                            chunks_with_embeddings = [c for c in raw_chunks if c.get('embedding') is not None]
+                            
+                            if query_text and chunks_with_embeddings:
+                                # Compute similarity scores
+                                try:
+                                    # Get query embedding
+                                    query_embedding = analyzer.analyzer.embeddings.get_text_embedding(query_text)
+                                    query_embedding = np.array(query_embedding, dtype=np.float32)
+                                    
+                                    # Compute similarity for each chunk
+                                    similarities = []
+                                    for chunk in raw_chunks:
+                                        if chunk.get('embedding') is not None:
+                                            chunk_embedding = np.frombuffer(chunk['embedding'], dtype=np.float32)
+                                            # Compute cosine similarity
+                                            similarity = np.dot(query_embedding, chunk_embedding) / (
+                                                np.linalg.norm(query_embedding) * np.linalg.norm(chunk_embedding)
+                                            )
+                                            similarities.append(similarity)
+                                        else:
+                                            similarities.append(0.0)
+                                    
+                                    # Sort chunks by similarity
+                                    chunk_similarity_pairs = list(zip(raw_chunks, similarities))
+                                    chunk_similarity_pairs.sort(key=lambda x: x[1], reverse=True)
+                                    
+                                    # Create rows with similarity scores
+                                    for i, (chunk, similarity) in enumerate(chunk_similarity_pairs):
+                                        chunk_row = {
+                                            'Rank': i + 1,
+                                            'Similarity': similarity,
+                                            'Text': chunk.get('text', chunk.get('chunk_text', '')),
+                                            'Has Embedding': chunk.get('embedding') is not None,
+                                            'Chunk Size': chunk.get('chunk_size', 'N/A'),
+                                            'Chunk Overlap': chunk.get('chunk_overlap', 'N/A')
+                                        }
+                                        chunks_rows.append(chunk_row)
+                                    
+                                    st.success(f"✓ Sorted {len(chunks_rows)} chunks by similarity to query")
+                                    
+                                except Exception as e:
+                                    st.error(f"Error computing similarity: {str(e)}")
+                                    # Fall back to original display
+                                    for i, chunk in enumerate(raw_chunks):
+                                        chunk_row = {
+                                            'Chunk #': i + 1,
+                                            'Text': chunk.get('text', chunk.get('chunk_text', '')),
+                                            'Has Embedding': chunk.get('embedding') is not None,
+                                            'Chunk Size': chunk.get('chunk_size', 'N/A'),
+                                            'Chunk Overlap': chunk.get('chunk_overlap', 'N/A')
+                                        }
+                                        chunks_rows.append(chunk_row)
+                            
+                            else:
+                                # No query or no embeddings - show original order
+                                for i, chunk in enumerate(raw_chunks):
+                                    chunk_row = {
+                                        'Chunk #': i + 1,
+                                        'Text': chunk.get('text', chunk.get('chunk_text', '')),
+                                        'Has Embedding': chunk.get('embedding') is not None,
+                                        'Chunk Size': chunk.get('chunk_size', 'N/A'),
+                                        'Chunk Overlap': chunk.get('chunk_overlap', 'N/A')
+                                    }
+                                    chunks_rows.append(chunk_row)
+                                
+                                if query_text and not chunks_with_embeddings:
+                                    st.warning("No chunks with embeddings found. Run Step 2 to generate embeddings for similarity search.")
+                            
+                            # Display chunks
                             chunks_df = pd.DataFrame(chunks_rows)
-                            st.dataframe(
-                                data=chunks_df,
-                                use_container_width=True,
-                                hide_index=True,
-                                column_config={
+                            
+                            # Configure columns based on whether we have similarity scores
+                            if query_text and chunks_with_embeddings:
+                                column_config = {
+                                    "Rank": st.column_config.NumberColumn(
+                                        "Rank",
+                                        width="small",
+                                    ),
+                                    "Similarity": st.column_config.NumberColumn(
+                                        "Similarity",
+                                        format="%.4f",
+                                        width="small",
+                                    ),
+                                    "Text": st.column_config.TextColumn(
+                                        "Text",
+                                        width="large",
+                                    ),
+                                    "Has Embedding": st.column_config.CheckboxColumn(
+                                        "Has Embedding",
+                                    ),
+                                    "Chunk Size": st.column_config.NumberColumn(
+                                        "Chunk Size",
+                                        width="small",
+                                    ),
+                                    "Chunk Overlap": st.column_config.NumberColumn(
+                                        "Chunk Overlap",
+                                        width="small",
+                                    )
+                                }
+                            else:
+                                column_config = {
                                     "Chunk #": st.column_config.NumberColumn(
                                         "Chunk #",
                                         width="small",
@@ -903,6 +1036,12 @@ def display_consolidated_results(analyzer, question_set):
                                         width="small",
                                     )
                                 }
+                            
+                            st.dataframe(
+                                data=chunks_df,
+                                use_container_width=True,
+                                hide_index=True,
+                                column_config=column_config
                             )
                             
                             st.info(f"✓ Found {len(chunks_rows)} total document chunks in this configuration.")
@@ -911,6 +1050,9 @@ def display_consolidated_results(analyzer, question_set):
                     
                     else:  # "Chunks by Question"
                         # Show chunks with embeddings for each question
+                        # Make sure analyzer is using the correct question set
+                        if analyzer.analyzer.question_set != question_set:
+                            analyzer.analyzer.update_question_set(question_set)
                         questions = analyzer.analyzer.questions
                         chunks_rows = []
                         questions_with_analysis = set()
@@ -1024,6 +1166,9 @@ def display_consolidated_results(analyzer, question_set):
                     
                     if cached_results:
                         # Get questions data
+                        # Make sure analyzer is using the correct question set
+                        if analyzer.analyzer.question_set != question_set:
+                            analyzer.analyzer.update_question_set(question_set)
                         questions = analyzer.analyzer.questions
                         
                         # Process results into analysis rows

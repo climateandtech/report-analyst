@@ -16,7 +16,7 @@ class CacheManager:
     def __init__(self, db_path: str = None):
         if db_path is None:
             # Use the project's storage path
-            storage_path = os.getenv('STORAGE_PATH', './storage')
+            storage_path = os.getenv('STORAGE_PATH', './data')
             db_path = str(Path(storage_path) / 'cache' / 'analysis.db')
         
         self.db_path = Path(db_path)
@@ -311,7 +311,7 @@ class CacheManager:
                     config['chunk_overlap'],
                     config['top_k'],
                     config['model'],
-                    config['question_set'],
+                    question_set,  # Use the extracted question_set (e.g., 'ev') not config['question_set'] (e.g., 'everest')
                     json.dumps(result),
                     datetime.now().isoformat()
                 ))
@@ -344,6 +344,15 @@ class CacheManager:
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
+                # Map question set to database identifier (same mapping as in save_analysis)
+                question_set_mapping = {
+                    'everest': 'ev',
+                    'tcfd': 'tcfd',
+                    's4m': 's4m',
+                    'lucia': 'lucia'
+                }
+                db_question_set = question_set_mapping.get(config['question_set'], config['question_set'])
+                
                 # First get the analysis results from the cache table
                 query = """
                     SELECT question_id, result
@@ -361,7 +370,7 @@ class CacheManager:
                     config['chunk_overlap'],
                     config['top_k'],
                     config['model'],
-                    config['question_set']
+                    db_question_set  # Use mapped question set
                 ]
 
                 if question_ids:
@@ -416,7 +425,7 @@ class CacheManager:
                         config['chunk_overlap'], 
                         config['top_k'], 
                         config['model'], 
-                        config['question_set']
+                        db_question_set  # Use mapped question set
                     ] + list(results.keys())
                     
                     logger.info(f"Executing chunk query with params: {chunk_params}")

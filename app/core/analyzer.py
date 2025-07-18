@@ -1372,7 +1372,21 @@ Output only the scores, one per line, in order:""")
     def get_question_by_number(self, number: int) -> Optional[Dict]:
         """Get question data by its number."""
         try:
-            question_key = f"{self.question_set}_{number}"
+            # Handle question set to prefix mapping
+            question_set_mapping = {
+                'everest': 'ev',
+                'tcfd': 'tcfd',
+                's4m': 's4m',
+                'lucia': 'lucia'
+            }
+            
+            # Get the correct prefix for the question set
+            question_prefix = question_set_mapping.get(self.question_set, self.question_set)
+            question_key = f"{question_prefix}_{number}"
+            
+            logger.debug(f"Looking for question {number} with key: {question_key}")
+            logger.debug(f"Available question keys: {list(self.questions.keys())}")
+            
             return self.questions.get(question_key)
         except Exception as e:
             log_analysis_step(f"Error getting question {number}: {str(e)}", "error")
