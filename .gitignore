@@ -15,3 +15,6 @@ __pycache__/
 /app/cache/
 **/storage/cache/
 report_analyst/temp/*
+
+# Cursor IDE files
+.cursor/

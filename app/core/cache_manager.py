@@ -114,6 +114,65 @@ class CacheManager:
                 UNIQUE(question_analysis_id, document_chunk_id)
             )
             """)
+            
+            # Benchmarking tables
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS benchmark_datasets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataset_id TEXT UNIQUE,
+                name TEXT,
+                description TEXT,
+                version TEXT,
+                question_set TEXT,
+                file_path TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+            
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS ground_truth_chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataset_id TEXT,
+                question_id TEXT,
+                chunk_id TEXT,
+                relevance_score REAL,
+                is_evidence BOOLEAN,
+                evidence_order INTEGER,
+                annotation_notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(dataset_id) REFERENCES benchmark_datasets(dataset_id)
+            )
+            """)
+            
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS benchmark_evaluations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataset_id TEXT,
+                evaluation_name TEXT,
+                config_hash TEXT,
+                retrieval_config TEXT,
+                evaluation_metrics TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(dataset_id) REFERENCES benchmark_datasets(dataset_id)
+            )
+            """)
+            
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS human_annotations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                evaluation_id INTEGER,
+                question_id TEXT,
+                chunk_id TEXT,
+                human_relevance_score REAL,
+                human_is_evidence BOOLEAN,
+                human_evidence_order INTEGER,
+                annotation_notes TEXT,
+                annotator_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(evaluation_id) REFERENCES benchmark_evaluations(id)
+            )
+            """)
 
         finally:
             conn.close()

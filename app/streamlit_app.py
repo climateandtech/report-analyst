@@ -1272,10 +1272,11 @@ def main():
                 )
 
         # Create tabs
-        file_tab, upload_tab, consolidated_tab = st.tabs([
+        file_tab, upload_tab, consolidated_tab, benchmark_tab = st.tabs([
             "Previous Reports",
             "Upload New",
-            "Consolidated Results"
+            "Consolidated Results",
+            "🎯 Benchmarking"
         ])
 
         # Previous Reports tab
@@ -1564,6 +1565,35 @@ def main():
         """
         st.markdown(footer, unsafe_allow_html=True)
 
+
+        # Benchmarking tab
+        with benchmark_tab:
+            try:
+                from app.ui.benchmarking import BenchmarkingUI
+                benchmark_ui = BenchmarkingUI(analyzer.cache_manager)
+                
+                # Sub-tabs for benchmarking features
+                dataset_tab, eval_tab, results_tab, annotation_tab = st.tabs([
+                    "📊 Datasets", "🎯 Evaluate", "📈 Results", "✍️ Annotate"
+                ])
+                
+                with dataset_tab:
+                    benchmark_ui.render_dataset_management()
+                
+                with eval_tab:
+                    benchmark_ui.render_benchmarking_interface()
+                
+                with results_tab:
+                    benchmark_ui.render_results_dashboard()
+                
+                with annotation_tab:
+                    benchmark_ui.render_annotation_interface()
+                    
+            except ImportError as e:
+                st.error(f"Benchmarking functionality not available: {e}")
+            except Exception as e:
+                st.error(f"Error loading benchmarking interface: {e}")
+                st.exception(e)
 
     except Exception as e:
         st.error("Error during analysis:")
