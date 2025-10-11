@@ -20,6 +20,7 @@ report_analyst/temp/*
 
 # Cursor IDE files
 .cursor/
+<<<<<<< HEAD
 
 # Coverage and test artifacts
 .coverage
@@ -55,3 +56,5 @@ THEME_SWITCHING.md
 VERCEL_CHANGES_SUMMARY.md
 VERCEL_DEPLOYMENT_ASSESSMENT.md
 VERCEL_MIGRATION_GUIDE.md
+=======
+>>>>>>> ceb9333 (Add complete benchmarking system for information retrieval evaluation)
