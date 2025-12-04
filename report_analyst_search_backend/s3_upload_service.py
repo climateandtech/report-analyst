@@ -9,7 +9,7 @@ as the PDF service. This is an enterprise feature that requires:
 
 Usage:
     from .s3_upload_service import S3UploadService
-    
+
     uploader = S3UploadService(config)
     resource_id = await uploader.upload_pdf_via_s3_nats(file_bytes, filename)
 """
