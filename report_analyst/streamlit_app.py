@@ -818,6 +818,18 @@ def display_analysis_results(
 def display_consolidated_results(analyzer, question_set):
     """Display consolidated results for all analyzed documents"""
     try:
+        # Create mapping from question set names to database identifiers
+        question_set_mapping = {
+            'tcfd': 'tcfd',
+            's4m': 's4m', 
+            'lucia': 'lucia',
+            'everest': 'ev'  # Everest questions use 'ev_' prefix, so database stores as 'ev'
+        }
+        
+        # Get the database identifier for the selected question set
+        db_question_set = question_set_mapping.get(question_set, question_set)
+        logger.info(f"Mapping question set '{question_set}' to database identifier '{db_question_set}'")
+        
         # Get all available cache configurations
         cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
         logger.info(f"Found cache configs: {cache_configs}")
@@ -831,7 +843,7 @@ def display_consolidated_results(analyzer, question_set):
         for config in cache_configs:
             if len(config) == 6:  # Full config row from cache_status
                 file_path, chunk_size, chunk_overlap, top_k, model, qs = config
-                if qs == question_set:  # Only show configs for selected question set
+                if qs == db_question_set:  # Only show configs for selected question set using database identifier
                     if file_path not in file_configs:
                         file_configs[file_path] = []
                     file_configs[file_path].append(
