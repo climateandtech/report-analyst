@@ -36,6 +36,13 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
+# Check for backend configuration first
+use_backend = os.getenv("USE_BACKEND", "false").lower() == "true"
+use_centralized_llm = os.getenv("USE_CENTRALIZED_LLM", "false").lower() == "true"
+use_full_backend_analysis = (
+    os.getenv("USE_FULL_BACKEND_ANALYSIS", "false").lower() == "true"
+)
+
 # Check for required environment variables
 openai_key = os.getenv("OPENAI_API_KEY")
 gemini_key = os.getenv("GOOGLE_API_KEY")
@@ -45,37 +52,52 @@ default_model = os.getenv("OPENAI_API_MODEL", "gpt-3.5-turbo-1106")
 logger.info(
     f"API Keys available - OpenAI: {bool(openai_key)}, Gemini: {bool(gemini_key)}"
 )
+logger.info(
+    f"Backend mode - USE_BACKEND: {use_backend}, USE_CENTRALIZED_LLM: {use_centralized_llm}, USE_FULL_BACKEND_ANALYSIS: {use_full_backend_analysis}"
+)
 
-# Check if we need to force the default model based on available keys
-if default_model.startswith("gemini-") and not gemini_key:
-    logger.warning(
-        f"Default model is {default_model} but no GOOGLE_API_KEY is available"
-    )
-    if openai_key:
-        default_model = "gpt-3.5-turbo-1106"
-        logger.info(f"Switching default model to {default_model}")
-    else:
-        logger.error("No valid API keys available for any models")
-        raise ValueError(
-            "No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY"
+# If using backend for LLM, don't require local API keys
+if use_backend and (use_centralized_llm or use_full_backend_analysis):
+    logger.info("🔗 Using backend for LLM functionality - local API keys not required")
+    # Set placeholder values for compatibility
+    if not openai_key:
+        openai_key = "backend-handles-llm"
+    if not gemini_key:
+        gemini_key = "backend-handles-llm"
+else:
+    # Only check for API keys if not using backend LLM
+    # Check if we need to force the default model based on available keys
+    if default_model.startswith("gemini-") and not gemini_key:
+        logger.warning(
+            f"Default model is {default_model} but no GOOGLE_API_KEY is available"
         )
-elif default_model.startswith("gpt-") and not openai_key:
-    logger.warning(
-        f"Default model is {default_model} but no OPENAI_API_KEY is available"
-    )
-    if gemini_key:
-        default_model = "gemini-pro"
-        logger.info(f"Switching default model to {default_model}")
-    else:
-        logger.error("No valid API keys available for any models")
-        raise ValueError(
-            "No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY"
+        if openai_key:
+            default_model = "gpt-3.5-turbo-1106"
+            logger.info(f"Switching default model to {default_model}")
+        else:
+            logger.error("No valid API keys available for any models")
+            raise ValueError(
+                "No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY"
+            )
+    elif default_model.startswith("gpt-") and not openai_key:
+        logger.warning(
+            f"Default model is {default_model} but no OPENAI_API_KEY is available"
         )
+        if gemini_key:
+            default_model = "gemini-pro"
+            logger.info(f"Switching default model to {default_model}")
+        else:
+            logger.error("No valid API keys available for any models")
+            raise ValueError(
+                "No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY"
+            )
 
-# Ensure we have at least one API key for the selected model type
-if not openai_key and not gemini_key:
-    logger.error("No API keys found - set either OPENAI_API_KEY or GOOGLE_API_KEY")
-    raise ValueError("Set either OPENAI_API_KEY or GOOGLE_API_KEY environment variable")
+    # Ensure we have at least one API key for the selected model type
+    if not openai_key and not gemini_key:
+        logger.error("No API keys found - set either OPENAI_API_KEY or GOOGLE_API_KEY")
+        raise ValueError(
+            "Set either OPENAI_API_KEY or GOOGLE_API_KEY environment variable"
+        )
 
 if not os.getenv("OPENAI_ORGANIZATION"):
     logger.warning("OPENAI_ORGANIZATION environment variable is not set")
@@ -137,51 +159,75 @@ class DocumentAnalyzer:
         self.default_model = default_model
         log_analysis_step(f"Using default model from env: {self.default_model}")
 
-        try:
-            # Initialize LLM with caching using the provider factory
-            self.llm = get_llm(
-                model_name=self.default_model,
-                cache_dir=str(self.llm_cache_path),
-            )
+        # Check if we should use backend for all LLM functionality
+        self.use_backend_llm = use_backend and (
+            use_centralized_llm or use_full_backend_analysis
+        )
 
-            # Initialize embeddings if OpenAI API key is available
-            if openai_key:
-                self.embeddings = OpenAIEmbedding(
-                    api_key=openai_key,
-                    api_base=os.getenv("OPENAI_API_BASE"),
-                    model_name=os.getenv(
-                        "OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"
-                    ),
-                    embed_batch_size=100,
+        if self.use_backend_llm:
+            log_analysis_step(
+                "🔗 Skipping local LLM initialization - using backend for all LLM functionality",
+                "info",
+            )
+            # Set minimal placeholders for compatibility
+            self.llm = None
+            self.embeddings = None
+        else:
+            try:
+                # Initialize LLM with caching using the provider factory
+                self.llm = get_llm(
+                    model_name=self.default_model,
+                    cache_dir=str(self.llm_cache_path),
                 )
 
-                # Configure embeddings globally for LlamaIndex
-                Settings.embed_model = self.embeddings
-            else:
-                logger.warning(
-                    "No OpenAI API key - embedding functionality will be limited"
+                # Initialize embeddings if OpenAI API key is available
+                if openai_key and openai_key != "backend-handles-llm":
+                    self.embeddings = OpenAIEmbedding(
+                        api_key=openai_key,
+                        api_base=os.getenv("OPENAI_API_BASE"),
+                        model_name=os.getenv(
+                            "OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"
+                        ),
+                        embed_batch_size=100,
+                    )
+
+                    # Configure embeddings globally for LlamaIndex
+                    Settings.embed_model = self.embeddings
+                else:
+                    logger.warning(
+                        "No OpenAI API key - embedding functionality will be limited"
+                    )
+                    self.embeddings = None
+
+            except Exception as e:
+                log_analysis_step(
+                    f"Error initializing local LLM clients: {str(e)}", "error"
                 )
-                # TODO: Add fallback embedding model (e.g. HuggingFace) if needed
+                if not self.use_backend_llm:
+                    raise
+                else:
+                    # In backend mode, local LLM failures are not critical
+                    logger.warning(
+                        "Local LLM initialization failed, but using backend mode"
+                    )
+                    self.llm = None
+                    self.embeddings = None
 
-            # Initialize caching
-            self.use_cache = True  # Default to True, can be overridden
-            Settings.ingestion_cache = IngestionCache(
-                cache_dir=str(self.llm_cache_path), cache_type="local"
-            )
+        # Initialize caching and text processing (these are always needed)
+        self.use_cache = True  # Default to True, can be overridden
+        Settings.ingestion_cache = IngestionCache(
+            cache_dir=str(self.llm_cache_path), cache_type="local"
+        )
 
-            self.text_splitter = SentenceSplitter(chunk_size=500, chunk_overlap=20)
+        self.text_splitter = SentenceSplitter(chunk_size=500, chunk_overlap=20)
 
-            # Cache parameters
-            self.chunk_params = {"chunk_size": 500, "chunk_overlap": 20, "top_k": 5}
+        # Cache parameters
+        self.chunk_params = {"chunk_size": 500, "chunk_overlap": 20, "top_k": 5}
 
-            self.embedding_params = {
-                "model": "text-embedding-ada-002",
-                "batch_size": 100,
-            }
-
-        except Exception as e:
-            log_analysis_step(f"Error initializing OpenAI clients: {str(e)}", "error")
-            raise
+        self.embedding_params = {
+            "model": "text-embedding-ada-002",
+            "batch_size": 100,
+        }
 
         # Add a cache for loaded answers
         self._answers_cache = {}

@@ -615,7 +615,7 @@ class CacheManager:
                 """,
                     (str(file_path),),
                 ):
-                    metadata = json.loads(row[2])
+                    metadata = json.loads(row[2]) if row[2] else {}
 
                     # Reconstruct embedding with proper shape
                     embedding = None

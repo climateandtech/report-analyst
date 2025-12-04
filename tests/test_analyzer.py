@@ -174,7 +174,6 @@ def analyzer(test_env, clean_db):
     with patch("langchain_openai.ChatOpenAI") as mock_llm, patch(
         "llama_index.embeddings.openai.OpenAIEmbedding"
     ) as mock_embedding, patch("llama_index.core.Settings") as mock_settings:
-
         # Configure mock LLM
         mock_llm_instance = Mock(
             model="gpt-3.5-turbo-test",
@@ -196,10 +195,8 @@ def analyzer(test_env, clean_db):
 
         # Explicitly set the database path for the cache manager
         analyzer.cache_manager.db_path = Path(clean_db)  # Use clean_db directly
-
         # Set the mocked LLM instance
         analyzer.llm = mock_llm_instance
-
         # Force reload questions from test file
         analyzer.questions = analyzer._load_questions()
 
@@ -387,7 +384,6 @@ async def test_document_analysis_workflow(test_env):
     with patch("langchain_openai.ChatOpenAI") as mock_llm, patch(
         "llama_index.embeddings.openai.OpenAIEmbedding"
     ) as mock_embedding, patch("llama_index.core.Settings") as mock_settings:
-
         # Configure mock LLM responses
         mock_llm.return_value = Mock(
             model="gpt-3.5-turbo-test",
@@ -422,7 +418,6 @@ async def test_document_analysis_workflow(test_env):
             elif "error" in result:
                 # Error results are expected in test environment
                 pass
-
         # Verify results
         assert len(results) > 0
         # Check that results have either status or error fields
