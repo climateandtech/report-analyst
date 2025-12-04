@@ -1,0 +1,407 @@
+name: Everest
+shortcut: ev
+description: Comprehensive sustainability labeling framework for evaluating climate transformation initiatives and carbon footprint reporting
+
+questions:
+  - id: ev_1
+    text: "What is the company name and the file name of the sustainability report?"
+    guidelines: |
+      - Look for the company name on the front page of the PDF or in the document name
+      - Identify the exact file name of the sustainability report
+      - Note any discrepancies between the document title and file name
+
+  - id: ev_2
+    text: "What are the most important actions and solutions for the transformation to a climate-neutral company operation?"
+    guidelines: |
+      - Look for CO2 compensation initiatives, carbon-neutral production or operations
+      - Focus on efficiency improvements like compressed air optimization or building insulation
+      - Identify actions to reduce direct emissions from operations
+      - Consider use of renewable energy in production or conversion to green electricity
+      - List solutions for customers first, followed by internal actions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: ev_3
+    text: "What actions and services does the company provide related to climate-friendly solutions and consulting?"
+    guidelines: |
+      - Look for offerings and initiatives related to climate consulting and advisory services
+      - Identify use or development of tools like CO2 calculators, platforms, or offsetting services
+      - Note energy consulting, ESG consulting, or climate protection roadmaps provided to customers
+      - Include products or solutions that help measure, reduce, or offset emissions
+      - Consider both internal consulting practices and customer-facing services
+      - Format answers as bullet points starting with #, maximum 150 characters each
+      - Use the company's exact wording from the report when possible
+      - If no relevant actions or services are mentioned, respond with: "no action found"
+
+  - id: ev_4
+    text: "What are the most important actions and solutions for transformation to an energy-efficient economy and society?"
+    guidelines: |
+      - Look for initiatives focused on reducing energy consumption and improving efficiency
+      - Focus on technologies like motion detectors, LED lighting, efficient cooling systems
+      - Identify initiatives related to energy efficiency classes, ISO 50001 certification
+      - Consider actions involving insulation, combined heat and power, or low-energy buildings
+      - List solutions for customers first, followed by internal actions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: ev_5
+    text: "What are the most important actions and solutions for the transformation to an energy system based on renewable energies?"
+    guidelines: |
+      - Look for initiatives involving biogas, biomass, geothermal, solar, wind, or water power
+      - Focus on adoption of green electricity, photovoltaics, or smart grid technologies
+      - Identify actions related to PPAs (Power Purchase Agreements) or renewable energy certificates
+      - Consider both on-site renewable generation and procurement strategies
+      - List solutions for customers first, followed by internal actions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: ev_6
+    text: "What actions and solutions does the company implement to transform its building stock into climate-neutral, energy-efficient, and sustainable structures?"
+    guidelines: |
+      - Look for initiatives related to climate-neutral building design and construction
+      - Identify use of sustainable building materials such as wood or timber construction
+      - Note certifications or standards like BREEAM, LEED, or energy performance certificates
+      - Focus on energy-efficient refurbishment, insulation, passive house concepts, and renovations
+      - Consider efforts to use buildings as carbon storage (e.g., use of wood)
+      - Include both new builds and retrofitting of existing buildings
+      - Format answers as bullet points starting with #, max 150 characters each
+      - Use the company's original wording from the report where possible
+      - If no relevant actions are found, respond with: "no action found"
+
+  - id: ev_7
+    text: "What actions and solutions does the company take to promote zero-emission and sustainable mobility and travel?"
+    guidelines: |
+      - Look for initiatives supporting electric vehicles, e-mobility, and charging infrastructure
+      - Identify use of car sharing, company bikes, or company cars with low emissions
+      - Note efforts encouraging public transport use (e.g., rail travel, BahnCard, bus)
+      - Include measures such as home office policies, coworking, and green travel options
+      - Consider adoption of e-fuels, electromobility, or support for green hotels
+      - Format responses as bullet points starting with #, max 150 characters each
+      - Use the company's exact wording from the report when possible
+      - If no relevant actions are mentioned, respond with: "no action found"
+
+  - id: ev_8
+    text: "What actions and solutions does the company implement to support the expansion and development of smart grids for the energy transition?"
+    guidelines: |
+      - Look for initiatives involving intelligent grid management, decentralized grids, and microgrids
+      - Identify use of smart meters, load management, and neighbourhood or prosumer grids
+      - Note activities related to grid expansion, underground cables, and transmission improvements
+      - Consider projects for offshore connections and integration of heating or electricity grids
+      - Include both customer solutions and internal infrastructure development
+      - Format answers as bullet points starting with #, max 150 characters each
+      - Use the company's original wording from the report when possible
+      - If no relevant actions are found, respond with: "no action found"
+
+  - id: ev_9
+    text: "What actions and solutions does the company pursue to develop and implement energy storage infrastructure critical for the energy transition?"
+    guidelines: |
+      - Look for initiatives related to battery technology, chemical storage, and decentralized storage systems
+      - Identify use of car batteries as storage, power-to-x, pumped storage, salt storage, or powerwalls
+      - Note development of grid feed-in capabilities and large-scale storage infrastructure
+      - Consider both internal projects and customer-facing energy storage solutions
+      - Format answers as bullet points starting with #, max 150 characters each
+      - Use the company's exact wording from the report when possible
+      - If no relevant actions are found, respond with: "no action found"
+
+  - id: ev_10
+    text: "What actions and solutions does the company implement to achieve climate-neutral IT through energy-efficient hardware and sustainable software practices?"
+    guidelines: |
+      - Look for initiatives on energy-efficient IT infrastructure, green data centers, and hardware optimization
+      - Identify practices such as server virtualization, data center waste heat recovery, and efficient cooling
+      - Note software-related actions like green coding, energy-saving algorithms, and power-saving IT settings
+      - Consider both internal IT management and customer-facing green IT services
+      - Format responses as bullet points starting with #, max 150 characters each
+      - Use the company's original wording from the report when possible
+      - If no relevant actions are found, respond with: "no action found"
+
+  - id: ev_11
+    text: "What are the most important actions and solutions for the transformation to a circular economy with circular solutions and business models?"
+    guidelines: |
+      - Look for mentions of circular economy concepts and circular business models
+      - Focus on product reuse, recycling, rental, take-back systems, and sharing models
+      - Identify use of reusable or closed-loop product designs
+      - Include initiatives around sharing, leasing, or product-as-a-service models
+      - Consider both internal actions and customer-oriented solutions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report whenever possible
+      - If no actions found, respond with: "no action found"
+
+  - id: ev_12
+    text: "What actions and solutions does the company implement to promote the use of sustainable, durable, and reusable materials in its products and processes?"
+    guidelines: |
+      - Look for initiatives involving biobased materials, bioplastics, and biomaterials
+      - Identify use of renewable raw materials, recyclable materials, and secondary raw materials
+      - Note focus on durable and reusable materials to support circular economy principles
+      - Consider both product-related materials and internal material sourcing
+      - Format answers as bullet points starting with #, max 150 characters each
+      - Use the company's original wording from the report when possible
+      - If no relevant actions are found, respond with: "no action found"
+
+  - id: ev_13
+    text: "What are the most important actions and solutions for occupational safety, health and safety in the company?"
+    guidelines: |
+      - Look for initiatives on occupational health and safety, accident prevention
+      - Focus on safety training, protective measures, or ergonomics improvements
+      - Identify actions related to stress prevention or hazard management
+      - Consider reporting on lost days, occupational accidents, or safety officers
+      - List internal actions and any related customer solutions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: ev_14
+    text: "What actions and solutions does the company take to promote equal opportunities, diversity, and inclusion within the organization?"
+    guidelines: |
+      - Look for initiatives related to diversity, inclusion, and anti-discrimination policies
+      - Identify efforts supporting equal pay, women in management, and advancement through education
+      - Note programs for disability inclusion, family friendliness, and participation opportunities
+      - Consider formal commitments like diversity charters or equity policies
+      - Format answers as bullet points starting with #, max 150 characters each
+      - Use the company's original wording from the report when possible
+      - If no relevant actions are found, respond with: "no action found"
+
+  - id: ev_15
+    text: "What actions and solutions does the company implement to support the training, education, and qualification of its employees?"
+    guidelines: |
+      - Look for initiatives related to employee development, training, and further education
+      - Identify programs such as internal academies, learning platforms, or online training
+      - Note support for lifelong learning, university partnerships, and qualification programs
+      - Include activities for trainees, apprentices, or professional upskilling
+      - Format responses as bullet points starting with #, max 150 characters each
+      - Use the company's original wording from the report when possible
+      - If no relevant actions are found, respond with: "no action found"
+
+  - id: ev_16
+    text: "What actions does the company take to protect human rights, especially in its own operations and across its supply chain?"
+    guidelines: |
+      - Look for policies or actions that aim to protect human rights and ensure ethical working conditions
+      - Focus on topics such as child labor, forced labor, discrimination, and fair working conditions
+      - Identify human rights risk assessments or audits in the supply chain
+      - Note hot spot analysis, grievance mechanisms, whistleblower systems
+      - Consider roles such as human rights officer or ombudsman
+      - Look for references to ILO standards, OECD guidelines, or supply chain due diligence laws
+      - Include both internal company measures and supplier-related efforts
+      - Format each action as a bullet point starting with #, up to 150 characters
+      - Use the company's original wording where possible
+      - If no relevant information is found, write: "no action found"
+
+  - id: ev_17
+    text: "What actions and solutions does the company take to enable financial participation of stakeholders in its sustainability and transformation efforts?"
+    guidelines: |
+      - Look for initiatives that allow employees, citizens, or stakeholders to financially participate in the company's transformation
+      - Focus on share programs, profit-sharing, or cooperative ownership models
+      - Identify citizen participation, citizens' councils, or crowdfunding for sustainability projects
+      - Note stakeholder involvement in decision-making with financial or value-sharing components
+      - Consider both internal programs (e.g., employee shares) and external participation opportunities
+      - Format each initiative as a bullet point starting with #, max 150 characters
+      - Use the company's original wording from the report wherever possible
+      - If no relevant actions are found, write: "no action found"
+
+  - id: ev_18
+    text: "How does the company measure, report, and manage its carbon footprint, including Scope 1, 2, and 3 emissions?"
+    guidelines: |
+      - Look for reporting on greenhouse gas emissions under Scope 1, 2, and 3
+      - Identify use of CO₂ equivalents (CO₂e/CO₂eq) and reporting years
+      - Check for carbon reduction targets, net-zero goals, or science-based targets
+      - Mention any use of GHG Protocol, science-based target methodologies, or third-party verification
+      - Format each item as a bullet point starting with #, max 150 characters
+      - Use the company's original wording where possible
+      - If no relevant carbon footprint data is found, write: "no action found"
+
+  - id: ev_19
+    text: "Does the company comply with ISO 14001 environmental management standards?"
+    guidelines: |
+      - Look for explicit mention of ISO 14001 certification
+      - Check if certification covers all operations or just specific sites
+      - Note when certification was obtained and any recertification
+      - Consider any details about the implementation of the environmental management system
+      - Respond with clear "Yes" or "No" and supporting details
+
+  - id: ev_20
+    text: "Does the company comply with EMAS certification standards?"
+    guidelines: |
+      - Look for explicit mention of EMAS (Eco-Management and Audit Scheme) certification
+      - Check if certification covers all operations or just specific sites
+      - Note when certification was obtained and any recertification
+      - Consider any details about the implementation of the environmental management system
+      - Respond with clear "Yes" or "No" and supporting details
+
+  - id: ev_21
+    text: "Does the company comply with ISO 50001 energy management standards?"
+    guidelines: |
+      - Look for explicit mention of ISO 50001 certification
+      - Check if certification covers all operations or just specific sites
+      - Note when certification was obtained and any recertification
+      - Consider any details about the implementation of the energy management system
+      - Respond with clear "Yes" or "No" and supporting details
+
+  - id: ev_22
+    text: "Does the company participate in the CDP reporting and what score did they receive?"
+    guidelines: |
+      - Look for explicit mention of CDP (formerly Carbon Disclosure Project) participation
+      - Check if an A-score or other rating was achieved
+      - Note which CDP programs the company participates in (Climate Change, Water, Forests)
+      - Consider any history of participation and score trends
+      - Respond with clear "Yes" or "No" and details about the score
+
+  - id: ev_23
+    text: "Does the company have Science-Based Targets initiative (SBTi) commitments?"
+    guidelines: |
+      - Look for explicit mention of SBTi commitments or targets
+      - Check if targets are short-term or long-term
+      - Note if targets are aligned with 1.5°C pathway
+      - Consider if targets have been officially validated by SBTi
+      - Respond with clear "Yes" or "No" and supporting details
+
+  - id: ev_24
+    text: "What are the company's reported Scope 1 CO₂ emissions for the year 2022?"
+    guidelines: |
+      - Look for the Scope 1 emissions value for the reporting year 2022
+      - Scope 1 includes direct greenhouse gas emissions from sources owned or controlled by the company
+      - Report the value in metric tons of CO₂ or CO₂ equivalents (CO₂e/CO₂eq)
+      - Be aware of number formatting differences (German vs English)
+      - Note if the figure is verified by a third party
+      - Use the exact number and unit as stated in the report
+      - If the value is not reported, write: "no data reported"
+
+  - id: ev_25
+    text: "What are the company's reported Scope 2 CO₂ emissions for the year 2022?"
+    guidelines: |
+      - Search for Scope 2 CO₂ emissions reported for 2022
+      - Scope 2 includes indirect emissions from purchased energy (especially electricity)
+      - If both location-based and market-based values are provided, note both
+      - Use the exact number and unit provided
+      - Be aware of number formatting differences (German vs English)
+      - Note if the figure is verified by a third party
+      - If no Scope 2 data is found, write: "no data reported"
+
+  - id: ev_26
+    text: "What are the company's reported Scope 3 CO₂ emissions for the year 2022?"
+    guidelines: |
+      - Look for Scope 3 CO₂ emissions data specifically for 2022
+      - Scope 3 includes indirect emissions not owned or directly controlled by the company
+      - If a total Scope 3 value is reported, use that
+      - If only individual category values are reported, use the sum or list the categories
+      - Use the company's original number and unit
+      - Respect regional number formatting differences
+      - Note if the figure is third-party verified
+      - If no Scope 3 data is available, write: "no data reported"
+
+  - id: ev_27
+    text: "What is the total amount of CO₂ emissions reported by the company for the year 2022?"
+    guidelines: |
+      - Look for the total CO₂ emissions reported for 2022
+      - The total should ideally include Scope 1, Scope 2, and Scope 3
+      - Note if both location-based and market-based Scope 2 formats are used
+      - Use the company's original number and unit
+      - Respect regional number formatting differences
+      - Note if the figure is third-party verified
+      - If no total is reported but individual scopes are available, add them manually and mention this
+      - If no total CO₂ data is available, write: "no data reported"
+
+  - id: ev_28
+    text: "What are the company's reported Scope 1 CO₂ emissions for the year 2023?"
+    guidelines: |
+      - Look for the Scope 1 emissions value for the reporting year 2023
+      - Scope 1 includes direct greenhouse gas emissions from sources owned or controlled by the company
+      - Report the value in metric tons of CO₂ or CO₂ equivalents (CO₂e/CO₂eq)
+      - Be aware of number formatting differences (German vs English)
+      - Note if the figure is verified by a third party
+      - Use the exact number and unit as stated in the report
+      - If the value is not reported, write: "no data reported"
+
+  - id: ev_29
+    text: "What are the company's reported Scope 2 CO₂ emissions for the year 2023?"
+    guidelines: |
+      - Search for Scope 2 CO₂ emissions reported for 2023
+      - Scope 2 includes indirect emissions from purchased energy (especially electricity)
+      - If both location-based and market-based values are provided, note both
+      - Use the exact number and unit provided
+      - Be aware of number formatting differences (German vs English)
+      - Note if the figure is verified by a third party
+      - If no Scope 2 data is found, write: "no data reported"
+
+  - id: ev_30
+    text: "What are the company's reported Scope 3 CO₂ emissions for the year 2023?"
+    guidelines: |
+      - Look for Scope 3 CO₂ emissions data specifically for 2023
+      - Scope 3 includes indirect emissions not owned or directly controlled by the company
+      - If a total Scope 3 value is reported, use that
+      - If only individual category values are reported, use the sum or list the categories
+      - Use the company's original number and unit
+      - Respect regional number formatting differences
+      - Note if the figure is third-party verified
+      - If no Scope 3 data is available, write: "no data reported"
+
+  - id: ev_31
+    text: "What is the total amount of CO₂ emissions reported by the company for the year 2023?"
+    guidelines: |
+      - Look for the total CO₂ emissions reported for 2023
+      - The total should ideally include Scope 1, Scope 2, and Scope 3
+      - Note if both location-based and market-based Scope 2 formats are used
+      - Use the company's original number and unit
+      - Respect regional number formatting differences
+      - Note if the figure is third-party verified
+      - If no total is reported but individual scopes are available, add them manually and mention this
+      - If no total CO₂ data is available, write: "no data reported"
+
+  - id: ev_32
+    text: "What are the company's reported Scope 1 CO₂ emissions for the year 2024?"
+    guidelines: |
+      - Look for the Scope 1 emissions value for the reporting year 2024
+      - Scope 1 includes direct greenhouse gas emissions from sources owned or controlled by the company
+      - Report the value in metric tons of CO₂ or CO₂ equivalents (CO₂e/CO₂eq)
+      - Be aware of number formatting differences (German vs English)
+      - Note if the figure is verified by a third party
+      - Use the exact number and unit as stated in the report
+      - If the value is not reported, write: "no data reported"
+
+  - id: ev_33
+    text: "What are the company's reported Scope 2 CO₂ emissions for the year 2024?"
+    guidelines: |
+      - Search for Scope 2 CO₂ emissions reported for 2024
+      - Scope 2 includes indirect emissions from purchased energy (especially electricity)
+      - If both location-based and market-based values are provided, note both
+      - Use the exact number and unit provided
+      - Be aware of number formatting differences (German vs English)
+      - Note if the figure is verified by a third party
+      - If no Scope 2 data is found, write: "no data reported"
+
+  - id: ev_34
+    text: "What are the company's reported Scope 3 CO₂ emissions for the year 2024?"
+    guidelines: |
+      - Look for Scope 3 CO₂ emissions data specifically for 2024
+      - Scope 3 includes indirect emissions not owned or directly controlled by the company
+      - If a total Scope 3 value is reported, use that
+      - If only individual category values are reported, use the sum or list the categories
+      - Use the company's original number and unit
+      - Respect regional number formatting differences
+      - Note if the figure is third-party verified
+      - If no Scope 3 data is available, write: "no data reported"
+
+  - id: ev_35
+    text: "What is the total amount of CO₂ emissions reported by the company for the year 2024?"
+    guidelines: |
+      - Look for the total CO₂ emissions reported for 2024
+      - The total should ideally include Scope 1, Scope 2, and Scope 3
+      - Note if both location-based and market-based Scope 2 formats are used
+      - Use the company's original number and unit
+      - Respect regional number formatting differences
+      - Note if the figure is third-party verified
+      - If no total is reported but individual scopes are available, add them manually and mention this
+      - If no total CO₂ data is available, write: "no data reported"
+
+analysis_guidelines: |
+  - Responses must be precise and grounded in report extracts
+  - Acknowledge uncertainty rather than making assumptions
+  - Consider potential greenwashing and cheap talk
+  - Scrutinize quantifiable data vs vague statements
+  - Maintain a critical analytical tone
+  - Acknowledge information represents company's perspective
+  - Evaluate completeness and quality of disclosures
+  - Use original company wording where possible
+  - Format responses consistently with bullet points where specified
+  - Clearly state when no relevant information is found 

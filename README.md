@@ -11,24 +11,32 @@ A modern document analysis tool built with LangChain for analyzing corporate rep
 - 🎯 Modular prompt system
 - 🚀 FastAPI backend
 - ⚡ High performance document processing
+- 🧪 Comprehensive test suite with CI/CD
+- 🎨 Modern Streamlit UI with dynamic question loading
 
 ## Project Structure
 
 ```
 report-analyst/
-├── app/                    # Main application code
-│   ├── api/               # FastAPI routes and endpoints
+├── report_analyst/         # Main application code
 │   ├── core/              # Core business logic
-│   ├── models/            # Pydantic models
-│   └── services/          # Service layer
+│   ├── questionsets/      # Question set YAML files
+│   ├── streamlit_app.py   # Main Streamlit application
+│   └── streamlit_app_backend.py  # Backend integration
+├── report_analyst_api/     # FastAPI backend
+├── report_analyst_jobs/    # Background job processing
+├── report_analyst_search_backend/  # Search backend
 ├── prompts/               # Modular prompt templates
 │   ├── analysis/         # Document analysis prompts
 │   └── qa/               # Q&A prompts
-├── config/                # Configuration files
-├── data/                  # Data directory
-│   ├── input/            # Input documents
-│   └── output/           # Generated outputs
-└── tests/                # Test suite
+├── tests/                # Comprehensive test suite
+│   ├── test_streamlit_app*.py  # Streamlit AppTest tests
+│   ├── test_question_loader.py # Question loader tests
+│   └── integration/      # Integration tests
+├── .github/workflows/     # GitHub Actions CI/CD
+└── data/                  # Data directory
+    ├── input/            # Input documents
+    └── output/           # Generated outputs
 ```
 
 ## Question Set Naming Convention
@@ -38,8 +46,8 @@ This project uses a **mountain peak naming convention** for question sets to ena
 ### Current Question Sets:
 - **`everest_questions.yaml`** - Comprehensive sustainability labeling framework (35 questions, prefix: `ev_`)
 - **`tcfd_questions.yaml`** - TCFD climate disclosure questions (prefix: `tcfd_`)
-- **`s4m_questions.yaml`** - Score4More sustainability questions (prefix: `s4m_`)
-- **`lucia_questions.yaml`** - Lucia sustainability analysis questions (prefix: `lucia_`)
+- **`kilimanjaro_questions.yaml`** - Kilimanjaro sustainability questions (prefix: `kilimanjaro_`)
+- **`denali_questions.yaml`** - Denali sustainability analysis questions (prefix: `denali_`)
 
 ### Future Naming Pattern:
 | Version | Mountain | File | Prefix |
@@ -97,11 +105,61 @@ The application supports multiple LLM providers:
 
 Models will only be available in the UI if you have the corresponding API key configured.
 
+## CI/CD and Testing
+
+This project includes comprehensive CI/CD with GitHub Actions:
+
+### Test Coverage
+- **41 Streamlit AppTest tests** covering all UI functionality
+- **Question loader tests** with 100% coverage
+- **Integration tests** for API and backend components
+- **Multi-Python version testing** (3.8-3.12)
+
+### GitHub Actions Workflows
+- **Basic Tests**: Essential functionality and imports
+- **Question Loader Tests**: Dynamic question set loading
+- **Streamlit Tests**: Complete UI testing with AppTest
+- **API Tests**: FastAPI backend testing
+- **Full CI**: Comprehensive testing with linting and security scanning
+
+### Running Tests Locally
+```bash
+# Install dependencies
+pip install -r requirements.txt
+pip install pytest pytest-cov pytest-asyncio
+
+# Set environment variables
+export QUESTIONSETS_PATH=report_analyst/questionsets
+export OPENAI_API_KEY=your_key
+export GOOGLE_API_KEY=your_key
+
+# Run all tests
+pytest tests/ -v --cov=report_analyst --cov-report=term-missing
+
+# Run specific test suites
+pytest tests/test_streamlit_app*.py -v  # Streamlit tests
+pytest tests/test_question_loader.py -v  # Question loader tests
+```
+
 ## Usage
 
+### Streamlit App
+```bash
+# Run the main Streamlit application
+streamlit run report_analyst/streamlit_app.py
+```
+
+### API Backend
+```bash
+# Run the FastAPI backend
+cd report_analyst_api
+uvicorn main:app --reload
+```
+
+### Document Analysis
 1. Place your documents in the `data/input` directory
-2. Use the API endpoints to:
-   - Analyze documents
+2. Use the Streamlit UI or API endpoints to:
+   - Analyze documents with dynamic question sets
    - Ask questions about documents
    - Generate structured reports
 

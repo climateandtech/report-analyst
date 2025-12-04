@@ -1,0 +1,251 @@
+name: Denali sustainability report analysis
+shortcut: denali
+description: Comprehensive question set for analyzing sustainability reports based on Denali criteria
+
+questions:
+  - id: denali_1
+    text: "What is the company name and the file name of the sustainability report?"
+    guidelines: |
+      - Look for the company name on the front page of the PDF or in the document name
+      - Identify the exact file name of the sustainability report
+      - Note any discrepancies between the document title and file name
+
+  - id: denali_2
+    text: "What is the overall sustainability strategy, actions and impacts of the company?"
+    guidelines: |
+      - Focus on the company's business model and how sustainability integrates with it
+      - Summarize the key sustainability goals, strategies, and vision
+      - Identify concrete actions being taken to implement the sustainability strategy
+      - Assess the reported impacts and outcomes of sustainability initiatives
+      - Consider the comprehensiveness and coherence of the sustainability approach
+      - Limit the abstract to maximum 500 characters
+
+  - id: denali_3
+    text: "What is the most courageous sustainability initiative that demonstrates the highest entrepreneurial courage from the company?"
+    guidelines: |
+      - Look for initiatives that go beyond industry standards or regulatory requirements
+      - Identify actions that involve significant investment, innovation or risk-taking
+      - Consider initiatives that demonstrate leadership in sustainability
+      - Focus on pioneering approaches that could transform the industry
+      - Evaluate how the company frames these initiatives in terms of courage or leadership
+      - Limit the highlight to maximum 400 characters
+
+  - id: denali_4
+    text: "What is the most important sustainability action implemented internally that represents the biggest sustainability progress?"
+    guidelines: |
+      - Focus on internal operations or supply chain initiatives
+      - Look for actions with measurable impacts or significant scope
+      - Consider initiatives that address the company's most material environmental impacts
+      - Identify actions that show clear progress or transformation
+      - Evaluate the effectiveness and ambition of the highlighted action
+      - Limit the highlight to maximum 400 characters
+
+  - id: denali_5
+    text: "What is the most important sustainability solution offered to customers that represents the highest impact?"
+    guidelines: |
+      - Focus on products or services specifically designed to improve customer sustainability
+      - Look for solutions that address significant environmental challenges
+      - Consider the scale of potential impact these solutions might have
+      - Evaluate whether impact claims are supported by evidence or metrics
+      - Assess how innovative and effective these customer-facing solutions are
+      - Limit the highlight to maximum 400 characters
+
+  - id: denali_6
+    text: "What are the most important actions and solutions for the transformation into a climate-neutral building stock including the use of wood as a carbon storage?"
+    guidelines: |
+      - Look for initiatives related to sustainable building practices and materials
+      - Focus on actions related to architecture, building materials, insulation, energy-efficient refurbishment
+      - Identify solutions involving timber construction, LEED or BREEAM certification
+      - Consider actions related to renovation, facade improvements, or passive house standards
+      - List solutions for customers first, followed by internal actions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: denali_7
+    text: "What are the most important actions and solutions for transformation to an energy-efficient economy and society?"
+    guidelines: |
+      - Look for initiatives focused on reducing energy consumption and improving efficiency
+      - Focus on technologies like motion detectors, LED lighting, efficient cooling systems
+      - Identify initiatives related to energy efficiency classes, ISO 50001 certification
+      - Consider actions involving insulation, combined heat and power, or low-energy buildings
+      - List solutions for customers first, followed by internal actions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: denali_8
+    text: "What are the most important actions and solutions for the transformation to an energy system based on renewable energies?"
+    guidelines: |
+      - Look for initiatives involving biogas, biomass, geothermal, solar, wind, or water power
+      - Focus on adoption of green electricity, photovoltaics, or smart grid technologies
+      - Identify actions related to PPAs (Power Purchase Agreements) or renewable energy certificates
+      - Consider both on-site renewable generation and procurement strategies
+      - List solutions for customers first, followed by internal actions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: denali_9
+    text: "What are the most important actions and solutions for the transformation to a climate-neutral company operation?"
+    guidelines: |
+      - Look for CO2 compensation initiatives, carbon-neutral production or operations
+      - Focus on efficiency improvements like compressed air optimization or building insulation
+      - Identify actions to reduce direct emissions from operations
+      - Consider use of renewable energy in production or conversion to green electricity
+      - List solutions for customers first, followed by internal actions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: denali_10
+    text: "What are the most important actions and solutions to transform to a circular economy with sustainable, durable, reusable circular materials?"
+    guidelines: |
+      - Look for initiatives involving biobased materials, bioplastics, or renewable raw materials
+      - Focus on circular materials, recyclable materials, or use of recyclates
+      - Identify actions related to durability, repairability, or secondary raw materials
+      - Consider both product design improvements and material sourcing strategies
+      - List solutions for customers first, followed by internal actions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: denali_11
+    text: "What are the most important actions and solutions for occupational safety, health and safety in the company?"
+    guidelines: |
+      - Look for initiatives on occupational health and safety, accident prevention
+      - Focus on safety training, protective measures, or ergonomics improvements
+      - Identify actions related to stress prevention or hazard management
+      - Consider reporting on lost days, occupational accidents, or safety officers
+      - List internal actions and any related customer solutions
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no actions found, state "no action found"
+
+  - id: denali_12
+    text: "What measurements of greenhouse gas emissions are reported in the corporate carbon footprint?"
+    guidelines: |
+      - Look for reporting on CO2 equivalents, direct and indirect emissions
+      - Focus on how the company measures and reports on Scope 1, 2, and 3 emissions
+      - Identify targets or commitments for emissions reduction (2030, 2045, 2050)
+      - Consider alignment with science-based targets or net zero commitments
+      - Format responses as bullet points starting with # (maximum 150 characters per item)
+      - Use the company's original wording from the report
+      - If no measurements found, state "no measurements found"
+
+  - id: denali_13
+    text: "What are the company's carbon footprint emissions for Scope 1 in 2022, 2023, and 2024?"
+    guidelines: |
+      - Look for specific emissions data for Scope 1 (direct emissions) across years
+      - Convert all emissions figures into tons of CO2 equivalents in #.### t CO2e format
+      - Check if data is available for all requested years
+      - Note any methodology changes that might affect year-to-year comparisons
+      - If data is not available for certain years, note this clearly
+
+  - id: denali_14
+    text: "What are the company's carbon footprint emissions for Scope 2 in 2022, 2023, and 2024?"
+    guidelines: |
+      - Look for specific emissions data for Scope 2 (indirect emissions from purchased energy) across years
+      - Distinguish between location-based and market-based Scope 2 emissions if both are reported
+      - Convert all emissions figures into tons of CO2 equivalents in #.### t CO2e format
+      - Check if data is available for all requested years
+      - If data is not available for certain years, note this clearly
+
+  - id: denali_15
+    text: "What are the company's carbon footprint emissions for Scope 3 in 2022, 2023, and 2024?"
+    guidelines: |
+      - Look for specific emissions data for Scope 3 (all other indirect emissions) across years
+      - Note which Scope 3 categories are included in the reporting
+      - Convert all emissions figures into tons of CO2 equivalents in #.### t CO2e format
+      - Check if data is available for all requested years
+      - If data is not available for certain years, note this clearly
+
+  - id: denali_16
+    text: "What are the company's total carbon footprint emissions in 2022, 2023, and 2024?"
+    guidelines: |
+      - Look for total emissions figures that combine Scope 1, 2, and 3
+      - Convert all emissions figures into tons of CO2 equivalents in #.### t CO2e format
+      - Check if data is available for all requested years
+      - Verify that the total matches the sum of individual scopes
+      - If data is not available for certain years, note this clearly
+
+  - id: denali_17
+    text: "Does the company comply with ISO 14001 environmental management standards?"
+    guidelines: |
+      - Look for explicit mention of ISO 14001 certification
+      - Check if certification covers all operations or just specific sites
+      - Note when certification was obtained and any recertification
+      - Consider any details about the implementation of the environmental management system
+      - Respond with clear "Yes" or "No" and supporting details
+
+  - id: denali_18
+    text: "Does the company comply with EMAS certification standards?"
+    guidelines: |
+      - Look for explicit mention of EMAS (Eco-Management and Audit Scheme) certification
+      - Check if certification covers all operations or just specific sites
+      - Note when certification was obtained and any recertification
+      - Consider any details about the implementation of the environmental management system
+      - Respond with clear "Yes" or "No" and supporting details
+
+  - id: denali_19
+    text: "Does the company comply with ISO 50001 energy management standards?"
+    guidelines: |
+      - Look for explicit mention of ISO 50001 certification
+      - Check if certification covers all operations or just specific sites
+      - Note when certification was obtained and any recertification
+      - Consider any details about the implementation of the energy management system
+      - Respond with clear "Yes" or "No" and supporting details
+
+  - id: denali_20
+    text: "Does the company participate in the CDP reporting and what score did they receive?"
+    guidelines: |
+      - Look for explicit mention of CDP (formerly Carbon Disclosure Project) participation
+      - Check if an A-score or other rating was achieved
+      - Note which CDP programs the company participates in (Climate Change, Water, Forests)
+      - Consider any history of participation and score trends
+      - Respond with clear "Yes" or "No" and details about the score
+
+  - id: denali_21
+    text: "Does the company have Science-Based Targets initiative (SBTi) commitments?"
+    guidelines: |
+      - Look for explicit mention of SBTi commitments or targets
+      - Check if targets are short-term or long-term
+      - Note if targets are aligned with 1.5°C pathway
+      - Consider if targets have been officially validated by SBTi
+      - Respond with clear "Yes" or "No" and supporting details
+
+  - id: denali_22
+    text: "What other important sustainability initiatives does the company implement that are not covered by the previous criteria?"
+    guidelines: |
+      - Look for sustainability initiatives that fall outside the previously mentioned categories
+      - Consider social sustainability initiatives, community engagement, or philanthropy
+      - Focus on unique or innovative approaches not covered elsewhere
+      - Look for initiatives related to diversity, equality, human rights, or ethical governance
+      - Summarize these initiatives in maximum 1000 characters
+      - Only include initiatives not already covered in other criteria
+
+  - id: denali_23
+    text: "Has the company faced any sustainability-related controversies in the last five years, and how did they react to them?"
+    guidelines: |
+      - Look for mentions of controversies, challenges, or negative incidents in the report
+      - Consider any media reports or public controversies that may not be mentioned in the report
+      - Focus on how the company responded to these controversies
+      - Assess whether the response appears adequate and transparent
+      - Evaluate if preventive measures were implemented to avoid similar controversies
+      - Summarize any controversies and responses in maximum 1000 characters
+      - If no controversies are found, leave this section blank
+
+analysis_guidelines: |
+  - Responses must be precise and grounded in report extracts
+  - Acknowledge uncertainty rather than making assumptions
+  - Consider potential greenwashing and cheap talk
+  - Scrutinize quantifiable data vs vague statements
+  - Maintain a critical analytical tone
+  - Acknowledge information represents company's perspective
+  - Evaluate completeness and quality of disclosures
+  - Generate results in the language of the PDF (German or English)
+  - Read through the entire content carefully before extracting information
+  - Look for clear headings or labels that indicate each piece of information
+  - For actions and solutions, prioritize listing solutions for customers before internal actions
+  - Only list actions and solutions that actually exist in the report
+  - Use the company's original wording from the report wherever possible 

@@ -14,3 +14,27 @@ __pycache__/
 /app/storage/
 /app/cache/
 **/storage/cache/
+report_analyst/temp/*
+
+# Cursor IDE files
+.cursor/
+
+# Coverage and test artifacts
+.coverage
+.pytest_cache/
+
+# Temporary files and diffs
+*.diff
+analyzer.diff
+streamlit.diff
+
+# Database files
+cache.db
+*.db
+
+# Environment and backup files
+.env.backup
+inputlucia
+
+# macOS system files
+.DS_Store
