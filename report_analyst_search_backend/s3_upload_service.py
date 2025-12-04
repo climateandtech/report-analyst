@@ -15,15 +15,16 @@ Usage:
 """
 
 import json
-import uuid
-from config.nats_config import config as nats_config
+import logging
 import os
+import uuid
+from datetime import datetime
+from typing import Any, Dict, Optional
+
 import boto3
 import nats
-import logging
-from datetime import datetime
-from typing import Optional, Dict, Any
 from botocore.config import Config
+from config.nats_config import config as nats_config
 
 from .config import BackendConfig
 
@@ -238,9 +239,10 @@ class S3UploadService:
             True if all required dependencies are available
         """
         try:
+            import os
+
             import boto3
             import nats
-            import os
 
             # Check for required environment variables (matches backend/PDF service)
             required_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]

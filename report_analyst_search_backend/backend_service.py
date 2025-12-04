@@ -62,8 +62,9 @@ class BackendService:
     def _should_use_s3_upload(self) -> bool:
         """Check if S3+NATS upload should be used"""
         try:
-            from .s3_upload_service import S3UploadService
             import os
+
+            from .s3_upload_service import S3UploadService
 
             # Check if enterprise S3 upload is enabled and available
             s3_enabled = os.getenv("USE_S3_UPLOAD", "").lower() in ("true", "1", "yes")

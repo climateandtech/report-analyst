@@ -9,11 +9,11 @@ Usage:
     python run_step_by_step_tests.py [--verbose] [--specific-test TEST_NAME]
 """
 
+import argparse
+import os
 import subprocess
 import sys
-import os
 from pathlib import Path
-import argparse
 
 
 def run_tests(verbose=False, specific_test=None):
@@ -86,8 +86,8 @@ def main():
 
     # Check if required dependencies are installed
     try:
-        import streamlit
         import pytest
+        import streamlit
 
         print(f"✓ Streamlit version: {streamlit.__version__}")
         print(f"✓ Pytest version: {pytest.__version__}")
