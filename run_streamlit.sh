@@ -9,4 +9,4 @@ fi
 pip install -r requirements.txt
 
 # Run the Streamlit app
-streamlit run app/streamlit_app.py 
+streamlit run report_analyst/streamlit_app.py 
