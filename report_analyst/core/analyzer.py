@@ -39,7 +39,9 @@ load_dotenv()
 # Check for backend configuration first
 use_backend = os.getenv("USE_BACKEND", "false").lower() == "true"
 use_centralized_llm = os.getenv("USE_CENTRALIZED_LLM", "false").lower() == "true"
-use_full_backend_analysis = os.getenv("USE_FULL_BACKEND_ANALYSIS", "false").lower() == "true"
+use_full_backend_analysis = (
+    os.getenv("USE_FULL_BACKEND_ANALYSIS", "false").lower() == "true"
+)
 
 # Check for required environment variables
 openai_key = os.getenv("OPENAI_API_KEY")
@@ -93,7 +95,9 @@ else:
     # Ensure we have at least one API key for the selected model type
     if not openai_key and not gemini_key:
         logger.error("No API keys found - set either OPENAI_API_KEY or GOOGLE_API_KEY")
-        raise ValueError("Set either OPENAI_API_KEY or GOOGLE_API_KEY environment variable")
+        raise ValueError(
+            "Set either OPENAI_API_KEY or GOOGLE_API_KEY environment variable"
+        )
 
 if not os.getenv("OPENAI_ORGANIZATION"):
     logger.warning("OPENAI_ORGANIZATION environment variable is not set")
@@ -156,10 +160,15 @@ class DocumentAnalyzer:
         log_analysis_step(f"Using default model from env: {self.default_model}")
 
         # Check if we should use backend for all LLM functionality
-        self.use_backend_llm = use_backend and (use_centralized_llm or use_full_backend_analysis)
+        self.use_backend_llm = use_backend and (
+            use_centralized_llm or use_full_backend_analysis
+        )
 
         if self.use_backend_llm:
-            log_analysis_step("🔗 Skipping local LLM initialization - using backend for all LLM functionality", "info")
+            log_analysis_step(
+                "🔗 Skipping local LLM initialization - using backend for all LLM functionality",
+                "info",
+            )
             # Set minimal placeholders for compatibility
             self.llm = None
             self.embeddings = None
@@ -191,33 +200,29 @@ class DocumentAnalyzer:
                     self.embeddings = None
 
             except Exception as e:
-                log_analysis_step(f"Error initializing local LLM clients: {str(e)}", "error")
+                log_analysis_step(
+                    f"Error initializing local LLM clients: {str(e)}", "error"
+                )
                 if not self.use_backend_llm:
                     raise
                 else:
                     # In backend mode, local LLM failures are not critical
-                    logger.warning("Local LLM initialization failed, but using backend mode")
+                    logger.warning(
+                        "Local LLM initialization failed, but using backend mode"
+                    )
                     self.llm = None
                     self.embeddings = None
 
         # Initialize caching and text processing (these are always needed)
         self.use_cache = True  # Default to True, can be overridden
         Settings.ingestion_cache = IngestionCache(
-            cache_dir=str(self.llm_cache_path),
-            cache_type="local"
+            cache_dir=str(self.llm_cache_path), cache_type="local"
         )
 
-        self.text_splitter = SentenceSplitter(
-            chunk_size=500,
-            chunk_overlap=20
-        )
+        self.text_splitter = SentenceSplitter(chunk_size=500, chunk_overlap=20)
 
         # Cache parameters
-        self.chunk_params = {
-            "chunk_size": 500,
-            "chunk_overlap": 20,
-            "top_k": 5
-        }
+        self.chunk_params = {"chunk_size": 500, "chunk_overlap": 20, "top_k": 5}
 
         self.embedding_params = {
             "model": "text-embedding-ada-002",

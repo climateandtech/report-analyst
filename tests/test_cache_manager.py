@@ -78,6 +78,7 @@ def test_save_and_get_analysis(temp_db):
     assert cached[question_id]["result"]["SCORE"] == 7
     assert len(cached[question_id]["result"]["EVIDENCE"]) == 2
 
+
 def test_save_and_get_vectors(temp_db):
     """Test saving and retrieving vector embeddings"""
     import numpy as np

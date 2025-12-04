@@ -49,27 +49,28 @@ class BackendService:
         if self._should_use_s3_upload():
             try:
                 from .s3_upload_service import S3UploadService
+
                 s3_service = S3UploadService(self.config)
                 return await s3_service.upload_pdf_via_s3_nats(file_bytes, filename)
             except Exception as e:
                 # Fall back to HTTP upload if S3 fails
                 logger.warning(f"S3+NATS upload failed, falling back to HTTP: {e}")
-        
+
         # Default HTTP upload
         return await self._upload_via_http(file_bytes, filename)
-    
+
     def _should_use_s3_upload(self) -> bool:
         """Check if S3+NATS upload should be used"""
         try:
             from .s3_upload_service import S3UploadService
             import os
-            
+
             # Check if enterprise S3 upload is enabled and available
-            s3_enabled = os.getenv('USE_S3_UPLOAD', '').lower() in ('true', '1', 'yes')
+            s3_enabled = os.getenv("USE_S3_UPLOAD", "").lower() in ("true", "1", "yes")
             return s3_enabled and S3UploadService.is_available()
         except ImportError:
             return False
-    
+
     async def _upload_via_http(self, file_bytes: bytes, filename: str) -> str:
         """Upload PDF via HTTP (default method)"""
         try:

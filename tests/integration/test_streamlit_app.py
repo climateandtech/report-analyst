@@ -168,6 +168,7 @@ def test_load_question_set(report_analyzer, test_env):
     assert "tcfd_1" in question_set["questions"]
     assert "tcfd_11" in question_set["questions"]
 
+
 @pytest.mark.asyncio
 async def test_analyze_document(report_analyzer, test_env):
     """Test document analysis flow"""

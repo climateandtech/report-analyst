@@ -25,6 +25,7 @@ def test_db():
     try:
         # Use CacheManager to create the database with all required tables
         from report_analyst.core.cache_manager import CacheManager
+
         cache_manager = CacheManager(str(db_path))
         print(f"Database created successfully at {db_path}")  # Debug print
 
@@ -321,6 +322,7 @@ async def test_process_document_with_cache(analyzer):
     )
     assert cached_result is not None
     assert cached_result["tcfd_1"]["result"]["ANSWER"] == test_answer["ANSWER"]
+
 
 def test_update_llm_model(analyzer):
     """Test LLM model update"""
