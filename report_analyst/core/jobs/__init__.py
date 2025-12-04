@@ -2,7 +2,7 @@
 Job Coordination System (Core)
 
 This package provides basic job coordination using NATS for the core report_analyst package.
-For universal analysis functions that can be integrated into Lambda/Celery/etc., 
+For universal analysis functions that can be integrated into Lambda/Celery/etc.,
 use the separate `report_analyst_jobs` module instead.
 
 This core jobs system is primarily for:
@@ -11,18 +11,23 @@ This core jobs system is primarily for:
 - Integration with the Streamlit app
 """
 
-from .interfaces import JobDefinition, JobResult, JobStatus, ExecutionBackend, AnalysisJobDefinition
 from .coordinator import JobCoordinator, create_job_coordinator
+from .interfaces import (
+    AnalysisJobDefinition,
+    ExecutionBackend,
+    JobDefinition,
+    JobResult,
+    JobStatus,
+)
 
 __all__ = [
     # Core interfaces
     "JobDefinition",
-    "JobResult", 
+    "JobResult",
     "JobStatus",
     "ExecutionBackend",
     "AnalysisJobDefinition",
-    
     # Job coordination
     "JobCoordinator",
-    "create_job_coordinator"
-] 
+    "create_job_coordinator",
+]

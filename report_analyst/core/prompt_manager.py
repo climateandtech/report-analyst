@@ -1,28 +1,34 @@
+import json
 import os
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import yaml
 from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage, SystemMessage
-import json
-import yaml
 from llama_index.core.llms import ChatMessage, MessageRole
+
 
 class PromptManager:
     def __init__(self, prompts_dir: str = "prompts"):
         self.prompts_dir = Path(prompts_dir)
 
-    def get_analysis_messages(self, question: str, context: str, guidelines: str, chunks_data: List[Dict]) -> List[ChatMessage]:
+    def get_analysis_messages(
+        self, question: str, context: str, guidelines: str, chunks_data: List[Dict]
+    ) -> List[ChatMessage]:
         """Generate messages for TCFD question analysis"""
         # Format chunks with numbers and scores for reference
-        formatted_chunks = "\n\n".join([
-            f"[CHUNK {i+1}] (Relevance Score: {chunk.get('computed_score', chunk.get('relevance_score', 0.0)):.3f})\n{chunk['text']}"
-            for i, chunk in enumerate(chunks_data)
-        ])
+        formatted_chunks = "\n\n".join(
+            [
+                f"[CHUNK {i+1}] (Relevance Score: {chunk.get('computed_score', chunk.get('relevance_score', 0.0)):.3f})\n{chunk['text']}"
+                for i, chunk in enumerate(chunks_data)
+            ]
+        )
 
         return [
             ChatMessage(
                 role=MessageRole.SYSTEM,
-                content="You are an AI assistant in the role of a Senior Equity Analyst with expertise in climate science that analyzes companys' sustainability reports."
+                content="You are an AI assistant in the role of a Senior Equity Analyst with expertise in climate science that analyzes companys' sustainability reports.",
             ),
             ChatMessage(
                 role=MessageRole.USER,
@@ -59,16 +65,16 @@ IMPORTANT: Your response MUST be in valid JSON format like this example:
     "SOURCES": [X, Y, Z]  # List of chunk numbers referenced
 }}
 
-Your FINAL_ANSWER in JSON (ensure there's no format error):"""
-            )
+Your FINAL_ANSWER in JSON (ensure there's no format error):""",
+            ),
         ]
 
     def process_result(self, result: dict, results: dict, q_id: str):
         try:
-            result_json = json.loads(result['result'])
+            result_json = json.loads(result["result"])
             results["answers"][q_id] = result_json.get("ANSWER", "No answer provided")
             results["sources"][q_id] = result_json.get("SOURCES", [])
         except Exception as e:
             print(f"Error processing result: {e}")
             results["answers"][q_id] = "Error processing result"
-            results["sources"][q_id] = [] 
+            results["sources"][q_id] = []
