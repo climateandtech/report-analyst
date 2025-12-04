@@ -1,10 +1,13 @@
+import shutil
 import uuid
 from pathlib import Path
 from typing import Optional, Union
-from fastapi import UploadFile
+
 import fitz  # PyMuPDF
+from fastapi import UploadFile
+
 from report_analyst.models.requests import DocumentMetadata
-import shutil
+
 
 class DocumentProcessor:
     def __init__(self, input_dir: str = "data/input", output_dir: str = "data/output"):
@@ -20,23 +23,23 @@ class DocumentProcessor:
             source_path = Path(file_path)
             safe_filename = source_path.name
             dest_path = self.input_dir / f"{document_id}_{safe_filename}"
-            
+
             print(f"Processing upload: {safe_filename}")
             print(f"Destination path: {dest_path}")
-            
+
             # Ensure parent directory exists
             dest_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Copy the file
             shutil.copy2(str(source_path), str(dest_path))
-            
+
             # Verify file was copied
             if not dest_path.exists():
                 raise ValueError("File was not created")
-            
+
             file_size = dest_path.stat().st_size
             print(f"Copied file size: {file_size} bytes")
-            
+
             if file_size == 0:
                 raise ValueError("File was copied but is empty")
 
@@ -55,29 +58,28 @@ class DocumentProcessor:
 
             # Extract metadata
             metadata = await self._extract_metadata(dest_path, safe_filename)
-            return {
-                "document_id": document_id,
-                "metadata": metadata
-            }
+            return {"document_id": document_id, "metadata": metadata}
         except Exception as e:
             print(f"Error processing upload: {str(e)}")
-            if 'dest_path' in locals() and dest_path.exists():
+            if "dest_path" in locals() and dest_path.exists():
                 dest_path.unlink()  # Clean up on error
             raise
 
-    async def _extract_metadata(self, file_path: Path, original_filename: str) -> DocumentMetadata:
+    async def _extract_metadata(
+        self, file_path: Path, original_filename: str
+    ) -> DocumentMetadata:
         """Extract metadata from the document using PyMuPDF"""
         try:
             file_size = file_path.stat().st_size
             file_type = file_path.suffix.lower()[1:]  # Remove the dot
-            
+
             metadata = {
                 "file_type": file_type,
                 "file_size": file_size,
                 "title": None,
                 "author": None,
                 "date": None,
-                "num_pages": None
+                "num_pages": None,
             }
 
             # Extract PDF metadata using PyMuPDF
@@ -99,7 +101,7 @@ class DocumentProcessor:
                 title=None,
                 author=None,
                 date=None,
-                num_pages=None
+                num_pages=None,
             )
 
     async def get_document_path(self, document_id: str) -> Optional[Path]:
@@ -114,4 +116,4 @@ class DocumentProcessor:
         if document_path and document_path.exists():
             document_path.unlink()
             return True
-        return False 
+        return False

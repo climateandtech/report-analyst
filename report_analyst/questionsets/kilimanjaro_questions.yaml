@@ -1,8 +1,9 @@
-name:  short profile analysis Questions
-description:  question set for analyzing sustainability reports
+name: Kilimanjaro short profile analysis Questions
+shortcut: kilimanjaro
+description: question set for analyzing sustainability reports based on Kilimanjaro criteria
 
 questions:
-  - id: s4m_1
+  - id: kilimanjaro_1
     text: "What are the most important actions and solutions for the transformation into a climate-neutral building stock incl. use of wood as a carbon storage the company is doing?"
     guidelines: |
       - Focus on sustainable building practices and materials used, particularly the incorporation of wood as a carbon storage solution
@@ -11,7 +12,7 @@ questions:
       - Assess the company's long-term strategies for maintaining and retrofitting existing buildings to meet climate-neutral standards
       - Consider the metrics and reporting frameworks used to track progress toward climate-neutral goals in the building sector
 
-  - id: s4m_2
+  - id: kilimanjaro_2
     text: "What are the most important actions and solutions for transformation to an energy-efficient economy and society the company is doing?"
     guidelines: |
       - Focus on specific energy-saving initiatives and programms implemented by the company
@@ -20,7 +21,7 @@ questions:
       - Consider alignment of energy efficiency practices with corporate sustainability goals and long-term strategies
       - Assess the clarity and comprehensiveness of energy consumption metrics and reporting methods used by the company
 
-  - id: s4m_3
+  - id: kilimanjaro_3
     text: "What are the most important actions and solutions for the transformation to an energy system based on renewable energies the company is doing?"
     guidelines: |
       - Focus on the deployment of renewable energy technologies (e.g., solar, wind, hydro)
@@ -29,7 +30,7 @@ questions:
       - Consider partnerships or collaborations with renewable energy providers or organizations
       - Assess the transparency and accuracy of reported renewable energy usage and generation metrics
 
-  - id: s4m_4
+  - id: kilimanjaro_4
     text: "What are the most important actions and solutions for the transformation to a climate-neutral company operation the company is doing?"
     guidelines: |
       - Focus on specific carbon reduction initiatives implemented by the company
@@ -38,7 +39,7 @@ questions:
       - Assess the effectiveness of current climate action programs and their measurable outcomes
       - Consider the transparency and comprehensiveness of emissions reporting and data collection methods
 
-  - id: s4m_5
+  - id: kilimanjaro_5
     text: "In which scopes is the company measuring its greenhouse gas emissions in the corporate carbon footprint? Have the greenhouse gas emissions decreased or increased (in some of the scopes) over the past three years? Is the company measuring scopes based on a certain framework? Does the company have a reduction target? What is the progress regarding that reduction target?"
     guidelines: |
       - Focus on emissions scope categorization: Determine if the company is measuring Scope 1, Scope 2, and Scope 3 emissions and how comprehensively and completely they are covered
@@ -47,47 +48,47 @@ questions:
       - Consider the presence of reduction targets: Check if the company has set specific, measurable, and time-bound targets for reducing greenhouse gas emissions and how these align with global climate goals and assess their progress towards reduction targets
       - Review whether the reported emissions have been reviewed and verified by an external party
 
-  - id: s4m_6
+  - id: kilimanjaro_6
     text: "What are the companies greenhouse gas emissions in Scope 1 in 2020, 2021, 2022, 2023 and 2024?"
     guidelines: |
       - Focus on specific emissions data for Scope 1 in t CO2e across the years 2020 to 2024
 
-  - id: s4m_7
+  - id: kilimanjaro_7
     text: "What are the companies greenhouse gas emissions in Scope 2 in 2020, 2021, 2022, 2023 and 2024?"
     guidelines: |
       - Focus on specific emissions data for Scope 2 (market-based) in t CO2e across the years 2020 to 2024
 
-  - id: s4m_8
+  - id: kilimanjaro_8
     text: "What are the companies greenhouse gas emissions in Scope 3 in 2020, 2021, 2022, 2023 and 2024?"
     guidelines: |
       - Focus on specific emissions data for Scope 3 in t CO2e across the years 2020 to 2024
 
-  - id: s4m_9
+  - id: kilimanjaro_9
     text: "Does the company count with ISO 14001 certification?"
     guidelines: |
       - Assess whether the company has implemented a comprehensive certified environmental management system in alignment with ISO 14001
 
-  - id: s4m_10
+  - id: kilimanjaro_10
     text: "Does the company count with EMAS certification?"
     guidelines: |
       - Assess whether the company has implemented a comprehensive certified environmental management system in alignment with EMAS
 
-  - id: s4m_11
+  - id: kilimanjaro_11
     text: "Does the company count with ISO 50001 certification?"
     guidelines: |
       - Assess whether the company has implemented a comprehensive certified energy management system in alignment with ISO 50001
 
-  - id: s4m_12
+  - id: kilimanjaro_12
     text: "Does the company participate in the CDP?"
     guidelines: |
       - Look for the company's participation in the CDP initiative over the past years
 
-  - id: s4m_13
+  - id: kilimanjaro_13
     text: "Does the company count with SBTi commitment?"
     guidelines: |
       - Look for a verified SBTi commitment or target submission
 
-  - id: s4m_14
+  - id: kilimanjaro_14
     text: "What are the most important actions and solutions to transform to a circular economy with sustainable, durable, reusable circular materials the company is doing?"
     guidelines: |
       - Focus on the adoption of sustainable, durable and reusable materials in product design
@@ -96,7 +97,7 @@ questions:
       - Look for long-, mid-, and short-term goals regarding circular materials use and replacement of unsustainable materials
       - Assess the use of metrics to measure progress towards circularity in material usage
 
-  - id: s4m_15
+  - id: kilimanjaro_15
     text: "What are the most important actions and solutions for occupational safety, health and safety in the company the company is doing?"
     guidelines: |
       - Focus on specific safety training programs implemented for employees

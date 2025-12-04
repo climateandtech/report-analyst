@@ -1,3 +1,3 @@
 from .cache_manager import CacheManager
 
-__all__ = ['CacheManager']
+__all__ = ["CacheManager"]

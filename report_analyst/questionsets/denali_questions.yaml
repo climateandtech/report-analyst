@@ -1,15 +1,16 @@
-name: lucia sustainability report analysis
-description: Comprehensive question set for analyzing sustainability reports based on Lucia criteria
+name: Denali sustainability report analysis
+shortcut: denali
+description: Comprehensive question set for analyzing sustainability reports based on Denali criteria
 
 questions:
-  - id: lucia_1
+  - id: denali_1
     text: "What is the company name and the file name of the sustainability report?"
     guidelines: |
       - Look for the company name on the front page of the PDF or in the document name
       - Identify the exact file name of the sustainability report
       - Note any discrepancies between the document title and file name
 
-  - id: lucia_2
+  - id: denali_2
     text: "What is the overall sustainability strategy, actions and impacts of the company?"
     guidelines: |
       - Focus on the company's business model and how sustainability integrates with it
@@ -19,7 +20,7 @@ questions:
       - Consider the comprehensiveness and coherence of the sustainability approach
       - Limit the abstract to maximum 500 characters
 
-  - id: lucia_3
+  - id: denali_3
     text: "What is the most courageous sustainability initiative that demonstrates the highest entrepreneurial courage from the company?"
     guidelines: |
       - Look for initiatives that go beyond industry standards or regulatory requirements
@@ -29,7 +30,7 @@ questions:
       - Evaluate how the company frames these initiatives in terms of courage or leadership
       - Limit the highlight to maximum 400 characters
 
-  - id: lucia_4
+  - id: denali_4
     text: "What is the most important sustainability action implemented internally that represents the biggest sustainability progress?"
     guidelines: |
       - Focus on internal operations or supply chain initiatives
@@ -39,7 +40,7 @@ questions:
       - Evaluate the effectiveness and ambition of the highlighted action
       - Limit the highlight to maximum 400 characters
 
-  - id: lucia_5
+  - id: denali_5
     text: "What is the most important sustainability solution offered to customers that represents the highest impact?"
     guidelines: |
       - Focus on products or services specifically designed to improve customer sustainability
@@ -49,7 +50,7 @@ questions:
       - Assess how innovative and effective these customer-facing solutions are
       - Limit the highlight to maximum 400 characters
 
-  - id: lucia_6
+  - id: denali_6
     text: "What are the most important actions and solutions for the transformation into a climate-neutral building stock including the use of wood as a carbon storage?"
     guidelines: |
       - Look for initiatives related to sustainable building practices and materials
@@ -61,7 +62,7 @@ questions:
       - Use the company's original wording from the report
       - If no actions found, state "no action found"
 
-  - id: lucia_7
+  - id: denali_7
     text: "What are the most important actions and solutions for transformation to an energy-efficient economy and society?"
     guidelines: |
       - Look for initiatives focused on reducing energy consumption and improving efficiency
@@ -73,7 +74,7 @@ questions:
       - Use the company's original wording from the report
       - If no actions found, state "no action found"
 
-  - id: lucia_8
+  - id: denali_8
     text: "What are the most important actions and solutions for the transformation to an energy system based on renewable energies?"
     guidelines: |
       - Look for initiatives involving biogas, biomass, geothermal, solar, wind, or water power
@@ -85,7 +86,7 @@ questions:
       - Use the company's original wording from the report
       - If no actions found, state "no action found"
 
-  - id: lucia_9
+  - id: denali_9
     text: "What are the most important actions and solutions for the transformation to a climate-neutral company operation?"
     guidelines: |
       - Look for CO2 compensation initiatives, carbon-neutral production or operations
@@ -97,7 +98,7 @@ questions:
       - Use the company's original wording from the report
       - If no actions found, state "no action found"
 
-  - id: lucia_10
+  - id: denali_10
     text: "What are the most important actions and solutions to transform to a circular economy with sustainable, durable, reusable circular materials?"
     guidelines: |
       - Look for initiatives involving biobased materials, bioplastics, or renewable raw materials
@@ -109,7 +110,7 @@ questions:
       - Use the company's original wording from the report
       - If no actions found, state "no action found"
 
-  - id: lucia_11
+  - id: denali_11
     text: "What are the most important actions and solutions for occupational safety, health and safety in the company?"
     guidelines: |
       - Look for initiatives on occupational health and safety, accident prevention
@@ -121,7 +122,7 @@ questions:
       - Use the company's original wording from the report
       - If no actions found, state "no action found"
 
-  - id: lucia_12
+  - id: denali_12
     text: "What measurements of greenhouse gas emissions are reported in the corporate carbon footprint?"
     guidelines: |
       - Look for reporting on CO2 equivalents, direct and indirect emissions
@@ -132,7 +133,7 @@ questions:
       - Use the company's original wording from the report
       - If no measurements found, state "no measurements found"
 
-  - id: lucia_13
+  - id: denali_13
     text: "What are the company's carbon footprint emissions for Scope 1 in 2022, 2023, and 2024?"
     guidelines: |
       - Look for specific emissions data for Scope 1 (direct emissions) across years
@@ -141,7 +142,7 @@ questions:
       - Note any methodology changes that might affect year-to-year comparisons
       - If data is not available for certain years, note this clearly
 
-  - id: lucia_14
+  - id: denali_14
     text: "What are the company's carbon footprint emissions for Scope 2 in 2022, 2023, and 2024?"
     guidelines: |
       - Look for specific emissions data for Scope 2 (indirect emissions from purchased energy) across years
@@ -150,7 +151,7 @@ questions:
       - Check if data is available for all requested years
       - If data is not available for certain years, note this clearly
 
-  - id: lucia_15
+  - id: denali_15
     text: "What are the company's carbon footprint emissions for Scope 3 in 2022, 2023, and 2024?"
     guidelines: |
       - Look for specific emissions data for Scope 3 (all other indirect emissions) across years
@@ -159,7 +160,7 @@ questions:
       - Check if data is available for all requested years
       - If data is not available for certain years, note this clearly
 
-  - id: lucia_16
+  - id: denali_16
     text: "What are the company's total carbon footprint emissions in 2022, 2023, and 2024?"
     guidelines: |
       - Look for total emissions figures that combine Scope 1, 2, and 3
@@ -168,7 +169,7 @@ questions:
       - Verify that the total matches the sum of individual scopes
       - If data is not available for certain years, note this clearly
 
-  - id: lucia_17
+  - id: denali_17
     text: "Does the company comply with ISO 14001 environmental management standards?"
     guidelines: |
       - Look for explicit mention of ISO 14001 certification
@@ -177,7 +178,7 @@ questions:
       - Consider any details about the implementation of the environmental management system
       - Respond with clear "Yes" or "No" and supporting details
 
-  - id: lucia_18
+  - id: denali_18
     text: "Does the company comply with EMAS certification standards?"
     guidelines: |
       - Look for explicit mention of EMAS (Eco-Management and Audit Scheme) certification
@@ -186,7 +187,7 @@ questions:
       - Consider any details about the implementation of the environmental management system
       - Respond with clear "Yes" or "No" and supporting details
 
-  - id: lucia_19
+  - id: denali_19
     text: "Does the company comply with ISO 50001 energy management standards?"
     guidelines: |
       - Look for explicit mention of ISO 50001 certification
@@ -195,7 +196,7 @@ questions:
       - Consider any details about the implementation of the energy management system
       - Respond with clear "Yes" or "No" and supporting details
 
-  - id: lucia_20
+  - id: denali_20
     text: "Does the company participate in the CDP reporting and what score did they receive?"
     guidelines: |
       - Look for explicit mention of CDP (formerly Carbon Disclosure Project) participation
@@ -204,7 +205,7 @@ questions:
       - Consider any history of participation and score trends
       - Respond with clear "Yes" or "No" and details about the score
 
-  - id: lucia_21
+  - id: denali_21
     text: "Does the company have Science-Based Targets initiative (SBTi) commitments?"
     guidelines: |
       - Look for explicit mention of SBTi commitments or targets
@@ -213,7 +214,7 @@ questions:
       - Consider if targets have been officially validated by SBTi
       - Respond with clear "Yes" or "No" and supporting details
 
-  - id: lucia_22
+  - id: denali_22
     text: "What other important sustainability initiatives does the company implement that are not covered by the previous criteria?"
     guidelines: |
       - Look for sustainability initiatives that fall outside the previously mentioned categories
@@ -223,7 +224,7 @@ questions:
       - Summarize these initiatives in maximum 1000 characters
       - Only include initiatives not already covered in other criteria
 
-  - id: lucia_23
+  - id: denali_23
     text: "Has the company faced any sustainability-related controversies in the last five years, and how did they react to them?"
     guidelines: |
       - Look for mentions of controversies, challenges, or negative incidents in the report
