@@ -1,6 +1,8 @@
 # GitHub Actions CI/CD
 
-This repository uses GitHub Actions for continuous integration and testing.
+This repository uses GitHub Actions for continuous integration and testing of the **Open Sustainability Analyst** (open-core) and related modules.
+
+Part of the **Open Sustainability Analysis** project by **Climate+Tech**.
 
 ## Workflows
 
