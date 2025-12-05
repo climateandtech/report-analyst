@@ -13,6 +13,7 @@ from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.document_sources import DocumentSource
 from report_analyst.core.plugins import discover_document_sources
 from report_analyst.core.question_loader import get_question_loader
+
 from .interfaces import (
     AnalysisJobDefinition,
     JobDefinition,
