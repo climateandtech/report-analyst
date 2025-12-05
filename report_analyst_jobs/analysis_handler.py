@@ -9,10 +9,10 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List
 
-from ..analyzer import DocumentAnalyzer
-from ..document_sources import DocumentSource
-from ..plugins import discover_document_sources
-from ..question_loader import get_question_loader
+from report_analyst.core.analyzer import DocumentAnalyzer
+from report_analyst.core.document_sources import DocumentSource
+from report_analyst.core.plugins import discover_document_sources
+from report_analyst.core.question_loader import get_question_loader
 from .interfaces import (
     AnalysisJobDefinition,
     JobDefinition,
@@ -238,7 +238,7 @@ Include specific references to relevant information found in the chunks.
         # For now, return a placeholder
 
         # You would use:
-        # from ..llm_providers import get_llm_provider
+        # from report_analyst.core.llm_providers import get_llm_provider
         # provider = get_llm_provider(model_name)
         # return await provider.generate(prompt)
 

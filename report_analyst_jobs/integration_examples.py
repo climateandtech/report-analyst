@@ -314,7 +314,7 @@ def run_analysis_script():
     Simple script example.
 
     Usage:
-    python -c "from report_analyst.core.jobs.integration_examples import run_analysis_script; run_analysis_script()"
+    python -c "from report_analyst_jobs.integration_examples import run_analysis_script; run_analysis_script()"
     """
     import asyncio
 
@@ -349,7 +349,7 @@ INTEGRATION_CONFIGS = {
         "description": "Celery worker configuration",
         "broker": "redis://localhost:6379",
         "backend": "redis://localhost:6379",
-        "imports": ["report_analyst.core.jobs.integration_examples"],
+        "imports": ["report_analyst_jobs.integration_examples"],
         "task_routes": {
             "analyze_document_task": {"queue": "analysis"},
             "analyze_document_with_progress_task": {"queue": "analysis"},
