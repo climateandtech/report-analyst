@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -1267,6 +1268,860 @@ def main():
 
         st.set_page_config(page_title="Report Analyst", layout="wide")
 
+        # Inject MINIMAL custom CSS for specific customizations only
+        # Let Streamlit handle most theming automatically
+        try:
+            # Minimal custom CSS - only for active sidebar item styling
+            custom_css = """
+            <style>
+            /* Import fonts from Google Fonts */
+            @import url('https://fonts.googleapis.com/css2?family=Afacad:wght@400;500;600;700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Cousine:wght@400;700&display=swap');
+            
+            /* Designer Colors - Exact specifications from Daniela */
+            
+            /* ========== LIGHT MODE ========== */
+            
+            /* Main app background - #F5F7FF */
+            .stApp {
+                background-color: #F5F7FF !important;
+                font-family: 'Afacad', sans-serif !important;
+            }
+            
+            /* Primary font - Afacad for titles and body text */
+            body, .main, p, span, div, label {
+                font-family: 'Afacad', sans-serif !important;
+            }
+            
+            /* Titles use Afacad */
+            h1, h2, h3, h4, h5, h6 {
+                font-family: 'Afacad', sans-serif !important;
+            }
+            
+            /* Secondary font - Cousine for UI elements */
+            button, .stButton > button,
+            input, textarea, select,
+            .stTextInput input, .stTextArea textarea, .stSelectbox select,
+            [data-baseweb="select"],
+            [data-baseweb="input"],
+            ::placeholder,
+            .stCaption, small,
+            [data-testid="stCaptionContainer"],
+            code, pre {
+                font-family: 'Cousine', monospace !important;
+            }
+            
+            /* Main container - #FFFFFF */
+            .main .block-container {
+                background-color: #FFFFFF !important;
+            }
+            
+            /* Secondary containers - C0C4FA 10% opacity */
+            [data-testid="stExpander"],
+            .stAlert,
+            [data-testid="stNotification"],
+            .stInfo {
+                background-color: rgba(192, 196, 250, 0.1) !important;
+            }
+            
+            /* Fix text layout - prevent vertical stacking */
+            .stInfo {
+                word-break: normal !important;
+                white-space: normal !important;
+            }
+            
+            .stInfo p,
+            .stInfo span {
+                writing-mode: horizontal-tb !important;
+                text-orientation: mixed !important;
+            }
+            
+            /* Ensure columns don't cause vertical text */
+            [data-testid="column"] {
+                min-width: 0 !important;
+            }
+            
+            [data-testid="column"] * {
+                word-break: normal !important;
+                white-space: normal !important;
+            }
+            
+            /* Titles - #4313C8 */
+            h1, h2, [data-testid="stMarkdownContainer"] h1, [data-testid="stMarkdownContainer"] h2 {
+                color: #4313C8 !important;
+            }
+            
+            /* Subtitles - #979DF6 */
+            h3, h4, [data-testid="stMarkdownContainer"] h3, [data-testid="stMarkdownContainer"] h4 {
+                color: #979DF6 !important;
+            }
+            
+            /* Body text - #170843 */
+            p, span, label {
+                color: #170843 !important;
+            }
+            
+            /* Don't force color on all divs - let them inherit to prevent layout issues */
+            div:not([data-testid="stSidebar"] div):not(.stCheckbox):not([data-testid="stMarkdownContainer"]) {
+                color: #170843 !important;
+            }
+            
+            /* Caption text - #718096 */
+            .stCaption, small, [data-testid="stCaptionContainer"] {
+                color: #718096 !important;
+            }
+            
+            /* Sidebar - white background */
+            [data-testid="stSidebar"] {
+                background-color: #FFFFFF !important;
+            }
+            
+            /* Sidebar text - #7872A7 */
+            [data-testid="stSidebar"] *:not([data-testid="stSidebarNav"] [aria-current="page"] *) {
+                color: #7872A7 !important;
+            }
+            
+            /* Sidebar accent (active item) - #4313C8 with white text */
+            [data-testid="stSidebarNav"] li[aria-selected="true"],
+            [data-testid="stSidebarNav"] a[aria-selected="true"],
+            [data-testid="stSidebarNav"] li[aria-current="page"],
+            [data-testid="stSidebarNav"] a[aria-current="page"] {
+                background-color: #4313C8 !important;
+                border-radius: 4px !important;
+            }
+            
+            /* Active sidebar item text and icons - white */
+            [data-testid="stSidebarNav"] li[aria-current="page"] *,
+            [data-testid="stSidebarNav"] a[aria-current="page"] * {
+                color: #ffffff !important;
+                fill: #ffffff !important;
+            }
+            
+            /* Sidebar navigation radio buttons - styled like screen design */
+            [data-testid="stSidebar"] [data-baseweb="radio"] {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 4px !important;
+            }
+            
+            /* Hide radio button input circles completely */
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                position: absolute !important;
+                width: 0 !important;
+                height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            /* Hide the radio button circle indicators */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div > div:first-child,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label::before,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label > div:first-child:not(span) {
+                display: none !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] > label {
+                padding: 10px 15px !important;
+                border-radius: 6px !important;
+                margin: 2px 0 !important;
+                transition: all 0.2s ease !important;
+                cursor: pointer !important;
+                background-color: transparent !important;
+                border: none !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] > label:hover {
+                background-color: rgba(67, 19, 200, 0.1) !important;
+            }
+            
+            /* Inactive sidebar items - purple text */
+            [data-testid="stSidebar"] [data-baseweb="radio"] label {
+                color: #4313C8 !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] label span {
+                color: #4313C8 !important;
+                font-family: 'Cousine', monospace !important;
+                font-weight: 400 !important;
+            }
+            
+            /* Active/selected sidebar item - purple background with white text */
+            /* Streamlit uses a div wrapper with data-checked attribute */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label[data-checked="true"],
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked ~ label,
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked + label {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border-radius: 6px !important;
+                font-weight: 700 !important;
+            }
+            
+            /* Also target the parent div when checked */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] {
+                background-color: #4313C8 !important;
+                border-radius: 6px !important;
+            }
+            
+            /* Active sidebar item text - white and bold */
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked ~ label span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked + label span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label[data-checked="true"] span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label[aria-checked="true"] span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div > label[data-checked="true"] span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > label[data-checked="true"] span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] [data-checked="true"] span {
+                color: #ffffff !important;
+                font-weight: 700 !important;
+            }
+            
+            /* Active sidebar item - also target the parent container */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                font-weight: 700 !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label span {
+                color: #ffffff !important;
+                font-weight: 700 !important;
+            }
+            
+            /* Sidebar Material Icons - match text color */
+            [data-testid="stSidebar"] [data-baseweb="radio"] label .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label .material-icons {
+                color: #4313C8 !important;
+                font-size: 20px !important;
+                margin-right: 8px !important;
+                vertical-align: middle !important;
+            }
+            
+            /* Active sidebar item Material Icons - white */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label[data-checked="true"] .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked ~ label .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked + label .nav-material-icon {
+                color: #ffffff !important;
+            }
+            
+            /* Keep tooltip icons (help icons) visible and styled */
+            [data-testid="stSidebar"] [data-baseweb="radio"] label [data-testid="stTooltipIcon"] svg,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label [data-testid="stTooltipHoverTarget"] svg {
+                display: inline-block !important;
+                color: #4313C8 !important;
+                stroke: #4313C8 !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label [data-testid="stTooltipIcon"] svg,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label [data-testid="stTooltipIcon"] svg {
+                color: #ffffff !important;
+                stroke: #ffffff !important;
+            }
+            
+            /* Green accent - #2E9D6F */
+            .stSuccess {
+                background-color: rgba(46, 157, 111, 0.3) !important;
+                border-color: #2E9D6F !important;
+                color: #2E9D6F !important;
+            }
+            
+            /* Green cards - 30% and 10% opacity */
+            [data-testid="stNotification"][data-status="success"] {
+                background-color: rgba(46, 157, 111, 0.1) !important;
+            }
+            
+            /* Buttons - primary color with inverted hover (matching screen designs) */
+            .stButton > button,
+            button[data-baseweb="button"],
+            [data-baseweb="button"],
+            button[type="button"],
+            button.kind-primary {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                border-radius: 4px !important;
+                transition: all 0.3s ease !important;
+                font-family: 'Cousine', monospace !important;
+                font-weight: 400 !important;
+                padding: 0.5rem 1rem !important;
+            }
+            
+            .stButton > button:hover,
+            button[data-baseweb="button"]:hover,
+            [data-baseweb="button"]:hover,
+            button[type="button"]:hover,
+            button.kind-primary:hover {
+                background-color: #ffffff !important;
+                color: #4313C8 !important;
+                border: 2px solid #4313C8 !important;
+            }
+            
+            .stButton > button:active,
+            button[data-baseweb="button"]:active,
+            [data-baseweb="button"]:active,
+            button[type="button"]:active,
+            button.kind-primary:active,
+            .stButton > button:focus,
+            button[data-baseweb="button"]:focus {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                outline: none !important;
+            }
+            
+            /* Remove all orange/red borders and states from buttons */
+            button,
+            .stButton > button,
+            [data-baseweb="button"],
+            button:focus,
+            button:active {
+                border-color: #4313C8 !important;
+                outline: none !important;
+            }
+            
+            /* Override Streamlit's default button colors */
+            [data-baseweb="base-button"] {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border-color: #4313C8 !important;
+            }
+            
+            [data-baseweb="base-button"]:hover {
+                background-color: #ffffff !important;
+                color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            [data-baseweb="base-button"]:active,
+            [data-baseweb="base-button"]:focus {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border-color: #4313C8 !important;
+                outline: none !important;
+            }
+            
+            /* File uploader button styling */
+            [data-testid="stFileUploader"] button,
+            [data-testid="stFileUploader"] [data-baseweb="button"],
+            .stFileUploader button {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                border-radius: 4px !important;
+                transition: all 0.3s ease !important;
+                font-family: 'Cousine', monospace !important;
+            }
+            
+            [data-testid="stFileUploader"] button:hover,
+            [data-testid="stFileUploader"] [data-baseweb="button"]:hover,
+            .stFileUploader button:hover {
+                background-color: #ffffff !important;
+                color: #4313C8 !important;
+                border: 2px solid #4313C8 !important;
+            }
+            
+            [data-testid="stFileUploader"] button:active,
+            [data-testid="stFileUploader"] button:focus,
+            [data-testid="stFileUploader"] [data-baseweb="button"]:active,
+            .stFileUploader button:active,
+            .stFileUploader button:focus {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                outline: none !important;
+            }
+            
+            /* Download button styling */
+            .stDownloadButton > button,
+            [data-testid="stDownloadButton"] button {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                border-radius: 4px !important;
+                transition: all 0.3s ease !important;
+                font-family: 'Cousine', monospace !important;
+            }
+            
+            .stDownloadButton > button:hover,
+            [data-testid="stDownloadButton"] button:hover {
+                background-color: #ffffff !important;
+                color: #4313C8 !important;
+                border: 2px solid #4313C8 !important;
+            }
+            
+            .stDownloadButton > button:active,
+            .stDownloadButton > button:focus,
+            [data-testid="stDownloadButton"] button:active,
+            [data-testid="stDownloadButton"] button:focus {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                outline: none !important;
+            }
+            
+            /* Secondary buttons */
+            button[data-baseweb="button"][kind="secondary"],
+            [data-baseweb="button"][kind="secondary"],
+            button.kind-secondary {
+                background-color: transparent !important;
+                color: #4313C8 !important;
+                border: 2px solid #4313C8 !important;
+            }
+            
+            button[data-baseweb="button"][kind="secondary"]:hover,
+            [data-baseweb="button"][kind="secondary"]:hover,
+            button.kind-secondary:hover {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+            }
+            
+            /* Checkboxes - purple accent, remove ALL orange, make checkmark visible */
+            .stCheckbox > label > span[data-baseweb="checkbox"],
+            span[data-baseweb="checkbox"],
+            [data-baseweb="checkbox"],
+            .stCheckbox input[type="checkbox"] {
+                background-color: transparent !important;
+                border: 2px solid #4313C8 !important;
+                border-radius: 4px !important;
+                width: 18px !important;
+                height: 18px !important;
+            }
+            
+            .stCheckbox > label > span[data-baseweb="checkbox"][aria-checked="true"],
+            span[data-baseweb="checkbox"][aria-checked="true"],
+            [data-baseweb="checkbox"][aria-checked="true"],
+            .stCheckbox input[type="checkbox"]:checked {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Make checkmark visible - white checkmark on purple background */
+            .stCheckbox > label > span[data-baseweb="checkbox"][aria-checked="true"] svg,
+            span[data-baseweb="checkbox"][aria-checked="true"] svg,
+            [data-baseweb="checkbox"][aria-checked="true"] svg {
+                color: #ffffff !important;
+                fill: #ffffff !important;
+                stroke: #ffffff !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            /* Alternative checkmark using CSS if SVG doesn't work */
+            .stCheckbox > label > span[data-baseweb="checkbox"][aria-checked="true"]::after,
+            span[data-baseweb="checkbox"][aria-checked="true"]::after {
+                content: "✓" !important;
+                color: #ffffff !important;
+                font-size: 16px !important;
+                font-weight: bold !important;
+                display: block !important;
+                position: absolute !important;
+                top: 50% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                line-height: 1 !important;
+            }
+            
+            /* Make checkmark visible in Streamlit's internal checkboxes */
+            span.st-bi[aria-checked="true"] svg,
+            span[class*="st-bi"][aria-checked="true"] svg {
+                color: #ffffff !important;
+                fill: #ffffff !important;
+                stroke: #ffffff !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            /* Question checkboxes - make them visible like in screen design */
+            .stCheckbox {
+                margin-bottom: 12px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .stCheckbox > div {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .stCheckbox label {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: flex-start !important;
+                gap: 8px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                font-family: 'Cousine', monospace !important;
+                box-sizing: border-box !important;
+            }
+            
+            .stCheckbox label > span[data-baseweb="checkbox"] {
+                min-width: 18px !important;
+                width: 18px !important;
+                min-height: 18px !important;
+                height: 18px !important;
+                flex-shrink: 0 !important;
+                flex-grow: 0 !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                margin-top: 2px !important;
+            }
+            
+            /* Fix markdown container - ensure horizontal text and proper responsive layout */
+            .stCheckbox label [data-testid="stMarkdownContainer"] {
+                writing-mode: horizontal-tb !important;
+                text-orientation: mixed !important;
+                flex: 1 1 auto !important;
+                min-width: 0 !important;
+                width: calc(100% - 26px) !important;
+                max-width: calc(100% - 26px) !important;
+                background-color: transparent !important;
+                border: none !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                box-sizing: border-box !important;
+            }
+            
+            .stCheckbox label [data-testid="stMarkdownContainer"] p {
+                writing-mode: horizontal-tb !important;
+                text-orientation: mixed !important;
+                word-break: normal !important;
+                white-space: normal !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                display: block !important;
+                line-height: 1.5 !important;
+                text-align: left !important;
+                background-color: transparent !important;
+                border: none !important;
+                font-family: 'Cousine', monospace !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-wrap: break-word !important;
+                word-wrap: break-word !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Remove any background or border from checkbox label elements */
+            .stCheckbox label,
+            .stCheckbox label *,
+            .stCheckbox label div,
+            .stCheckbox label span,
+            .stCheckbox label p,
+            .stCheckbox label [data-testid="stWidgetLabel"],
+            .stCheckbox label [data-testid="stWidgetLabel"] * {
+                background-color: transparent !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            
+            /* Remove borders from markdown container specifically */
+            .stCheckbox label [data-testid="stMarkdownContainer"],
+            .stCheckbox label [data-testid="stMarkdownContainer"] *,
+            .stCheckbox label [data-testid="stMarkdownContainer"] p,
+            .stCheckbox label [data-testid="stMarkdownContainer"] div {
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+                background-color: transparent !important;
+            }
+            
+            /* Prevent text fragmentation in checkbox labels */
+            .stCheckbox label [data-testid="stMarkdownContainer"] * {
+                word-break: normal !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                background-color: transparent !important;
+                border: none !important;
+            }
+            
+            /* Ensure checkbox container doesn't break text */
+            .stCheckbox > div,
+            .stCheckbox > div > div {
+                width: 100% !important;
+                overflow: visible !important;
+                background-color: transparent !important;
+                border: none !important;
+            }
+            
+            /* Remove borders from all checkbox-related elements */
+            .stCheckbox * {
+                border: none !important;
+            }
+            
+            /* But keep the checkbox itself visible */
+            .stCheckbox label > span[data-baseweb="checkbox"] {
+                border: 2px solid #4313C8 !important;
+            }
+            
+            /* Ensure all checkboxes are visible */
+            input[type="checkbox"] {
+                width: 18px !important;
+                height: 18px !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                display: block !important;
+            }
+            
+            /* Remove orange from Streamlit's internal checkbox elements */
+            span.st-bi,
+            span[class*="st-bi"],
+            span[class*="st-bj"],
+            span[class*="st-bk"],
+            span[class*="st-bl"],
+            span[class*="st-bm"],
+            span[class*="st-bn"],
+            span[class*="st-bo"],
+            span[class*="st-bp"],
+            span[class*="st-bq"],
+            span[class*="st-br"],
+            span[class*="st-bs"],
+            span[class*="st-bt"] {
+                background-color: transparent !important;
+                border: 2px solid #4313C8 !important;
+            }
+            
+            span.st-bi[aria-checked="true"],
+            span[class*="st-bi"][aria-checked="true"] {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Make checkmark visible in Streamlit's internal checkboxes */
+            span.st-bi[aria-checked="true"]::after,
+            span[class*="st-bi"][aria-checked="true"]::after {
+                content: "✓" !important;
+                color: #ffffff !important;
+                font-size: 14px !important;
+                font-weight: bold !important;
+                display: block !important;
+            }
+            
+            /* Force remove #FF4B4B (Streamlit's default orange) from ALL elements */
+            * {
+                --primary-color: #4313C8 !important;
+            }
+            
+            /* Remove orange from ALL elements with #FF4B4B */
+            div[style*="#FF4B4B"],
+            span[style*="#FF4B4B"],
+            div[style*="#ff4b4b"],
+            span[style*="#ff4b4b"],
+            div[style*="rgb(255, 75, 75)"],
+            span[style*="rgb(255, 75, 75)"],
+            *[style*="#FF4B4B"],
+            *[style*="#ff4b4b"] {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+                color: #4313C8 !important;
+            }
+            
+            /* Remove orange from Streamlit's internal div classes */
+            div[class*="st-cu"],
+            div[class*="st-cl"],
+            div[class*="st-f6"],
+            div[class*="st-f7"],
+            div[class*="st-f8"],
+            div[class*="st-f9"],
+            div[class*="st-fo"],
+            div[class*="st-fp"],
+            div[class*="st-b0"],
+            div[class*="st-fq"],
+            div[class*="st-fr"] {
+                background-color: transparent !important;
+                border-color: transparent !important;
+            }
+            
+            /* Specifically hide the orange line element */
+            div.st-cu.st-cl.st-f6.st-f7.st-f8.st-f9.st-fo.st-fp.st-b0.st-fq.st-fr {
+                display: none !important;
+                background-color: transparent !important;
+                border-color: transparent !important;
+            }
+            
+            /* Radio buttons - purple accent */
+            .stRadio > label > div[data-baseweb="radio"] > div {
+                background-color: transparent !important;
+                border-color: #4313C8 !important;
+            }
+            
+            .stRadio > label > div[data-baseweb="radio"][aria-checked="true"] > div:first-child {
+                background-color: #4313C8 !important;
+            }
+            
+            /* Number input buttons */
+            .stNumberInput button {
+                color: #4313C8 !important;
+                background-color: transparent !important;
+            }
+            
+            .stNumberInput button:hover {
+                background-color: rgba(67, 19, 200, 0.1) !important;
+            }
+            
+            /* Tabs - remove orange/red underline completely */
+            .stTabs [data-baseweb="tab"] {
+                color: #170843 !important;
+            }
+            
+            .stTabs [aria-selected="true"],
+            .stTabs [aria-selected="true"] [data-baseweb="tab"] {
+                color: #4313C8 !important;
+                border-bottom-color: #4313C8 !important;
+            }
+            
+            /* Remove all orange/red Streamlit defaults from tabs */
+            [data-baseweb="tab"][aria-selected="true"],
+            [data-baseweb="tab-list"] [aria-selected="true"] {
+                border-bottom: 2px solid #4313C8 !important;
+            }
+            
+            /* Remove orange from tab indicators and underlines */
+            .stTabs [aria-selected="true"]::after,
+            .stTabs [aria-selected="true"]::before,
+            [data-baseweb="tab"][aria-selected="true"]::after,
+            [data-baseweb="tab"][aria-selected="true"]::before {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Target Streamlit's internal tab styling */
+            div[class*="stTabs"] [aria-selected="true"],
+            div[class*="stTabs"] [aria-selected="true"] > div {
+                border-bottom-color: #4313C8 !important;
+            }
+            
+            /* Remove any orange borders/lines from tabs */
+            .stTabs * {
+                border-color: transparent !important;
+            }
+            
+            .stTabs [aria-selected="true"] * {
+                border-bottom-color: #4313C8 !important;
+            }
+            
+            /* Progress bars */
+            .stProgress > div > div > div {
+                background-color: #4313C8 !important;
+            }
+            
+            /* Sliders */
+            [data-baseweb="slider"] [data-baseweb="slider-track"] {
+                background-color: #4313C8 !important;
+            }
+            
+            [data-baseweb="slider"] [data-baseweb="slider-handle"] {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* File uploader */
+            [data-testid="stFileUploader"] button {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+            }
+            
+            /* Remove any orange from links */
+            a:link, a:visited {
+                color: #4313C8 !important;
+            }
+            
+            a:hover {
+                color: #979DF6 !important;
+            }
+            
+            /* Expander icons */
+            .streamlit-expanderHeader {
+                color: #4313C8 !important;
+            }
+            
+            /* Header - remove orange/red bar at top */
+            [data-testid="stHeader"],
+            [data-testid="stHeader"] > div,
+            [data-testid="stHeader"] > div > div {
+                background-color: transparent !important;
+                border-bottom: none !important;
+            }
+            
+            /* Remove orange from progress bars */
+            [data-baseweb="progressbar"],
+            [data-baseweb="progressbar"] > div,
+            [data-baseweb="progressbar"] > div > div {
+                background-color: #4313C8 !important;
+            }
+            
+            /* Remove orange from any remaining Streamlit elements */
+            [style*="rgb(255, 75, 75)"],
+            [style*="rgb(255, 107, 107)"],
+            [style*="#ff4b4b"],
+            [style*="#ff6b6b"],
+            [style*="rgb(255, 99, 71)"],
+            [style*="#ff6347"],
+            [style*="rgb(255, 140, 0)"],
+            [style*="#ff8c00"] {
+                color: #4313C8 !important;
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Force remove orange backgrounds */
+            div[style*="background"][style*="255, 75"],
+            div[style*="background"][style*="255, 107"],
+            div[style*="background"][style*="#ff4b"],
+            div[style*="background"][style*="#ff6b"] {
+                background-color: transparent !important;
+            }
+            
+            /* Links */
+            a {
+                color: #4313C8 !important;
+            }
+            
+            /* Footer styling - in sidebar at bottom */
+            [data-testid="stSidebar"] .footer {
+                text-align: center;
+                padding: 15px 10px;
+                font-size: 11px;
+                border-top: 1px solid rgba(67, 19, 200, 0.1);
+                margin-top: 20px;
+            }
+            
+            [data-testid="stSidebar"] .footer a {
+                color: #4313C8 !important;
+            }
+            
+            [data-testid="stSidebar"] .footer img {
+                height: 25px;
+                vertical-align: middle;
+                margin-right: 8px;
+            }
+            
+            [data-testid="stSidebar"] .footer p {
+                margin: 4px 0;
+                color: #7872A7;
+                font-size: 11px;
+            }
+            
+            </style>
+            """
+            
+            st.markdown(custom_css, unsafe_allow_html=True)
+        except Exception as e:
+            # Fallback if theme detection fails
+            logger.warning(f"Could not apply custom theme: {str(e)}")
+
         # Initialize analyzer with default question set
         try:
             # Initialize analyzer and store in session state if not already there
@@ -1279,151 +2134,214 @@ def main():
             st.exception(e)
             return
 
-        st.title("Report Analyst")
-
-        # Backend Integration Section
-        if BACKEND_INTEGRATION_AVAILABLE:
-            with st.expander("🔧 Backend Integration", expanded=False):
-                config = configure_backend_integration()
-                display_config_status(config)
-        else:
-            # Show fallback info
-            with st.expander("🔧 Backend Integration", expanded=False):
-                st.warning("⚠️ Backend integration modules not available")
-                st.info(
-                    "Install backend integration dependencies to enable advanced features"
+        # Add logo to sidebar
+        try:
+            logo_path = Path(__file__).parent / "assets" / "open-sustainability-analyst.svg"
+            if logo_path.exists():
+                with open(logo_path, "rb") as f:
+                    logo_data = base64.b64encode(f.read()).decode()
+                    st.sidebar.markdown(
+                        f"""
+                        <div style="text-align: center; padding: 10px 20px 30px 20px; margin-bottom: 20px;">
+                            <img src="data:image/svg+xml;base64,{logo_data}" 
+                                 alt="Open Sustainability Analyst" 
+                                 style="width: 90%; max-width: 200px; height: auto;" />
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+        except Exception as e:
+            logger.warning(f"Could not load sidebar logo: {str(e)}")
+        
+        # Create sidebar navigation using streamlit-option-menu (much simpler!)
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### Navigation")
+        
+        try:
+            from streamlit_option_menu import option_menu
+            
+            # Ensure it's in sidebar context
+            with st.sidebar:
+                nav_page = option_menu(
+                    menu_title=None,
+                    options=["Upload New", "Analyze report", "Browse data"],
+                    icons=["upload", "file-text", "bar-chart"],
+                    menu_icon=None,
+                    default_index=0,
+                    orientation="vertical",
+                    key="nav_page",
+                    styles={
+                        "container": {"padding": "0", "background-color": "transparent"},
+                        "icon": {"color": "#4313C8", "font-size": "20px"},
+                        "nav-link": {
+                            "font-family": "'Cousine', monospace",
+                            "font-size": "16px",
+                            "text-align": "left",
+                            "margin": "2px 0",
+                            "padding": "10px 15px",
+                            "border-radius": "6px",
+                            "color": "#4313C8",
+                            "background-color": "transparent",
+                        },
+                        "nav-link-selected": {
+                            "background-color": "#4313C8",
+                            "color": "#ffffff",
+                            "font-weight": "700",
+                        },
+                    }
                 )
+        except ImportError:
+            # Fallback to regular radio if package not installed
+            nav_options = ["Upload New", "Analyze report", "Browse data"]
+            nav_page = st.sidebar.radio(
+                "",
+                nav_options,
+                key="nav_page",
+                label_visibility="collapsed"
+            )
+        
+        # Backend Integration in sidebar (available on all pages)
+        st.sidebar.markdown("---")
+        if BACKEND_INTEGRATION_AVAILABLE:
+            config = configure_backend_integration()
+        else:
+            st.sidebar.markdown("### 🔧 Backend Integration")
+            st.sidebar.warning("⚠️ Backend integration modules not available")
+            config = None
 
-        # Settings section - moved below the title
-        with st.expander("Analysis Configuration", expanded=True):
-            # Enterprise Integration Settings
-            if BACKEND_INTEGRATION_AVAILABLE:
-                st.subheader("🚀 Enterprise Integration")
-                col1, col2 = st.columns(2)
+        # Show page-specific content based on navigation
+        if nav_page == "Analyze report":
+            st.title("Report Analyst")
+
+            # Show backend integration status in main area (if configured)
+            if BACKEND_INTEGRATION_AVAILABLE and config and config.use_backend:
+                with st.expander("🔧 Backend Integration Status", expanded=False):
+                    display_config_status(config)
+
+            # Settings section - moved below the title
+            with st.expander("Analysis Configuration", expanded=True):
+                # Enterprise Integration Settings
+                if BACKEND_INTEGRATION_AVAILABLE:
+                    st.subheader("🚀 Enterprise Integration")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        use_s3_upload = st.checkbox(
+                            "Enable S3+NATS Upload",
+                            value=os.getenv("USE_S3_UPLOAD", "false").lower() == "true",
+                            key="use_s3_upload",
+                            help="Upload documents via S3 and process via NATS for enterprise integration with backend",
+                        )
+                    with col2:
+                        if use_s3_upload:
+                            st.success(
+                                "✅ Enterprise mode enabled - documents will be processed via S3+NATS"
+                            )
+                        else:
+                            st.info("📁 Local mode - documents processed locally")
+                    st.divider()
+
+                # Question set selection
+                col1, col2 = st.columns([1, 2])
                 with col1:
-                    use_s3_upload = st.checkbox(
-                        "Enable S3+NATS Upload",
-                        value=os.getenv("USE_S3_UPLOAD", "false").lower() == "true",
-                        key="use_s3_upload",
-                        help="Upload documents via S3 and process via NATS for enterprise integration with backend",
+                    selected_set = st.selectbox(
+                        "Select Question Set",
+                        options=list(question_sets.keys()),
+                        format_func=lambda x: question_sets[x]["name"],
+                        key="new_question_set",
+                        index=0,  # Ensure a default is selected
+                        on_change=update_analyzer_parameters,
+                    )
+
+                # Show question set description
+                with col2:
+                    if selected_set in question_sets:
+                        st.info(question_sets[selected_set]["description"])
+
+                # Update analyzer's question set
+                analyzer.analyzer.update_question_set(selected_set)
+
+                # Clear results if question set changed
+                if (
+                    "last_question_set" not in st.session_state
+                    or st.session_state.last_question_set != selected_set
+                ):
+                    if "results" in st.session_state:
+                        del st.session_state.results
+                    st.session_state.last_question_set = selected_set
+
+                # LLM settings
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    new_llm_scoring = st.checkbox(
+                        "Use LLM Scoring",
+                        value=False,
+                        key="new_llm_scoring",
+                        on_change=update_analyzer_parameters,
                     )
                 with col2:
-                    if use_s3_upload:
-                        st.success(
-                            "✅ Enterprise mode enabled - documents will be processed via S3+NATS"
-                        )
+                    new_batch_scoring = st.checkbox(
+                        "Batch Scoring",
+                        value=True,
+                        key="new_batch_scoring",
+                        disabled=not st.session_state.get("new_llm_scoring", False),
+                        help="Batch scoring only applies when LLM scoring is enabled. When enabled, all chunks are scored in one API call instead of individual calls.",
+                    )
+                with col3:
+                    # Display available API info
+                    api_info = []
+                    if os.getenv("OPENAI_API_KEY"):
+                        api_info.append("OpenAI")
+                    if os.getenv("GOOGLE_API_KEY"):
+                        api_info.append("Gemini")
+
+                    if len(api_info) > 1:
+                        api_status = f"Using {' & '.join(api_info)} models"
+                    elif len(api_info) == 1:
+                        api_status = f"Using {api_info[0]} models only"
                     else:
-                        st.info("📁 Local mode - documents processed locally")
-                st.divider()
+                        api_status = "No API keys configured"
 
-            # Question set selection
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                selected_set = st.selectbox(
-                    "Select Question Set",
-                    options=list(question_sets.keys()),
-                    format_func=lambda x: question_sets[x]["name"],
-                    key="new_question_set",
-                    index=0,  # Ensure a default is selected
-                    on_change=update_analyzer_parameters,
-                )
+                    st.caption(api_status)
 
-            # Show question set description
-            with col2:
-                if selected_set in question_sets:
-                    st.info(question_sets[selected_set]["description"])
+                    new_llm_model = st.selectbox(
+                        "LLM Model",
+                        options=LLM_MODELS,
+                        index=0,  # Ensure a default is selected
+                        key="new_llm_model",
+                        on_change=update_analyzer_parameters,
+                    )
 
-            # Update analyzer's question set
-            analyzer.analyzer.update_question_set(selected_set)
+                # Chunking parameters
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    new_chunk_size = st.number_input(
+                        "Chunk Size",
+                        min_value=100,
+                        max_value=2000,
+                        value=500,  # Default value
+                        key="new_chunk_size",
+                        on_change=update_analyzer_parameters,
+                    )
+                with col2:
+                    new_overlap = st.number_input(
+                        "Overlap",
+                        min_value=0,
+                        max_value=100,
+                        value=20,  # Default value
+                        key="new_overlap",
+                        on_change=update_analyzer_parameters,
+                    )
+                with col3:
+                    new_top_k = st.number_input(
+                        "Top K",
+                        min_value=1,
+                        max_value=20,
+                        value=5,  # Default value
+                        key="new_top_k",
+                        on_change=update_analyzer_parameters,
+                    )
 
-            # Clear results if question set changed
-            if (
-                "last_question_set" not in st.session_state
-                or st.session_state.last_question_set != selected_set
-            ):
-                if "results" in st.session_state:
-                    del st.session_state.results
-                st.session_state.last_question_set = selected_set
-
-            # LLM settings
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                new_llm_scoring = st.checkbox(
-                    "Use LLM Scoring",
-                    value=False,
-                    key="new_llm_scoring",
-                    on_change=update_analyzer_parameters,
-                )
-            with col2:
-                new_batch_scoring = st.checkbox(
-                    "Batch Scoring",
-                    value=True,
-                    key="new_batch_scoring",
-                    disabled=not st.session_state.get("new_llm_scoring", False),
-                    help="Batch scoring only applies when LLM scoring is enabled. When enabled, all chunks are scored in one API call instead of individual calls.",
-                )
-            with col3:
-                # Display available API info
-                api_info = []
-                if os.getenv("OPENAI_API_KEY"):
-                    api_info.append("OpenAI")
-                if os.getenv("GOOGLE_API_KEY"):
-                    api_info.append("Gemini")
-
-                if len(api_info) > 1:
-                    api_status = f"Using {' & '.join(api_info)} models"
-                elif len(api_info) == 1:
-                    api_status = f"Using {api_info[0]} models only"
-                else:
-                    api_status = "No API keys configured"
-
-                st.caption(api_status)
-
-                new_llm_model = st.selectbox(
-                    "LLM Model",
-                    options=LLM_MODELS,
-                    index=0,  # Ensure a default is selected
-                    key="new_llm_model",
-                    on_change=update_analyzer_parameters,
-                )
-
-            # Chunking parameters
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                new_chunk_size = st.number_input(
-                    "Chunk Size",
-                    min_value=100,
-                    max_value=2000,
-                    value=500,  # Default value
-                    key="new_chunk_size",
-                    on_change=update_analyzer_parameters,
-                )
-            with col2:
-                new_overlap = st.number_input(
-                    "Overlap",
-                    min_value=0,
-                    max_value=100,
-                    value=20,  # Default value
-                    key="new_overlap",
-                    on_change=update_analyzer_parameters,
-                )
-            with col3:
-                new_top_k = st.number_input(
-                    "Top K",
-                    min_value=1,
-                    max_value=20,
-                    value=5,  # Default value
-                    key="new_top_k",
-                    on_change=update_analyzer_parameters,
-                )
-
-        # Create tabs
-        file_tab, upload_tab, consolidated_tab = st.tabs(
-            ["Previous Reports", "Upload New", "Consolidated Results"]
-        )
-
-        # Previous Reports tab
-        with file_tab:
+            # Previous Reports page content
             previous_files = get_uploaded_files_history()
             if previous_files:
                 selected_file = st.selectbox(
@@ -1440,9 +2358,6 @@ def main():
                             st.session_state.new_question_set
                         )
                         questions = question_set_data["questions"]
-
-                        if question_set_data["description"]:
-                            st.write(question_set_data["description"])
 
                         # Add cache selector
                         display_cache_selector(str(file_path))
@@ -1602,8 +2517,8 @@ def main():
             else:
                 st.info("No previously analyzed reports found")
 
-        # Upload New tab
-        with upload_tab:
+        # Upload New page
+        elif nav_page == "Upload New":
             # Check if S3+NATS enterprise integration is enabled (from UI checkbox)
             use_s3_upload = st.session_state.get("use_s3_upload", False)
 
@@ -1727,8 +2642,8 @@ def main():
                         st.session_state.file_processed = True
                         st.rerun()
 
-        # Consolidated Results tab
-        with consolidated_tab:
+        # Browse data page
+        elif nav_page == "Browse data":
             st.header("View All Results")
             st.write("View and export consolidated results for all analyzed reports")
 
@@ -1748,33 +2663,36 @@ def main():
                 # Only show consolidated results
                 display_consolidated_results(analyzer, selected_set)
 
-        # Add Climate+Tech footer at the end
-        footer = """
-        <style>
-        .footer {
-            position: fixed;
-            left: 0;
-            bottom: 0;
-            width: 100%;
-            background-color: #f1f1f1;
-            color: black;
-            text-align: center;
-            padding: 10px;
-            font-size: 14px;
-        }
-        .footer img {
-            height: 30px;
-            vertical-align: middle;
-            margin-right: 10px;
-        }
-        </style>
+        # Add Climate+Tech footer at the bottom of sidebar
+        # Get current theme for logo selection and encode image as base64
+        try:
+            theme = st.context.theme if hasattr(st.context, 'theme') else {}
+            is_dark = theme.get('base', 'light') == 'dark' if theme else False
+            logo_filename = "assets/climate-and-tech-logo-dark-mode.png" if is_dark else "assets/climateandtech-logo-new-light-mode.png"
+            logo_path = Path(__file__).parent / logo_filename
+            
+            # Read and encode image as base64
+            if logo_path.exists():
+                with open(logo_path, "rb") as img_file:
+                    img_data = base64.b64encode(img_file.read()).decode()
+                    logo_src = f"data:image/png;base64,{img_data}"
+            else:
+                # Fallback if logo file doesn't exist
+                logo_src = ""
+        except Exception as e:
+            logger.warning(f"Could not load logo: {str(e)}")
+            logo_src = ""
+        
+        # Add footer to sidebar
+        st.sidebar.markdown("---")
+        footer = f"""
         <div class="footer">
-            <img src="https://www.climateandtech.com/climateandtech.png" alt="Climate+Tech Logo">
+            {f'<img src="{logo_src}" alt="Climate+Tech Logo" style="height: 25px; vertical-align: middle; margin-right: 8px;">' if logo_src else ''}
             <p>Climate+Tech Sustainability Report Analysis Tool</p>
             <p>For custom tool development contact us at <a href="https://www.climateandtech.com" target="_blank">www.climateandtech.com</a></p>
         </div>
         """
-        st.markdown(footer, unsafe_allow_html=True)
+        st.sidebar.markdown(footer, unsafe_allow_html=True)
 
     except Exception as e:
         st.error("Error during analysis:")
