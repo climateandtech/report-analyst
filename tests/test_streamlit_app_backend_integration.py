@@ -152,7 +152,13 @@ def test_backend_integration_compatibility():
     # Backend integration should be compatible with the main app
     # This is verified by the app loading and functioning correctly
 
+    # Check that navigation page is set in session state
+    assert "nav_page" in at.session_state, "Navigation page not found in session state"
+    
+    # Navigate to Report Analyst page to check for title
+    at.session_state["nav_page"] = "Report Analyst"
+    at.run(timeout=10)
+
     # Check that all main app features still work with backend integration
     assert len(at.title) > 0, "App title not found with backend integration"
-    assert len(at.tabs) >= 3, "Not enough tabs found with backend integration"
     assert not at.exception

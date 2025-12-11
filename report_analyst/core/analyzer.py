@@ -1167,7 +1167,23 @@ Output only the scores, one per line, in order:"""
     def get_question_by_number(self, number: int) -> Optional[Dict]:
         """Get question data by its number."""
         try:
-            question_key = f"{self.question_set}_{number}"
+            # Handle question set to prefix mapping
+            question_set_mapping = {
+                "everest": "ev",
+                "tcfd": "tcfd",
+                "s4m": "s4m",
+                "lucia": "lucia",
+            }
+
+            # Get the correct prefix for the question set
+            question_prefix = question_set_mapping.get(
+                self.question_set, self.question_set
+            )
+            question_key = f"{question_prefix}_{number}"
+
+            logger.debug(f"Looking for question {number} with key: {question_key}")
+            logger.debug(f"Available question keys: {list(self.questions.keys())}")
+
             return self.questions.get(question_key)
         except Exception as e:
             log_analysis_step(f"Error getting question {number}: {str(e)}", "error")
@@ -1211,6 +1227,58 @@ Output only the scores, one per line, in order:"""
         """Update the question set and reload questions."""
         self.question_set = question_set
         self.questions = self._load_questions()
+
+    def check_step_completion(self, file_path: str) -> Dict[str, bool]:
+        """Check which steps are completed for a file with current configuration"""
+        try:
+            config = {
+                "chunk_size": self.chunk_params["chunk_size"],
+                "chunk_overlap": self.chunk_params["chunk_overlap"],
+                "top_k": self.chunk_params["top_k"],
+                "model": self.llm.model if self.llm and hasattr(self.llm, "model") else self.default_model,
+                "question_set": self.question_set,
+            }
+
+            # Check step 1: Chunks without embeddings
+            chunks_without_embeddings = self.cache_manager.get_chunks_without_embeddings(
+                file_path=file_path,
+                chunk_size=config["chunk_size"],
+                chunk_overlap=config["chunk_overlap"],
+            )
+            step1_complete = len(chunks_without_embeddings) > 0
+
+            # Check step 2: Chunks with embeddings
+            chunks_with_embeddings = self.cache_manager.get_document_chunks(
+                file_path=file_path,
+                chunk_size=config["chunk_size"],
+                chunk_overlap=config["chunk_overlap"],
+            )
+            step2_complete = (
+                len(chunks_with_embeddings) > 0
+                and any(c.get("embedding") is not None for c in chunks_with_embeddings)
+            )
+
+            # Check step 3: Chunk scoring (check if any questions have been scored)
+            step3_complete = self.cache_manager.has_chunk_scoring(file_path, config)
+
+            # Check step 4: Full analysis (check if any questions have been analyzed)
+            step4_complete = len(self.cache_manager.get_analysis(file_path, config)) > 0
+
+            return {
+                "chunks": step1_complete,
+                "embeddings": step2_complete,
+                "scoring": step3_complete,
+                "analysis": step4_complete,
+            }
+
+        except Exception as e:
+            logger.error(f"Error checking step completion: {str(e)}")
+            return {
+                "chunks": False,
+                "embeddings": False,
+                "scoring": False,
+                "analysis": False,
+            }
 
     def _parse_config_from_filename(self, filename: str) -> Dict[str, Any]:
         """Parse configuration parameters from a cache filename.

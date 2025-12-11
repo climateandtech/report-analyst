@@ -9,12 +9,14 @@ from streamlit.testing.v1 import AppTest
 def test_question_set_selectbox_exists():
     """Test question set selectbox is present"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
+    # Navigate to Report Analyst page where question set selectbox is located
+    at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Find question set selectbox
     question_selectbox = None
     for sb in at.selectbox:
-        if "Question Set" in str(sb.label):
+        if "Question Set" in str(sb.label) or "new_question_set" in str(sb.key):
             question_selectbox = sb
             break
 
@@ -25,11 +27,13 @@ def test_question_set_selectbox_exists():
 def test_question_sets_loaded_dynamically():
     """Test question sets loaded from question_loader"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
+    # Navigate to Report Analyst page where question set selectbox is located
+    at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Find question set selectbox
     for sb in at.selectbox:
-        if "Question Set" in str(sb.label):
+        if "Question Set" in str(sb.label) or "new_question_set" in str(sb.key):
             options = [str(opt) for opt in sb.options]
             # Should have multiple question sets
             assert (
@@ -49,12 +53,14 @@ def test_question_sets_loaded_dynamically():
 def test_question_set_selectbox_has_options():
     """Test question set selectbox has multiple options available"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
+    # Navigate to Report Analyst page where question set selectbox is located
+    at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Find question set selectbox
     question_selectbox = None
     for sb in at.selectbox:
-        if "Question Set" in str(sb.label):
+        if "Question Set" in str(sb.label) or "new_question_set" in str(sb.key):
             question_selectbox = sb
             break
 

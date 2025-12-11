@@ -67,13 +67,9 @@ def create_analysis_dataframes(
                     "Question ID": question_id,
                     "Analysis": result.get("ANSWER", ""),
                     "Score": float(result.get("SCORE", 0)),
-                    "Key Evidence": "\n".join(
-                        str(e) for e in result.get("EVIDENCE", [])
-                    ),
-                    "Gaps": "\n".join(str(gap) for gap in result.get("GAPS", [])),
-                    "Sources": "\n".join(
-                        str(source) for source in result.get("SOURCES", [])
-                    ),
+                    "Key Evidence": format_list_field(result.get("EVIDENCE", [])),
+                    "Gaps": format_list_field(result.get("GAPS", [])),
+                    "Sources": format_list_field(result.get("SOURCES", [])),
                 }
                 analysis_rows.append(analysis_row)
                 logger.info(f"Added analysis row for question {question_id}")

@@ -206,3 +206,144 @@ def test_cache_status(temp_db):
     assert status[0][1] == 20  # chunk_overlap
     assert status[0][2] == 5  # top_k
     assert status[0][3] == "gpt-4"  # model
+
+
+def test_get_chunks_without_embeddings(temp_db):
+    """Test get_chunks_without_embeddings method"""
+    import numpy as np
+    import sqlite3
+    from datetime import datetime
+
+    file_path = "test_file.pdf"
+    chunk_size = 500
+    chunk_overlap = 20
+
+    # Insert chunks directly into database (some without embeddings, some with)
+    with sqlite3.connect(temp_db.db_path) as conn:
+        timestamp = datetime.now().isoformat()
+        
+        # Insert chunks without embeddings
+        conn.execute(
+            """
+            INSERT INTO document_chunks
+            (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                file_path,
+                "Chunk 1 without embedding",
+                chunk_size,
+                chunk_overlap,
+                None,  # No embedding
+                json.dumps({}),
+                timestamp,
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO document_chunks
+            (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                file_path,
+                "Chunk 2 without embedding",
+                chunk_size,
+                chunk_overlap,
+                None,  # No embedding
+                json.dumps({}),
+                timestamp,
+            ),
+        )
+        
+        # Insert chunk with embedding
+        embedding_bytes = np.array([0.1, 0.2, 0.3], dtype=np.float32).tobytes()
+        conn.execute(
+            """
+            INSERT INTO document_chunks
+            (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                file_path,
+                "Chunk 3 with embedding",
+                chunk_size,
+                chunk_overlap,
+                embedding_bytes,
+                json.dumps({}),
+                timestamp,
+            ),
+        )
+
+    # Get chunks without embeddings
+    result = temp_db.get_chunks_without_embeddings(
+        file_path, chunk_size, chunk_overlap
+    )
+
+    # Should return only chunks without embeddings
+    assert len(result) == 2
+    assert all(chunk.get("embedding") is None for chunk in result)
+    assert all("Chunk" in chunk["text"] for chunk in result)
+
+
+def test_has_chunk_scoring(temp_db):
+    """Test has_chunk_scoring method"""
+    import numpy as np
+    import sqlite3
+    from datetime import datetime
+
+    file_path = "test_file.pdf"
+    config = {
+        "chunk_size": 500,
+        "chunk_overlap": 20,
+        "top_k": 5,
+        "model": "gpt-4",
+        "question_set": "tcfd",
+    }
+
+    # Initially should be False
+    assert temp_db.has_chunk_scoring(file_path, config) is False
+
+    # First, save the chunk to document_chunks table so it can be referenced
+    chunk_text = "Chunk 1"
+    embedding_bytes = np.array([0.1, 0.2, 0.3], dtype=np.float32).tobytes()
+    with sqlite3.connect(temp_db.db_path) as conn:
+        timestamp = datetime.now().isoformat()
+        conn.execute(
+            """
+            INSERT INTO document_chunks
+            (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                file_path,
+                chunk_text,
+                config["chunk_size"],
+                config["chunk_overlap"],
+                embedding_bytes,
+                json.dumps({}),
+                timestamp,
+            ),
+        )
+
+    # Save analysis with chunk relevance (scoring)
+    temp_db.save_analysis(
+        file_path,
+        "tcfd_1",
+        {
+            "ANSWER": "Test answer",
+            "chunks": [
+                {
+                    "text": chunk_text,
+                    "similarity_score": 0.8,
+                    "llm_score": 0.7,
+                    "is_evidence": True,
+                    "chunk_order": 1,
+                }
+            ],
+        },
+        config,
+    )
+
+    # Now should be True
+    assert temp_db.has_chunk_scoring(file_path, config) is True

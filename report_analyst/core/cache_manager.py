@@ -412,13 +412,24 @@ class CacheManager:
                     AND model = ?
                     AND question_set = ?
                 """
+                # Map question set to database identifier (same mapping as in save_analysis)
+                question_set_mapping = {
+                    "everest": "ev",
+                    "tcfd": "tcfd",
+                    "s4m": "s4m",
+                    "lucia": "lucia",
+                }
+                db_question_set = question_set_mapping.get(
+                    config["question_set"], config["question_set"]
+                )
+
                 params = [
                     str(file_path),
                     config["chunk_size"],
                     config["chunk_overlap"],
                     config["top_k"],
                     config["model"],
-                    config["question_set"],
+                    db_question_set,  # Use mapped question set
                 ]
 
                 if question_ids:
@@ -475,7 +486,7 @@ class CacheManager:
                         config["chunk_overlap"],
                         config["top_k"],
                         config["model"],
-                        config["question_set"],
+                        db_question_set,  # Use mapped question set
                     ] + list(results.keys())
 
                     logger.info(f"Executing chunk query with params: {chunk_params}")
@@ -929,3 +940,90 @@ class CacheManager:
         except Exception as e:
             logger.error(f"Error getting document chunks: {str(e)}", exc_info=True)
             return []
+
+    def get_chunks_without_embeddings(
+        self, file_path: str, chunk_size: int = None, chunk_overlap: int = None
+    ) -> List[Dict]:
+        """Get chunks without embeddings (where embedding IS NULL)"""
+        try:
+            logger.info(f"Retrieving chunks without embeddings for {file_path}")
+            logger.info(
+                f"Filters: chunk_size={chunk_size}, chunk_overlap={chunk_overlap}"
+            )
+
+            with sqlite3.connect(self.db_path) as conn:
+                query = """
+                    SELECT id, chunk_text, metadata, chunk_size, chunk_overlap
+                    FROM document_chunks
+                    WHERE file_path = ? AND embedding IS NULL
+                """
+                params = [str(file_path)]
+
+                if chunk_size is not None:
+                    query += " AND chunk_size = ?"
+                    params.append(chunk_size)
+
+                if chunk_overlap is not None:
+                    query += " AND chunk_overlap = ?"
+                    params.append(chunk_overlap)
+
+                logger.debug(f"Executing query: {query}")
+                logger.debug(f"Query parameters: {params}")
+
+                cursor = conn.execute(query, params)
+                rows = cursor.fetchall()
+
+                chunks = []
+                for row in rows:
+                    chunk_id, chunk_text, metadata_json, chunk_size, chunk_overlap = row
+
+                    # Parse metadata JSON
+                    metadata = {}
+                    if metadata_json:
+                        metadata = json.loads(metadata_json)
+
+                    chunks.append(
+                        {
+                            "id": chunk_id,
+                            "text": chunk_text,
+                            "embedding": None,
+                            "metadata": metadata,
+                            "chunk_size": chunk_size,
+                            "chunk_overlap": chunk_overlap,
+                        }
+                    )
+
+                logger.info(f"Retrieved {len(chunks)} chunks without embeddings")
+                return chunks
+
+        except Exception as e:
+            logger.error(
+                f"Error getting chunks without embeddings: {str(e)}", exc_info=True
+            )
+            return []
+
+    def has_chunk_scoring(self, file_path: str, config: Dict) -> bool:
+        """Check if any questions have been scored for this file/config"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT COUNT(DISTINCT q.question_id)
+                    FROM questions q
+                    JOIN question_analysis qa ON qa.question_id = q.id
+                    JOIN chunk_relevance cr ON cr.question_analysis_id = qa.id
+                    WHERE qa.file_path = ? AND qa.model = ? AND qa.top_k = ?
+                """,
+                    (
+                        str(file_path),
+                        config["model"],
+                        config["top_k"],
+                    ),
+                )
+
+                count = cursor.fetchone()[0]
+                return count > 0
+
+        except Exception as e:
+            logger.error(f"Error checking chunk scoring: {str(e)}")
+            return False

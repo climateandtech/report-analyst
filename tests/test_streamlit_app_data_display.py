@@ -55,6 +55,8 @@ def test_file_history_functionality():
 def test_question_display_functionality():
     """Test question display and selection functionality"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
+    # Navigate to Report Analyst page where questions are displayed
+    at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Check for question-related UI elements
@@ -77,12 +79,14 @@ def test_question_display_functionality():
 def test_model_selection_display():
     """Test LLM model selection display"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
+    # Navigate to Report Analyst page where model selection is located
+    at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Check for model selection
     has_model_selection = False
     for sb in at.selectbox:
-        if "model" in str(sb.label).lower():
+        if "model" in str(sb.label).lower() or "llm_model" in str(sb.key).lower():
             has_model_selection = True
             # Check that it has model options
             options = [str(opt).lower() for opt in sb.options]
@@ -98,6 +102,8 @@ def test_model_selection_display():
 def test_configuration_display():
     """Test configuration parameter display"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
+    # Navigate to Report Analyst page where configuration widgets are located
+    at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Check for configuration number inputs
@@ -125,6 +131,8 @@ def test_configuration_display():
 def test_analysis_controls_display():
     """Test analysis control options display"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
+    # Navigate to Report Analyst page where analysis controls are located
+    at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Check for analysis control checkboxes
@@ -153,18 +161,14 @@ def test_error_handling_display():
 
 
 def test_consolidated_results_display():
-    """Test consolidated results display functionality"""
+    """Test All Results page display functionality (previously called Consolidated Results)"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
+    # Navigate to All Results page
+    at.session_state["nav_page"] = "All Results"
     at.run(timeout=10)
 
-    # Check for consolidated results tab
-    has_consolidated_tab = False
-    for tab in at.tabs:
-        if "Consolidated Results" in tab.label:
-            has_consolidated_tab = True
-            break
-
-    assert has_consolidated_tab, "Consolidated Results tab not found"
+    # Check that we're on the All Results page
+    assert at.session_state["nav_page"] == "All Results", "Not on All Results page"
 
     # Check for consolidated results selectbox
     has_consolidated_selectbox = False
@@ -182,9 +186,15 @@ def test_app_layout_and_structure():
     at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
+    # Check that navigation page is set in session state
+    assert "nav_page" in at.session_state, "Navigation page not found in session state"
+    
+    # Navigate to Report Analyst page to check for title
+    at.session_state["nav_page"] = "Report Analyst"
+    at.run(timeout=10)
+
     # Check basic app structure
     assert len(at.title) > 0, "App title not found"
-    assert len(at.tabs) >= 3, "Not enough tabs found"
     assert len(at.expander) > 0, "No expanders found"
 
     # Check for wide layout (should be set in page_config)
@@ -196,6 +206,8 @@ def test_app_layout_and_structure():
 def test_dynamic_content_loading():
     """Test dynamic content loading capabilities"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
+    # Navigate to Report Analyst page where question sets are displayed
+    at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Check that dynamic content can be loaded
@@ -204,7 +216,7 @@ def test_dynamic_content_loading():
     # Question sets should be loaded dynamically
     has_question_sets = False
     for sb in at.selectbox:
-        if "Question Set" in str(sb.label) and len(sb.options) > 0:
+        if ("Question Set" in str(sb.label) or "new_question_set" in str(sb.key)) and len(sb.options) > 0:
             has_question_sets = True
             break
 

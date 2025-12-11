@@ -251,3 +251,53 @@ def test_display_dataframes():
     with patch("streamlit.dataframe") as mock_df:
         display_dataframes(analysis_df, chunks_df)
         assert mock_df.call_count == 2
+
+
+def test_check_step_completion(report_analyzer, test_env):
+    """Test check_step_completion method"""
+    file_path = test_env["test_pdf"]
+
+    # Mock cache manager methods
+    with patch.object(
+        report_analyzer.analyzer.cache_manager, "get_chunks_without_embeddings"
+    ) as mock_get_chunks_wo, patch.object(
+        report_analyzer.analyzer.cache_manager, "get_document_chunks"
+    ) as mock_get_chunks, patch.object(
+        report_analyzer.analyzer.cache_manager, "has_chunk_scoring"
+    ) as mock_has_scoring, patch.object(
+        report_analyzer.analyzer.cache_manager, "get_analysis"
+    ) as mock_get_analysis:
+
+        # Test all steps incomplete
+        mock_get_chunks_wo.return_value = []
+        mock_get_chunks.return_value = []
+        mock_has_scoring.return_value = False
+        mock_get_analysis.return_value = {}
+
+        status = report_analyzer.analyzer.check_step_completion(str(file_path))
+        assert status["chunks"] is False
+        assert status["embeddings"] is False
+        assert status["scoring"] is False
+        assert status["analysis"] is False
+
+        # Test chunks complete
+        mock_get_chunks_wo.return_value = [{"id": 1, "text": "chunk1"}]
+        status = report_analyzer.analyzer.check_step_completion(str(file_path))
+        assert status["chunks"] is True
+
+        # Test embeddings complete
+        mock_get_chunks.return_value = [
+            {"id": 1, "text": "chunk1", "embedding": [0.1, 0.2]}
+        ]
+        status = report_analyzer.analyzer.check_step_completion(str(file_path))
+        assert status["embeddings"] is True
+
+        # Test scoring complete
+        mock_has_scoring.return_value = True
+        status = report_analyzer.analyzer.check_step_completion(str(file_path))
+        assert status["scoring"] is True
+
+        # Test analysis complete
+        mock_get_analysis.return_value = {"q1": {"result": {}}}
+        status = report_analyzer.analyzer.check_step_completion(str(file_path))
+        assert status["analysis"] is True
