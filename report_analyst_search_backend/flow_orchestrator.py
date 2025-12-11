@@ -138,7 +138,7 @@ class FlowOrchestrator:
             AnalysisResult: Complete analysis result
         """
         try:
-            st.info("🏭 Using complete backend analysis - backend does all the work!")
+            st.info("Using complete backend analysis - backend does all the work!")
 
             # Step 1: Upload
             with st.spinner("Uploading document to backend..."):
@@ -166,7 +166,7 @@ class FlowOrchestrator:
                 analysis_job_id = self.backend_service.submit_analysis_job(
                     resource_id, question_set
                 )
-                st.success(f"✅ Analysis job submitted! Job ID: {analysis_job_id}")
+                st.success(f"Analysis job submitted! Job ID: {analysis_job_id}")
 
             # Step 5: Wait for analysis
             with st.spinner("Backend is running analysis..."):
@@ -174,8 +174,8 @@ class FlowOrchestrator:
                     analysis_job_id
                 )
 
-            st.success("🎉 Analysis completed and stored in backend database!")
-            st.info("💡 These results are now available to all authorized users")
+            st.success("Analysis completed and stored in backend database!")
+            st.info("These results are now available to all authorized users")
 
             return AnalysisResult(
                 success=True,
@@ -190,7 +190,7 @@ class FlowOrchestrator:
 
     def _process_local(self, uploaded_file) -> ProcessingResult:
         """Process document locally"""
-        st.info("📱 Using local processing")
+        st.info("Using local processing")
 
         with st.spinner("Processing document locally..."):
             # Simulate local processing
@@ -255,7 +255,7 @@ class FlowOrchestrator:
         self, chunks: List[Dict[str, Any]], questions: List[str]
     ) -> AnalysisResult:
         """Analyze locally"""
-        st.info("🔄 Using local analysis")
+        st.info("Using local analysis")
 
         results = []
         for question in questions:
@@ -289,7 +289,7 @@ class FlowOrchestrator:
         """Enhanced analysis with centralized LLM and data lake"""
         # This would use NATS LLM and store in data lake
         # For now, fallback to local analysis
-        st.info("🚀 Enhanced analysis not fully implemented - using local analysis")
+        st.info("Enhanced analysis not fully implemented - using local analysis")
         return self._analyze_local(chunks, questions)
 
     def _configure_question_set(self, default_question_set: str) -> str:

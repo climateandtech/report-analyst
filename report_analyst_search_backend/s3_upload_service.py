@@ -76,9 +76,9 @@ class S3UploadService:
                 self.nc = await nats.connect(nats_url)
                 # Initialize JetStream (CLI --jetstream works)
                 self.js = self.nc.jetstream()
-                logger.info("✅ Connected to NATS with JetStream")
+                logger.info("Connected to NATS with JetStream")
             except Exception as e:
-                logger.error(f"❌ Failed to connect to NATS: {e}")
+                logger.error(f"Failed to connect to NATS: {e}")
                 raise S3UploadServiceError(f"NATS connection failed: {str(e)}")
 
     async def close(self):
@@ -88,9 +88,9 @@ class S3UploadService:
                 await self.nc.close()
                 self.nc = None
                 self.js = None
-                logger.info("🔌 Disconnected from NATS")
+                logger.info("Disconnected from NATS")
             except Exception as e:
-                logger.error(f"❌ Error closing NATS connection: {e}")
+                logger.error(f"Error closing NATS connection: {e}")
 
     async def upload_pdf_via_s3_nats(self, file_bytes: bytes, filename: str) -> str:
         """
@@ -149,11 +149,11 @@ class S3UploadService:
                 await self.nc.close()
                 self.nc = None
                 self.js = None
-                logger.info(f"✅ Published control message for {filename}")
-                logger.info(f"🔌 Closed connection")
+                logger.info(f"Published control message for {filename}")
+                logger.info(f"Closed connection")
 
             except Exception as publish_error:
-                logger.error(f"❌ NATS publish failed: {publish_error}")
+                logger.error(f"NATS publish failed: {publish_error}")
                 raise
 
             return request_id
@@ -163,7 +163,7 @@ class S3UploadService:
             try:
                 await self._cleanup_s3_object(s3_key)
             except Exception as cleanup_e:
-                logger.warning(f"⚠️ Failed to cleanup S3 object: {cleanup_e}")
+                logger.warning(f"Failed to cleanup S3 object: {cleanup_e}")
             raise S3UploadServiceError(f"S3+NATS upload failed: {str(e)}")
 
     async def _upload_to_s3(self, file_bytes: bytes, s3_key: str, filename: str) -> str:
@@ -196,14 +196,14 @@ class S3UploadService:
                 },
             )
 
-            logger.info(f"✅ Uploaded {filename} to S3")
+            logger.info(f"Uploaded {filename} to S3")
 
             # Return S3 URL in path style
             endpoint = os.getenv("S3_ENDPOINT_URL").rstrip("/")
             return f"{endpoint}/{self.s3_bucket}/{s3_key}"
 
         except Exception as e:
-            logger.error(f"❌ S3 upload failed: {e}")
+            logger.error(f"S3 upload failed: {e}")
             raise S3UploadServiceError(f"S3 upload failed: {str(e)}")
 
     def _get_s3_bucket(self) -> str:
@@ -226,9 +226,9 @@ class S3UploadService:
                 ),
             )
             s3_client.delete_object(Bucket=self.s3_bucket, Key=s3_key)
-            logger.info(f"✅ Cleaned up S3 object: {s3_key}")
+            logger.info(f"Cleaned up S3 object: {s3_key}")
         except Exception as e:
-            logger.warning(f"⚠️ Failed to cleanup S3 object: {e}")
+            logger.warning(f"Failed to cleanup S3 object: {e}")
 
     @staticmethod
     def is_available() -> bool:

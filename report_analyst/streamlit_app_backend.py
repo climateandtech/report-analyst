@@ -34,7 +34,7 @@ try:
 
     BACKEND_INTEGRATION_AVAILABLE = True
 except ImportError as e:
-    st.error(f"❌ Backend integration not available: {e}")
+    st.error(f"Backend integration not available: {e}")
     BACKEND_INTEGRATION_AVAILABLE = False
 
 # Try to import existing core functionality
@@ -52,7 +52,7 @@ try:
         return []
 
 except ImportError as e:
-    st.error(f"❌ Core functionality not available: {e}")
+    st.error(f"Core functionality not available: {e}")
     CORE_FUNCTIONALITY_AVAILABLE = False
 
     def get_question_set(question_set_name):
@@ -67,15 +67,15 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Main Streamlit application"""
-    st.set_page_config(page_title="Report Analyst", page_icon="📊", layout="wide")
+    st.set_page_config(page_title="Report Analyst", layout="wide")
 
-    st.title("📊 Report Analyst")
+    st.title("Report Analyst")
     st.markdown("Analyze documents with configurable backend integration")
 
     # Check if backend integration is available
     if not BACKEND_INTEGRATION_AVAILABLE:
         st.warning(
-            "⚠️ Backend integration modules not available. Running in fallback mode."
+            "Backend integration modules not available. Running in fallback mode."
         )
         run_fallback_mode()
         return
@@ -115,7 +115,7 @@ def run_application(orchestrator, config: BackendConfig):
 def handle_complete_backend_flow(orchestrator, uploaded_file, config: BackendConfig):
     """Handle complete backend analysis flow (Flow 4)"""
 
-    st.header("🏭 Complete Backend Analysis")
+    st.header("Complete Backend Analysis")
 
     # Select question set
     if CORE_FUNCTIONALITY_AVAILABLE:
@@ -131,7 +131,7 @@ def handle_complete_backend_flow(orchestrator, uploaded_file, config: BackendCon
         help="Question set for backend analysis",
     )
 
-    if st.button("🚀 Start Complete Backend Analysis"):
+    if st.button("Start Complete Backend Analysis"):
         # Run complete backend analysis
         result = orchestrator.complete_backend_analysis(uploaded_file, question_set)
 
@@ -139,7 +139,7 @@ def handle_complete_backend_flow(orchestrator, uploaded_file, config: BackendCon
             st.session_state.backend_analysis_result = result
             st.session_state.analysis_completed = True
         else:
-            st.error(f"❌ Complete backend analysis failed: {result.error}")
+            st.error(f"Complete backend analysis failed: {result.error}")
 
     # Display results if available
     if st.session_state.get("analysis_completed", False):
@@ -155,11 +155,11 @@ def handle_processing_and_analysis_flow(
     processing_result = orchestrator.process_document(uploaded_file)
 
     if not processing_result.success:
-        st.error(f"❌ Document processing failed: {processing_result.error}")
+        st.error(f"Document processing failed: {processing_result.error}")
         return
 
     # Store processing results
-    st.success(f"✅ Document processed! Found {len(processing_result.chunks)} chunks")
+    st.success(f"Document processed! Found {len(processing_result.chunks)} chunks")
     st.session_state.chunks = processing_result.chunks
     st.session_state.resource_id = processing_result.resource_id
     st.session_state.document_uploaded = True
@@ -189,7 +189,7 @@ def run_analysis_section(orchestrator, config: BackendConfig):
         if result.success:
             display_analysis_results(result, config)
         else:
-            st.error(f"❌ Analysis failed: {result.error}")
+            st.error(f"Analysis failed: {result.error}")
 
 
 def configure_questions() -> List[str]:
@@ -221,7 +221,7 @@ def configure_questions() -> List[str]:
 def display_analysis_results(result: AnalysisResult, config: BackendConfig):
     """Display analysis results from local/enhanced flows"""
 
-    st.subheader("📊 Analysis Results")
+    st.subheader("Analysis Results")
 
     results = result.results
     questions = results.get("questions", [])
@@ -235,7 +235,7 @@ def display_analysis_results(result: AnalysisResult, config: BackendConfig):
         st.divider()
 
     # Display summary
-    st.subheader("📈 Analysis Summary")
+    st.subheader("Analysis Summary")
     st.write(f"**Total Questions:** {len(questions)}")
     st.write(f"**Analysis Method:** {method.title()}")
     st.write(f"**Flow Type:** {config.flow_type.replace('_', ' ').title()}")
@@ -248,27 +248,27 @@ def display_backend_analysis_results(result: AnalysisResult):
     """Display results from complete backend analysis"""
 
     if not result or not result.success:
-        st.error("❌ No analysis results to display")
+        st.error("No analysis results to display")
         return
 
-    st.subheader("📊 Complete Backend Analysis Results")
+    st.subheader("Complete Backend Analysis Results")
 
     # Display metadata
-    st.subheader("📋 Analysis Metadata")
+    st.subheader("Analysis Metadata")
     col1, col2 = st.columns(2)
 
     with col1:
         st.write(f"**Analysis Job ID:** {result.analysis_job_id}")
         st.write(
-            f"**Stored in Backend:** {'✅ Yes' if result.stored_in_backend else '❌ No'}"
+            f"**Stored in Backend:** {'Yes' if result.stored_in_backend else 'No'}"
         )
 
     with col2:
         st.write(f"**Analysis Method:** Complete Backend")
-        st.write(f"**Multi-user Access:** ✅ Available to authorized users")
+        st.write(f"**Multi-user Access:** Available to authorized users")
 
     # Display results
-    st.subheader("📊 Results")
+    st.subheader("Results")
 
     if isinstance(result.results, dict):
         if "questions" in result.results and "answers" in result.results:
@@ -285,18 +285,18 @@ def display_backend_analysis_results(result: AnalysisResult):
         st.write(result.results)
 
     # Display backend analysis benefits
-    st.subheader("🎯 Backend Analysis Benefits")
+    st.subheader("Backend Analysis Benefits")
     st.info(
         """
-    ✅ **Persistent Storage**: Results stored in backend database
-    ✅ **Multi-User Access**: Available to all authorized users  
-    ✅ **Centralized Processing**: All computation done in backend
-    ✅ **Scalable**: Backend handles multiple concurrent analyses
-    ✅ **Consistent**: Same analysis logic across all clients
+    **Persistent Storage**: Results stored in backend database
+    **Multi-User Access**: Available to all authorized users  
+    **Centralized Processing**: All computation done in backend
+    **Scalable**: Backend handles multiple concurrent analyses
+    **Consistent**: Same analysis logic across all clients
     """
     )
 
-    if st.button("🔄 Refresh Results"):
+    if st.button("Refresh Results"):
         st.rerun()
 
 
@@ -305,51 +305,51 @@ def display_flow_benefits(config: BackendConfig):
 
     flow_benefits = {
         "local": [
-            "✅ No dependencies",
-            "✅ Works offline",
-            "✅ Full local control",
-            "❌ Limited processing power",
+            "No dependencies",
+            "Works offline",
+            "Full local control",
+            "Limited processing power",
         ],
         "basic_backend": [
-            "✅ Better PDF processing",
-            "✅ Vector search capabilities",
-            "✅ Async processing",
-            "❌ Still local analysis",
+            "Better PDF processing",
+            "Vector search capabilities",
+            "Async processing",
+            "Still local analysis",
         ],
         "backend_with_features": [
-            "✅ Backend processing",
-            "✅ Enhanced features",
-            "✅ Better integration",
-            "❌ Partial backend usage",
+            "Backend processing",
+            "Enhanced features",
+            "Better integration",
+            "Partial backend usage",
         ],
         "enhanced_integration": [
-            "✅ Centralized LLM",
-            "✅ Data lake storage",
-            "✅ Full integration",
-            "✅ Production ready",
+            "Centralized LLM",
+            "Data lake storage",
+            "Full integration",
+            "Production ready",
         ],
     }
 
-    benefits = flow_benefits.get(config.flow_type, ["✅ Unknown flow benefits"])
+    benefits = flow_benefits.get(config.flow_type, ["Unknown flow benefits"])
 
-    st.subheader(f"🎯 {config.flow_type.replace('_', ' ').title()} Benefits")
+    st.subheader(f"{config.flow_type.replace('_', ' ').title()} Benefits")
     for benefit in benefits:
         st.write(benefit)
 
 
 def run_fallback_mode():
     """Run in fallback mode when backend integration is not available"""
-    st.info("📱 Running in fallback mode - basic functionality only")
+    st.info("Running in fallback mode - basic functionality only")
 
     # File upload section
-    st.header("📄 Document Upload")
+    st.header("Document Upload")
     uploaded_file = st.file_uploader("Upload a document", type=["pdf"])
 
     if not uploaded_file:
         return
 
     # Question configuration
-    st.header("🔍 Document Analysis")
+    st.header("Document Analysis")
 
     if CORE_FUNCTIONALITY_AVAILABLE:
         question_set_options = question_loader.get_question_set_options() + ["custom"]
@@ -368,21 +368,21 @@ def run_fallback_mode():
         else:
             questions = get_question_set(question_set_name)
 
-        if st.button("🚀 Run Analysis"):
+        if st.button("Run Analysis"):
             st.success(
-                f"✅ Loaded {len(questions)} questions from {question_set_name.upper()}"
+                f"Loaded {len(questions)} questions from {question_set_name.upper()}"
             )
 
             # Display questions (fallback analysis)
-            st.subheader("📊 Questions to Analyze")
+            st.subheader("Questions to Analyze")
             for i, question in enumerate(questions, 1):
                 st.write(f"**{i}.** {question}")
 
             st.info(
-                "💡 This is a demo mode. Backend integration modules are not available."
+                "This is a demo mode. Backend integration modules are not available."
             )
     else:
-        st.error("❌ Core functionality not available. Please check your installation.")
+        st.error("Core functionality not available. Please check your installation.")
 
 
 if __name__ == "__main__":

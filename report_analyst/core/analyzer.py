@@ -58,7 +58,7 @@ logger.info(
 
 # If using backend for LLM, don't require local API keys
 if use_backend and (use_centralized_llm or use_full_backend_analysis):
-    logger.info("🔗 Using backend for LLM functionality - local API keys not required")
+    logger.info("Using backend for LLM functionality - local API keys not required")
     # Set placeholder values for compatibility
     if not openai_key:
         openai_key = "backend-handles-llm"
@@ -166,7 +166,7 @@ class DocumentAnalyzer:
 
         if self.use_backend_llm:
             log_analysis_step(
-                "🔗 Skipping local LLM initialization - using backend for all LLM functionality",
+                "Skipping local LLM initialization - using backend for all LLM functionality",
                 "info",
             )
             # Set minimal placeholders for compatibility

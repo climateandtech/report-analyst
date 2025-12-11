@@ -434,7 +434,7 @@ async def analyze_document_and_display(
                 f"Found {len(cached_answers)} cached answers for {file_key}"
             )
             # Show cache info
-            st.info(f"📁 Loading results from cache: {file_key}")
+            st.info(f"📁 Loading results from stored: {file_key}")
 
             # Update results with cached answers
             for q_id, answer in cached_answers.items():
@@ -521,7 +521,7 @@ async def analyze_document_and_display(
             log_analysis_step("All selected questions have cached answers")
             # Show success message for cached results
             st.success(
-                f"✓ All {len(selected_questions_list)} selected questions loaded from cache"
+                f"✓ All {len(selected_questions_list)} selected questions loaded from stored"
             )
 
         # Mark this file as analyzed with current configuration
@@ -838,7 +838,7 @@ def display_consolidated_results(analyzer, question_set):
         logger.info(f"Found cache configs: {cache_configs}")
 
         if not cache_configs:
-            st.warning("No cached analyses found")
+            st.warning("No stored analyses found")
             return
 
         # Group configurations by file
@@ -862,7 +862,7 @@ def display_consolidated_results(analyzer, question_set):
                     )
 
         if not file_configs:
-            st.warning(f"No cached results found for question set: {question_set}")
+            st.warning(f"No stored results found for question set: {question_set}")
             return
 
         # File selection
@@ -967,9 +967,9 @@ def display_consolidated_results(analyzer, question_set):
                         file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
                         display_analysis_results(analysis_df, chunks_df, file_key)
                     else:
-                        st.warning("No results found in cache for this configuration")
+                        st.warning("No results found in stored for this configuration")
                 else:
-                    st.warning("No cached results found for this configuration")
+                    st.warning("No stored results found for this configuration")
 
     except Exception as e:
         logger.error(f"Error displaying consolidated results: {str(e)}", exc_info=True)
@@ -978,7 +978,7 @@ def display_consolidated_results(analyzer, question_set):
 
 def display_cache_selector(file_path: str):
     """Display cache management options"""
-    st.subheader("Cache Management")
+    st.subheader("Stored Data Management")
 
     # Get current configuration
     current_config = {
@@ -1007,12 +1007,12 @@ def display_cache_selector(file_path: str):
                     st.text(f"Current configuration: {current_config}")
 
                 with col2:
-                    if st.button("🔄 Clear Cache for File"):
+                    if st.button("Clear Stored Data for File"):
                         try:
                             st.session_state.analyzer.analyzer.cache_manager.clear_cache(
                                 file_path
                             )
-                            st.success(f"Cache cleared for file.")
+                            st.success(f"Stored data cleared for file.")
                             # Clear results from session state
                             if "results" in st.session_state:
                                 del st.session_state.results
@@ -1023,11 +1023,11 @@ def display_cache_selector(file_path: str):
                             st.session_state.analysis_complete = False
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Error clearing cache: {str(e)}")
+                            st.error(f"Error clearing stored data: {str(e)}")
             else:
-                st.info("No cached analyses available for this file")
+                st.info("No stored analyses available for this file")
         except Exception as e:
-            st.error(f"Error checking cache status: {str(e)}")
+            st.error(f"Error checking stored data status: {str(e)}")
 
 
 def get_current_settings(st) -> dict:
@@ -1068,7 +1068,7 @@ def update_analyzer_parameters():
         # If somehow a Gemini model was selected but no API key exists
         logger.error(f"Attempt to use Gemini model '{llm_model}' without API key")
         st.error(
-            f"⚠️ Cannot use {llm_model} - No Google API key is set. Defaulting to {OPENAI_MODELS[0]}."
+            f"Cannot use {llm_model} - No Google API key is set. Defaulting to {OPENAI_MODELS[0]}."
         )
         # Reset to default OpenAI model
         llm_model = OPENAI_MODELS[0]
@@ -1076,7 +1076,7 @@ def update_analyzer_parameters():
     elif llm_model.startswith("gpt-") and not os.getenv("OPENAI_API_KEY"):
         logger.error(f"Attempt to use OpenAI model '{llm_model}' without API key")
         st.error(
-            f"⚠️ OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly."
+            f"OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly."
         )
 
     # Update the analyzer with the new parameters
@@ -1132,7 +1132,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         )
         if cached_results and not st.session_state.get("force_recompute", False):
             logger.info(f"[CACHE] Cache HIT for config: {config}")
-            progress_text.success("Found cached results!")
+            progress_text.success("Found stored results!")
             st.session_state.results = cached_results
             logger.info(
                 f"[ANALYSIS] Writing results to session state for file: {file_path}"
@@ -1266,6 +1266,10 @@ def main():
                 False  # Initialize analysis complete flag
             )
 
+        # Initialize use_s3_upload in session state if not already set
+        if "use_s3_upload" not in st.session_state:
+            st.session_state.use_s3_upload = os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+
         st.set_page_config(page_title="Report Analyst", layout="wide")
 
         # Inject MINIMAL custom CSS for specific customizations only
@@ -1277,6 +1281,87 @@ def main():
             /* Import fonts from Google Fonts */
             @import url('https://fonts.googleapis.com/css2?family=Afacad:wght@400;500;600;700&display=swap');
             @import url('https://fonts.googleapis.com/css2?family=Cousine:wght@400;700&display=swap');
+            @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+            
+            /* Material Icons base styles */
+            .material-icons {
+                font-family: 'Material Icons';
+                font-weight: normal;
+                font-style: normal;
+                font-size: 24px;
+                line-height: 1;
+                letter-spacing: normal;
+                text-transform: none;
+                display: inline-block;
+                white-space: nowrap;
+                word-wrap: normal;
+                direction: ltr;
+                -webkit-font-feature-settings: 'liga';
+                -webkit-font-smoothing: antialiased;
+                vertical-align: middle;
+                margin-right: 8px;
+            }
+            
+            /* Add Material Icon to all notifications (unified - using info icon for all) */
+            .stAlert [data-testid="stMarkdownContainer"]::before,
+            [data-testid="stNotification"] [data-testid="stMarkdownContainer"]::before,
+            .stInfo [data-testid="stMarkdownContainer"]::before,
+            .stSuccess [data-testid="stMarkdownContainer"]::before,
+            .stError [data-testid="stMarkdownContainer"]::before,
+            .stWarning [data-testid="stMarkdownContainer"]::before {
+                content: 'info';
+                font-family: 'Material Icons';
+                font-size: 20px;
+                vertical-align: middle;
+                margin-right: 8px;
+                display: inline-block;
+            }
+            
+            /* Alternative selectors for notifications without markdown container */
+            .stAlert p::before,
+            [data-testid="stNotification"] p::before,
+            .stInfo p::before,
+            .stSuccess p::before,
+            .stError p::before,
+            .stWarning p::before {
+                content: 'info';
+                font-family: 'Material Icons';
+                font-size: 20px;
+                vertical-align: middle;
+                margin-right: 8px;
+                display: inline-block;
+            }
+            
+            /* Settings expander icon in sidebar */
+            [data-testid="stSidebar"] [data-testid="stExpander"] summary::before {
+                content: 'settings';
+                font-family: 'Material Icons';
+                font-size: 20px;
+                vertical-align: middle;
+                margin-right: 8px;
+                display: inline-block;
+            }
+            
+            /* Active navigation item - light purple background with dark purple text */
+            [data-testid="stSidebar"] .nav-link-selected {
+                background-color: rgba(67, 19, 200, 0.15) !important;
+                color: #4313C8 !important;
+                font-weight: 700 !important;
+            }
+            
+            /* Active navigation item icon - dark purple */
+            [data-testid="stSidebar"] .nav-link-selected i {
+                color: #4313C8 !important;
+            }
+            
+            /* Inactive navigation items - gray text and icons */
+            [data-testid="stSidebar"] .nav-link:not(.nav-link-selected) {
+                color: #7872A7 !important;
+            }
+            
+            [data-testid="stSidebar"] .nav-link:not(.nav-link-selected) i {
+                color: #7872A7 !important;
+            }
             
             /* Designer Colors - Exact specifications from Daniela */
             
@@ -1376,9 +1461,15 @@ def main():
                 background-color: #FFFFFF !important;
             }
             
-            /* Sidebar text - #7872A7 */
-            [data-testid="stSidebar"] *:not([data-testid="stSidebarNav"] [aria-current="page"] *) {
+            /* Sidebar text - #7872A7 (exclude option-menu navigation) */
+            [data-testid="stSidebar"] *:not([data-testid="stSidebarNav"] [aria-current="page"] *):not(.nav-link):not(.nav-link-selected):not(.nav-link *):not([class*="nav-link"]) {
                 color: #7872A7 !important;
+            }
+            
+            /* Ensure option-menu navigation styles are not overridden */
+            [data-testid="stSidebar"] .nav-link,
+            [data-testid="stSidebar"] .nav-link-selected {
+                color: inherit !important;
             }
             
             /* Sidebar accent (active item) - #4313C8 with white text */
@@ -1540,94 +1631,117 @@ def main():
                 background-color: rgba(46, 157, 111, 0.1) !important;
             }
             
-            /* Buttons - primary color with inverted hover (matching screen designs) */
+            /* ========== UNIFIED BUTTON STYLES ========== */
+            
+            /* Default: All buttons in main content - white background with purple text (like Browse File) */
+            /* Style all buttons first, then override for sidebar and special buttons */
             .stButton > button,
+            .stDownloadButton > button,
+            [data-testid="stDownloadButton"] button,
             button[data-baseweb="button"],
-            [data-baseweb="button"],
-            button[type="button"],
-            button.kind-primary {
+            [data-baseweb="button"] {
+                background-color: #FFFFFF !important;
+                color: #4313C8 !important;
+                border: 1px solid #4313C8 !important;
+                border-radius: 6px !important;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.04) !important;
+                transition: all 0.2s ease !important;
+                font-family: 'Cousine', monospace !important;
+                font-weight: 400 !important;
+                font-size: 14px !important;
+                padding: 0.5rem 1rem !important;
+                text-align: center !important;
+                width: auto !important;
+                min-width: auto !important;
+            }
+            
+            .stButton > button:hover,
+            .stDownloadButton > button:hover,
+            [data-testid="stDownloadButton"] button:hover,
+            button[data-baseweb="button"]:hover,
+            [data-baseweb="button"]:hover {
+                background-color: #4313C8 !important;
+                color: #FFFFFF !important;
+                border: 1px solid #4313C8 !important;
+                box-shadow: 0 2px 6px rgba(67, 19, 200, 0.25), 0 1px 3px rgba(67, 19, 200, 0.15) !important;
+            }
+            
+            .stButton > button:active,
+            .stButton > button:focus,
+            .stDownloadButton > button:active,
+            .stDownloadButton > button:focus,
+            [data-testid="stDownloadButton"] button:active,
+            [data-testid="stDownloadButton"] button:focus,
+            button[data-baseweb="button"]:active,
+            button[data-baseweb="button"]:focus,
+            [data-baseweb="button"]:active,
+            [data-baseweb="button"]:focus {
+                background-color: #4313C8 !important;
+                color: #FFFFFF !important;
+                border: 1px solid #4313C8 !important;
+                outline: none !important;
+                box-shadow: 0 1px 3px rgba(67, 19, 200, 0.3) !important;
+            }
+            
+            /* Sidebar buttons - override with purple background (higher specificity) */
+            [data-testid="stSidebar"] .stButton > button {
                 background-color: #4313C8 !important;
                 color: #ffffff !important;
                 border: 2px solid #4313C8 !important;
-                border-radius: 4px !important;
-                transition: all 0.3s ease !important;
+                border-radius: 6px !important;
+                box-shadow: none !important;
+                transition: all 0.2s ease !important;
                 font-family: 'Cousine', monospace !important;
                 font-weight: 400 !important;
                 padding: 0.5rem 1rem !important;
             }
             
-            .stButton > button:hover,
-            button[data-baseweb="button"]:hover,
-            [data-baseweb="button"]:hover,
-            button[type="button"]:hover,
-            button.kind-primary:hover {
-                background-color: #ffffff !important;
-                color: #4313C8 !important;
-                border: 2px solid #4313C8 !important;
+            [data-testid="stSidebar"] .stButton > button:hover {
+                background-color: #979DF6 !important;
+                color: #ffffff !important;
+                border: 2px solid #979DF6 !important;
+                box-shadow: none !important;
             }
             
-            .stButton > button:active,
-            button[data-baseweb="button"]:active,
-            [data-baseweb="button"]:active,
-            button[type="button"]:active,
-            button.kind-primary:active,
-            .stButton > button:focus,
-            button[data-baseweb="button"]:focus {
+            [data-testid="stSidebar"] .stButton > button:active,
+            [data-testid="stSidebar"] .stButton > button:focus {
                 background-color: #4313C8 !important;
                 color: #ffffff !important;
                 border: 2px solid #4313C8 !important;
                 outline: none !important;
+                box-shadow: none !important;
             }
             
             /* Remove all orange/red borders and states from buttons */
-            button,
-            .stButton > button,
-            [data-baseweb="button"],
-            button:focus,
-            button:active {
+            /* Note: Main button styles are defined above, this just ensures border color */
+            /* Exclude sidebar and file uploader buttons, but include download buttons */
+            button:not([data-testid="stSidebar"] button):not([data-testid*="FileUploader"] button),
+            .stButton > button:not([data-testid="stSidebar"] .stButton > button):not([data-testid*="FileUploader"] button),
+            [data-baseweb="button"]:not([data-testid="stSidebar"] [data-baseweb="button"]):not([data-testid*="FileUploader"] [data-baseweb="button"]) {
                 border-color: #4313C8 !important;
                 outline: none !important;
             }
             
-            /* Override Streamlit's default button colors */
-            [data-baseweb="base-button"] {
-                background-color: #4313C8 !important;
-                color: #ffffff !important;
-                border-color: #4313C8 !important;
-            }
-            
-            [data-baseweb="base-button"]:hover {
-                background-color: #ffffff !important;
-                color: #4313C8 !important;
-                border-color: #4313C8 !important;
-            }
-            
-            [data-baseweb="base-button"]:active,
-            [data-baseweb="base-button"]:focus {
-                background-color: #4313C8 !important;
-                color: #ffffff !important;
-                border-color: #4313C8 !important;
-                outline: none !important;
-            }
-            
-            /* File uploader button styling */
+            /* File uploader buttons - purple with white text (keep special styling) */
             [data-testid="stFileUploader"] button,
             [data-testid="stFileUploader"] [data-baseweb="button"],
             .stFileUploader button {
                 background-color: #4313C8 !important;
                 color: #ffffff !important;
                 border: 2px solid #4313C8 !important;
-                border-radius: 4px !important;
-                transition: all 0.3s ease !important;
+                border-radius: 6px !important;
+                transition: all 0.2s ease !important;
                 font-family: 'Cousine', monospace !important;
+                font-weight: 400 !important;
+                padding: 0.5rem 1rem !important;
             }
             
             [data-testid="stFileUploader"] button:hover,
             [data-testid="stFileUploader"] [data-baseweb="button"]:hover,
             .stFileUploader button:hover {
-                background-color: #ffffff !important;
-                color: #4313C8 !important;
-                border: 2px solid #4313C8 !important;
+                background-color: #979DF6 !important;
+                color: #ffffff !important;
+                border: 2px solid #979DF6 !important;
             }
             
             [data-testid="stFileUploader"] button:active,
@@ -1641,41 +1755,18 @@ def main():
                 outline: none !important;
             }
             
-            /* Download button styling */
-            .stDownloadButton > button,
-            [data-testid="stDownloadButton"] button {
-                background-color: #4313C8 !important;
-                color: #ffffff !important;
-                border: 2px solid #4313C8 !important;
-                border-radius: 4px !important;
-                transition: all 0.3s ease !important;
-                font-family: 'Cousine', monospace !important;
-            }
+            /* Download buttons - use main content button style (white background, purple text) */
+            /* They inherit from .stButton > button above, no special override needed */
             
-            .stDownloadButton > button:hover,
-            [data-testid="stDownloadButton"] button:hover {
-                background-color: #ffffff !important;
-                color: #4313C8 !important;
-                border: 2px solid #4313C8 !important;
-            }
-            
-            .stDownloadButton > button:active,
-            .stDownloadButton > button:focus,
-            [data-testid="stDownloadButton"] button:active,
-            [data-testid="stDownloadButton"] button:focus {
-                background-color: #4313C8 !important;
-                color: #ffffff !important;
-                border: 2px solid #4313C8 !important;
-                outline: none !important;
-            }
-            
-            /* Secondary buttons */
+            /* Secondary buttons - transparent with purple border */
             button[data-baseweb="button"][kind="secondary"],
             [data-baseweb="button"][kind="secondary"],
             button.kind-secondary {
                 background-color: transparent !important;
                 color: #4313C8 !important;
                 border: 2px solid #4313C8 !important;
+                border-radius: 6px !important;
+                font-family: 'Cousine', monospace !important;
             }
             
             button[data-baseweb="button"][kind="secondary"]:hover,
@@ -2104,8 +2195,16 @@ def main():
             
             [data-testid="stSidebar"] .footer img {
                 height: 25px;
+                max-width: 100%;
+                width: auto;
                 vertical-align: middle;
                 margin-right: 8px;
+                object-fit: contain;
+            }
+            
+            [data-testid="stSidebar"] .footer {
+                overflow: visible;
+                word-wrap: break-word;
             }
             
             [data-testid="stSidebar"] .footer p {
@@ -2153,9 +2252,8 @@ def main():
         except Exception as e:
             logger.warning(f"Could not load sidebar logo: {str(e)}")
         
-        # Create sidebar navigation using streamlit-option-menu (much simpler!)
+        # Create sidebar navigation using streamlit-option-menu
         st.sidebar.markdown("---")
-        st.sidebar.markdown("### Navigation")
         
         try:
             from streamlit_option_menu import option_menu
@@ -2164,35 +2262,35 @@ def main():
             with st.sidebar:
                 nav_page = option_menu(
                     menu_title=None,
-                    options=["Upload New", "Analyze report", "Browse data"],
-                    icons=["upload", "file-text", "bar-chart"],
+                    options=["Upload Report", "Report Analyst", "All Results"],
+                    icons=["house", "file-text", "bar-chart"],
                     menu_icon=None,
                     default_index=0,
                     orientation="vertical",
                     key="nav_page",
                     styles={
                         "container": {"padding": "0", "background-color": "transparent"},
-                        "icon": {"color": "#4313C8", "font-size": "20px"},
+                        "icon": {"color": "#7872A7", "font-size": "20px"},
                         "nav-link": {
-                            "font-family": "'Cousine', monospace",
+                            "font-family": "'Afacad', sans-serif",
                             "font-size": "16px",
                             "text-align": "left",
                             "margin": "2px 0",
                             "padding": "10px 15px",
                             "border-radius": "6px",
-                            "color": "#4313C8",
+                            "color": "#7872A7",
                             "background-color": "transparent",
                         },
                         "nav-link-selected": {
-                            "background-color": "#4313C8",
-                            "color": "#ffffff",
+                            "background-color": "rgba(67, 19, 200, 0.15)",
+                            "color": "#4313C8",
                             "font-weight": "700",
                         },
                     }
                 )
         except ImportError:
             # Fallback to regular radio if package not installed
-            nav_options = ["Upload New", "Analyze report", "Browse data"]
+            nav_options = ["Upload Report", "Report Analyst", "All Results"]
             nav_page = st.sidebar.radio(
                 "",
                 nav_options,
@@ -2200,46 +2298,42 @@ def main():
                 label_visibility="collapsed"
             )
         
-        # Backend Integration in sidebar (available on all pages)
+        # Settings section in sidebar (consolidates all integration settings)
         st.sidebar.markdown("---")
-        if BACKEND_INTEGRATION_AVAILABLE:
-            config = configure_backend_integration()
-        else:
-            st.sidebar.markdown("### 🔧 Backend Integration")
-            st.sidebar.warning("⚠️ Backend integration modules not available")
-            config = None
+        with st.sidebar.expander("Settings", expanded=False):
+            # Show Enterprise Mode status at the top
+            use_s3_upload = st.session_state.get("use_s3_upload", False)
+            if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
+                st.caption("Enterprise mode")
+            
+            # Enterprise Integration (S3+NATS) - always shown first, outside of backend config
+            st.subheader("Enterprise Integration")
+            use_s3_upload = st.checkbox(
+                "Enable S3+NATS Upload",
+                value=st.session_state.use_s3_upload,
+                key="use_s3_upload",
+                help="Upload documents via S3 and process via NATS for enterprise integration",
+            )
+            
+            st.divider()
+            
+            # Backend Integration
+            if BACKEND_INTEGRATION_AVAILABLE:
+                config = configure_backend_integration()
+                # Store config in session state for access across pages
+                st.session_state.backend_config = config
+            else:
+                st.subheader("Backend Integration")
+                st.warning("Backend integration modules not available")
+                config = None
+                st.session_state.backend_config = None
 
         # Show page-specific content based on navigation
-        if nav_page == "Analyze report":
+        if nav_page == "Report Analyst":
             st.title("Report Analyst")
 
-            # Show backend integration status in main area (if configured)
-            if BACKEND_INTEGRATION_AVAILABLE and config and config.use_backend:
-                with st.expander("🔧 Backend Integration Status", expanded=False):
-                    display_config_status(config)
-
-            # Settings section - moved below the title
+            # Analysis Configuration section
             with st.expander("Analysis Configuration", expanded=True):
-                # Enterprise Integration Settings
-                if BACKEND_INTEGRATION_AVAILABLE:
-                    st.subheader("🚀 Enterprise Integration")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        use_s3_upload = st.checkbox(
-                            "Enable S3+NATS Upload",
-                            value=os.getenv("USE_S3_UPLOAD", "false").lower() == "true",
-                            key="use_s3_upload",
-                            help="Upload documents via S3 and process via NATS for enterprise integration with backend",
-                        )
-                    with col2:
-                        if use_s3_upload:
-                            st.success(
-                                "✅ Enterprise mode enabled - documents will be processed via S3+NATS"
-                            )
-                        else:
-                            st.info("📁 Local mode - documents processed locally")
-                    st.divider()
-
                 # Question set selection
                 col1, col2 = st.columns([1, 2])
                 with col1:
@@ -2341,7 +2435,7 @@ def main():
                         on_change=update_analyzer_parameters,
                     )
 
-            # Previous Reports page content
+            # Report Analyst page content
             previous_files = get_uploaded_files_history()
             if previous_files:
                 selected_file = st.selectbox(
@@ -2380,7 +2474,7 @@ def main():
                             )
                         with col2:
                             reanalyze_clicked = st.button(
-                                "🔄 Reanalyze", key="reanalyze_button"
+                                "Reanalyze", key="reanalyze_button"
                             )
 
                         if analyze_clicked or reanalyze_clicked:
@@ -2517,17 +2611,13 @@ def main():
             else:
                 st.info("No previously analyzed reports found")
 
-        # Upload New page
-        elif nav_page == "Upload New":
+        # Upload Report page
+        elif nav_page == "Upload Report":
             # Check if S3+NATS enterprise integration is enabled (from UI checkbox)
             use_s3_upload = st.session_state.get("use_s3_upload", False)
 
+            # Initialize backend integration with S3+NATS enabled if needed
             if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
-                st.info(
-                    "🚀 Enterprise Mode: Using S3+NATS integration for document processing"
-                )
-
-                # Initialize backend integration with S3+NATS enabled
                 if "backend_config" not in st.session_state or not getattr(
                     st.session_state.get("backend_config"), "use_backend", False
                 ):
@@ -2549,13 +2639,100 @@ def main():
                         st.session_state.backend_config
                     )
 
-                uploaded_file = st.file_uploader(
-                    "Choose a PDF file", type="pdf", key="file_uploader"
-                )
-                if uploaded_file:
+            # Unified upload page styling (shows for both enterprise and regular mode)
+            st.markdown("""
+            <style>
+            .upload-icon-box {
+                background-color: rgba(192, 196, 250, 0.1);
+                border-radius: 12px;
+                padding: 50px 40px;
+                margin: 0 auto 40px auto;
+                max-width: 300px;
+                display: inline-block;
+            }
+            .upload-icon-box i.material-icons {
+                font-family: 'Material Icons' !important;
+                font-weight: normal !important;
+                font-style: normal !important;
+                font-size: 80px !important;
+                line-height: 1 !important;
+                letter-spacing: normal !important;
+                text-transform: none !important;
+                display: block !important;
+                white-space: nowrap !important;
+                word-wrap: normal !important;
+                direction: ltr !important;
+                -webkit-font-feature-settings: 'liga' !important;
+                -webkit-font-smoothing: antialiased !important;
+                color: #4313C8 !important;
+            }
+            </style>
+            <div style="text-align: center; padding: 60px 20px 40px 20px;">
+                <div class="upload-icon-box">
+                    <i class="material-icons">cloud_upload</i>
+                </div>
+                <h1 style="color: #4313C8; font-family: 'Afacad', sans-serif; font-weight: 700; margin: 0 0 20px 0; font-size: 32px;">Upload your Sustainability Report</h1>
+                <p style="color: #718096; font-family: 'Cousine', monospace; font-size: 14px; margin: 0 0 40px 0; line-height: 1.5;">Drag and drop your file here, or click to browse.<br>PDF only, limited to 200MB</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Style the file uploader (works for both modes)
+            st.markdown("""
+            <style>
+            [data-testid="stFileUploader"] {
+                text-align: center;
+                margin: 0 auto;
+                max-width: 600px;
+            }
+            [data-testid="stFileUploader"] > div:first-child {
+                border: 2px dashed #4313C8 !important;
+                border-radius: 8px !important;
+                background-color: #FFFFFF !important;
+                padding: 40px !important;
+            }
+            [data-testid="stFileUploader"] [data-baseweb="file-uploader"] {
+                border: none !important;
+                background-color: transparent !important;
+            }
+            [data-testid="stFileUploader"] button {
+                background-color: #4313C8 !important;
+                color: #FFFFFF !important;
+                border: none !important;
+                border-radius: 6px !important;
+                font-family: 'Cousine', monospace !important;
+                padding: 10px 24px !important;
+                font-weight: 400 !important;
+                font-size: 14px !important;
+                margin: 0 auto !important;
+                display: block !important;
+                cursor: pointer !important;
+                transition: all 0.2s ease !important;
+            }
+            [data-testid="stFileUploader"] button:hover {
+                background-color: #979DF6 !important;
+            }
+            [data-testid="stFileUploader"] label {
+                font-family: 'Afacad', sans-serif !important;
+                color: #4313C8 !important;
+                font-weight: 600 !important;
+                margin-bottom: 10px !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            uploaded_file = st.file_uploader(
+                "Choose a PDF file", 
+                type="pdf", 
+                key="file_uploader",
+                help="Limit 200MB per file • PDF"
+            )
+            
+            if uploaded_file:
+                # Handle upload based on mode
+                if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
                     # Use S3+NATS enterprise flow
                     with st.spinner(
-                        "🚀 Uploading to S3 and triggering backend processing..."
+                        "Uploading to S3 and triggering backend processing..."
                     ):
                         try:
                             # Debug: Check if backend_service exists
@@ -2590,9 +2767,9 @@ def main():
 
                             if result:
                                 st.success(
-                                    f"✅ File uploaded via S3+NATS: {uploaded_file.name}"
+                                    f"File uploaded via S3+NATS: {uploaded_file.name}"
                                 )
-                                st.info(f"📋 Document ID: {result}")
+                                st.info(f"Document ID: {result}")
                                 st.session_state.current_file = result
                                 st.session_state.uploaded_file = uploaded_file
                                 st.session_state.analysis_complete = False
@@ -2601,49 +2778,44 @@ def main():
                                     del st.session_state.results
                                 st.rerun()
                             else:
-                                st.error("❌ Failed to upload file via S3+NATS")
+                                st.error("Failed to upload file via S3+NATS")
                         except Exception as e:
                             logger.error(
                                 f"[ENTERPRISE] Error in S3+NATS upload: {e}",
                                 exc_info=True,
                             )
-                            st.error(f"❌ Error uploading via S3+NATS: {str(e)}")
-                            st.info("💡 Falling back to local processing...")
+                            st.error(f"Error uploading via S3+NATS: {str(e)}")
+                            st.info("Falling back to local processing...")
                             # Fall through to local processing
                             use_s3_upload = False
-
-            if not use_s3_upload or not BACKEND_INTEGRATION_AVAILABLE:
-                uploaded_file = st.file_uploader(
-                    "Choose a PDF file", type="pdf", key="file_uploader"
-                )
-            if uploaded_file and (
-                not use_s3_upload or not BACKEND_INTEGRATION_AVAILABLE
-            ):
-                file_path = save_uploaded_file(uploaded_file)
-                logger.info(
-                    f"[UPLOAD] Saved uploaded file: {uploaded_file.name} at {file_path}"
-                )
-                if file_path and file_path != st.session_state.get("current_file"):
-                    st.session_state.current_file = file_path
-                    st.session_state.uploaded_file = uploaded_file
-                    st.session_state.analysis_complete = False
-                    st.session_state.analysis_triggered = False
-                    if "results" in st.session_state:
-                        del st.session_state.results
+                
+                # Local processing (when enterprise mode is off or failed)
+                if not use_s3_upload or not BACKEND_INTEGRATION_AVAILABLE:
+                    file_path = save_uploaded_file(uploaded_file)
                     logger.info(
-                        f"[UPLOAD] Added file to session state: {uploaded_file.name}"
+                        f"[UPLOAD] Saved uploaded file: {uploaded_file.name} at {file_path}"
                     )
-                    st.success(f"File uploaded successfully: {uploaded_file.name}")
-                    logger.info(
-                        f"[UPLOAD] Displaying cache selector for file: {file_path}"
-                    )
-                    display_cache_selector(file_path)
-                    if not st.session_state.get("file_processed"):
-                        st.session_state.file_processed = True
-                        st.rerun()
+                    if file_path and file_path != st.session_state.get("current_file"):
+                        st.session_state.current_file = file_path
+                        st.session_state.uploaded_file = uploaded_file
+                        st.session_state.analysis_complete = False
+                        st.session_state.analysis_triggered = False
+                        if "results" in st.session_state:
+                            del st.session_state.results
+                        logger.info(
+                            f"[UPLOAD] Added file to session state: {uploaded_file.name}"
+                        )
+                        st.success(f"File uploaded successfully: {uploaded_file.name}")
+                        logger.info(
+                            f"[UPLOAD] Displaying cache selector for file: {file_path}"
+                        )
+                        display_cache_selector(file_path)
+                        if not st.session_state.get("file_processed"):
+                            st.session_state.file_processed = True
+                            st.rerun()
 
-        # Browse data page
-        elif nav_page == "Browse data":
+        # All Results page
+        elif nav_page == "All Results":
             st.header("View All Results")
             st.write("View and export consolidated results for all analyzed reports")
 
@@ -2687,7 +2859,7 @@ def main():
         st.sidebar.markdown("---")
         footer = f"""
         <div class="footer">
-            {f'<img src="{logo_src}" alt="Climate+Tech Logo" style="height: 25px; vertical-align: middle; margin-right: 8px;">' if logo_src else ''}
+            {f'<img src="{logo_src}" alt="Climate+Tech Logo" style="height: 25px; max-width: 100%; width: auto; vertical-align: middle; margin-right: 8px; object-fit: contain;">' if logo_src else ''}
             <p>Climate+Tech Sustainability Report Analysis Tool</p>
             <p>For custom tool development contact us at <a href="https://www.climateandtech.com" target="_blank">www.climateandtech.com</a></p>
         </div>

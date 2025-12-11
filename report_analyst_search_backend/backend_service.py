@@ -125,14 +125,14 @@ class BackendService:
                 for resource in resources:
                     if resource["id"] == resource_id:
                         status = resource.get("status", "UNKNOWN")
-                        status_text.text(f"📊 Processing status: {status}")
+                        status_text.text(f"Processing status: {status}")
 
                         if status == "COMPLETED":
                             progress_bar.progress(100)
                             return True
                         elif status == "FAILED":
                             error_msg = resource.get("error_message", "Unknown error")
-                            st.error(f"❌ Processing failed: {error_msg}")
+                            st.error(f"Processing failed: {error_msg}")
                             return False
 
                         # Update progress
@@ -142,13 +142,13 @@ class BackendService:
                 # Check timeout
                 elapsed = time.time() - start_time
                 if elapsed > timeout:
-                    st.error(f"⏰ Processing timed out after {timeout} seconds")
+                    st.error(f"Processing timed out after {timeout} seconds")
                     return False
 
                 time.sleep(3)
 
             except Exception as e:
-                st.error(f"❌ Error checking status: {str(e)}")
+                st.error(f"Error checking status: {str(e)}")
                 return False
 
     def get_chunks(self, resource_id: str) -> List[Dict[str, Any]]:
@@ -269,7 +269,7 @@ class BackendService:
                     job_data = response.json()
                     status = job_data.get("status", "unknown")
 
-                    status_text.text(f"🔬 Analysis status: {status}")
+                    status_text.text(f"Analysis status: {status}")
 
                     if status == "completed":
                         progress_bar.progress(100)
@@ -377,6 +377,6 @@ def create_backend_service(config: BackendConfig) -> BackendService:
 
 def handle_backend_error(error: BackendServiceError, context: str = ""):
     """Standard error handling for backend service errors"""
-    error_msg = f"❌ {context} failed: {str(error)}" if context else f"❌ {str(error)}"
+    error_msg = f"{context} failed: {str(error)}" if context else f"{str(error)}"
     st.error(error_msg)
     logger.error(f"Backend service error: {error}")
