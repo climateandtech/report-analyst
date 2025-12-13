@@ -346,6 +346,55 @@ class BackendService:
         except requests.RequestException:
             return []
 
+    def get_resources(self) -> List[Dict[str, Any]]:
+        """Public method to get backend resources (for compatibility)"""
+        return self._get_resources()
+
+    def list_reports(self) -> List[Any]:
+        """List sustainability reports from this backend as ReportResource objects"""
+        from report_analyst.core.report_data_client import ReportResource
+
+        resources = self._get_resources()
+        report_resources = []
+
+        for resource in resources:
+            resource_id = resource["id"]
+            # Normalize backend URL for URN (remove protocol)
+            backend_host = self._normalize_backend_url(self.config.backend_url)
+            # Generate URN: urn:report-analyst:backend:host:resource_id
+            urn = f"urn:report-analyst:backend:{backend_host}:{resource_id}"
+
+            report_resources.append(
+                ReportResource(
+                    name=resource.get("filename", resource.get("id", "Unknown")),
+                    uri=urn,
+                    date=self._parse_date(resource.get("created_at")),
+                    size=resource.get("file_size", 0),
+                    metadata={
+                        "resource_id": resource_id,
+                        "backend_url": self.config.backend_url,
+                        "status": resource.get("status"),
+                    },
+                )
+            )
+
+        return report_resources
+
+    def _normalize_backend_url(self, url: str) -> str:
+        """Normalize backend URL for URN (remove protocol, handle ports)"""
+        url = url.replace("http://", "").replace("https://", "")
+        return url
+
+    def _parse_date(self, date_str: Optional[str]) -> Optional[float]:
+        """Parse ISO date string to timestamp"""
+        if not date_str:
+            return None
+        try:
+            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            return dt.timestamp()
+        except Exception:
+            return None
+
     def _get_progress_for_status(self, status: str) -> int:
         """Map processing status to progress percentage"""
         progress_map = {

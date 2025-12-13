@@ -238,19 +238,54 @@ class DocumentAnalyzer:
         self._initialized = True
 
     def _get_cache_key(self, file_path: str) -> str:
-        """Generate a unique cache key based on file and all analysis parameters."""
+        """Generate a unique cache key based on file and all analysis parameters.
+        
+        Handles both local file paths and URNs (backend resources).
+        Maintains backwards compatibility with existing local file cache keys.
+        """
         try:
+            # Safely get model name, fallback to default_model if llm is None
+            model_name = self.llm.model if self.llm and hasattr(self.llm, "model") else self.default_model
             params_str = (
                 f"cs{self.chunk_params['chunk_size']}_"
                 f"ov{self.chunk_params['chunk_overlap']}_"
                 f"tk{self.chunk_params['top_k']}_"
-                f"m{self.llm.model}_"  # Include LLM model
+                f"m{model_name}_"  # Include LLM model
                 f"qs{self.question_set}"
             )  # Include question set
-            return f"{Path(file_path).stem}_{params_str}"
+            
+            # Handle URNs (backend resources) vs local file paths
+            if file_path.startswith("urn:report-analyst:backend:"):
+                # Extract resource ID from URN for cache key
+                # Format: urn:report-analyst:backend:host:resource_id
+                parts = file_path.replace("urn:report-analyst:backend:", "").split(":")
+                if len(parts) >= 2:
+                    resource_id = parts[-1]  # Get the last part (resource_id)
+                    # Use resource_id as identifier (sanitize for filesystem)
+                    safe_id = "".join(c if c.isalnum() or c in "_-" else "_" for c in resource_id)
+                    return f"backend_{safe_id}_{params_str}"
+                else:
+                    # Fallback: use full URN (sanitized)
+                    safe_urn = "".join(c if c.isalnum() or c in "_-" else "_" for c in file_path)
+                    return f"backend_{safe_urn}_{params_str}"
+            elif file_path.startswith("file://"):
+                # Handle file:// URIs - extract path
+                file_path_clean = file_path.replace("file://", "")
+                return f"{Path(file_path_clean).stem}_{params_str}"
+            else:
+                # Local file path (existing behavior - maintain backwards compatibility)
+                return f"{Path(file_path).stem}_{params_str}"
         except Exception as e:
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to generate cache key: {e}")
-            return f"{Path(file_path).stem}_fallback"
+            # Fallback: try to extract identifier safely
+            if file_path.startswith("urn:report-analyst:backend:"):
+                safe_id = "".join(c if c.isalnum() or c in "_-" else "_" for c in file_path[-20:])
+                return f"backend_{safe_id}_fallback"
+            else:
+                try:
+                    return f"{Path(file_path).stem}_fallback"
+                except:
+                    return f"unknown_fallback"
 
     def _get_vector_store_collection_name(self, cache_key: str) -> str:
         """Generate a valid collection name from cache key."""
@@ -495,7 +530,9 @@ Output only the scores, one per line, in order:"""
             logger.info(f"- Chunk size: {self.chunk_params['chunk_size']}")
             logger.info(f"- Overlap: {self.chunk_params['chunk_overlap']}")
             logger.info(f"- Top K: {self.chunk_params['top_k']}")
-            logger.info(f"- Model: {self.llm.model}")
+            # Safely get model name, fallback to default_model if llm is None
+            model_name = self.llm.model if self.llm and hasattr(self.llm, "model") else self.default_model
+            logger.info(f"- Model: {model_name}")
             logger.info(f"- Question set: {self.question_set}")
 
             # Log cache directory and available files
@@ -506,7 +543,7 @@ Output only the scores, one per line, in order:"""
                 logger.info(f"- {cf.name}")
 
             # Generate cache key for current configuration
-            cache_key = f"cs{self.chunk_params['chunk_size']}_ov{self.chunk_params['chunk_overlap']}_tk{self.chunk_params['top_k']}_m{self.llm.model}_qs{self.question_set}"
+            cache_key = f"cs{self.chunk_params['chunk_size']}_ov{self.chunk_params['chunk_overlap']}_tk{self.chunk_params['top_k']}_m{model_name}_qs{self.question_set}"
             file_stem = Path(file_path).stem
             cache_file = Path(self.cache_path) / f"{file_stem}_{cache_key}.json"
 
@@ -557,8 +594,18 @@ Output only the scores, one per line, in order:"""
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncGenerator[Dict, None]:
-        """Process a document for selected questions"""
+        """Process a document for selected questions
+        
+        Args:
+            file_path: Path to document file or URN for backend resources
+            selected_questions: List of question numbers to process
+            use_llm_scoring: Whether to use LLM for chunk scoring
+            single_call: Whether to use single LLM call per question
+            force_recompute: Whether to force recomputation
+            pre_retrieved_chunks: Optional pre-retrieved chunks (e.g., from backend)
+        """
         try:
             # Add more detailed logging
             logger.info(f"[ANALYSIS] Starting document processing for {file_path}")
@@ -574,32 +621,64 @@ Output only the scores, one per line, in order:"""
             self.current_file_path = file_path
 
             # 1. Load and chunk the document - use CacheManager with current chunk parameters
-            logger.info(
-                f"[ANALYSIS] Getting document chunks from cache for {file_path} with size={self.chunk_params['chunk_size']}, overlap={self.chunk_params['chunk_overlap']}"
-            )
-            chunks = self.cache_manager.get_document_chunks(
-                file_path=file_path,
-                chunk_size=self.chunk_params["chunk_size"],
-                chunk_overlap=self.chunk_params["chunk_overlap"],
-            )
-            logger.info(f"[ANALYSIS] Retrieved {len(chunks)} chunks from cache")
-
-            if not chunks:
-                logger.info(
-                    f"[ANALYSIS] No chunks found in cache with current parameters, creating new chunks"
-                )
-                # If no chunks in cache with current parameters, create them
-                chunks = self._create_chunks(file_path)
-                logger.info(f"[ANALYSIS] Created {len(chunks)} new chunks")
-
-                # Save chunks to cache with current parameters
+            if pre_retrieved_chunks:
+                # Use pre-retrieved chunks (e.g., from backend)
+                logger.info(f"[ANALYSIS] Using {len(pre_retrieved_chunks)} pre-retrieved chunks")
+                chunks = pre_retrieved_chunks
+                # Convert backend chunk format to analyzer format if needed
+                if chunks and "chunk_text" in chunks[0]:
+                    # Backend format: convert to analyzer format
+                    chunks = [
+                        {
+                            "text": chunk.get("chunk_text", ""),
+                            "metadata": chunk.get("chunk_metadata", {}),
+                        }
+                        for chunk in chunks
+                    ]
+                # Save chunks to cache for future use
                 self.cache_manager.save_document_chunks(
                     file_path=file_path,
                     chunks=chunks,
                     chunk_size=self.chunk_params["chunk_size"],
                     chunk_overlap=self.chunk_params["chunk_overlap"],
                 )
-                logger.info(f"[ANALYSIS] Saved {len(chunks)} chunks to cache")
+                logger.info(f"[ANALYSIS] Saved {len(chunks)} pre-retrieved chunks to cache")
+            else:
+                logger.info(
+                    f"[ANALYSIS] Getting document chunks from cache for {file_path} with size={self.chunk_params['chunk_size']}, overlap={self.chunk_params['chunk_overlap']}"
+                )
+                chunks = self.cache_manager.get_document_chunks(
+                    file_path=file_path,
+                    chunk_size=self.chunk_params["chunk_size"],
+                    chunk_overlap=self.chunk_params["chunk_overlap"],
+                )
+                logger.info(f"[ANALYSIS] Retrieved {len(chunks)} chunks from cache")
+
+                if not chunks:
+                    logger.info(
+                        f"[ANALYSIS] No chunks found in cache with current parameters, creating new chunks"
+                    )
+                    # If no chunks in cache with current parameters, create them
+                    # Check if file_path is a URN (backend resource)
+                    if file_path.startswith("urn:report-analyst:backend:"):
+                        logger.warning(
+                            f"[ANALYSIS] URN detected but no pre-retrieved chunks provided. Cannot process backend resource without chunks."
+                        )
+                        yield {
+                            "error": "Backend resource requires pre-retrieved chunks. Please ensure chunks are retrieved from backend first."
+                        }
+                        return
+                    chunks = self._create_chunks(file_path)
+                    logger.info(f"[ANALYSIS] Created {len(chunks)} new chunks")
+
+                    # Save chunks to cache with current parameters
+                    self.cache_manager.save_document_chunks(
+                        file_path=file_path,
+                        chunks=chunks,
+                        chunk_size=self.chunk_params["chunk_size"],
+                        chunk_overlap=self.chunk_params["chunk_overlap"],
+                    )
+                    logger.info(f"[ANALYSIS] Saved {len(chunks)} chunks to cache")
 
             yield {"status": f"Document loaded with {len(chunks)} chunks"}
 
@@ -750,11 +829,13 @@ Output only the scores, one per line, in order:"""
                     )
 
                     # Create config dict for cache manager
+                    # Safely get model name, fallback to default_model if llm is None
+                    model_name = self.llm.model if self.llm and hasattr(self.llm, "model") else self.default_model
                     config = {
                         "chunk_size": self.chunk_params["chunk_size"],
                         "chunk_overlap": self.chunk_params["chunk_overlap"],
                         "top_k": self.chunk_params["top_k"],
-                        "model": self.llm.model,
+                        "model": model_name,
                         "question_set": self.question_set,
                     }
 

@@ -183,8 +183,19 @@ class ReportAnalyzer:
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncGenerator[Dict, None]:
-        """Analyze a document using the provided questions"""
+        """Analyze a document using the provided questions
+        
+        Args:
+            file_path: Path to document file or URN for backend resources
+            questions: Dictionary of questions
+            selected_questions: List of selected question IDs
+            use_llm_scoring: Whether to use LLM for chunk scoring
+            single_call: Whether to use single LLM call per question
+            force_recompute: Whether to force recomputation
+            pre_retrieved_chunks: Optional pre-retrieved chunks (e.g., from backend)
+        """
         try:
             log_analysis_step(f"Starting analysis of document: {file_path}")
             log_analysis_step(f"Selected questions: {selected_questions}")
@@ -211,6 +222,7 @@ class ReportAnalyzer:
                 use_llm_scoring,
                 single_call,
                 force_recompute,
+                pre_retrieved_chunks=pre_retrieved_chunks,
             ):
                 # Pass through status and error messages
                 if "status" in result or "error" in result:
@@ -469,6 +481,9 @@ async def analyze_document_and_display(
             report_analyzer.analyzer.question_set = question_set
 
             # Process only uncached questions
+            # Check if we have pre-retrieved chunks (for backend resources)
+            pre_retrieved_chunks = st.session_state.get("backend_chunks")
+            
             async for result in report_analyzer.analyze_document(
                 file_path,
                 questions,
@@ -476,6 +491,7 @@ async def analyze_document_and_display(
                 use_llm_scoring,
                 single_call,
                 force_recompute,
+                pre_retrieved_chunks=pre_retrieved_chunks,
             ):
                 # Add debug logging to see what results we're getting
                 log_analysis_step(f"Received result: {str(result)[:200]}...")
@@ -689,28 +705,39 @@ def load_question_sets() -> Dict[str, str]:
         return {}
 
 
-def get_uploaded_files_history() -> List[Dict]:
-    """Get list of previously uploaded files from temp directory"""
-    temp_dir = Path("temp")
-    if not temp_dir.exists():
-        return []
+def get_uploaded_files_history(backend_config=None) -> List[Dict]:
+    """Get list of files for Streamlit dropdown (UI adapter)"""
+    from report_analyst.core.report_data_client import ReportDataClient
 
-    files = []
-    for file in temp_dir.glob("*.pdf"):
-        # Verify file exists and is not empty
-        if file.exists() and file.stat().st_size > 0:
-            files.append(
-                {
-                    "name": file.name,
-                    "path": str(file.resolve()),  # Get absolute path
-                    "date": file.stat().st_mtime,
-                    "size": file.stat().st_size,
-                }
-            )
-            logger.info(f"Found file: {file.name}, size: {file.stat().st_size} bytes")
+    client = ReportDataClient()
 
-    # Sort by most recent first
-    return sorted(files, key=lambda x: x["date"], reverse=True)
+    # Collect backend configs (could be multiple backends in future)
+    backend_configs = [backend_config] if backend_config and hasattr(backend_config, "use_backend") and backend_config.use_backend else []
+
+    resources = client.list_reports(backend_configs=backend_configs)
+
+    # Convert to dict format for Streamlit selectbox
+    result = []
+    for r in resources:
+        # Extract actual file path from file:// URI for backward compatibility
+        if r.is_local_resource and r.uri.startswith("file://"):
+            # Extract path from file:// URI (remove file:// prefix)
+            actual_path = r.uri.replace("file://", "")
+        elif r.is_local_resource:
+            # Already a direct path
+            actual_path = r.uri
+        else:
+            # Backend resource - keep URI as path for compatibility
+            actual_path = r.uri
+        
+        result.append({
+            "name": r.name,
+            "uri": r.uri,  # Primary identifier (URN or file://)
+            "path": actual_path,  # Actual file path for local files, URI for backend
+            "date": r.date,
+            "size": r.size,
+        })
+    return result
 
 
 def display_analysis_results(
@@ -1424,6 +1451,9 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
             else:
                 progress_text.warning(f"Invalid question ID format: {q_id}")
 
+        # Check if we have pre-retrieved chunks (for backend resources)
+        pre_retrieved_chunks = st.session_state.get("backend_chunks")
+        
         # First update the analyzer's process_document method to use progress_text instead of yielding status
         async for result in analyzer.process_document(
             file_path=file_path,
@@ -1432,6 +1462,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
                 "new_llm_scoring", False
             ),  # Use the checkbox value directly
             force_recompute=st.session_state.get("force_recompute", False),
+            pre_retrieved_chunks=pre_retrieved_chunks,  # Pass backend chunks if available
         ):
             # Handle errors by displaying them but not storing them
             if "error" in result:
@@ -1527,6 +1558,12 @@ def main():
 
         st.set_page_config(page_title="Report Analyst", layout="wide")
 
+        # Inject Material Icons link tag at the top
+        st.markdown(
+            '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">',
+            unsafe_allow_html=True
+        )
+        
         # Inject MINIMAL custom CSS for specific customizations only
         # Let Streamlit handle most theming automatically
         try:
@@ -1539,7 +1576,8 @@ def main():
             @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
             
             /* Material Icons base styles */
-            .material-icons {
+            .material-icons,
+            i.material-icons {
                 font-family: 'Material Icons';
                 font-weight: normal;
                 font-style: normal;
@@ -1727,6 +1765,148 @@ def main():
                 color: inherit !important;
             }
             
+            /* File Display Panel - Unique class for green panel styling */
+            /* The key="file-display-panel" creates the class st-key-file-display-panel */
+            /* Target the container element which has the st-key- class */
+            [data-testid="stVerticalBlock"].st-key-file-display-panel,
+            .st-key-file-display-panel[data-testid="stVerticalBlock"] {
+                background-color: #E8F5E9 !important;
+                border-radius: 12px !important;
+                padding: 1rem 1.5rem !important;
+                margin: 1rem 0 1.5rem 0 !important;
+            }
+            
+            /* Target the horizontal block inside the container (for columns) */
+            .st-key-file-display-panel [data-testid="stHorizontalBlock"] {
+                background-color: transparent !important;
+            }
+
+            /* Ensure columns inside the file display panel have transparent background */
+            .st-key-file-display-panel [data-testid="column"] {
+                background-color: transparent !important;
+            }
+            
+            /* Keep upload date gray */
+            .st-key-file-display-panel .pdf-upload-date {
+                color: #718096 !important;
+            }
+            
+            .pdf-icon-box {
+                background-color: #C8E6C9;
+                border-radius: 12px;
+                width: 56px;
+                height: 56px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+            
+            .pdf-icon-box .material-icons,
+            .pdf-icon-box i.material-icons {
+                font-size: 28px !important;
+                color: #2E7D32 !important;
+                display: inline-block !important;
+            }
+            
+            .pdf-info-section {
+                flex-grow: 1;
+            }
+            
+            .pdf-upload-date {
+                font-size: 13px;
+                color: #718096;
+                display: block;
+                margin-top: 4px;
+            }
+            
+            /* Style ONLY the PDF selectbox - target it specifically within the file display panel */
+            /* Make the selectbox container bigger */
+            .st-key-file-display-panel [data-baseweb="select"] {
+                min-width: 300px !important;
+                max-width: 500px !important;
+            }
+            
+            /* Target the main selectbox wrapper */
+            .st-key-file-display-panel [data-baseweb="select"] > div {
+                background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            
+            /* Target the div with value attribute (the displayed text) - make it bigger, bolder, and green */
+            .st-key-file-display-panel [data-baseweb="select"] div[value] {
+                font-size: 22px !important;
+                font-weight: 800 !important;
+                color: #1B9E6B !important;
+            }
+            
+            /* Also target by the specific class pattern for the value div */
+            .st-key-file-display-panel [data-baseweb="select"] [class*="st-dn"] {
+                font-size: 22px !important;
+                font-weight: 800 !important;
+                color: #1B9E6B !important;
+            }
+            
+            /* Target nested divs that contain the text */
+            .st-key-file-display-panel [data-baseweb="select"] > div > div > div[value],
+            .st-key-file-display-panel [data-baseweb="select"] > div > div > div[class*="st-dn"] {
+                font-size: 22px !important;
+                font-weight: 800 !important;
+                color: #1B9E6B !important;
+            }
+            
+            /* Make the dropdown arrow bigger, bold, and green */
+            .st-key-file-display-panel [data-baseweb="select"] svg {
+                color: #1B9E6B !important;
+                width: 28px !important;
+                height: 28px !important;
+            }
+            
+            .st-key-file-display-panel [data-baseweb="select"] svg path,
+            .st-key-file-display-panel [data-baseweb="select"] svg polygon {
+                stroke-width: 4 !important;
+                stroke: #1B9E6B !important;
+                fill: #1B9E6B !important;
+            }
+            
+            /* Styled Selectboxes - White background, thin border */
+            /* Only target selectboxes that are NOT in the PDF container */
+            /* Target selectboxes inside expanders or other sections, but NOT in PDF container */
+            [data-testid="stExpander"] [data-baseweb="select"] > div,
+            [data-testid="stExpander"] [data-baseweb="select"] > div > div {
+                background-color: #FFFFFF !important;
+                border: 1px solid #E2E8F0 !important;
+                border-radius: 4px !important;
+            }
+            
+            /* Ensure selectboxes in expanders have normal text color (NOT green) */
+            [data-testid="stExpander"] [data-baseweb="select"] > div > div > div {
+                color: #170843 !important;
+            }
+            
+            /* Ensure selectbox arrows in expanders are NOT green */
+            [data-testid="stExpander"] [data-baseweb="select"] svg path,
+            [data-testid="stExpander"] [data-baseweb="select"] svg polygon {
+                stroke: #170843 !important;
+                fill: #170843 !important;
+                stroke-width: 1 !important;
+            }
+            
+            [data-testid="stExpander"] [data-baseweb="select"]:hover > div,
+            [data-testid="stExpander"] [data-baseweb="select"]:hover > div > div {
+                border-color: #4313C8 !important;
+            }
+            
+            /* Styled Questions Table */
+            .questions-table-container {
+                background-color: #FFFFFF;
+                border: 1px solid #E2E8F0;
+                border-radius: 8px;
+                padding: 1rem;
+                margin: 1rem 0;
+            }
+            
             /* Sidebar accent (active item) - #4313C8 with white text */
             [data-testid="stSidebarNav"] li[aria-selected="true"],
             [data-testid="stSidebarNav"] a[aria-selected="true"],
@@ -1887,6 +2067,65 @@ def main():
             }
             
             /* ========== UNIFIED BUTTON STYLES ========== */
+            
+            /* Help icon button - styled as icon only, no background */
+            div[data-testid="stButton"] button:has-text("ℹ️") {
+                background-color: transparent !important;
+                color: #4313C8 !important;
+                border: none !important;
+                padding: 0 4px !important;
+                min-width: auto !important;
+                width: auto !important;
+                height: auto !important;
+                font-size: 18px !important;
+                cursor: help !important;
+                box-shadow: none !important;
+                line-height: 1 !important;
+            }
+            
+            div[data-testid="stButton"] button:has-text("ℹ️"):hover {
+                background-color: transparent !important;
+                color: #4313C8 !important;
+                opacity: 0.7 !important;
+                transform: none !important;
+            }
+            
+            /* Select All button - small light purple button like processing steps */
+            /* Target primary buttons that appear after "Select Questions" heading */
+            h3:has-text("Select Questions") + div[data-testid="stButton"] button[kind="primary"],
+            /* Fallback: target primary buttons with smaller text */
+            div[data-testid="stButton"] button[kind="primary"] {
+                background-color: rgba(192, 196, 250, 0.1) !important;
+                color: #4313C8 !important;
+                border: 1px solid #4313C8 !important;
+                border-radius: 4px !important;
+                padding: 4px 12px !important;
+                font-size: 12px !important;
+                font-family: 'Cousine', monospace !important;
+                height: auto !important;
+                min-height: 28px !important;
+                width: auto !important;
+                max-width: fit-content !important;
+            }
+            
+            /* Hover state for Select All button */
+            h3:has-text("Select Questions") + div[data-testid="stButton"] button[kind="primary"]:hover,
+            div[data-testid="stButton"] button[kind="primary"]:hover {
+                background-color: rgba(192, 196, 250, 0.2) !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Override for larger primary buttons (like Analyze Selected Questions, Reanalyze) */
+            /* These buttons have more text, so we can target them by their longer text content */
+            div[data-testid="stButton"]:has(button:contains("Analyze")) button,
+            div[data-testid="stButton"]:has(button:contains("Reanalyze")) button {
+                background-color: #4313C8 !important;
+                color: #FFFFFF !important;
+                padding: 10px 24px !important;
+                font-size: 14px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
             
             /* Default: All buttons in main content - white background with purple text (like Browse File) */
             /* Style all buttons first, then override for sidebar and special buttons */
@@ -2586,11 +2825,87 @@ def main():
         # Show page-specific content based on navigation
         if nav_page == "Report Analyst":
             st.title("Report Analyst")
+            st.caption("Analysis parameters tailored to your configurations")
 
-            # Analysis Configuration section
+            # Get file list for dropdown (including backend resources if enabled)
+            backend_config = st.session_state.get("backend_config")
+            previous_files = get_uploaded_files_history(backend_config=backend_config)
+            
+            # Determine selected file for display - check session state first
+            selected_file_for_display = None
+            if previous_files:
+                if "previous_file" in st.session_state:
+                    prev_file = st.session_state.previous_file
+                    # Handle both dict (from dropdown) and string (from initial state) formats
+                    if isinstance(prev_file, dict):
+                        selected_file_for_display = prev_file
+                    else:
+                        # If it's a string, find the matching file in the list
+                        for f in previous_files:
+                            if f["name"] == prev_file or f.get("path") == prev_file:
+                                selected_file_for_display = f
+                                break
+                
+                # If no file selected yet, use first one
+                if not selected_file_for_display and previous_files:
+                    selected_file_for_display = previous_files[0]
+            
+            # Green PDF Display Container with integrated file selector
+            if previous_files:
+                # Use container with unique key for green panel styling
+                # The key will be used as CSS class name prefixed with st-key-
+                with st.container(key="file-display-panel"):
+                    # Use columns for layout
+                    icon_col, content_col = st.columns([0.1, 0.9])
+                    
+                    with icon_col:
+                        st.markdown("""
+                        <div class="pdf-icon-box">
+                            <i class="material-icons">description</i>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with content_col:
+                        # File selector inside the green container
+                        selected_file_dropdown = st.selectbox(
+                            "Select Report",
+                            options=previous_files,
+                            format_func=lambda x: x["name"],
+                            key="previous_file",
+                            label_visibility="collapsed"
+                        )
+                        
+                        # Upload date below selector
+                        if selected_file_dropdown:
+                            selected_uri = selected_file_dropdown.get("uri", selected_file_dropdown.get("path", ""))
+                            is_backend = selected_uri.startswith("urn:report-analyst:backend:")
+                            
+                            if is_backend:
+                                # For backend resources, show backend info
+                                from report_analyst.core.report_data_client import ReportResource
+                                resource = ReportResource(name=selected_file_dropdown["name"], uri=selected_uri)
+                                parsed = resource.parse_backend_urn()
+                                if parsed:
+                                    st.markdown(f'<span class="pdf-upload-date">Backend: {parsed["host"]}</span>', unsafe_allow_html=True)
+                            else:
+                                # For local files, show upload date
+                                file_path_str = selected_file_dropdown.get("path", "")
+                                # Handle file:// URI format
+                                if file_path_str.startswith("file://"):
+                                    file_path_str = file_path_str.replace("file://", "")
+                                
+                                file_path_display = Path(file_path_str)
+                                if file_path_display.exists():
+                                    import datetime
+                                    mod_time = file_path_display.stat().st_mtime
+                                    upload_date = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y")
+                                    st.markdown(f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>', unsafe_allow_html=True)
+
+            # Analysis Configuration section - 3 column layout
             with st.expander("Analysis Configuration", expanded=True):
-                # Question set selection
-                col1, col2 = st.columns([1, 2])
+                col1, col2, col3 = st.columns([1, 1, 1])
+                
+                # Left column: Question Set
                 with col1:
                     selected_set = st.selectbox(
                         "Select Question Set",
@@ -2600,11 +2915,327 @@ def main():
                         index=0,  # Ensure a default is selected
                         on_change=update_analyzer_parameters,
                     )
-
-                # Show question set description
-                with col2:
+                    
+                    # Show question set description below
                     if selected_set in question_sets:
-                        st.info(question_sets[selected_set]["description"])
+                        st.caption(question_sets[selected_set]["description"])
+
+                # Middle column: Processing Steps
+                with col2:
+                    # Processing Steps heading with help icon and tooltip
+                    st.markdown("""
+                    <style>
+                    .help-container {
+                        position: relative;
+                        display: inline-block;
+                    }
+                    .help-icon {
+                        display: inline-block !important;
+                        margin-left: 6px;
+                        color: #4313C8 !important;
+                        cursor: help;
+                        font-size: 18px !important;
+                        vertical-align: middle;
+                        opacity: 0.7;
+                        transition: opacity 0.2s;
+                        font-family: 'Material Icons' !important;
+                        font-weight: normal !important;
+                        font-style: normal !important;
+                        line-height: 1 !important;
+                        letter-spacing: normal !important;
+                        text-transform: none !important;
+                        white-space: nowrap !important;
+                        word-wrap: normal !important;
+                        direction: ltr !important;
+                    }
+                    .help-icon:hover {
+                        opacity: 1;
+                    }
+                    .help-tooltip {
+                        visibility: hidden;
+                        opacity: 0;
+                        position: absolute;
+                        bottom: 125%;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background-color: #ffffff;
+                        color: #170843;
+                        text-align: left;
+                        border-radius: 6px;
+                        padding: 12px 16px;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                        z-index: 1000;
+                        width: 320px;
+                        font-size: 13px;
+                        line-height: 1.5;
+                        font-family: 'Afacad', sans-serif;
+                        border: 1px solid rgba(67, 19, 200, 0.2);
+                        transition: opacity 0.2s, visibility 0.2s;
+                        pointer-events: none;
+                    }
+                    .help-tooltip::after {
+                        content: "";
+                        position: absolute;
+                        top: 100%;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        border: 6px solid transparent;
+                        border-top-color: #ffffff;
+                    }
+                    .help-container:hover .help-tooltip {
+                        visibility: visible;
+                        opacity: 1;
+                    }
+                    </style>
+                    <div class="help-container">
+                        <strong>Processing Steps</strong>
+                        <i class="material-icons help-icon">help_outline</i>
+                        <div class="help-tooltip">
+                            You can choose if you want to first only cut the report in pieces (Chunking), make it searchable (Embedding), map text to questions (Question Mapping), or answer the questions (Question Answering). Note: Answering questions incurs LLM API costs.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Get step status if file is selected (check if we have a file path)
+                    step_status = {
+                        "chunks": False,
+                        "embeddings": False,
+                        "scoring": False,
+                        "analysis": False,
+                    }
+                    
+                    # Try to get step status if a file is selected
+                    if previous_files and "previous_file" in st.session_state:
+                        try:
+                            selected_file_obj = None
+                            for f in previous_files:
+                                if f["name"] == st.session_state.previous_file or f.get("path") == st.session_state.previous_file:
+                                    selected_file_obj = f
+                                    break
+                            
+                            if selected_file_obj:
+                                selected_uri = selected_file_obj.get("uri", selected_file_obj.get("path", ""))
+                                is_backend = selected_uri.startswith("urn:report-analyst:backend:")
+                                
+                                if is_backend:
+                                    # For backend resources, use URN for step status check
+                                    try:
+                                        step_status = analyzer.analyzer.check_step_completion(
+                                            selected_uri
+                                        )
+                                    except Exception as e:
+                                        logger.warning(f"Error checking step completion: {str(e)}")
+                                else:
+                                    file_path_for_status = Path(selected_file_obj["path"])
+                                    if file_path_for_status.exists():
+                                        try:
+                                            step_status = analyzer.analyzer.check_step_completion(
+                                                str(file_path_for_status)
+                                            )
+                                        except Exception as e:
+                                            logger.warning(f"Error checking step completion: {str(e)}")
+                        except Exception as e:
+                            logger.warning(f"Error getting step status: {str(e)}")
+                    
+                    # Define processing steps with shorter labels
+                    step_options = [
+                        "Chunk",
+                        "Embed", 
+                        "Map",
+                        "Answer"
+                    ]
+                    
+                    # Full step names for display
+                    step_full_names = {
+                        "Chunk": "Chunking",
+                        "Embed": "Embedding",
+                        "Map": "Question Mapping",
+                        "Answer": "Question Answering"
+                    }
+                    
+                    # Initialize selected step in session state if not exists
+                    if "processing_steps_slider" not in st.session_state:
+                        st.session_state.processing_steps_slider = "Answer"
+                    
+                    # Add CSS to make slider labels more visible
+                    st.markdown("""
+                    <style>
+                    /* Style select slider labels to be more visible */
+                    div[data-testid="stSlider"] label,
+                    div[data-testid="stSlider"] p {
+                        color: #170843 !important;
+                        font-weight: 500 !important;
+                        font-size: 14px !important;
+                        font-family: 'Afacad', sans-serif !important;
+                    }
+                    
+                    /* Make all slider tick labels visible */
+                    [data-baseweb="slider"] [role="slider"] ~ div,
+                    [data-baseweb="slider"] div[role="slider"] ~ div,
+                    [data-baseweb="slider"] div[role="slider"] + div,
+                    [data-baseweb="slider"] > div > div > div {
+                        color: #170843 !important;
+                        font-size: 12px !important;
+                        font-family: 'Afacad', sans-serif !important;
+                        font-weight: 500 !important;
+                        opacity: 1 !important;
+                        visibility: visible !important;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
+                    # Create select slider for step selection
+                    selected_step = st.select_slider(
+                        "Select processing steps",
+                        options=step_options,
+                        value=st.session_state.processing_steps_slider,
+                        key="processing_steps_slider",
+                        help="Select how many processing steps to execute",
+                        label_visibility="collapsed"
+                    )
+                    
+                    # Display all step labels below the slider
+                    step_cols = st.columns(4)
+                    selected_index = step_options.index(selected_step) if selected_step in step_options else len(step_options) - 1
+                    
+                    # Map step names to status keys
+                    step_status_map = {
+                        "Chunk": step_status.get("chunks", False),
+                        "Embed": step_status.get("embeddings", False),
+                        "Map": step_status.get("scoring", False),
+                        "Answer": step_status.get("analysis", False),
+                    }
+                    
+                    # Check if there's any stored data for this file
+                    # Reuse the file_path_for_status from the step_status check above
+                    has_stored_data = False
+                    if "analyzer" in st.session_state:
+                        try:
+                            # Use file_path_for_status if it was set in the step_status check above
+                            file_to_check = None
+                            if previous_files and "previous_file" in st.session_state:
+                                # Try to find the selected file
+                                selected_file_obj = None
+                                prev_file = st.session_state.previous_file
+                                
+                                # Handle both dict and string formats
+                                if isinstance(prev_file, dict):
+                                    for f in previous_files:
+                                        if (f["name"] == prev_file.get("name") or 
+                                            f.get("path") == prev_file.get("path")):
+                                            selected_file_obj = f
+                                            break
+                                else:
+                                    for f in previous_files:
+                                        if f["name"] == prev_file or f.get("path") == prev_file:
+                                            selected_file_obj = f
+                                            break
+                                
+                                if selected_file_obj:
+                                    selected_uri = selected_file_obj.get("uri", selected_file_obj.get("path", ""))
+                                    is_backend = selected_uri.startswith("urn:report-analyst:backend:")
+                                    if is_backend:
+                                        file_to_check = None  # Backend resources don't have local file paths
+                                    else:
+                                        file_to_check = Path(selected_file_obj["path"])
+                            
+                            # If we have a file path, check for stored data
+                            if file_to_check and file_to_check.exists():
+                                cache_entries = st.session_state.analyzer.analyzer.cache_manager.check_cache_status(
+                                    str(file_to_check)
+                                )
+                                # check_cache_status returns a list of tuples, so check if it has any entries
+                                has_stored_data = bool(cache_entries) and len(cache_entries) > 0
+                        except Exception as e:
+                            logger.debug(f"Error checking stored data: {str(e)}")
+                            has_stored_data = False
+                    
+                    for idx, step_short in enumerate(step_options):
+                        with step_cols[idx]:
+                            step_full = step_full_names[step_short]
+                            is_selected = idx <= selected_index
+                            is_complete = step_status_map.get(step_short, False)
+                            
+                            # Show checkmark if complete, circle if incomplete
+                            indicator = "✓" if is_complete else "○"
+                            
+                            # Visual styling for selected steps
+                            if is_selected:
+                                highlight_style = "background-color: rgba(192, 196, 250, 0.1); border: 1px solid #4313C8; color: #4313C8;"
+                            else:
+                                highlight_style = "background-color: rgba(192, 196, 250, 0.05); border: 1px solid rgba(67, 19, 200, 0.3); color: #718096;"
+                            
+                            # Add status badge next to Chunking step - always show
+                            status_badge = ""
+                            if step_short == "Chunk":
+                                badge_text = "Stored" if has_stored_data else "New"
+                                badge_bg = "rgba(192, 196, 250, 0.3)" if has_stored_data else "rgba(192, 196, 250, 0.15)"
+                                status_badge = f'<span style="background-color: {badge_bg}; color: #4313C8; border: 1px solid #4313C8; border-radius: 12px; padding: 2px 8px; font-size: 9px; margin-left: 6px; font-family: \'Cousine\', monospace; display: inline-block;">{badge_text}</span>'
+                            
+                            st.markdown(f"""
+                            <div style="{highlight_style} border-radius: 8px; padding: 0.5rem; text-align: center; font-size: 11px; font-family: 'Afacad', sans-serif;">
+                                <span>{indicator} {step_full}</span>{status_badge}
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                # Right column: Advanced Parameters
+                with col3:
+                    st.markdown("**Advanced Parameters**")
+                    
+                    # Use 2 columns for Advanced Parameters to make it more compact
+                    adv_col1, adv_col2 = st.columns(2)
+                    
+                    with adv_col1:
+                        new_top_k = st.number_input(
+                            "Top K",
+                            min_value=1,
+                            max_value=20,
+                            value=5,  # Default value
+                            key="new_top_k",
+                            on_change=update_analyzer_parameters,
+                        )
+                        
+                        new_chunk_size = st.number_input(
+                            "Chunk Size",
+                            min_value=100,
+                            max_value=2000,
+                            value=500,  # Default value
+                            key="new_chunk_size",
+                            on_change=update_analyzer_parameters,
+                        )
+                        
+                        new_overlap = st.number_input(
+                            "Overlap",
+                            min_value=0,
+                            max_value=100,
+                            value=20,  # Default value
+                            key="new_overlap",
+                            on_change=update_analyzer_parameters,
+                        )
+                    
+                    with adv_col2:
+                        new_llm_model = st.selectbox(
+                            "LLM Model",
+                            options=LLM_MODELS,
+                            index=0,  # Ensure a default is selected
+                            key="new_llm_model",
+                            on_change=update_analyzer_parameters,
+                        )
+                        
+                        new_llm_scoring = st.checkbox(
+                            "LLM Scoring",
+                            value=False,
+                            key="new_llm_scoring",
+                            on_change=update_analyzer_parameters,
+                        )
+                        
+                        new_batch_scoring = st.checkbox(
+                            "Batch Scoring",
+                            value=True,
+                            key="new_batch_scoring",
+                            disabled=not st.session_state.get("new_llm_scoring", False),
+                            help="Batch scoring only applies when LLM scoring is enabled.",
+                        )
 
                 # Update analyzer's question set
                 analyzer.analyzer.update_question_set(selected_set)
@@ -2618,314 +3249,328 @@ def main():
                         del st.session_state.results
                     st.session_state.last_question_set = selected_set
 
-                # LLM settings
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    new_llm_scoring = st.checkbox(
-                        "Use LLM Scoring",
-                        value=False,
-                        key="new_llm_scoring",
-                        on_change=update_analyzer_parameters,
-                    )
-                with col2:
-                    new_batch_scoring = st.checkbox(
-                        "Batch Scoring",
-                        value=True,
-                        key="new_batch_scoring",
-                        disabled=not st.session_state.get("new_llm_scoring", False),
-                        help="Batch scoring only applies when LLM scoring is enabled. When enabled, all chunks are scored in one API call instead of individual calls.",
-                    )
-                with col3:
-                    # Display available API info
-                    api_info = []
-                    if os.getenv("OPENAI_API_KEY"):
-                        api_info.append("OpenAI")
-                    if os.getenv("GOOGLE_API_KEY"):
-                        api_info.append("Gemini")
-
-                    if len(api_info) > 1:
-                        api_status = f"Using {' & '.join(api_info)} models"
-                    elif len(api_info) == 1:
-                        api_status = f"Using {api_info[0]} models only"
+            # Report Analyst page content - questions and analysis
+            if previous_files and selected_file_dropdown:
+                # Check if this is a backend resource (URN) or local file
+                selected_uri = selected_file_dropdown.get("uri", selected_file_dropdown.get("path", ""))
+                is_backend_resource = selected_uri.startswith("urn:report-analyst:backend:")
+                
+                if is_backend_resource:
+                    # Handle backend resource
+                    from report_analyst.core.report_data_client import get_chunks_for_backend_resource
+                    
+                    backend_config = st.session_state.get("backend_config")
+                    backend_configs = [backend_config] if backend_config and hasattr(backend_config, "use_backend") and backend_config.use_backend else []
+                    
+                    # Get chunks from backend
+                    chunks = get_chunks_for_backend_resource(selected_uri, backend_configs)
+                    if chunks:
+                        # Store chunks in session state for analysis
+                        st.session_state.backend_chunks = chunks
+                        st.session_state.backend_resource_uri = selected_uri
+                        # Use URN as file_path for cache (maintains compatibility with cache_manager)
+                        file_path = selected_uri  # Store as string, not Path
                     else:
-                        api_status = "No API keys configured"
-
-                    st.caption(api_status)
-
-                    new_llm_model = st.selectbox(
-                        "LLM Model",
-                        options=LLM_MODELS,
-                        index=0,  # Ensure a default is selected
-                        key="new_llm_model",
-                        on_change=update_analyzer_parameters,
+                        st.error("Failed to retrieve chunks from backend resource")
+                        chunks = None
+                        file_path = None
+                else:
+                    # Handle local file - maintain backwards compatibility
+                    # Use absolute path string as before (existing behavior for SQLite cache)
+                    file_path_str = selected_file_dropdown.get("path", "")
+                    
+                    # Handle file:// URI format - extract actual path
+                    if file_path_str.startswith("file://"):
+                        file_path_str = file_path_str.replace("file://", "")
+                    
+                    if file_path_str:
+                        file_path_obj = Path(file_path_str)
+                        if file_path_obj.exists():
+                            # Use absolute path string (maintains backwards compatibility with cache)
+                            file_path = str(file_path_obj.resolve())
+                            st.session_state.backend_chunks = None
+                            st.session_state.backend_resource_uri = None
+                        else:
+                            # File path doesn't exist - log warning but don't set file_path to None yet
+                            # This allows the error message to show the actual path
+                            file_path = file_path_str
+                            logger.warning(f"File path does not exist: {file_path_str}")
+                    else:
+                        # No path found in selected file
+                        file_path = None
+                        logger.warning(f"No path found in selected file: {selected_file_dropdown}")
+                
+                # Continue with analysis if we have a valid file path or chunks
+                if (not is_backend_resource and file_path and Path(file_path).exists()) or (is_backend_resource and chunks):
+                    # Load questions and handle selection
+                    question_set_data = analyzer.load_question_set(
+                        st.session_state.new_question_set
                     )
+                    questions = question_set_data["questions"]
 
-                # Chunking parameters
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    new_chunk_size = st.number_input(
-                        "Chunk Size",
-                        min_value=100,
-                        max_value=2000,
-                        value=500,  # Default value
-                        key="new_chunk_size",
-                        on_change=update_analyzer_parameters,
-                    )
-                with col2:
-                    new_overlap = st.number_input(
-                        "Overlap",
-                        min_value=0,
-                        max_value=100,
-                        value=20,  # Default value
-                        key="new_overlap",
-                        on_change=update_analyzer_parameters,
-                    )
-                with col3:
-                    new_top_k = st.number_input(
-                        "Top K",
-                        min_value=1,
-                        max_value=20,
-                        value=5,  # Default value
-                        key="new_top_k",
-                        on_change=update_analyzer_parameters,
-                    )
+                    st.markdown("<br>", unsafe_allow_html=True)
 
-            # Report Analyst page content
-            previous_files = get_uploaded_files_history()
-            if previous_files:
-                selected_file = st.selectbox(
-                    "Select a previously analyzed report",
-                    options=previous_files,
-                    format_func=lambda x: x["name"],
-                    key="previous_file",
-                )
-                if selected_file:
-                    file_path = Path(selected_file["path"])
-                    if file_path.exists():
-                        # Load questions and handle selection
-                        question_set_data = analyzer.load_question_set(
-                            st.session_state.new_question_set
+                    # Add question selection UI - styled table format
+                    st.subheader("Select Questions")
+                    
+                    table_key = f"questions_table_{st.session_state.new_question_set}"
+                    select_all_key = f"select_all_{st.session_state.new_question_set}"
+                    
+                    # Select All button - styled purple, smaller, below heading
+                    select_all_clicked = st.button(
+                        "Select All",
+                        key=select_all_key,
+                        type="primary"
+                    )
+                    
+                    # Handle select all button click - toggle state
+                    if select_all_clicked:
+                        # Toggle the select all state
+                        toggle_key = f"select_all_state_{st.session_state.new_question_set}"
+                        if toggle_key not in st.session_state:
+                            st.session_state[toggle_key] = False
+                        st.session_state[toggle_key] = not st.session_state[toggle_key]
+                    
+                    # Get current select all state
+                    toggle_key = f"select_all_state_{st.session_state.new_question_set}"
+                    select_all = st.session_state.get(toggle_key, False)
+                    
+                    # If select all is active, update all checkboxes
+                    if select_all:
+                        # Set all questions to selected
+                        questions_data = []
+                        for q_id, q_data in questions.items():
+                            questions_data.append({
+                                "Select": True,
+                                "QID": q_id,
+                                "QUESTION": q_data['text']
+                            })
+                        questions_df = pd.DataFrame(questions_data)
+                    else:
+                        # Build dataframe - let widget manage its own state, don't sync until analyze is clicked
+                        # Check if widget state exists and has the correct structure
+                        if table_key in st.session_state:
+                            widget_df = st.session_state[table_key]
+                            # Check if widget_df is a DataFrame with the expected columns
+                            if isinstance(widget_df, pd.DataFrame) and "QID" in widget_df.columns and "Select" in widget_df.columns:
+                                # Widget has valid state - use it directly
+                                questions_data = []
+                                for q_id, q_data in questions.items():
+                                    if q_id in widget_df["QID"].values:
+                                        is_selected = bool(widget_df[widget_df["QID"] == q_id]["Select"].iloc[0])
+                                    else:
+                                        # Question not in widget state yet, default to False
+                                        is_selected = False
+                                    
+                                    questions_data.append({
+                                        "Select": is_selected,
+                                        "QID": q_id,
+                                        "QUESTION": q_data['text']
+                                    })
+                                questions_df = pd.DataFrame(questions_data)
+                            else:
+                                # Widget state exists but has wrong structure - rebuild from scratch
+                                questions_data = []
+                                for q_id, q_data in questions.items():
+                                    questions_data.append({
+                                        "Select": False,
+                                        "QID": q_id,
+                                        "QUESTION": q_data['text']
+                                    })
+                                questions_df = pd.DataFrame(questions_data)
+                        else:
+                            # First time - build from scratch (don't use session state to avoid sync issues)
+                            questions_data = []
+                            for q_id, q_data in questions.items():
+                                questions_data.append({
+                                    "Select": False,
+                                    "QID": q_id,
+                                    "QUESTION": q_data['text']
+                                })
+                            questions_df = pd.DataFrame(questions_data)
+                    
+                    # Display as editable table - widget manages its own state
+                    edited_df = st.data_editor(
+                        questions_df,
+                        column_config={
+                            "Select": st.column_config.CheckboxColumn("Select", width=70),
+                            "QID": st.column_config.TextColumn("QID", disabled=True, width=120),
+                            "QUESTION": st.column_config.TextColumn("Question", disabled=True)
+                        },
+                        hide_index=True,
+                        use_container_width=True,
+                        key=table_key,
+                        num_rows="fixed",
+                        column_order=["Select", "QID", "QUESTION"]
+                    )
+                    
+                    # Don't sync to session state here - only sync when analyze button is clicked
+
+                    # Analysis button and results
+                    col1, col2 = st.columns([2, 1])
+                    with col1:
+                        analyze_clicked = st.button(
+                            "Analyze Selected Questions", key="analyze_button"
                         )
-                        questions = question_set_data["questions"]
+                    with col2:
+                        reanalyze_clicked = st.button(
+                            "Reanalyze", key="reanalyze_button"
+                        )
 
-                        # Display Processing Steps status
-                        try:
-                            step_status = analyzer.analyzer.check_step_completion(
-                                str(file_path)
+                    if analyze_clicked or reanalyze_clicked:
+                        # NOW sync the selection state from the widget
+                        # Get selected questions from the edited dataframe
+                        selected_questions = edited_df[edited_df["Select"] == True]["QID"].tolist()
+                        
+                        # Update session state for individual question checkboxes (for backward compatibility)
+                        for q_id in questions.keys():
+                            is_selected = q_id in selected_questions
+                            st.session_state[f"individual_question_{q_id}"] = is_selected
+                        
+                        if not selected_questions:
+                            st.warning(
+                                "Please select at least one question to analyze."
                             )
-                        except Exception as e:
-                            logger.warning(f"Error checking step completion: {str(e)}")
-                            step_status = {
-                                "chunks": False,
-                                "embeddings": False,
-                                "scoring": False,
-                                "analysis": False,
-                            }
+                        else:
+                            try:
+                                # Set force_recompute based on which button was clicked
+                                st.session_state.force_recompute = reanalyze_clicked
 
-                        # Processing Steps UI
-                        st.markdown("### Processing Steps")
-                        step_cols = st.columns(4)
-                        steps = [
-                            ("Chunks Generated", step_status.get("chunks", False)),
-                            ("Embeddings Generated", step_status.get("embeddings", False)),
-                            ("Chunks Scored", step_status.get("scoring", False)),
-                            ("Questions Answered", step_status.get("analysis", False)),
-                        ]
+                                # Get current configuration
+                                config = {
+                                    "chunk_size": st.session_state.new_chunk_size,
+                                    "chunk_overlap": st.session_state.new_overlap,
+                                    "top_k": st.session_state.new_top_k,
+                                    "model": st.session_state.new_llm_model,
+                                    "question_set": st.session_state.new_question_set,
+                                }
 
-                        for idx, (step_name, is_complete) in enumerate(steps):
-                            with step_cols[idx]:
-                                if is_complete:
-                                    st.markdown(
-                                        f"""
-                                        <div style="
-                                            background-color: rgba(192, 196, 250, 0.1);
-                                            border: 1px solid #4313C8;
-                                            border-radius: 8px;
-                                            padding: 1rem;
-                                            text-align: center;
-                                        ">
-                                            <div style="color: #4313C8; font-family: 'Afacad', sans-serif; font-weight: 600;">
-                                                ✓ {step_name}
-                                            </div>
-                                        </div>
-                                        """,
-                                        unsafe_allow_html=True,
+                                # Initialize progress display
+                                progress_text = st.empty()
+
+                                # Check if this is a backend resource
+                                is_backend = st.session_state.get("backend_chunks") is not None
+                                backend_uri = st.session_state.get("backend_resource_uri")
+                                
+                                # Use URN as file_path for backend resources, absolute path string for local files
+                                # This maintains backwards compatibility with SQLite cache
+                                if is_backend and backend_uri:
+                                    analysis_file_path = backend_uri  # URN string
+                                else:
+                                    # Local file - ensure it's absolute path string (backwards compatible)
+                                    analysis_file_path = str(Path(file_path).resolve()) if file_path else file_path
+                                
+                                if reanalyze_clicked:
+                                    # For reanalysis, skip cache check and analyze all selected questions
+                                    progress_text.info(
+                                        f"Reanalyzing {len(selected_questions)} questions..."
+                                    )
+                                    asyncio.run(
+                                        run_analysis(
+                                            analyzer,
+                                            file_path=analysis_file_path,
+                                            selected_questions=selected_questions,
+                                            progress_text=progress_text,
+                                        )
                                     )
                                 else:
-                                    st.markdown(
-                                        f"""
-                                        <div style="
-                                            background-color: rgba(192, 196, 250, 0.05);
-                                            border: 1px solid rgba(67, 19, 200, 0.3);
-                                            border-radius: 8px;
-                                            padding: 1rem;
-                                            text-align: center;
-                                        ">
-                                            <div style="color: rgba(67, 19, 200, 0.6); font-family: 'Afacad', sans-serif; font-weight: 600;">
-                                                ○ {step_name}
-                                            </div>
-                                        </div>
-                                        """,
-                                        unsafe_allow_html=True,
+                                    # For normal analysis, check cache first
+                                    cached_results = analyzer.analyzer.cache_manager.get_analysis(
+                                        file_path=analysis_file_path,
+                                        config=config,
+                                        question_ids=selected_questions,
                                     )
 
-                        st.markdown("<br>", unsafe_allow_html=True)
+                                    if cached_results:
+                                        # Process cached results
+                                        for (
+                                            question_id,
+                                            result,
+                                        ) in cached_results.items():
+                                            st.session_state.results["answers"][
+                                                question_id
+                                            ] = result
 
-                        # Add cache selector
-                        display_cache_selector(str(file_path))
-
-                        # Add question selection UI
-                        st.subheader("Select Questions")
-                        selected_questions = []
-                        for q_id, q_data in questions.items():
-                            if st.checkbox(
-                                f"{q_id}: {q_data['text']}",
-                                key=f"individual_question_{q_id}",
-                            ):
-                                selected_questions.append(q_id)
-
-                        # Analysis button and results
-                        col1, col2 = st.columns([2, 1])
-                        with col1:
-                            analyze_clicked = st.button(
-                                "Analyze Selected Questions", key="analyze_button"
-                            )
-                        with col2:
-                            reanalyze_clicked = st.button(
-                                "Reanalyze", key="reanalyze_button"
-                            )
-
-                        if analyze_clicked or reanalyze_clicked:
-                            if not selected_questions:
-                                st.warning(
-                                    "Please select at least one question to analyze."
-                                )
-                            else:
-                                try:
-                                    # Set force_recompute based on which button was clicked
-                                    st.session_state.force_recompute = reanalyze_clicked
-
-                                    # Get current configuration
-                                    config = {
-                                        "chunk_size": st.session_state.new_chunk_size,
-                                        "chunk_overlap": st.session_state.new_overlap,
-                                        "top_k": st.session_state.new_top_k,
-                                        "model": st.session_state.new_llm_model,
-                                        "question_set": st.session_state.new_question_set,
-                                    }
-
-                                    # Initialize progress display
-                                    progress_text = st.empty()
-
-                                    if reanalyze_clicked:
-                                        # For reanalysis, skip cache check and analyze all selected questions
-                                        progress_text.info(
-                                            f"Reanalyzing {len(selected_questions)} questions..."
+                                        # Generate file key for display
+                                        file_key = generate_file_key(
+                                            analysis_file_path, st
                                         )
-                                        asyncio.run(
-                                            run_analysis(
-                                                analyzer,
-                                                file_path=str(file_path),
-                                                selected_questions=selected_questions,
-                                                progress_text=progress_text,
+
+                                        # Update display
+                                        analysis_df, chunks_df = (
+                                            create_analysis_dataframes(
+                                                st.session_state.results["answers"],
+                                                file_key,
                                             )
+                                        )
+                                        st.session_state.analysis_df = analysis_df
+                                        st.session_state.chunks_df = chunks_df
+                                        st.session_state.analysis_complete = True
+                                    else:
+                                        # Run analysis for uncached questions
+                                        progress_text.info(
+                                            f"Processing {len(selected_questions)} questions..."
+                                        )
+
+                                        try:
+                                            # Run analysis for uncached questions
+                                            asyncio.run(
+                                                analyze_document_and_display(
+                                                    analyzer,
+                                                    file_path=analysis_file_path,  # Use URN for backend, file path for local
+                                                    questions=questions,
+                                                    selected_questions=selected_questions,
+                                                    use_llm_scoring=st.session_state.new_llm_scoring,
+                                                    single_call=st.session_state.new_batch_scoring,
+                                                )
+                                            )
+
+                                            progress_text.success(
+                                                "Analysis complete!"
+                                            )
+
+                                        except Exception as e:
+                                            st.error(
+                                                f"Error during analysis: {str(e)}"
+                                            )
+                                            st.exception(e)
+
+                                    # Get final results
+                                    all_results = analyzer.analyzer.cache_manager.get_analysis(
+                                        file_path=str(file_path),
+                                        config=config,
+                                        question_ids=selected_questions,
+                                    )
+
+                                    # Process all results into dataframes
+                                    if all_results:
+                                        analysis_df, chunks_df = (
+                                            create_analysis_dataframes(all_results)
+                                        )
+                                        file_key = Path(file_path).stem
+                                        display_analysis_results(
+                                            analysis_df, chunks_df, file_key
+                                        )
+                                        progress_text.success(
+                                            f"✓ Analysis complete for {len(selected_questions)} questions"
                                         )
                                     else:
-                                        # For normal analysis, check cache first
-                                        cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                                            file_path=str(file_path),
-                                            config=config,
-                                            question_ids=selected_questions,
+                                        progress_text.error(
+                                            "No results found after analysis"
                                         )
 
-                                        if cached_results:
-                                            # Process cached results
-                                            for (
-                                                question_id,
-                                                result,
-                                            ) in cached_results.items():
-                                                st.session_state.results["answers"][
-                                                    question_id
-                                                ] = result
-
-                                            # Generate file key for display
-                                            file_key = generate_file_key(
-                                                str(file_path), st
-                                            )
-
-                                            # Update display
-                                            analysis_df, chunks_df = (
-                                                create_analysis_dataframes(
-                                                    st.session_state.results["answers"],
-                                                    file_key,
-                                                )
-                                            )
-                                            st.session_state.analysis_df = analysis_df
-                                            st.session_state.chunks_df = chunks_df
-                                            st.session_state.analysis_complete = True
-                                        else:
-                                            # Run analysis for uncached questions
-                                            progress_text.info(
-                                                f"Processing {len(selected_questions)} questions..."
-                                            )
-
-                                            try:
-                                                # Run analysis for uncached questions
-                                                asyncio.run(
-                                                    analyze_document_and_display(
-                                                        analyzer,
-                                                        file_path=str(
-                                                            file_path
-                                                        ),  # Use the actual file path
-                                                        questions=questions,
-                                                        selected_questions=selected_questions,
-                                                        use_llm_scoring=st.session_state.new_llm_scoring,
-                                                        single_call=st.session_state.new_batch_scoring,
-                                                    )
-                                                )
-
-                                                progress_text.success(
-                                                    "Analysis complete!"
-                                                )
-
-                                            except Exception as e:
-                                                st.error(
-                                                    f"Error during analysis: {str(e)}"
-                                                )
-                                                st.exception(e)
-
-                                        # Get final results
-                                        all_results = analyzer.analyzer.cache_manager.get_analysis(
-                                            file_path=str(file_path),
-                                            config=config,
-                                            question_ids=selected_questions,
-                                        )
-
-                                        # Process all results into dataframes
-                                        if all_results:
-                                            analysis_df, chunks_df = (
-                                                create_analysis_dataframes(all_results)
-                                            )
-                                            file_key = Path(file_path).stem
-                                            display_analysis_results(
-                                                analysis_df, chunks_df, file_key
-                                            )
-                                            progress_text.success(
-                                                f"✓ Analysis complete for {len(selected_questions)} questions"
-                                            )
-                                        else:
-                                            progress_text.error(
-                                                "No results found after analysis"
-                                            )
-
-                                except Exception as e:
-                                    logger.error(
-                                        f"Error during analysis: {str(e)}",
-                                        exc_info=True,
-                                    )
-                                    st.error(f"Error during analysis: {str(e)}")
+                            except Exception as e:
+                                logger.error(
+                                    f"Error during analysis: {str(e)}",
+                                    exc_info=True,
+                                )
+                                st.error(f"Error during analysis: {str(e)}")
+                else:
+                    # Show helpful error message
+                    if file_path is None:
+                        st.error("File not found: No file path available. Please select a valid file.")
                     else:
-                        st.error(f"File not found: {file_path}")
+                        st.error(f"File not found: {file_path}. Please ensure the file exists.")
             else:
                 st.info("No previously analyzed reports found")
 
@@ -3127,7 +3772,7 @@ def main():
                         logger.info(
                             f"[UPLOAD] Displaying cache selector for file: {file_path}"
                         )
-                        display_cache_selector(file_path)
+                        # Removed display_cache_selector - stored data status now shown as pill next to Chunking step
                         if not st.session_state.get("file_processed"):
                             st.session_state.file_processed = True
                             st.rerun()
