@@ -1,7 +1,8 @@
 """
 Streamlit custom component backend for JSON Schema form.
 
-This creates a proper Streamlit custom component using React and RJSF.
+This creates a proper Streamlit custom component using the framework-agnostic
+web component, which internally uses React and RJSF.
 """
 
 import json

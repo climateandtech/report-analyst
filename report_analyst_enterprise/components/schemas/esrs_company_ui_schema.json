@@ -1,0 +1,78 @@
+{
+  "companyName": {
+    "ui:placeholder": "Enter the official legal name of the company"
+  },
+  "lei": {
+    "ui:placeholder": "20-character LEI code (e.g., 5493000IBP32UQZ0KL24)",
+    "ui:help": "Legal Entity Identifier - a 20-character alphanumeric code"
+  },
+  "registeredAddress": {
+    "ui:order": ["street", "city", "postalCode", "country"],
+    "street": {
+      "ui:placeholder": "Street address and number"
+    },
+    "city": {
+      "ui:placeholder": "City name"
+    },
+    "postalCode": {
+      "ui:placeholder": "Postal/ZIP code"
+    },
+    "country": {
+      "ui:placeholder": "Two-letter country code (e.g., DE, FR, UK)",
+      "ui:help": "ISO 3166-1 alpha-2 country code"
+    }
+  },
+  "industryClassification": {
+    "ui:widget": "select",
+    "ui:placeholder": "Select industry sector"
+  },
+  "naceCode": {
+    "ui:placeholder": "e.g., 25.11",
+    "ui:help": "NACE Rev. 2 classification code"
+  },
+  "reportingPeriodStart": {
+    "ui:widget": "date",
+    "ui:placeholder": "YYYY-MM-DD"
+  },
+  "reportingPeriodEnd": {
+    "ui:widget": "date",
+    "ui:placeholder": "YYYY-MM-DD"
+  },
+  "reportingFramework": {
+    "ui:options": {
+      "addable": true,
+      "orderable": true,
+      "removable": true
+    }
+  },
+  "consolidationScope": {
+    "ui:widget": "radio",
+    "ui:options": {
+      "inline": true
+    }
+  },
+  "currency": {
+    "ui:placeholder": "EUR",
+    "ui:help": "ISO 4217 currency code"
+  },
+  "fiscalYearEnd": {
+    "ui:placeholder": "MM-DD (e.g., 12-31)",
+    "ui:help": "Month and day when fiscal year ends"
+  },
+  "website": {
+    "ui:placeholder": "https://www.example.com",
+    "ui:widget": "uri"
+  },
+  "contactEmail": {
+    "ui:placeholder": "sustainability@company.com",
+    "ui:widget": "email"
+  },
+  "notes": {
+    "ui:widget": "textarea",
+    "ui:options": {
+      "rows": 4
+    },
+    "ui:placeholder": "Additional notes or context about the company or reporting"
+  }
+}
+

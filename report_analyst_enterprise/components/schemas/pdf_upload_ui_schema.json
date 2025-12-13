@@ -1,0 +1,30 @@
+{
+  "filename": {
+    "ui:widget": "text",
+    "ui:placeholder": "Enter PDF filename (e.g., report-2024.pdf)",
+    "ui:help": "Must end with .pdf extension"
+  },
+  "category": {
+    "ui:widget": "select",
+    "ui:help": "Select the document category"
+  },
+  "tags": {
+    "ui:options": {
+      "addable": true,
+      "orderable": true,
+      "removable": true
+    }
+  },
+  "description": {
+    "ui:widget": "textarea",
+    "ui:options": {
+      "rows": 4
+    },
+    "ui:placeholder": "Enter a description of the document"
+  },
+  "year": {
+    "ui:widget": "updown",
+    "ui:help": "Year between 2000 and 2100"
+  }
+}
+

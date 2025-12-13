@@ -1,0 +1,11 @@
+/* Additional styles for json-schema-form web component */
+
+json-schema-form {
+  --primary-color: #0066cc;
+  --error-color: #d32f2f;
+  --border-color: #ddd;
+  --text-color: #333;
+  --text-secondary: #666;
+}
+
+

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Schema Form Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+        .output {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        pre {
+            background: #fff;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>JSON Schema Form Web Component Test</h1>
+    
+    <json-schema-form id="test-form"></json-schema-form>
+    
+    <div class="output">
+        <h2>Output</h2>
+        <div id="output">No form data yet...</div>
+    </div>
+    
+    <script type="module">
+        import JsonSchemaForm from './json-schema-form.js';
+        
+        const form = document.getElementById('test-form');
+        const output = document.getElementById('output');
+        
+        // Test schema
+        const schema = {
+            type: 'object',
+            title: 'PDF Upload Form',
+            required: ['filename', 'category'],
+            properties: {
+                filename: {
+                    type: 'string',
+                    title: 'File Name',
+                    pattern: '^.+\\.pdf$'
+                },
+                category: {
+                    type: 'string',
+                    title: 'Category',
+                    enum: ['sustainability', 'financial', 'governance', 'other']
+                },
+                tags: {
+                    type: 'array',
+                    title: 'Tags',
+                    items: { type: 'string' }
+                },
+                description: {
+                    type: 'string',
+                    title: 'Description'
+                },
+                year: {
+                    type: 'integer',
+                    title: 'Year',
+                    minimum: 2000,
+                    maximum: 2100
+                }
+            }
+        };
+        
+        const uiSchema = {
+            filename: {
+                'ui:placeholder': 'Enter PDF filename (e.g., report-2024.pdf)'
+            },
+            category: {
+                'ui:widget': 'select'
+            },
+            description: {
+                'ui:widget': 'textarea',
+                'ui:options': { rows: 4 }
+            }
+        };
+        
+        form.setAttribute('schema', JSON.stringify(schema));
+        form.setAttribute('ui-schema', JSON.stringify(uiSchema));
+        
+        form.addEventListener('change', (e) => {
+            output.innerHTML = `
+                <h3>Form Data Changed</h3>
+                <pre>${JSON.stringify(e.detail.formData, null, 2)}</pre>
+                ${e.detail.errors.length > 0 ? `
+                    <h3>Errors</h3>
+                    <pre>${JSON.stringify(e.detail.errors, null, 2)}</pre>
+                ` : ''}
+            `;
+        });
+        
+        form.addEventListener('submit', (e) => {
+            output.innerHTML = `
+                <h3>Form Submitted!</h3>
+                <pre>${JSON.stringify(e.detail.formData, null, 2)}</pre>
+            `;
+        });
+        
+        form.addEventListener('error', (e) => {
+            output.innerHTML = `
+                <h3>Validation Errors</h3>
+                <pre>${JSON.stringify(e.detail.errors, null, 2)}</pre>
+            `;
+        });
+    </script>
+</body>
+</html>
+
+

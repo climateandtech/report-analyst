@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Question Set Editor",
+  "description": "Create or edit a question set for document analysis",
+  "required": ["name", "questions"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "Question Set Name",
+      "description": "Unique identifier for this question set",
+      "pattern": "^[a-z0-9_-]+$",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "title": "Display Title",
+      "description": "Human-readable title for the question set"
+    },
+    "description": {
+      "type": "string",
+      "title": "Description",
+      "description": "Description of what this question set analyzes"
+    },
+    "questions": {
+      "type": "array",
+      "title": "Questions",
+      "description": "List of questions to analyze",
+      "items": {
+        "type": "object",
+        "required": ["id", "text"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Question ID",
+            "description": "Unique identifier for this question",
+            "pattern": "^[a-z0-9_-]+$"
+          },
+          "text": {
+            "type": "string",
+            "title": "Question Text",
+            "description": "The actual question to ask",
+            "minLength": 10
+          },
+          "guidelines": {
+            "type": "string",
+            "title": "Guidelines",
+            "description": "Optional guidelines for answering this question"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "Question category (e.g., governance, risk, strategy)",
+            "enum": ["governance", "strategy", "risk", "metrics", "other"]
+          }
+        }
+      },
+      "minItems": 1
+    }
+  }
+}
+
+

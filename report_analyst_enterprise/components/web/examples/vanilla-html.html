@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Schema Form - Vanilla HTML Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 1rem;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .output {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        pre {
+            background: #fff;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        h1 {
+            color: #4313C8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JSON Schema Form - Vanilla HTML</h1>
+        <p>This demonstrates the web component working in plain HTML without any framework.</p>
+        
+        <json-schema-form id="test-form"></json-schema-form>
+        
+        <div class="output">
+            <h2>Output</h2>
+            <div id="output">No form data yet...</div>
+        </div>
+    </div>
+    
+    <script type="module" src="../dist/json-schema-form.es.js"></script>
+    <script type="module">
+        const form = document.getElementById('test-form');
+        const output = document.getElementById('output');
+        
+        // Test schema (ESRS Company Information)
+        const schema = {
+            type: 'object',
+            title: 'Company Information',
+            required: ['companyName', 'lei'],
+            properties: {
+                companyName: {
+                    type: 'string',
+                    title: 'Company Name'
+                },
+                lei: {
+                    type: 'string',
+                    title: 'Legal Entity Identifier (LEI)',
+                    pattern: '^[A-Z0-9]{18}[0-9]{2}$'
+                },
+                registeredAddress: {
+                    type: 'string',
+                    title: 'Registered Address'
+                },
+                industryClassification: {
+                    type: 'string',
+                    title: 'Industry Classification',
+                    enum: ['Manufacturing', 'Services', 'Technology', 'Finance', 'Energy', 'Other']
+                },
+                reportingPeriodStart: {
+                    type: 'string',
+                    format: 'date',
+                    title: 'Reporting Period Start'
+                },
+                reportingPeriodEnd: {
+                    type: 'string',
+                    format: 'date',
+                    title: 'Reporting Period End'
+                }
+            }
+        };
+        
+        const uiSchema = {
+            companyName: {
+                'ui:placeholder': 'Enter company name'
+            },
+            lei: {
+                'ui:placeholder': 'Enter 20-character LEI'
+            },
+            registeredAddress: {
+                'ui:widget': 'textarea',
+                'ui:options': { rows: 3 }
+            },
+            industryClassification: {
+                'ui:widget': 'select'
+            }
+        };
+        
+        // Set schema and UI schema
+        form.setAttribute('schema', JSON.stringify(schema));
+        form.setAttribute('ui-schema', JSON.stringify(uiSchema));
+        
+        // Listen for events
+        form.addEventListener('change', (e) => {
+            output.innerHTML = `
+                <h3>Form Data Changed</h3>
+                <pre>${JSON.stringify(e.detail.formData, null, 2)}</pre>
+            `;
+        });
+        
+        form.addEventListener('submit', (e) => {
+            output.innerHTML = `
+                <h3 style="color: green;">Form Submitted Successfully!</h3>
+                <pre>${JSON.stringify(e.detail.formData, null, 2)}</pre>
+            `;
+        });
+        
+        form.addEventListener('error', (e) => {
+            output.innerHTML = `
+                <h3 style="color: red;">Validation Errors</h3>
+                <pre>${JSON.stringify(e.detail.errors, null, 2)}</pre>
+            `;
+        });
+    </script>
+</body>
+</html>
+
