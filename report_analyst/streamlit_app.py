@@ -3683,12 +3683,82 @@ def main():
             </style>
             """, unsafe_allow_html=True)
             
+            # Try to import JSON Schema form component (enterprise feature)
+            try:
+                # Use the proper Streamlit custom component
+                from report_analyst_enterprise.components.streamlit_component.backend import json_schema_form
+                import json
+                # Path is already imported at the top of the file
+                
+                JSON_SCHEMA_FORM_AVAILABLE = True
+                
+                # Load PDF upload schema
+                schema_path = Path(__file__).parent.parent / "report_analyst_enterprise" / "components" / "schemas" / "pdf_upload_schema.json"
+                ui_schema_path = Path(__file__).parent.parent / "report_analyst_enterprise" / "components" / "schemas" / "pdf_upload_ui_schema.json"
+                
+                if schema_path.exists() and ui_schema_path.exists():
+                    with open(schema_path) as f:
+                        pdf_upload_schema = json.load(f)
+                    with open(ui_schema_path) as f:
+                        pdf_upload_ui_schema = json.load(f)
+                else:
+                    JSON_SCHEMA_FORM_AVAILABLE = False
+                    pdf_upload_schema = None
+                    pdf_upload_ui_schema = None
+            except ImportError:
+                JSON_SCHEMA_FORM_AVAILABLE = False
+                pdf_upload_schema = None
+                pdf_upload_ui_schema = None
+            
+            # File upload with optional metadata form
             uploaded_file = st.file_uploader(
                 "Choose a PDF file", 
                 type="pdf", 
                 key="file_uploader",
                 help="Limit 200MB per file • PDF"
             )
+            
+            # Show metadata form if JSON Schema form is available
+            pdf_metadata = None
+            company_metadata = None
+            
+            if JSON_SCHEMA_FORM_AVAILABLE:
+                # ESRS Company Information Form
+                esrs_schema_path = Path(__file__).parent.parent / "report_analyst_enterprise" / "components" / "schemas" / "esrs_company_schema.json"
+                esrs_ui_schema_path = Path(__file__).parent.parent / "report_analyst_enterprise" / "components" / "schemas" / "esrs_company_ui_schema.json"
+                
+                if esrs_schema_path.exists() and esrs_ui_schema_path.exists():
+                    with open(esrs_schema_path) as f:
+                        esrs_company_schema = json.load(f)
+                    with open(esrs_ui_schema_path) as f:
+                        esrs_company_ui_schema = json.load(f)
+                    
+                    with st.expander("ESRS Company Information", expanded=True):
+                        st.caption("Enter company data aligned with ESRS XBRL taxonomy requirements")
+                        company_metadata = json_schema_form(
+                            schema=esrs_company_schema,
+                            ui_schema=esrs_company_ui_schema,
+                            key="esrs_company_form",
+                            height=700
+                        )
+                        if company_metadata and company_metadata.get("type") == "submit":
+                            st.success("Company information saved!")
+                            st.session_state.esrs_company_metadata = company_metadata.get("formData", company_metadata)
+                
+                # Basic PDF metadata form
+                if pdf_upload_schema:
+                    with st.expander("Add Document Metadata (Optional)", expanded=False):
+                        st.caption("Add metadata like category, tags, and description to help organize your documents.")
+                        pdf_metadata = json_schema_form(
+                            schema=pdf_upload_schema,
+                            ui_schema=pdf_upload_ui_schema,
+                            key="pdf_metadata_form",
+                            height=500
+                        )
+                        if pdf_metadata:
+                            st.success("Metadata saved!")
+                            # Store in session state for use after upload
+                            st.session_state.pdf_metadata = pdf_metadata
             
             if uploaded_file:
                 # Handle upload based on mode
