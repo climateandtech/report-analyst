@@ -62,26 +62,11 @@ def test_env():
     cache_path = storage_path / "cache"
     cache_path.mkdir(parents=True)
 
-    # Create test database
+    # Create test database using CacheManager (which will create all tables)
     db_path = cache_path / "analysis.db"
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS analysis_cache (
-            file_path TEXT,
-            question_id TEXT,
-            chunk_size INTEGER,
-            chunk_overlap INTEGER,
-            top_k INTEGER,
-            model TEXT,
-            question_set TEXT,
-            result TEXT,
-            created_at TEXT,
-            PRIMARY KEY (file_path, question_id, chunk_size, chunk_overlap, top_k, model, question_set)
-        )
-    """
-    )
-    conn.close()
+    from report_analyst.core.cache_manager import CacheManager
+    cache_manager = CacheManager(db_path=str(db_path))
+    # Tables are created automatically by CacheManager.init_db()
 
     # Create test question set
     questions_dir = Path(temp_dir) / "questionsets"

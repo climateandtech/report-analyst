@@ -15,7 +15,7 @@ This addresses the user requirement: "llm score is independent from is evidence"
 
 import json
 import os
-import sqlite3
+from sqlalchemy import inspect, text
 import sys
 import tempfile
 from pathlib import Path
@@ -55,22 +55,25 @@ class TestLLMEvidenceSeparation:
     def test_database_schema_separation(self, cache_manager):
         """Test that the database schema has separate fields for similarity_score, llm_score, and is_evidence."""
 
-        with sqlite3.connect(cache_manager.db_path) as conn:
-            cursor = conn.execute("PRAGMA table_info(chunk_relevance)")
-            columns = {row[1]: row[2] for row in cursor.fetchall()}
+        from sqlalchemy import inspect
+        inspector = inspect(cache_manager.db_manager.get_engine())
+        columns = {col["name"]: str(col["type"]) for col in inspector.get_columns("chunk_relevance")}
 
-            # Verify required columns exist with correct types
-            required_columns = {
-                "similarity_score": "REAL",
-                "llm_score": "REAL",
-                "is_evidence": "BOOLEAN",
-            }
+        # Verify required columns exist with correct types
+        # SQLAlchemy type names may differ (Float vs REAL, Boolean vs BOOLEAN)
+        required_columns = {
+            "similarity_score": ["REAL", "FLOAT", "DOUBLE PRECISION"],
+            "llm_score": ["REAL", "FLOAT", "DOUBLE PRECISION"],
+            "is_evidence": ["BOOLEAN", "BOOL"],
+        }
 
-            for col, expected_type in required_columns.items():
-                assert col in columns, f"Missing column: {col}"
-                assert (
-                    columns[col] == expected_type
-                ), f"Wrong type for {col}: got {columns[col]}, expected {expected_type}"
+        for col, expected_types in required_columns.items():
+            assert col in columns, f"Missing column: {col}"
+            col_type = columns[col].upper()
+            assert any(
+                expected_type.upper() in col_type
+                for expected_type in expected_types
+            ), f"Column {col} has type {columns[col]}, expected one of {expected_types}"
 
     def test_independent_value_storage(self, cache_manager):
         """Test that LLM score and evidence can be stored independently."""

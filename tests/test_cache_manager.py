@@ -1,12 +1,12 @@
 import json
 import os
 import shutil
-import sqlite3
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
 import pytest
+from sqlalchemy import inspect, text
 
 from report_analyst.core.cache_manager import CacheManager
 
@@ -14,39 +14,65 @@ from report_analyst.core.cache_manager import CacheManager
 @pytest.fixture(autouse=True)
 def setup_test_env():
     """Setup test environment variables"""
+    original_storage = os.environ.get("STORAGE_PATH")
     os.environ["STORAGE_PATH"] = str(Path(__file__).parent / "test_storage")
     yield
     # Cleanup after tests
     if Path(os.environ["STORAGE_PATH"]).exists():
         import shutil
-
         shutil.rmtree(os.environ["STORAGE_PATH"])
+    # Restore original
+    if original_storage:
+        os.environ["STORAGE_PATH"] = original_storage
+    elif "STORAGE_PATH" in os.environ:
+        del os.environ["STORAGE_PATH"]
 
 
 @pytest.fixture
 def temp_db():
-    """Create a temporary database for testing"""
+    """Create a temporary database for testing (SQLite)"""
     temp_dir = tempfile.mkdtemp()
     db_path = Path(temp_dir) / "test_cache.db"
-    cache_manager = CacheManager(str(db_path))
+    cache_manager = CacheManager(db_path=str(db_path))
     yield cache_manager
+    shutil.rmtree(temp_dir)
+
+
+@pytest.fixture(params=["sqlite", "postgres"])
+def temp_db_both(request):
+    """
+    Create a temporary database for testing both SQLite and PostgreSQL.
+    For PostgreSQL, requires DATABASE_URL environment variable or skips test.
+    """
+    temp_dir = tempfile.mkdtemp()
+    
+    if request.param == "sqlite":
+        db_path = Path(temp_dir) / "test_cache.db"
+        cache_manager = CacheManager(db_path=str(db_path))
+        yield cache_manager
+    else:
+        # PostgreSQL - check if DATABASE_URL is set
+        database_url = os.getenv("TEST_POSTGRES_URL")
+        if not database_url:
+            pytest.skip("TEST_POSTGRES_URL not set, skipping PostgreSQL test")
+        cache_manager = CacheManager(database_url=database_url)
+        yield cache_manager
+    
     shutil.rmtree(temp_dir)
 
 
 def test_init_db(temp_db):
     """Test database initialization"""
-    # Check if tables exist
-    with sqlite3.connect(temp_db.db_path) as conn:
-        cursor = conn.execute(
-            """
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND (name='analysis_cache' OR name='document_chunks')
-        """
-        )
-        tables = [row[0] for row in cursor.fetchall()]
+    # Check if tables exist using SQLAlchemy inspector
+    engine = temp_db.db_manager.get_engine()
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
 
     assert "analysis_cache" in tables
     assert "document_chunks" in tables
+    assert "questions" in tables
+    assert "question_analysis" in tables
+    assert "chunk_relevance" in tables
 
 
 def test_save_and_get_analysis(temp_db):
@@ -211,68 +237,66 @@ def test_cache_status(temp_db):
 def test_get_chunks_without_embeddings(temp_db):
     """Test get_chunks_without_embeddings method"""
     import numpy as np
-    import sqlite3
-    from datetime import datetime
 
     file_path = "test_file.pdf"
     chunk_size = 500
     chunk_overlap = 20
 
     # Insert chunks directly into database (some without embeddings, some with)
-    with sqlite3.connect(temp_db.db_path) as conn:
+    with temp_db.db_manager.get_connection() as conn:
         timestamp = datetime.now().isoformat()
         
         # Insert chunks without embeddings
         conn.execute(
-            """
-            INSERT INTO document_chunks
-            (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                file_path,
-                "Chunk 1 without embedding",
-                chunk_size,
-                chunk_overlap,
-                None,  # No embedding
-                json.dumps({}),
-                timestamp,
-            ),
+            text("""
+                INSERT INTO document_chunks
+                (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
+            """),
+            {
+                "file_path": file_path,
+                "chunk_text": "Chunk 1 without embedding",
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "embedding": None,
+                "metadata": json.dumps({}),
+                "created_at": timestamp,
+            },
         )
         conn.execute(
-            """
-            INSERT INTO document_chunks
-            (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                file_path,
-                "Chunk 2 without embedding",
-                chunk_size,
-                chunk_overlap,
-                None,  # No embedding
-                json.dumps({}),
-                timestamp,
-            ),
+            text("""
+                INSERT INTO document_chunks
+                (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
+            """),
+            {
+                "file_path": file_path,
+                "chunk_text": "Chunk 2 without embedding",
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "embedding": None,
+                "metadata": json.dumps({}),
+                "created_at": timestamp,
+            },
         )
         
         # Insert chunk with embedding
         embedding_bytes = np.array([0.1, 0.2, 0.3], dtype=np.float32).tobytes()
         conn.execute(
-            """
-            INSERT INTO document_chunks
-            (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                file_path,
-                "Chunk 3 with embedding",
-                chunk_size,
-                chunk_overlap,
-                embedding_bytes,
-                json.dumps({}),
-                timestamp,
-            ),
+            text("""
+                INSERT INTO document_chunks
+                (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
+            """),
+            {
+                "file_path": file_path,
+                "chunk_text": "Chunk 3 with embedding",
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "embedding": embedding_bytes,
+                "metadata": json.dumps({}),
+                "created_at": timestamp,
+            },
         )
 
     # Get chunks without embeddings
@@ -289,8 +313,6 @@ def test_get_chunks_without_embeddings(temp_db):
 def test_has_chunk_scoring(temp_db):
     """Test has_chunk_scoring method"""
     import numpy as np
-    import sqlite3
-    from datetime import datetime
 
     file_path = "test_file.pdf"
     config = {
@@ -307,23 +329,23 @@ def test_has_chunk_scoring(temp_db):
     # First, save the chunk to document_chunks table so it can be referenced
     chunk_text = "Chunk 1"
     embedding_bytes = np.array([0.1, 0.2, 0.3], dtype=np.float32).tobytes()
-    with sqlite3.connect(temp_db.db_path) as conn:
+    with temp_db.db_manager.get_connection() as conn:
         timestamp = datetime.now().isoformat()
         conn.execute(
-            """
-            INSERT INTO document_chunks
-            (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                file_path,
-                chunk_text,
-                config["chunk_size"],
-                config["chunk_overlap"],
-                embedding_bytes,
-                json.dumps({}),
-                timestamp,
-            ),
+            text("""
+                INSERT INTO document_chunks
+                (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
+            """),
+            {
+                "file_path": file_path,
+                "chunk_text": chunk_text,
+                "chunk_size": config["chunk_size"],
+                "chunk_overlap": config["chunk_overlap"],
+                "embedding": embedding_bytes,
+                "metadata": json.dumps({}),
+                "created_at": timestamp,
+            },
         )
 
     # Save analysis with chunk relevance (scoring)

@@ -47,10 +47,10 @@ def test_db():
 def clean_db(test_db):
     """Provide a clean database for each test function"""
     print(f"\nCleaning database at: {test_db}")  # Debug print
-    conn = sqlite3.connect(str(test_db))
-    conn.execute("DELETE FROM analysis_cache")
-    conn.commit()
-    conn.close()
+    # Use CacheManager to clean the database
+    from report_analyst.core.cache_manager import CacheManager
+    cache_manager = CacheManager(db_path=str(test_db))
+    cache_manager.clear_cache()  # Clear all cache
     return test_db
 
 
