@@ -1,0 +1,460 @@
+asyncapi: '2.6.0'
+info:
+  title: Report Analyst NATS Service Contract
+  version: '1.0.0'
+  description: |
+    Service discovery schema for NATS-based communication in Report Analyst.
+    This schema defines all NATS channels, message formats, and protocols that
+    a compatible backend service must implement.
+  
+  contact:
+    name: Report Analyst Team
+    url: https://github.com/your-org/report-analyst
+
+servers:
+  nats:
+    url: nats://localhost:4222
+    protocol: nats
+    description: NATS server for async messaging
+
+channels:
+  # Document Processing Channels
+  document.ready:
+    description: |
+      Published when a document has been processed (chunked, embedded) and is ready for analysis.
+      Published by: Search Backend
+      Subscribed by: Report Analyst Workers
+    publish:
+      message:
+        $ref: '#/components/messages/DocumentReadyEvent'
+  
+  document.upload:
+    description: |
+      Published when a document upload is requested via S3+NATS pattern.
+      Published by: Report Analyst Client
+      Subscribed by: Search Backend
+    publish:
+      message:
+        $ref: '#/components/messages/DocumentUploadEvent'
+  
+  # Analysis Job Channels
+  analysis.job.submit:
+    description: |
+      Published to submit an analysis job for a processed document.
+      Published by: Report Analyst Client
+      Subscribed by: Report Analyst Workers
+    publish:
+      message:
+        $ref: '#/components/messages/AnalysisJobRequest'
+  
+  analysis.job.status:
+    description: |
+      Published to update analysis job status (processing, completed, failed).
+      Published by: Report Analyst Workers
+      Subscribed by: Report Analyst Clients
+    publish:
+      message:
+        $ref: '#/components/messages/AnalysisJobStatus'
+  
+  analysis.job.completed:
+    description: |
+      Published when an analysis job completes successfully.
+      Published by: Report Analyst Workers
+      Subscribed by: Report Analyst Clients
+    publish:
+      message:
+        $ref: '#/components/messages/AnalysisJobCompleted'
+  
+  analysis.job.failed:
+    description: |
+      Published when an analysis job fails.
+      Published by: Report Analyst Workers
+      Subscribed by: Report Analyst Clients
+    publish:
+      message:
+        $ref: '#/components/messages/AnalysisJobFailed'
+  
+  # LLM Service Channels
+  llm.request:
+    description: |
+      Published to request LLM processing (question analysis, summarization, etc.).
+      Published by: Report Analyst Client
+      Subscribed by: LLM Worker (Search Backend)
+    publish:
+      message:
+        $ref: '#/components/messages/LLMRequest'
+  
+  llm.response:
+    description: |
+      Published with LLM processing results.
+      Published by: LLM Worker (Search Backend)
+      Subscribed by: Report Analyst Client
+    publish:
+      message:
+        $ref: '#/components/messages/LLMResponse'
+
+components:
+  messages:
+    DocumentReadyEvent:
+      name: DocumentReadyEvent
+      title: Document Ready Event
+      summary: Event published when document processing is complete
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DocumentReadyEvent'
+      examples:
+        - payload:
+            resource_id: "12345678-1234-1234-1234-123456789012"
+            document_url: "https://example.com/document.pdf"
+            chunks_count: 42
+            status: "ready"
+            created_at: "2024-01-01T00:00:00Z"
+    
+    DocumentUploadEvent:
+      name: DocumentUploadEvent
+      title: Document Upload Event
+      summary: Event published for S3+NATS document upload
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DocumentUploadEvent'
+      examples:
+        - payload:
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+            s3_bucket: "report-analyst-uploads"
+            s3_key: "report-analyst-uploads/550e8400-e29b-41d4-a716-446655440000.pdf"
+            s3_url: "https://s3.amazonaws.com/bucket/key"
+            filename: "sustainability_report.pdf"
+            timestamp: "2024-01-01T00:00:00Z"
+            file_size: 1048576
+            source: "report-analyst"
+            processing_timeout: 300
+    
+    AnalysisJobRequest:
+      name: AnalysisJobRequest
+      title: Analysis Job Request
+      summary: Request to analyze a processed document
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AnalysisJobRequest'
+      examples:
+        - payload:
+            id: "job-123"
+            resource_id: "12345678-1234-1234-1234-123456789012"
+            question_set: "tcfd"
+            analysis_config:
+              model: "gpt-4o-mini"
+              temperature: 0.1
+              chunk_size: 500
+              chunk_overlap: 20
+              top_k: 5
+            status: "pending"
+            created_at: "2024-01-01T00:00:00Z"
+    
+    AnalysisJobStatus:
+      name: AnalysisJobStatus
+      title: Analysis Job Status Update
+      summary: Status update for an analysis job
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AnalysisJobStatus'
+    
+    AnalysisJobCompleted:
+      name: AnalysisJobCompleted
+      title: Analysis Job Completed
+      summary: Notification that an analysis job completed successfully
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AnalysisJobCompleted'
+    
+    AnalysisJobFailed:
+      name: AnalysisJobFailed
+      title: Analysis Job Failed
+      summary: Notification that an analysis job failed
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AnalysisJobFailed'
+    
+    LLMRequest:
+      name: LLMRequest
+      title: LLM Request
+      summary: Request for LLM processing
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/LLMRequest'
+      examples:
+        - payload:
+            id: "llm-123"
+            request_type: "analyze_question"
+            prompt: "Analyze the following question..."
+            model: "gpt-4o-mini"
+            temperature: 0.1
+            system_prompt: "You are a helpful assistant..."
+            metadata:
+              question: "What are the main climate risks?"
+              chunk_count: 5
+              source: "report_analyst"
+            created_at: "2024-01-01T00:00:00Z"
+    
+    LLMResponse:
+      name: LLMResponse
+      title: LLM Response
+      summary: Response from LLM processing
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/LLMResponse'
+      examples:
+        - payload:
+            request_id: "llm-123"
+            response: "Based on the provided context..."
+            model_used: "gpt-4o-mini"
+            tokens_used: 150
+            cost: 0.001
+            processing_time: 1.5
+            created_at: "2024-01-01T00:00:01Z"
+
+  schemas:
+    DocumentReadyEvent:
+      type: object
+      required:
+        - resource_id
+        - document_url
+        - chunks_count
+        - status
+      properties:
+        resource_id:
+          type: string
+          description: Backend resource ID
+          example: "12345678-1234-1234-1234-123456789012"
+        document_url:
+          type: string
+          format: uri
+          description: URL to the processed document
+        chunks_count:
+          type: integer
+          description: Number of chunks created
+          minimum: 0
+        status:
+          type: string
+          enum: ["ready", "failed"]
+          description: Processing status
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when event was created
+    
+    DocumentUploadEvent:
+      type: object
+      required:
+        - request_id
+        - s3_bucket
+        - s3_key
+        - filename
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique request identifier
+        s3_bucket:
+          type: string
+          description: S3 bucket name
+        s3_key:
+          type: string
+          description: S3 object key
+        s3_url:
+          type: string
+          format: uri
+          description: Full S3 URL
+        filename:
+          type: string
+          description: Original filename
+        timestamp:
+          type: string
+          format: date-time
+          description: Upload timestamp
+        file_size:
+          type: integer
+          description: File size in bytes
+        source:
+          type: string
+          description: Source application
+          default: "report-analyst"
+        processing_timeout:
+          type: integer
+          description: Processing timeout in seconds
+          default: 300
+    
+    AnalysisJobRequest:
+      type: object
+      required:
+        - id
+        - resource_id
+        - question_set
+        - analysis_config
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Job identifier
+        resource_id:
+          type: string
+          description: Backend resource ID to analyze
+        question_set:
+          type: string
+          description: Question set identifier (e.g., "tcfd")
+        analysis_config:
+          type: object
+          required:
+            - model
+          properties:
+            model:
+              type: string
+              description: LLM model to use
+            temperature:
+              type: number
+              minimum: 0
+              maximum: 2
+              default: 0.1
+            chunk_size:
+              type: integer
+              default: 500
+            chunk_overlap:
+              type: integer
+              default: 20
+            top_k:
+              type: integer
+              default: 5
+        status:
+          type: string
+          enum: ["pending", "processing", "completed", "failed"]
+          default: "pending"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    AnalysisJobStatus:
+      allOf:
+        - $ref: '#/components/schemas/AnalysisJobRequest'
+        - type: object
+          properties:
+            updated_at:
+              type: string
+              format: date-time
+    
+    AnalysisJobCompleted:
+      allOf:
+        - $ref: '#/components/schemas/AnalysisJobStatus'
+        - type: object
+          required:
+            - result
+          properties:
+            status:
+              type: string
+              enum: ["completed"]
+            result:
+              type: object
+              properties:
+                resource_id:
+                  type: string
+                chunks_analyzed:
+                  type: integer
+                analysis_result:
+                  type: object
+                  description: Analysis results per question
+                completed_at:
+                  type: string
+                  format: date-time
+    
+    AnalysisJobFailed:
+      allOf:
+        - $ref: '#/components/schemas/AnalysisJobStatus'
+        - type: object
+          required:
+            - error
+          properties:
+            status:
+              type: string
+              enum: ["failed"]
+            error:
+              type: string
+              description: Error message
+    
+    LLMRequest:
+      type: object
+      required:
+        - id
+        - request_type
+        - prompt
+      properties:
+        id:
+          type: string
+          format: uuid
+        request_type:
+          type: string
+          enum: ["analyze_question", "summarize", "extract_keywords", "custom"]
+        prompt:
+          type: string
+          description: LLM prompt
+        model:
+          type: string
+          default: "gpt-4o-mini"
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 0.1
+        max_tokens:
+          type: integer
+        system_prompt:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+    
+    LLMResponse:
+      type: object
+      required:
+        - request_id
+        - response
+        - model_used
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        response:
+          type: string
+          description: LLM response text
+        model_used:
+          type: string
+        tokens_used:
+          type: integer
+        cost:
+          type: number
+        processing_time:
+          type: number
+          description: Processing time in seconds
+        error:
+          type: string
+          description: Error message if request failed
+        created_at:
+          type: string
+          format: date-time
+
+  securitySchemes:
+    natsAuth:
+      type: userPassword
+      description: NATS authentication (if configured)
+
+tags:
+  - name: documents
+    description: Document processing events
+  - name: analysis
+    description: Analysis job management
+  - name: llm
+    description: LLM service integration
+

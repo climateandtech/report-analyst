@@ -1,0 +1,499 @@
+openapi: 3.1.0
+info:
+  title: Report Analyst HTTP REST API Service Contract
+  version: '1.0.0'
+  description: |
+    Service discovery schema for HTTP REST API endpoints in Report Analyst.
+    This schema defines all REST endpoints, request/response formats, and protocols
+    that a compatible backend service must implement.
+  
+  contact:
+    name: Report Analyst Team
+    url: https://github.com/your-org/report-analyst
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.example.com
+    description: Production server
+
+paths:
+  # Resource Management
+  /resources/:
+    get:
+      summary: List all resources
+      description: Get a list of all processed resources
+      operationId: listResources
+      tags:
+        - resources
+      responses:
+        '200':
+          description: List of resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Resource'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  
+  /resources/text:
+    post:
+      summary: Upload a text resource
+      description: Upload a text resource (PDF, document) for processing
+      operationId: uploadResource
+      tags:
+        - resources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceUploadRequest'
+      responses:
+        '200':
+          description: Resource created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  
+  /resources/{resource_id}:
+    get:
+      summary: Get resource details
+      description: Get details of a specific resource
+      operationId: getResource
+      tags:
+        - resources
+      parameters:
+        - name: resource_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Resource identifier
+      responses:
+        '200':
+          description: Resource details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  
+  # Search Endpoints
+  /search/:
+    post:
+      summary: Search resources
+      description: Search across processed resources using semantic search
+      operationId: searchResources
+      tags:
+        - search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  
+  # Analysis Endpoints
+  /analysis/jobs/:
+    post:
+      summary: Submit analysis job
+      description: Submit an analysis job for a processed resource
+      operationId: submitAnalysisJob
+      tags:
+        - analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisJobRequest'
+      responses:
+        '200':
+          description: Analysis job submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisJobResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  
+  /analysis/jobs/{job_id}:
+    get:
+      summary: Get analysis job status
+      description: Get the status of an analysis job
+      operationId: getAnalysisJobStatus
+      tags:
+        - analysis
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Analysis job identifier
+      responses:
+        '200':
+          description: Analysis job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisJobStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  
+  /analysis/jobs/{job_id}/results:
+    get:
+      summary: Get analysis results
+      description: Get results for a completed analysis job
+      operationId: getAnalysisResults
+      tags:
+        - analysis
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Analysis job identifier
+      responses:
+        '200':
+          description: Analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResults'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  
+  /analysis/results:
+    get:
+      summary: Get analysis results by resource
+      description: Get analysis results for a resource (alternative to job-based lookup)
+      operationId: getAnalysisResultsByResource
+      tags:
+        - analysis
+      parameters:
+        - name: resource_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Resource identifier
+      responses:
+        '200':
+          description: Analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisResults'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  
+  # Health and Discovery
+  /resources/count:
+    get:
+      summary: Get resource count
+      description: Get the total number of resources (for health checks)
+      operationId: getResourceCount
+      tags:
+        - health
+      responses:
+        '200':
+          description: Resource count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  schemas:
+    Resource:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          description: Resource identifier (UUID)
+          example: "12345678-1234-1234-1234-123456789012"
+        filename:
+          type: string
+          description: Original filename
+        status:
+          type: string
+          enum: ["PENDING", "DOWNLOADING", "CHUNKING", "EMBEDDING", "COMPLETED", "FAILED"]
+          description: Processing status
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        file_size:
+          type: integer
+          description: File size in bytes
+        error_message:
+          type: string
+          description: Error message if status is FAILED
+    
+    ResourceUploadRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL to the resource (or streamlit://upload/{filename} for Streamlit uploads)
+        text:
+          type: string
+          description: Text content (optional)
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional metadata
+          properties:
+            source:
+              type: string
+            filename:
+              type: string
+            upload_time:
+              type: string
+              format: date-time
+            owner:
+              type: string
+    
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Search query text
+        top_k:
+          type: integer
+          default: 10
+          description: Number of results to return
+        threshold:
+          type: number
+          default: 0.0
+          minimum: 0.0
+          maximum: 1.0
+          description: Minimum similarity threshold
+        resource_id:
+          type: string
+          description: Filter by specific resource ID (optional)
+    
+    SearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+    
+    SearchResult:
+      type: object
+      properties:
+        resource:
+          $ref: '#/components/schemas/Resource'
+        chunks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChunkResult'
+    
+    ChunkResult:
+      type: object
+      properties:
+        chunk:
+          type: object
+          properties:
+            id:
+              type: string
+            chunk_text:
+              type: string
+            chunk_metadata:
+              type: object
+              additionalProperties: true
+        similarity:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+    
+    AnalysisJobRequest:
+      type: object
+      required:
+        - resource_id
+        - question_set
+      properties:
+        resource_id:
+          type: string
+          description: Resource identifier to analyze
+        question_set:
+          type: string
+          description: Question set identifier (e.g., "tcfd")
+        analysis_config:
+          type: object
+          properties:
+            model:
+              type: string
+              default: "gpt-4o-mini"
+            temperature:
+              type: number
+              default: 0.1
+            use_centralized_llm:
+              type: boolean
+              default: false
+            deployment_type:
+              type: string
+            owner:
+              type: string
+            experiment_name:
+              type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    
+    AnalysisJobResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          description: Analysis job identifier
+    
+    AnalysisJobStatus:
+      type: object
+      properties:
+        job_id:
+          type: string
+        resource_id:
+          type: string
+        question_set:
+          type: string
+        status:
+          type: string
+          enum: ["pending", "processing", "analyzing", "storing", "completed", "failed"]
+        progress:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        error:
+          type: string
+          description: Error message if status is failed
+        results:
+          type: object
+          description: Analysis results if status is completed
+    
+    AnalysisResults:
+      type: object
+      properties:
+        job_id:
+          type: string
+        resource_id:
+          type: string
+        question_set:
+          type: string
+        results:
+          type: object
+          description: Analysis results per question
+          additionalProperties:
+            type: object
+            properties:
+              question_id:
+                type: string
+              answer:
+                type: string
+              evidence_chunks:
+                type: array
+                items:
+                  type: object
+              confidence_score:
+                type: number
+        completed_at:
+          type: string
+          format: date-time
+  
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              detail:
+                type: string
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              detail:
+                type: string
+    
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              detail:
+                type: string
+
+tags:
+  - name: resources
+    description: Resource management
+  - name: search
+    description: Semantic search
+  - name: analysis
+    description: Analysis jobs
+  - name: health
+    description: Health checks
+
