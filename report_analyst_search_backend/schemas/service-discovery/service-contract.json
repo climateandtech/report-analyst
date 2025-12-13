@@ -248,6 +248,10 @@
         "data_lake": {
           "type": "boolean",
           "description": "Provides data lake integration"
+        },
+        "external_service_integration": {
+          "type": "boolean",
+          "description": "Supports external service integration (receive notifications, process S3 URLs or chunks, return analysis results)"
         }
       }
     },

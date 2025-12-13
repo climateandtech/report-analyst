@@ -336,6 +336,126 @@ class BackendService:
             logger.error(f"Error retrieving analysis results: {e}")
             return None
 
+    def store_analysis_results(
+        self,
+        resource_id: str,
+        analysis_results: Dict[str, Any],
+        question_set: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """
+        Store analysis results back to backend database.
+
+        This is used when automatically processing document.ready events:
+        backend publishes event → we pull chunks → run analysis → store results back.
+
+        Args:
+            resource_id: Resource ID that was analyzed
+            analysis_results: Analysis results dictionary
+            question_set: Question set used for analysis
+            metadata: Additional metadata (optional)
+
+        Returns:
+            Stored result ID if successful, None otherwise
+        """
+        try:
+            if metadata is None:
+                metadata = {}
+
+            store_data = {
+                "resource_id": resource_id,
+                "question_set": question_set,
+                "analysis_results": analysis_results,
+                "status": "completed",
+                "metadata": {
+                    "source": "nats_auto_index",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    **metadata,
+                },
+            }
+
+            # Try POST to /analysis/results/ endpoint
+            response = requests.post(
+                f"{self.config.backend_url}/analysis/results/",
+                json=store_data,
+                timeout=self.timeout,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                result_id = result.get("id") or result.get("result_id")
+                logger.info(
+                    f"Stored analysis results for resource {resource_id}: {result_id}"
+                )
+                return result_id
+            elif response.status_code == 404:
+                # Endpoint doesn't exist, try alternative: use submit_analysis_job pattern
+                logger.warning(
+                    "/analysis/results/ endpoint not found, "
+                    "trying alternative storage method"
+                )
+                # Alternative: Store as a new resource with analysis results
+                return self._store_analysis_as_resource(
+                    resource_id, analysis_results, question_set, metadata
+                )
+            else:
+                error_text = response.text
+                logger.error(
+                    f"Failed to store analysis results: {response.status_code} - {error_text}"
+                )
+                return None
+
+        except requests.RequestException as e:
+            logger.error(f"Error storing analysis results: {e}")
+            return None
+
+    def _store_analysis_as_resource(
+        self,
+        resource_id: str,
+        analysis_results: Dict[str, Any],
+        question_set: str,
+        metadata: Dict[str, Any],
+    ) -> Optional[str]:
+        """Store analysis results as a new resource (fallback method)"""
+        try:
+            analysis_data = {
+                "url": f"analysis://result/{resource_id}",
+                "text": f"Analysis results for resource {resource_id}",
+                "tags": ["analysis_result", question_set],
+                "metadata": {
+                    "type": "analysis_result",
+                    "source_resource_id": resource_id,
+                    "question_set": question_set,
+                    "analysis_data": analysis_results,
+                    "owner": self.config.owner,
+                    "created_at": datetime.utcnow().isoformat(),
+                    **metadata,
+                },
+            }
+
+            response = requests.post(
+                f"{self.config.backend_url}/resources/text",
+                json=analysis_data,
+                timeout=self.timeout,
+            )
+
+            if response.status_code == 200:
+                resource = response.json()
+                result_id = resource.get("id")
+                logger.info(
+                    f"Stored analysis results as resource for {resource_id}: {result_id}"
+                )
+                return result_id
+            else:
+                logger.error(
+                    f"Failed to store analysis as resource: {response.status_code}"
+                )
+                return None
+
+        except requests.RequestException as e:
+            logger.error(f"Error storing analysis as resource: {e}")
+            return None
+
     def _get_resources(self) -> List[Dict[str, Any]]:
         """Get all resources from backend"""
         try:

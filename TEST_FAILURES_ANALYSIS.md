@@ -161,3 +161,4 @@ But the tests expect formatted output with bullet points:
 2. **Unknown**: Investigate widget visibility → update tests based on findings
 3. **Consider**: Some tests might need to navigate to specific pages first before checking for widgets
 
+
