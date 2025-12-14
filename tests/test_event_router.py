@@ -35,6 +35,7 @@ def router():
 @pytest.mark.asyncio
 async def test_add_rule(router):
     """Test adding rules"""
+
     async def handler(ctx: EventContext):
         pass
 
@@ -68,6 +69,7 @@ async def test_match_subject(router):
 @pytest.mark.asyncio
 async def test_find_rule(router):
     """Test finding matching rule"""
+
     async def handler(ctx: EventContext):
         pass
 
@@ -155,6 +157,7 @@ async def test_handle_message_no_rule(router, mock_nats):
 @pytest.mark.asyncio
 async def test_priority_ordering(router):
     """Test that rules are checked in priority order"""
+
     async def handler1(ctx: EventContext):
         pass
 
@@ -182,6 +185,7 @@ async def test_disabled_rule(router):
 @pytest.mark.asyncio
 async def test_routing_table(router):
     """Test getting routing table"""
+
     async def handler(ctx: EventContext):
         pass
 
@@ -199,6 +203,7 @@ async def test_routing_table(router):
 @pytest.mark.asyncio
 async def test_set_rules(router):
     """Test setting all rules at once"""
+
     async def handler(ctx: EventContext):
         pass
 
@@ -212,4 +217,3 @@ async def test_set_rules(router):
     assert len(router.get_rules()) == 2
     # Should be sorted by priority
     assert router.get_rules()[0].priority == 10
-

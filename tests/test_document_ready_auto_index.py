@@ -70,9 +70,7 @@ async def test_process_document_ready_event(mock_chunks, mock_analysis_result):
     # Mock search backend client
     coordinator.search_backend = Mock()
     coordinator.search_backend.base_url = "http://localhost:8000"
-    coordinator.search_backend.get_resource_chunks = AsyncMock(
-        return_value=mock_chunks
-    )
+    coordinator.search_backend.get_resource_chunks = AsyncMock(return_value=mock_chunks)
 
     # Mock _get_chunks_for_resource (which calls get_resource_chunks)
     coordinator._get_chunks_for_resource = AsyncMock(return_value=mock_chunks)
@@ -306,4 +304,3 @@ async def test_config_options():
     assert config_dict["pull_chunks"] is False
     assert config_dict["chunk_retrieval_method"] == "direct"
     assert config_dict["max_chunks"] == 100
-

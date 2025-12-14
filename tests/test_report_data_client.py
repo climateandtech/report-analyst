@@ -46,9 +46,7 @@ def backend_config():
     """Create test backend configuration"""
     from report_analyst_search_backend.config import BackendConfig
 
-    return BackendConfig(
-        use_backend=True, backend_url="http://localhost:8000"
-    )
+    return BackendConfig(use_backend=True, backend_url="http://localhost:8000")
 
 
 def test_report_resource_urn_parsing():
@@ -100,7 +98,9 @@ def test_report_data_client_list_local_reports(temp_dir):
     assert resources[0].is_local_resource is True
 
 
-def test_report_data_client_list_backend_reports(backend_config, mock_backend_resources):
+def test_report_data_client_list_backend_reports(
+    backend_config, mock_backend_resources
+):
     """Test listing backend resources"""
     with patch("requests.get") as mock_get:
         mock_response = Mock()
@@ -117,7 +117,9 @@ def test_report_data_client_list_backend_reports(backend_config, mock_backend_re
         assert resources[0].name == "test_report.pdf"
 
 
-def test_report_data_client_combined_listing(temp_dir, backend_config, mock_backend_resources):
+def test_report_data_client_combined_listing(
+    temp_dir, backend_config, mock_backend_resources
+):
     """Test listing from both local and backend sources"""
     # Create local PDF
     test_pdf = temp_dir / "local_report.pdf"
@@ -210,15 +212,14 @@ def test_report_resource_urn_with_colons_in_resource_id():
     parsed = resource.parse_backend_urn()
     assert parsed is not None
     assert parsed["host"] == "localhost:8000"
-    assert parsed["resource_id"] == "abc:123:def"  # Should preserve all parts after host
+    assert (
+        parsed["resource_id"] == "abc:123:def"
+    )  # Should preserve all parts after host
 
 
 def test_report_resource_local_file_uri():
     """Test local file URI handling"""
-    resource = ReportResource(
-        name="test.pdf", uri="file:///absolute/path/to/file.pdf"
-    )
+    resource = ReportResource(name="test.pdf", uri="file:///absolute/path/to/file.pdf")
     assert resource.is_local_resource is True
     assert resource.is_backend_resource is False
     assert resource.parse_backend_urn() is None
-

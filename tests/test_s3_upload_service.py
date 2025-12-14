@@ -172,4 +172,3 @@ class TestS3UploadService:
         # Test when boto3 not available
         with patch("report_analyst_search_backend.s3_upload_service.boto3", None):
             assert S3UploadService.is_available() is False
-

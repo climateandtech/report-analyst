@@ -14,8 +14,10 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+
 try:
     from aioresponses import aioresponses
+
     HAS_AIORESPONSES = True
 except ImportError:
     HAS_AIORESPONSES = False
@@ -111,9 +113,7 @@ class TestExternalServiceHandler:
         external_handler.s3_client = mock_s3_client
 
         # Mock PyMuPDFReader
-        with patch(
-            "llama_index.readers.file.PyMuPDFReader"
-        ) as mock_reader:
+        with patch("llama_index.readers.file.PyMuPDFReader") as mock_reader:
             mock_doc = Mock()
             mock_doc.text = "Test PDF content"
             mock_doc.metadata = {}
@@ -338,7 +338,10 @@ class TestExternalServiceDelivery:
             service_id="service-x",
             request_id="req-123",
             external_request_id="ext-req-123",
-            results={"answers": [{"question_id": "q1", "answer": "test"}], "top_chunks": []},
+            results={
+                "answers": [{"question_id": "q1", "answer": "test"}],
+                "top_chunks": [],
+            },
             response_method="poll",
         )
 
@@ -402,7 +405,9 @@ class TestExternalServiceIntegration:
             content_type="invalid_type",
         )
 
-        result = await external_handler.handle_external_notification("service-x", notification)
+        result = await external_handler.handle_external_notification(
+            "service-x", notification
+        )
 
         assert not result.success
         assert result.error is not None
@@ -415,8 +420,9 @@ class TestExternalServiceIntegration:
             s3_url=None,  # Missing S3 URL
         )
 
-        result2 = await external_handler.handle_external_notification("service-x", notification2)
+        result2 = await external_handler.handle_external_notification(
+            "service-x", notification2
+        )
 
         assert not result2.success
         assert "S3 URL not provided" in result2.error
-

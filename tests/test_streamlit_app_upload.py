@@ -34,7 +34,9 @@ def test_app_has_file_related_ui():
     # Should have selectbox for question sets or file selection
     # Note: File selectbox might not be visible if no files exist, which is expected
     # So we just check that the app loads without errors
-    assert len(at.selectbox) >= 0, "App should have selectbox widgets (might be empty if no files)"
+    assert (
+        len(at.selectbox) >= 0
+    ), "App should have selectbox widgets (might be empty if no files)"
 
     # Should have some text elements (likely file-related instructions)
     assert len(at.text) > 0 or len(at.markdown) > 0, "App should have text content"

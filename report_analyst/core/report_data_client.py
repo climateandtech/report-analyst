@@ -35,7 +35,7 @@ class ReportResource:
 
     def parse_backend_urn(self) -> Optional[Dict[str, str]]:
         """Parse URN: urn:report-analyst:backend:host:resource_id
-        
+
         Handles both with and without ports:
         - urn:report-analyst:backend:localhost:8000:abc-123 (host:port:resource_id)
         - urn:report-analyst:backend:api.example.com:abc-123 (host:resource_id)
@@ -135,9 +135,7 @@ class ReportDataClient:
                     )
                     continue
             except Exception as e:
-                logger.warning(
-                    f"Skipping {file.name}: cannot open as PDF ({str(e)})"
-                )
+                logger.warning(f"Skipping {file.name}: cannot open as PDF ({str(e)})")
                 continue
 
             # Create file:// URI
@@ -170,9 +168,7 @@ class ReportDataClient:
             return []
 
 
-def get_backend_service_for_urn(
-    urn: str, backend_configs: List[Any]
-) -> Optional[Any]:
+def get_backend_service_for_urn(urn: str, backend_configs: List[Any]) -> Optional[Any]:
     """Get BackendService instance for a given backend URN"""
     if not urn.startswith("urn:report-analyst:backend:"):
         return None
@@ -219,4 +215,3 @@ def get_chunks_for_backend_resource(
 
     # Use BackendService to get chunks
     return backend_service.get_chunks(parsed["resource_id"])
-

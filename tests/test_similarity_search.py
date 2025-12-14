@@ -199,5 +199,3 @@ async def test_chunk_ordering_in_analysis():
     assert chunks[0]["chunk_order"] == 0  # Highest similarity = first position
     assert chunks[1]["chunk_order"] == 1  # Second highest = second position
     assert chunks[2]["chunk_order"] == 2  # Lowest = last position
-
-

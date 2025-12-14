@@ -66,22 +66,23 @@ def mock_nats_connection():
 def event_router_with_mocks(event_router_yaml_file, mock_nats_connection):
     """Event router with mocked NATS connection"""
     mock_nc, mock_js = mock_nats_connection
-    
+
     router = EventRouter.from_yaml(yaml_path=event_router_yaml_file)
     router.nc = mock_nc
     router.js = mock_js
-    
+
     return router
 
 
 @pytest.fixture
 def mock_nats_message():
     """Factory for creating mock NATS messages"""
+
     def _create_message(subject: str, data: dict):
         mock_msg = AsyncMock()
         mock_msg.subject = subject
         mock_msg.data = json.dumps(data).encode()
         mock_msg.ack = AsyncMock()
         return mock_msg
-    return _create_message
 
+    return _create_message

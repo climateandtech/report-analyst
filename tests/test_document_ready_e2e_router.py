@@ -58,14 +58,14 @@ def mock_analysis_result():
 def document_ready_handler(mock_chunks, mock_analysis_result):
     """Create a handler for document.ready events that uses NATSJobCoordinator"""
     coordinator = NATSJobCoordinator()
-    
+
     # Mock search backend client
     coordinator.search_backend = Mock()
     coordinator.search_backend.base_url = "http://localhost:8000"
     coordinator._get_chunks_for_resource = AsyncMock(return_value=mock_chunks)
     coordinator._run_analysis = AsyncMock(return_value=mock_analysis_result)
     coordinator._store_analysis_to_backend = AsyncMock()
-    
+
     # Create config
     config = DocumentReadyProcessingConfig(
         pull_chunks=True,
@@ -73,12 +73,12 @@ def document_ready_handler(mock_chunks, mock_analysis_result):
         analysis_config={"model": "gpt-4o-mini"},
         store_to_backend=True,
     )
-    
+
     async def handler(ctx: EventContext):
         """Handler that processes document.ready events"""
         event = DocumentReadyEvent(**ctx.data)
         await coordinator._handle_document_ready(ctx.message, config)
-    
+
     return handler, coordinator
 
 
@@ -92,18 +92,18 @@ async def test_e2e_document_ready_flow_with_router(
 ):
     """End-to-end test: document.ready event → router → handler → full processing"""
     handler, coordinator = document_ready_handler
-    
+
     # Create router with handler
     router = EventRouter.from_yaml(
         yaml_path=event_router_yaml_file,
         handler_registry={"handle_document_ready": handler},
     )
-    
+
     # Mock NATS connection
     mock_nc, mock_js = mock_nats_connection
     router.nc = mock_nc
     router.js = mock_js
-    
+
     # Create document.ready event message
     event_data = {
         "resource_id": "test-resource-123",
@@ -115,26 +115,26 @@ async def test_e2e_document_ready_flow_with_router(
     mock_msg.subject = "document.ready"
     mock_msg.data = json.dumps(event_data).encode()
     mock_msg.ack = AsyncMock()
-    
+
     # Process through router
     await router._handle_message(mock_msg)
-    
+
     # Verify full flow executed:
     # 1. Chunks were retrieved
     coordinator._get_chunks_for_resource.assert_called_once_with(
         "test-resource-123", "search", None
     )
-    
+
     # 2. Analysis was run
     coordinator._run_analysis.assert_called_once_with(
         mock_chunks, "tcfd", {"model": "gpt-4o-mini"}
     )
-    
+
     # 3. Results were stored
     coordinator._store_analysis_to_backend.assert_called_once_with(
         "test-resource-123", mock_analysis_result, "tcfd"
     )
-    
+
     # 4. Message was acked
     mock_msg.ack.assert_called_once()
 
@@ -150,24 +150,24 @@ async def test_e2e_document_ready_ignore_with_router(
         yaml_path=event_router_yaml_file,
         handler_registry={},
     )
-    
+
     # Add ignore rule for document.upload
     router.add_rule("document.upload", "ignore", priority=5)
-    
+
     # Mock NATS
     mock_nc, mock_js = mock_nats_connection
     router.nc = mock_nc
     router.js = mock_js
-    
+
     # Create document.upload event (should be ignored)
     mock_msg = AsyncMock()
     mock_msg.subject = "document.upload"
     mock_msg.data = json.dumps({"resource_id": "test-456"}).encode()
     mock_msg.ack = AsyncMock()
-    
+
     # Process through router
     await router._handle_message(mock_msg)
-    
+
     # Should be acked but not processed
     mock_msg.ack.assert_called_once()
     # No handlers should have been called (we didn't register any for upload)
@@ -184,27 +184,27 @@ async def test_e2e_document_ready_with_provided_chunks(
     coordinator._get_chunks_for_resource = AsyncMock()  # Should not be called
     coordinator._run_analysis = AsyncMock(return_value=mock_analysis_result)
     coordinator._store_analysis_to_backend = AsyncMock()
-    
+
     config = DocumentReadyProcessingConfig(
         pull_chunks=False,  # Don't pull, use provided chunks
         question_set="tcfd",
         analysis_config={"model": "gpt-4o-mini"},
         store_to_backend=True,
     )
-    
+
     async def handler(ctx: EventContext):
         event = DocumentReadyEvent(**ctx.data)
         await coordinator._handle_document_ready(ctx.message, config)
-    
+
     router = EventRouter.from_yaml(
         yaml_path=event_router_yaml_file,
         handler_registry={"handle_document_ready": handler},
     )
-    
+
     mock_nc, mock_js = mock_nats_connection
     router.nc = mock_nc
     router.js = mock_js
-    
+
     # Event with chunks included
     provided_chunks = [
         {"id": "chunk-1", "text": "Test chunk 1", "metadata": {}},
@@ -217,23 +217,22 @@ async def test_e2e_document_ready_with_provided_chunks(
         "status": "ready",
         "chunks": provided_chunks,
     }
-    
+
     mock_msg = AsyncMock()
     mock_msg.subject = "document.ready"
     mock_msg.data = json.dumps(event_data).encode()
     mock_msg.ack = AsyncMock()
-    
+
     await router._handle_message(mock_msg)
-    
+
     # Verify chunks were NOT pulled
     coordinator._get_chunks_for_resource.assert_not_called()
-    
+
     # Verify analysis was run with provided chunks
     coordinator._run_analysis.assert_called_once_with(
         provided_chunks, "tcfd", {"model": "gpt-4o-mini"}
     )
-    
+
     # Verify results stored
     coordinator._store_analysis_to_backend.assert_called_once()
     mock_msg.ack.assert_called_once()
-

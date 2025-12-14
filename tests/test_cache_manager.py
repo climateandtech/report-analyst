@@ -221,7 +221,7 @@ def test_get_chunks_without_embeddings(temp_db):
     # Insert chunks directly into database (some without embeddings, some with)
     with sqlite3.connect(temp_db.db_path) as conn:
         timestamp = datetime.now().isoformat()
-        
+
         # Insert chunks without embeddings
         conn.execute(
             """
@@ -255,7 +255,7 @@ def test_get_chunks_without_embeddings(temp_db):
                 timestamp,
             ),
         )
-        
+
         # Insert chunk with embedding
         embedding_bytes = np.array([0.1, 0.2, 0.3], dtype=np.float32).tobytes()
         conn.execute(
@@ -276,9 +276,7 @@ def test_get_chunks_without_embeddings(temp_db):
         )
 
     # Get chunks without embeddings
-    result = temp_db.get_chunks_without_embeddings(
-        file_path, chunk_size, chunk_overlap
-    )
+    result = temp_db.get_chunks_without_embeddings(file_path, chunk_size, chunk_overlap)
 
     # Should return only chunks without embeddings
     assert len(result) == 2

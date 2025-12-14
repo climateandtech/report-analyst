@@ -192,6 +192,7 @@ sqlite-vss==0.1.2
 starlette==0.46.1
 strawberry-graphql==0.262.1
 streamlit==1.32.0
+streamlit-card==1.0.2
 streamlit-option-menu==0.3.13
 striprtf==0.0.26
 sympy==1.13.3

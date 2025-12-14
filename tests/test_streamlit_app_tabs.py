@@ -19,7 +19,9 @@ def test_tabs_exist():
         # nav_page might be None on first run if option_menu hasn't set it yet
         # This is acceptable - the important thing is the app loads without errors
         if nav_page is not None:
-            assert nav_page in expected_pages, f"Navigation page '{nav_page}' not in expected pages: {expected_pages}"
+            assert (
+                nav_page in expected_pages
+            ), f"Navigation page '{nav_page}' not in expected pages: {expected_pages}"
     except (KeyError, AttributeError):
         # If nav_page is not set, that's also acceptable - it will default on first run
         pass
@@ -35,12 +37,16 @@ def test_previous_reports_tab():
     at.run(timeout=10)
 
     # Check that we're on the Report Analyst page
-    assert at.session_state["nav_page"] == "Report Analyst", "Not on Report Analyst page"
+    assert (
+        at.session_state["nav_page"] == "Report Analyst"
+    ), "Not on Report Analyst page"
 
     # Check if selectbox for previous files exists
     has_file_selectbox = False
     for sb in at.selectbox:
-        if "previously analyzed report" in str(sb.label).lower() or "previous_file" in str(sb.key):
+        if "previously analyzed report" in str(
+            sb.label
+        ).lower() or "previous_file" in str(sb.key):
             has_file_selectbox = True
             break
 
@@ -100,7 +106,9 @@ def test_configuration_expander():
     # Check for configuration expander
     has_config_expander = False
     for exp in at.expander:
-        if "Analysis Configuration" in str(exp.label) or "Configuration" in str(exp.label):
+        if "Analysis Configuration" in str(exp.label) or "Configuration" in str(
+            exp.label
+        ):
             has_config_expander = True
             break
 
@@ -140,7 +148,9 @@ def test_question_set_selection():
     # Find question set selectbox
     question_selectbox = None
     for sb in at.selectbox:
-        if ("Question Set" in str(sb.label) or "new_question_set" in str(sb.key)) and sb.options:
+        if (
+            "Question Set" in str(sb.label) or "new_question_set" in str(sb.key)
+        ) and sb.options:
             question_selectbox = sb
             break
 
@@ -174,13 +184,15 @@ def test_analysis_controls():
     # They only appear when a file is selected and questions are loaded
     # Since setting file selection in session state causes format_func issues in AppTest,
     # we verify the app loads correctly and the page structure is there
-    
+
     assert not at.exception, "App should load without errors"
-    
+
     # Verify we're on the Report Analyst page
     assert "nav_page" in at.session_state, "Navigation page should be set"
-    assert at.session_state["nav_page"] == "Report Analyst", "Should be on Report Analyst page"
-    
+    assert (
+        at.session_state["nav_page"] == "Report Analyst"
+    ), "Should be on Report Analyst page"
+
     # Note: UI elements like buttons and checkboxes are conditionally rendered
     # and may not appear until a file is selected. This is expected behavior.
     # The important thing is that the app loads correctly and handles the page navigation.
@@ -208,7 +220,7 @@ def test_session_state_initialization():
     # Navigate to Report Analyst page to check for title
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
-    
+
     # Check that the app has the expected structure
     assert len(at.title) > 0, "App title not found"
     assert len(at.expander) > 0, "No expanders found"

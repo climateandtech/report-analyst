@@ -187,7 +187,7 @@ class ReportAnalyzer:
         pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncGenerator[Dict, None]:
         """Analyze a document using the provided questions
-        
+
         Args:
             file_path: Path to document file or URN for backend resources
             questions: Dictionary of questions
@@ -484,7 +484,7 @@ async def analyze_document_and_display(
             # Process only uncached questions
             # Check if we have pre-retrieved chunks (for backend resources)
             pre_retrieved_chunks = st.session_state.get("backend_chunks")
-            
+
             async for result in report_analyzer.analyze_document(
                 file_path,
                 questions,
@@ -713,7 +713,13 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
     client = ReportDataClient()
 
     # Collect backend configs (could be multiple backends in future)
-    backend_configs = [backend_config] if backend_config and hasattr(backend_config, "use_backend") and backend_config.use_backend else []
+    backend_configs = (
+        [backend_config]
+        if backend_config
+        and hasattr(backend_config, "use_backend")
+        and backend_config.use_backend
+        else []
+    )
 
     resources = client.list_reports(backend_configs=backend_configs)
 
@@ -730,14 +736,16 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
         else:
             # Backend resource - keep URI as path for compatibility
             actual_path = r.uri
-        
-        result.append({
-            "name": r.name,
-            "uri": r.uri,  # Primary identifier (URN or file://)
-            "path": actual_path,  # Actual file path for local files, URI for backend
-            "date": r.date,
-            "size": r.size,
-        })
+
+        result.append(
+            {
+                "name": r.name,
+                "uri": r.uri,  # Primary identifier (URN or file://)
+                "path": actual_path,  # Actual file path for local files, URI for backend
+                "date": r.date,
+                "size": r.size,
+            }
+        )
     return result
 
 
@@ -844,9 +852,11 @@ def display_analysis_results(
         st.error(f"Error displaying results: {str(e)}")
 
 
-def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
+def display_consolidated_results(
+    analyzer, question_set, file_path=None, selected_config=None
+):
     """Display consolidated results for all analyzed documents
-    
+
     Args:
         analyzer: ReportAnalyzer instance
         question_set: Selected question set identifier
@@ -909,10 +919,10 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                 options=list(file_configs.keys()),
                 format_func=lambda x: Path(x).name,
             )
-            
+
             if not file_path:
                 return
-            
+
             # Get configs for selected file
             configs = file_configs[file_path]
         else:
@@ -924,16 +934,20 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                     if len(config) == 6:
                         fp, chunk_size, chunk_overlap, top_k, model, qs = config
                         if fp == file_path and qs == db_question_set:
-                            configs.append({
-                                "chunk_size": chunk_size,
-                                "chunk_overlap": chunk_overlap,
-                                "top_k": top_k,
-                                "model": model,
-                                "question_set": qs,
-                            })
-                
+                            configs.append(
+                                {
+                                    "chunk_size": chunk_size,
+                                    "chunk_overlap": chunk_overlap,
+                                    "top_k": top_k,
+                                    "model": model,
+                                    "question_set": qs,
+                                }
+                            )
+
                 if not configs:
-                    st.warning(f"No stored results found for {Path(file_path).name} with question set: {question_set}")
+                    st.warning(
+                        f"No stored results found for {Path(file_path).name} with question set: {question_set}"
+                    )
                     return
             else:
                 # Config already provided, wrap it in a list for consistency
@@ -954,7 +968,7 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                     options=config_options,
                     format_func=lambda x: x["label"],
                 )
-                
+
                 if selected_config_obj:
                     selected_config = selected_config_obj["config"]
                 else:
@@ -1110,7 +1124,8 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                             except Exception as e:
                                 st.error(f"Error computing similarity: {str(e)}")
                                 logger.error(
-                                    f"Error computing similarity: {str(e)}", exc_info=True
+                                    f"Error computing similarity: {str(e)}",
+                                    exc_info=True,
                                 )
                                 # Fall back to original display
                                 for i, chunk in enumerate(raw_chunks):
@@ -1133,7 +1148,9 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                             for i, chunk in enumerate(raw_chunks):
                                 chunk_row = {
                                     "Chunk #": i + 1,
-                                    "Text": chunk.get("text", chunk.get("chunk_text", "")),
+                                    "Text": chunk.get(
+                                        "text", chunk.get("chunk_text", "")
+                                    ),
                                     "Has Embedding": chunk.get("embedding") is not None,
                                     "Chunk Size": chunk.get("chunk_size", "N/A"),
                                     "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
@@ -1293,7 +1310,9 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                         )
 
                         # Display results using the existing display function
-                        file_key = f"{Path(file_path).stem}_cs{selected_config['chunk_size']}"
+                        file_key = (
+                            f"{Path(file_path).stem}_cs{selected_config['chunk_size']}"
+                        )
                         display_analysis_results(analysis_df, chunks_df, file_key)
                     else:
                         st.warning("No results found in stored for this configuration")
@@ -1500,7 +1519,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
 
         # Check if we have pre-retrieved chunks (for backend resources)
         pre_retrieved_chunks = st.session_state.get("backend_chunks")
-        
+
         # First update the analyzer's process_document method to use progress_text instead of yielding status
         async for result in analyzer.process_document(
             file_path=file_path,
@@ -1601,16 +1620,18 @@ def main():
 
         # Initialize use_s3_upload in session state if not already set
         if "use_s3_upload" not in st.session_state:
-            st.session_state.use_s3_upload = os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+            st.session_state.use_s3_upload = (
+                os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+            )
 
         st.set_page_config(page_title="Report Analyst", layout="wide")
 
         # Inject Material Icons link tag at the top
         st.markdown(
             '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">',
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
-        
+
         # Inject MINIMAL custom CSS for specific customizations only
         # Let Streamlit handle most theming automatically
         try:
@@ -2816,7 +2837,7 @@ def main():
             
             </style>
             """
-            
+
             st.markdown(custom_css, unsafe_allow_html=True)
         except Exception as e:
             # Fallback if theme detection fails
@@ -2836,7 +2857,9 @@ def main():
 
         # Add logo to sidebar
         try:
-            logo_path = Path(__file__).parent / "assets" / "open-sustainability-analyst.svg"
+            logo_path = (
+                Path(__file__).parent / "assets" / "open-sustainability-analyst.svg"
+            )
             if logo_path.exists():
                 with open(logo_path, "rb") as f:
                     logo_data = base64.b64encode(f.read()).decode()
@@ -2848,17 +2871,17 @@ def main():
                                  style="width: 90%; max-width: 200px; height: auto;" />
                         </div>
                         """,
-                        unsafe_allow_html=True
+                        unsafe_allow_html=True,
                     )
         except Exception as e:
             logger.warning(f"Could not load sidebar logo: {str(e)}")
-        
+
         # Create sidebar navigation using streamlit-option-menu
         st.sidebar.markdown("---")
-        
+
         try:
             from streamlit_option_menu import option_menu
-            
+
             # Ensure it's in sidebar context
             with st.sidebar:
                 nav_page = option_menu(
@@ -2870,7 +2893,10 @@ def main():
                     orientation="vertical",
                     key="nav_page",
                     styles={
-                        "container": {"padding": "0", "background-color": "transparent"},
+                        "container": {
+                            "padding": "0",
+                            "background-color": "transparent",
+                        },
                         "icon": {"color": "#7872A7", "font-size": "20px"},
                         "nav-link": {
                             "font-family": "'Afacad', sans-serif",
@@ -2887,18 +2913,15 @@ def main():
                             "color": "#4313C8",
                             "font-weight": "700",
                         },
-                    }
+                    },
                 )
         except ImportError:
             # Fallback to regular radio if package not installed
             nav_options = ["Upload Report", "Report Analyst", "All Results"]
             nav_page = st.sidebar.radio(
-                "",
-                nav_options,
-                key="nav_page",
-                label_visibility="collapsed"
+                "", nav_options, key="nav_page", label_visibility="collapsed"
             )
-        
+
         # Settings section in sidebar (consolidates all integration settings)
         st.sidebar.markdown("---")
         with st.sidebar.expander("Settings", expanded=False):
@@ -2906,7 +2929,7 @@ def main():
             use_s3_upload = st.session_state.get("use_s3_upload", False)
             if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
                 st.caption("Enterprise mode")
-            
+
             # Enterprise Integration (S3+NATS) - always shown first, outside of backend config
             st.subheader("Enterprise Integration")
             use_s3_upload = st.checkbox(
@@ -2915,9 +2938,9 @@ def main():
                 key="use_s3_upload",
                 help="Upload documents via S3 and process via NATS for enterprise integration",
             )
-            
+
             st.divider()
-            
+
             # Backend Integration
             if BACKEND_INTEGRATION_AVAILABLE:
                 config = configure_backend_integration()
@@ -2937,7 +2960,7 @@ def main():
             # Get file list for dropdown (including backend resources if enabled)
             backend_config = st.session_state.get("backend_config")
             previous_files = get_uploaded_files_history(backend_config=backend_config)
-            
+
             # Determine selected file for display - check session state first
             selected_file_for_display = None
             if previous_files:
@@ -2952,11 +2975,11 @@ def main():
                             if f["name"] == prev_file or f.get("path") == prev_file:
                                 selected_file_for_display = f
                                 break
-                
+
                 # If no file selected yet, use first one
                 if not selected_file_for_display and previous_files:
                     selected_file_for_display = previous_files[0]
-            
+
             # Green PDF Display Container with integrated file selector
             if previous_files:
                 # Use container with unique key for green panel styling
@@ -2964,14 +2987,17 @@ def main():
                 with st.container(key="file-display-panel"):
                     # Use columns for layout
                     icon_col, content_col = st.columns([0.1, 0.9])
-                    
+
                     with icon_col:
-                        st.markdown("""
+                        st.markdown(
+                            """
                         <div class="pdf-icon-box">
                             <i class="material-icons">description</i>
                         </div>
-                        """, unsafe_allow_html=True)
-                    
+                        """,
+                            unsafe_allow_html=True,
+                        )
+
                     with content_col:
                         # File selector inside the green container
                         selected_file_dropdown = st.selectbox(
@@ -2979,39 +3005,58 @@ def main():
                             options=previous_files,
                             format_func=lambda x: x["name"],
                             key="previous_file",
-                            label_visibility="collapsed"
+                            label_visibility="collapsed",
                         )
-                        
+
                         # Upload date below selector
                         if selected_file_dropdown:
-                            selected_uri = selected_file_dropdown.get("uri", selected_file_dropdown.get("path", ""))
-                            is_backend = selected_uri.startswith("urn:report-analyst:backend:")
-                            
+                            selected_uri = selected_file_dropdown.get(
+                                "uri", selected_file_dropdown.get("path", "")
+                            )
+                            is_backend = selected_uri.startswith(
+                                "urn:report-analyst:backend:"
+                            )
+
                             if is_backend:
                                 # For backend resources, show backend info
-                                from report_analyst.core.report_data_client import ReportResource
-                                resource = ReportResource(name=selected_file_dropdown["name"], uri=selected_uri)
+                                from report_analyst.core.report_data_client import (
+                                    ReportResource,
+                                )
+
+                                resource = ReportResource(
+                                    name=selected_file_dropdown["name"],
+                                    uri=selected_uri,
+                                )
                                 parsed = resource.parse_backend_urn()
                                 if parsed:
-                                    st.markdown(f'<span class="pdf-upload-date">Backend: {parsed["host"]}</span>', unsafe_allow_html=True)
+                                    st.markdown(
+                                        f'<span class="pdf-upload-date">Backend: {parsed["host"]}</span>',
+                                        unsafe_allow_html=True,
+                                    )
                             else:
                                 # For local files, show upload date
                                 file_path_str = selected_file_dropdown.get("path", "")
                                 # Handle file:// URI format
                                 if file_path_str.startswith("file://"):
                                     file_path_str = file_path_str.replace("file://", "")
-                                
+
                                 file_path_display = Path(file_path_str)
                                 if file_path_display.exists():
                                     import datetime
+
                                     mod_time = file_path_display.stat().st_mtime
-                                    upload_date = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y")
-                                    st.markdown(f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>', unsafe_allow_html=True)
+                                    upload_date = datetime.datetime.fromtimestamp(
+                                        mod_time
+                                    ).strftime("%d.%m.%Y")
+                                    st.markdown(
+                                        f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>',
+                                        unsafe_allow_html=True,
+                                    )
 
             # Analysis Configuration section - 3 column layout
             with st.expander("Analysis Configuration", expanded=True):
                 col1, col2, col3 = st.columns([1, 1, 1])
-                
+
                 # Left column: Question Set
                 with col1:
                     selected_set = st.selectbox(
@@ -3022,7 +3067,7 @@ def main():
                         index=0,  # Ensure a default is selected
                         on_change=update_analyzer_parameters,
                     )
-                    
+
                     # Show question set description below
                     if selected_set in question_sets:
                         st.caption(question_sets[selected_set]["description"])
@@ -3030,7 +3075,8 @@ def main():
                 # Middle column: Processing Steps
                 with col2:
                     # Processing Steps heading with help icon and tooltip
-                    st.markdown("""
+                    st.markdown(
+                        """
                     <style>
                     .help-container {
                         position: relative;
@@ -3101,8 +3147,10 @@ def main():
                             You can choose if you want to first only cut the report in pieces (Chunking), make it searchable (Embedding), map text to questions (Question Mapping), or answer the questions (Question Answering). Note: Answering questions incurs LLM API costs.
                         </div>
                     </div>
-                    """, unsafe_allow_html=True)
-                    
+                    """,
+                        unsafe_allow_html=True,
+                    )
+
                     # Get step status if file is selected (check if we have a file path)
                     step_status = {
                         "chunks": False,
@@ -3110,70 +3158,86 @@ def main():
                         "scoring": False,
                         "analysis": False,
                     }
-                    
+
                     # Try to get step status if a file is selected
                     if previous_files and "previous_file" in st.session_state:
                         try:
                             selected_file_obj = None
                             for f in previous_files:
-                                if f["name"] == st.session_state.previous_file or f.get("path") == st.session_state.previous_file:
+                                if (
+                                    f["name"] == st.session_state.previous_file
+                                    or f.get("path") == st.session_state.previous_file
+                                ):
                                     selected_file_obj = f
                                     break
-                            
+
                             if selected_file_obj:
-                                selected_uri = selected_file_obj.get("uri", selected_file_obj.get("path", ""))
-                                is_backend = selected_uri.startswith("urn:report-analyst:backend:")
-                                
+                                selected_uri = selected_file_obj.get(
+                                    "uri", selected_file_obj.get("path", "")
+                                )
+                                is_backend = selected_uri.startswith(
+                                    "urn:report-analyst:backend:"
+                                )
+
                                 if is_backend:
                                     # For backend resources, use URN for step status check
                                     try:
-                                        step_status = analyzer.analyzer.check_step_completion(
-                                            selected_uri
+                                        step_status = (
+                                            analyzer.analyzer.check_step_completion(
+                                                selected_uri
+                                            )
                                         )
                                     except Exception as e:
-                                        logger.warning(f"Error checking step completion: {str(e)}")
+                                        logger.warning(
+                                            f"Error checking step completion: {str(e)}"
+                                        )
                                 else:
-                                    file_path_for_status = Path(selected_file_obj["path"])
+                                    file_path_for_status = Path(
+                                        selected_file_obj["path"]
+                                    )
                                     if file_path_for_status.exists():
                                         try:
-                                            step_status = analyzer.analyzer.check_step_completion(
-                                                str(file_path_for_status)
+                                            step_status = (
+                                                analyzer.analyzer.check_step_completion(
+                                                    str(file_path_for_status)
+                                                )
                                             )
                                         except Exception as e:
-                                            logger.warning(f"Error checking step completion: {str(e)}")
+                                            logger.warning(
+                                                f"Error checking step completion: {str(e)}"
+                                            )
                         except Exception as e:
                             logger.warning(f"Error getting step status: {str(e)}")
-                    
+
                     # Define processing steps with shorter labels
-                    step_options = [
-                        "Chunk",
-                        "Embed", 
-                        "Map",
-                        "Answer"
-                    ]
-                    
+                    step_options = ["Chunk", "Embed", "Map", "Answer"]
+
                     # Full step names for display
                     step_full_names = {
                         "Chunk": "Chunking",
                         "Embed": "Embedding",
                         "Map": "Question Mapping",
-                        "Answer": "Question Answering"
+                        "Answer": "Question Answering",
                     }
-                    
+
                     # Initialize selected step in session state if not exists
                     if "processing_steps_slider" not in st.session_state:
                         st.session_state.processing_steps_slider = "Answer"
-                    
+
                     # Use Streamlit's built-in pills widget
                     selected_step = st.pills(
                         "Select processing step",
                         options=step_options,
                         format_func=lambda x: step_full_names[x],
-                        default=st.session_state.processing_steps_slider if st.session_state.processing_steps_slider in step_options else "Answer",
+                        default=(
+                            st.session_state.processing_steps_slider
+                            if st.session_state.processing_steps_slider in step_options
+                            else "Answer"
+                        ),
                         key="processing_steps_slider",
                         help="Select which processing step to execute",
                         label_visibility="collapsed",
-                        selection_mode="single"
+                        selection_mode="single",
                     )
 
                 # Right column: Advanced Parameters
@@ -3183,19 +3247,19 @@ def main():
                     current_chunk_size = st.session_state.get("new_chunk_size", 500)
                     current_overlap = st.session_state.get("new_overlap", 20)
                     current_model = st.session_state.get("new_llm_model", "gpt-4o-mini")
-                    
+
                     # Format model name for display
-                    if 'gpt-4o-mini' in current_model:
-                        model_display = 'GPT-4o Mini'
-                    elif 'gpt-4o' in current_model:
-                        model_display = 'GPT-4o'
-                    elif 'gpt-4' in current_model:
-                        model_display = 'GPT-4'
-                    elif 'gemini' in current_model.lower():
-                        model_display = 'Gemini'
+                    if "gpt-4o-mini" in current_model:
+                        model_display = "GPT-4o Mini"
+                    elif "gpt-4o" in current_model:
+                        model_display = "GPT-4o"
+                    elif "gpt-4" in current_model:
+                        model_display = "GPT-4"
+                    elif "gemini" in current_model.lower():
+                        model_display = "Gemini"
                     else:
                         model_display = current_model
-                    
+
                     # Show compact metrics as info widgets (always visible)
                     metric_cols = st.columns(4)
                     with metric_cols[0]:
@@ -3206,12 +3270,12 @@ def main():
                         st.metric("Overlap", current_overlap)
                     with metric_cols[3]:
                         st.metric("Top-K", current_top_k)
-                    
+
                     # Create expander for the controls
                     with st.expander("Advanced Parameters", expanded=False):
                         # Use 2 columns for Advanced Parameters to make it more compact
                         adv_col1, adv_col2 = st.columns(2)
-                    
+
                     with adv_col1:
                         new_top_k = st.number_input(
                             "Top K",
@@ -3221,7 +3285,7 @@ def main():
                             key="new_top_k",
                             on_change=update_analyzer_parameters,
                         )
-                        
+
                         new_chunk_size = st.number_input(
                             "Chunk Size",
                             min_value=100,
@@ -3230,7 +3294,7 @@ def main():
                             key="new_chunk_size",
                             on_change=update_analyzer_parameters,
                         )
-                        
+
                         new_overlap = st.number_input(
                             "Overlap",
                             min_value=0,
@@ -3239,7 +3303,7 @@ def main():
                             key="new_overlap",
                             on_change=update_analyzer_parameters,
                         )
-                    
+
                     with adv_col2:
                         new_llm_model = st.selectbox(
                             "LLM Model",
@@ -3248,14 +3312,14 @@ def main():
                             key="new_llm_model",
                             on_change=update_analyzer_parameters,
                         )
-                        
+
                         new_llm_scoring = st.checkbox(
                             "LLM Scoring",
                             value=False,
                             key="new_llm_scoring",
                             on_change=update_analyzer_parameters,
                         )
-                        
+
                         new_batch_scoring = st.checkbox(
                             "Batch Scoring",
                             value=True,
@@ -3279,18 +3343,32 @@ def main():
             # Report Analyst page content - questions and analysis
             if previous_files and selected_file_dropdown:
                 # Check if this is a backend resource (URN) or local file
-                selected_uri = selected_file_dropdown.get("uri", selected_file_dropdown.get("path", ""))
-                is_backend_resource = selected_uri.startswith("urn:report-analyst:backend:")
-                
+                selected_uri = selected_file_dropdown.get(
+                    "uri", selected_file_dropdown.get("path", "")
+                )
+                is_backend_resource = selected_uri.startswith(
+                    "urn:report-analyst:backend:"
+                )
+
                 if is_backend_resource:
                     # Handle backend resource
-                    from report_analyst.core.report_data_client import get_chunks_for_backend_resource
-                    
+                    from report_analyst.core.report_data_client import (
+                        get_chunks_for_backend_resource,
+                    )
+
                     backend_config = st.session_state.get("backend_config")
-                    backend_configs = [backend_config] if backend_config and hasattr(backend_config, "use_backend") and backend_config.use_backend else []
-                    
+                    backend_configs = (
+                        [backend_config]
+                        if backend_config
+                        and hasattr(backend_config, "use_backend")
+                        and backend_config.use_backend
+                        else []
+                    )
+
                     # Get chunks from backend
-                    chunks = get_chunks_for_backend_resource(selected_uri, backend_configs)
+                    chunks = get_chunks_for_backend_resource(
+                        selected_uri, backend_configs
+                    )
                     if chunks:
                         # Store chunks in session state for analysis
                         st.session_state.backend_chunks = chunks
@@ -3305,11 +3383,11 @@ def main():
                     # Handle local file - maintain backwards compatibility
                     # Use absolute path string as before (existing behavior for SQLite cache)
                     file_path_str = selected_file_dropdown.get("path", "")
-                    
+
                     # Handle file:// URI format - extract actual path
                     if file_path_str.startswith("file://"):
                         file_path_str = file_path_str.replace("file://", "")
-                    
+
                     if file_path_str:
                         file_path_obj = Path(file_path_str)
                         if file_path_obj.exists():
@@ -3325,10 +3403,14 @@ def main():
                     else:
                         # No path found in selected file
                         file_path = None
-                        logger.warning(f"No path found in selected file: {selected_file_dropdown}")
-                
+                        logger.warning(
+                            f"No path found in selected file: {selected_file_dropdown}"
+                        )
+
                 # Continue with analysis if we have a valid file path or chunks
-                if (not is_backend_resource and file_path and Path(file_path).exists()) or (is_backend_resource and chunks):
+                if (
+                    not is_backend_resource and file_path and Path(file_path).exists()
+                ) or (is_backend_resource and chunks):
                     # Load questions and handle selection
                     question_set_data = analyzer.load_question_set(
                         st.session_state.new_question_set
@@ -3339,39 +3421,41 @@ def main():
 
                     # Add question selection UI - styled table format
                     st.subheader("Select Questions")
-                    
+
                     table_key = f"questions_table_{st.session_state.new_question_set}"
                     select_all_key = f"select_all_{st.session_state.new_question_set}"
-                    
+
                     # Select All button - styled purple, smaller, below heading
                     select_all_clicked = st.button(
-                        "Select All",
-                        key=select_all_key,
-                        type="primary"
+                        "Select All", key=select_all_key, type="primary"
                     )
-                    
+
                     # Handle select all button click - toggle state
                     if select_all_clicked:
                         # Toggle the select all state
-                        toggle_key = f"select_all_state_{st.session_state.new_question_set}"
+                        toggle_key = (
+                            f"select_all_state_{st.session_state.new_question_set}"
+                        )
                         if toggle_key not in st.session_state:
                             st.session_state[toggle_key] = False
                         st.session_state[toggle_key] = not st.session_state[toggle_key]
-                    
+
                     # Get current select all state
                     toggle_key = f"select_all_state_{st.session_state.new_question_set}"
                     select_all = st.session_state.get(toggle_key, False)
-                    
+
                     # If select all is active, update all checkboxes
                     if select_all:
                         # Set all questions to selected
                         questions_data = []
                         for q_id, q_data in questions.items():
-                            questions_data.append({
-                                "Select": True,
-                                "QID": q_id,
-                                "QUESTION": q_data['text']
-                            })
+                            questions_data.append(
+                                {
+                                    "Select": True,
+                                    "QID": q_id,
+                                    "QUESTION": q_data["text"],
+                                }
+                            )
                         questions_df = pd.DataFrame(questions_data)
                     else:
                         # Build dataframe - let widget manage its own state, don't sync until analyze is clicked
@@ -3379,58 +3463,78 @@ def main():
                         if table_key in st.session_state:
                             widget_df = st.session_state[table_key]
                             # Check if widget_df is a DataFrame with the expected columns
-                            if isinstance(widget_df, pd.DataFrame) and "QID" in widget_df.columns and "Select" in widget_df.columns:
+                            if (
+                                isinstance(widget_df, pd.DataFrame)
+                                and "QID" in widget_df.columns
+                                and "Select" in widget_df.columns
+                            ):
                                 # Widget has valid state - use it directly
                                 questions_data = []
                                 for q_id, q_data in questions.items():
                                     if q_id in widget_df["QID"].values:
-                                        is_selected = bool(widget_df[widget_df["QID"] == q_id]["Select"].iloc[0])
+                                        is_selected = bool(
+                                            widget_df[widget_df["QID"] == q_id][
+                                                "Select"
+                                            ].iloc[0]
+                                        )
                                     else:
                                         # Question not in widget state yet, default to False
                                         is_selected = False
-                                    
-                                    questions_data.append({
-                                        "Select": is_selected,
-                                        "QID": q_id,
-                                        "QUESTION": q_data['text']
-                                    })
+
+                                    questions_data.append(
+                                        {
+                                            "Select": is_selected,
+                                            "QID": q_id,
+                                            "QUESTION": q_data["text"],
+                                        }
+                                    )
                                 questions_df = pd.DataFrame(questions_data)
                             else:
                                 # Widget state exists but has wrong structure - rebuild from scratch
                                 questions_data = []
                                 for q_id, q_data in questions.items():
-                                    questions_data.append({
-                                        "Select": False,
-                                        "QID": q_id,
-                                        "QUESTION": q_data['text']
-                                    })
+                                    questions_data.append(
+                                        {
+                                            "Select": False,
+                                            "QID": q_id,
+                                            "QUESTION": q_data["text"],
+                                        }
+                                    )
                                 questions_df = pd.DataFrame(questions_data)
                         else:
                             # First time - build from scratch (don't use session state to avoid sync issues)
                             questions_data = []
                             for q_id, q_data in questions.items():
-                                questions_data.append({
-                                    "Select": False,
-                                    "QID": q_id,
-                                    "QUESTION": q_data['text']
-                                })
+                                questions_data.append(
+                                    {
+                                        "Select": False,
+                                        "QID": q_id,
+                                        "QUESTION": q_data["text"],
+                                    }
+                                )
                             questions_df = pd.DataFrame(questions_data)
-                    
+
                     # Display as editable table - widget manages its own state
                     edited_df = st.data_editor(
                         questions_df,
                         column_config={
-                            "Select": st.column_config.CheckboxColumn("Select", width=70),
-                            "QID": st.column_config.TextColumn("QID", disabled=True, width=120),
-                            "QUESTION": st.column_config.TextColumn("Question", disabled=True)
+                            "Select": st.column_config.CheckboxColumn(
+                                "Select", width=70
+                            ),
+                            "QID": st.column_config.TextColumn(
+                                "QID", disabled=True, width=120
+                            ),
+                            "QUESTION": st.column_config.TextColumn(
+                                "Question", disabled=True
+                            ),
                         },
                         hide_index=True,
                         use_container_width=True,
                         key=table_key,
                         num_rows="fixed",
-                        column_order=["Select", "QID", "QUESTION"]
+                        column_order=["Select", "QID", "QUESTION"],
                     )
-                    
+
                     # Don't sync to session state here - only sync when analyze button is clicked
 
                     # Analysis button and results
@@ -3447,13 +3551,17 @@ def main():
                     if analyze_clicked or reanalyze_clicked:
                         # NOW sync the selection state from the widget
                         # Get selected questions from the edited dataframe
-                        selected_questions = edited_df[edited_df["Select"] == True]["QID"].tolist()
-                        
+                        selected_questions = edited_df[edited_df["Select"] == True][
+                            "QID"
+                        ].tolist()
+
                         # Update session state for individual question checkboxes (for backward compatibility)
                         for q_id in questions.keys():
                             is_selected = q_id in selected_questions
-                            st.session_state[f"individual_question_{q_id}"] = is_selected
-                        
+                            st.session_state[f"individual_question_{q_id}"] = (
+                                is_selected
+                            )
+
                         if not selected_questions:
                             st.warning(
                                 "Please select at least one question to analyze."
@@ -3476,17 +3584,25 @@ def main():
                                 progress_text = st.empty()
 
                                 # Check if this is a backend resource
-                                is_backend = st.session_state.get("backend_chunks") is not None
-                                backend_uri = st.session_state.get("backend_resource_uri")
-                                
+                                is_backend = (
+                                    st.session_state.get("backend_chunks") is not None
+                                )
+                                backend_uri = st.session_state.get(
+                                    "backend_resource_uri"
+                                )
+
                                 # Use URN as file_path for backend resources, absolute path string for local files
                                 # This maintains backwards compatibility with SQLite cache
                                 if is_backend and backend_uri:
                                     analysis_file_path = backend_uri  # URN string
                                 else:
                                     # Local file - ensure it's absolute path string (backwards compatible)
-                                    analysis_file_path = str(Path(file_path).resolve()) if file_path else file_path
-                                
+                                    analysis_file_path = (
+                                        str(Path(file_path).resolve())
+                                        if file_path
+                                        else file_path
+                                    )
+
                                 if reanalyze_clicked:
                                     # For reanalysis, skip cache check and analyze all selected questions
                                     progress_text.info(
@@ -3502,10 +3618,12 @@ def main():
                                     )
                                 else:
                                     # For normal analysis, check cache first
-                                    cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                                        file_path=analysis_file_path,
-                                        config=config,
-                                        question_ids=selected_questions,
+                                    cached_results = (
+                                        analyzer.analyzer.cache_manager.get_analysis(
+                                            file_path=analysis_file_path,
+                                            config=config,
+                                            question_ids=selected_questions,
+                                        )
                                     )
 
                                     if cached_results:
@@ -3552,21 +3670,19 @@ def main():
                                                 )
                                             )
 
-                                            progress_text.success(
-                                                "Analysis complete!"
-                                            )
+                                            progress_text.success("Analysis complete!")
 
                                         except Exception as e:
-                                            st.error(
-                                                f"Error during analysis: {str(e)}"
-                                            )
+                                            st.error(f"Error during analysis: {str(e)}")
                                             st.exception(e)
 
                                     # Get final results
-                                    all_results = analyzer.analyzer.cache_manager.get_analysis(
-                                        file_path=str(file_path),
-                                        config=config,
-                                        question_ids=selected_questions,
+                                    all_results = (
+                                        analyzer.analyzer.cache_manager.get_analysis(
+                                            file_path=str(file_path),
+                                            config=config,
+                                            question_ids=selected_questions,
+                                        )
                                     )
 
                                     # Process all results into dataframes
@@ -3595,9 +3711,13 @@ def main():
                 else:
                     # Show helpful error message
                     if file_path is None:
-                        st.error("File not found: No file path available. Please select a valid file.")
+                        st.error(
+                            "File not found: No file path available. Please select a valid file."
+                        )
                     else:
-                        st.error(f"File not found: {file_path}. Please ensure the file exists.")
+                        st.error(
+                            f"File not found: {file_path}. Please ensure the file exists."
+                        )
             else:
                 st.info("No previously analyzed reports found")
 
@@ -3630,7 +3750,8 @@ def main():
                     )
 
             # Unified upload page styling (shows for both enterprise and regular mode)
-            st.markdown("""
+            st.markdown(
+                """
             <style>
             .upload-icon-box {
                 background-color: rgba(192, 196, 250, 0.1);
@@ -3664,10 +3785,13 @@ def main():
                 <h1 style="color: #4313C8; font-family: 'Afacad', sans-serif; font-weight: 700; margin: 0 0 20px 0; font-size: 32px;">Upload your Sustainability Report</h1>
                 <p style="color: #718096; font-family: 'Cousine', monospace; font-size: 14px; margin: 0 0 40px 0; line-height: 1.5;">Drag and drop your file here, or click to browse.<br>PDF only, limited to 200MB</p>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
             # Style the file uploader (works for both modes)
-            st.markdown("""
+            st.markdown(
+                """
             <style>
             [data-testid="stFileUploader"] {
                 text-align: center;
@@ -3708,15 +3832,17 @@ def main():
                 margin-bottom: 10px !important;
             }
             </style>
-            """, unsafe_allow_html=True)
-            
-            uploaded_file = st.file_uploader(
-                "Choose a PDF file", 
-                type="pdf", 
-                key="file_uploader",
-                help="Limit 200MB per file • PDF"
+            """,
+                unsafe_allow_html=True,
             )
-            
+
+            uploaded_file = st.file_uploader(
+                "Choose a PDF file",
+                type="pdf",
+                key="file_uploader",
+                help="Limit 200MB per file • PDF",
+            )
+
             if uploaded_file:
                 # Handle upload based on mode
                 if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
@@ -3778,7 +3904,7 @@ def main():
                             st.info("Falling back to local processing...")
                             # Fall through to local processing
                             use_s3_upload = False
-                
+
                 # Local processing (when enterprise mode is off or failed)
                 if not use_s3_upload or not BACKEND_INTEGRATION_AVAILABLE:
                     file_path = save_uploaded_file(uploaded_file)
@@ -3811,23 +3937,28 @@ def main():
 
             # Initialize selected_set from session state if available
             if "consolidated_set" not in st.session_state:
-                st.session_state.consolidated_set = list(question_sets.keys())[0] if question_sets else None
-            
+                st.session_state.consolidated_set = (
+                    list(question_sets.keys())[0] if question_sets else None
+                )
+
             # 1. Question set and report selectors side by side (green containers)
             col1, col2 = st.columns([1, 1])
-            
+
             with col1:
                 # Question set selector in green container
                 with st.container(key="question-set-display-panel"):
                     icon_col, content_col = st.columns([0.1, 0.9])
-                    
+
                     with icon_col:
-                        st.markdown("""
+                        st.markdown(
+                            """
                         <div class="pdf-icon-box">
                             <i class="material-icons">help_outline</i>
                         </div>
-                        """, unsafe_allow_html=True)
-                    
+                        """,
+                            unsafe_allow_html=True,
+                        )
+
                     with content_col:
                         # Question set selector
                         selected_set = st.selectbox(
@@ -3835,9 +3966,9 @@ def main():
                             options=list(question_sets.keys()),
                             format_func=lambda x: question_sets[x]["name"],
                             key="consolidated_set",
-                            label_visibility="collapsed"
+                            label_visibility="collapsed",
                         )
-                        
+
                         # Show question set description
                         if selected_set and selected_set in question_sets:
                             st.caption(question_sets[selected_set]["description"])
@@ -3852,18 +3983,20 @@ def main():
                     "lucia": "lucia",
                     "everest": "ev",  # Everest questions use 'ev_' prefix, so database stores as 'ev'
                 }
-                
+
                 # Get the database identifier for the selected question set
                 db_question_set = question_set_mapping.get(selected_set, selected_set)
-                
+
                 # Get all available cache configurations
                 cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
-                
+
                 # Group configurations by file for the selected question set
                 if cache_configs:
                     for config in cache_configs:
                         if len(config) == 6:  # Full config row from cache_status
-                            file_path, chunk_size, chunk_overlap, top_k, model, qs = config
+                            file_path, chunk_size, chunk_overlap, top_k, model, qs = (
+                                config
+                            )
                             if qs == db_question_set:
                                 if file_path not in file_configs:
                                     file_configs[file_path] = []
@@ -3876,29 +4009,32 @@ def main():
                                         "question_set": qs,
                                     }
                                 )
-                
+
                 with col2:
                     # Report selector in green container
                     if file_configs:
                         with st.container(key="file-display-panel"):
                             icon_col, content_col = st.columns([0.1, 0.9])
-                            
+
                             with icon_col:
-                                st.markdown("""
+                                st.markdown(
+                                    """
                                 <div class="pdf-icon-box">
                                     <i class="material-icons">description</i>
                                 </div>
-                                """, unsafe_allow_html=True)
-                            
+                                """,
+                                    unsafe_allow_html=True,
+                                )
+
                             with content_col:
                                 selected_file_path = st.selectbox(
                                     "Select Report",
                                     options=list(file_configs.keys()),
                                     format_func=lambda x: Path(x).name,
                                     key="consolidated_file",
-                                    label_visibility="collapsed"
+                                    label_visibility="collapsed",
                                 )
-                                
+
                                 # Show file info
                                 if selected_file_path:
                                     file_path_str = str(selected_file_path)
@@ -3906,112 +4042,154 @@ def main():
                                         file_path_display = Path(file_path_str)
                                         if file_path_display.exists():
                                             import datetime
+
                                             mod_time = file_path_display.stat().st_mtime
-                                            upload_date = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y")
-                                            st.markdown(f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>', unsafe_allow_html=True)
+                                            upload_date = (
+                                                datetime.datetime.fromtimestamp(
+                                                    mod_time
+                                                ).strftime("%d.%m.%Y")
+                                            )
+                                            st.markdown(
+                                                f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>',
+                                                unsafe_allow_html=True,
+                                            )
                     else:
-                        st.warning("No stored results found for the selected question set")
+                        st.warning(
+                            "No stored results found for the selected question set"
+                        )
                         selected_file_path = None
-                
+
                 # 2. Configuration selector - horizontal styled cards
                 if selected_file_path and file_configs:
                     configs = file_configs[selected_file_path]
-                    
+
                     st.markdown("##### Configuration")
-                    
+
                     # Create config cards using columns
                     num_configs = len(configs)
                     if num_configs > 0:
                         # Initialize selected config from session state
                         if "selected_config_idx" not in st.session_state:
                             st.session_state.selected_config_idx = 0
-                        
+
                         # Ensure index is valid
                         if st.session_state.selected_config_idx >= num_configs:
                             st.session_state.selected_config_idx = 0
-                        
+
                         # Create fixed-width columns: each card is 1 unit, fill rest with spacer
                         # This ensures cards don't stretch too wide
                         col_spec = [1] * num_configs  # card columns
-                        remaining_space = max(0, 4 - num_configs)  # spacer to fill remaining width
+                        remaining_space = max(
+                            0, 4 - num_configs
+                        )  # spacer to fill remaining width
                         if remaining_space > 0:
                             col_spec.append(remaining_space)
-                        
+
                         all_cols = st.columns(col_spec)
                         config_cols = all_cols[:num_configs]  # only card columns
-                        
+
                         for idx, config in enumerate(configs):
                             with config_cols[idx]:
-                                    # Format model name nicely
-                                    model_name = config['model']
-                                    if 'gpt-4o-mini' in model_name:
-                                        model_display = 'GPT-4o Mini'
-                                    elif 'gpt-4o' in model_name:
-                                        model_display = 'GPT-4o'
-                                    elif 'gpt-4' in model_name:
-                                        model_display = 'GPT-4'
-                                    elif 'gemini' in model_name.lower():
-                                        model_display = 'Gemini'
-                                    else:
-                                        model_display = model_name
-                                    
-                                    # Check if this config is selected
-                                    is_selected = (idx == st.session_state.selected_config_idx)
-                                    
-                                    # Create clickable card
-                                    clicked = card(
-                                        title=model_display,
-                                        text=f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · Top-K: {config['top_k']}",
-                                        key=f"config_card_{idx}",
-                                        styles={
-                                            "card": {
-                                                "width": "100%",
-                                                "height": "85px",
-                                                "border-radius": "10px",
-                                                "box-shadow": "0 2px 8px rgba(0,0,0,0.08)" if not is_selected else "0 4px 16px rgba(67,19,200,0.25)",
-                                                "background-color": "#4313C8" if is_selected else "#FFFFFF",
-                                                "border": "2px solid #4313C8" if is_selected else "1px solid #E5E7EB",
-                                                "padding": "10px",
-                                                "margin": "0",
-                                            },
-                                            "title": {
-                                                "font-size": "15px",
-                                                "font-weight": "600",
-                                                "color": "white" if is_selected else "#1F2937",
-                                                "font-family": "'Afacad', sans-serif",
-                                                "margin-bottom": "2px",
-                                            },
-                                            "text": {
-                                                "font-size": "11px",
-                                                "color": "rgba(255,255,255,0.85)" if is_selected else "#6B7280",
-                                                "font-family": "'Afacad', sans-serif",
-                                            },
-                                        }
-                                    )
-                                    
-                                    if clicked:
-                                        st.session_state.selected_config_idx = idx
-                                        st.rerun()
-                        
+                                # Format model name nicely
+                                model_name = config["model"]
+                                if "gpt-4o-mini" in model_name:
+                                    model_display = "GPT-4o Mini"
+                                elif "gpt-4o" in model_name:
+                                    model_display = "GPT-4o"
+                                elif "gpt-4" in model_name:
+                                    model_display = "GPT-4"
+                                elif "gemini" in model_name.lower():
+                                    model_display = "Gemini"
+                                else:
+                                    model_display = model_name
+
+                                # Check if this config is selected
+                                is_selected = (
+                                    idx == st.session_state.selected_config_idx
+                                )
+
+                                # Create clickable card
+                                clicked = card(
+                                    title=model_display,
+                                    text=f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · Top-K: {config['top_k']}",
+                                    key=f"config_card_{idx}",
+                                    styles={
+                                        "card": {
+                                            "width": "100%",
+                                            "height": "85px",
+                                            "border-radius": "10px",
+                                            "box-shadow": (
+                                                "0 2px 8px rgba(0,0,0,0.08)"
+                                                if not is_selected
+                                                else "0 4px 16px rgba(67,19,200,0.25)"
+                                            ),
+                                            "background-color": (
+                                                "#4313C8" if is_selected else "#FFFFFF"
+                                            ),
+                                            "border": (
+                                                "2px solid #4313C8"
+                                                if is_selected
+                                                else "1px solid #E5E7EB"
+                                            ),
+                                            "padding": "10px",
+                                            "margin": "0",
+                                        },
+                                        "title": {
+                                            "font-size": "15px",
+                                            "font-weight": "600",
+                                            "color": (
+                                                "white" if is_selected else "#1F2937"
+                                            ),
+                                            "font-family": "'Afacad', sans-serif",
+                                            "margin-bottom": "2px",
+                                        },
+                                        "text": {
+                                            "font-size": "11px",
+                                            "color": (
+                                                "rgba(255,255,255,0.85)"
+                                                if is_selected
+                                                else "#6B7280"
+                                            ),
+                                            "font-family": "'Afacad', sans-serif",
+                                        },
+                                    },
+                                )
+
+                                if clicked:
+                                    st.session_state.selected_config_idx = idx
+                                    st.rerun()
+
                         # Get the selected config
-                        selected_config = {"label": "", "config": configs[st.session_state.selected_config_idx]}
+                        selected_config = {
+                            "label": "",
+                            "config": configs[st.session_state.selected_config_idx],
+                        }
                     else:
                         selected_config = None
                 else:
                     selected_config = None
-                
+
                 # 3. Display consolidated results
                 if selected_file_path and selected_config:
-                    display_consolidated_results(analyzer, selected_set, selected_file_path, selected_config["config"])
+                    display_consolidated_results(
+                        analyzer,
+                        selected_set,
+                        selected_file_path,
+                        selected_config["config"],
+                    )
 
         # Add Climate+Tech footer at the bottom of sidebar
         # Get current theme for logo selection and encode image as base64
         try:
-            theme = st.context.theme if hasattr(st.context, 'theme') else {}
-            is_dark = theme.get('base', 'light') == 'dark' if theme else False
-            logo_filename = "assets/climate-and-tech-logo-dark-mode.png" if is_dark else "assets/climateandtech-logo-new-light-mode.png"
+            theme = st.context.theme if hasattr(st.context, "theme") else {}
+            is_dark = theme.get("base", "light") == "dark" if theme else False
+            logo_filename = (
+                "assets/climate-and-tech-logo-dark-mode.png"
+                if is_dark
+                else "assets/climateandtech-logo-new-light-mode.png"
+            )
             logo_path = Path(__file__).parent / logo_filename
-            
+
             # Read and encode image as base64
             if logo_path.exists():
                 with open(logo_path, "rb") as img_file:
@@ -4023,7 +4201,7 @@ def main():
         except Exception as e:
             logger.warning(f"Could not load logo: {str(e)}")
             logo_src = ""
-        
+
         # Add footer to sidebar
         st.sidebar.markdown("---")
         footer = f"""
