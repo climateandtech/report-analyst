@@ -1,13 +1,14 @@
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
-import numpy as np
-from pathlib import Path
-import tempfile
-import shutil
 import json
+import shutil
+import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
-from report_analyst.core.cache_manager import CacheManager
+import numpy as np
+import pytest
+
 from report_analyst.core.analyzer import DocumentAnalyzer
+from report_analyst.core.cache_manager import CacheManager
 
 
 @pytest.fixture

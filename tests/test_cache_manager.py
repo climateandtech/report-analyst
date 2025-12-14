@@ -210,9 +210,10 @@ def test_cache_status(temp_db):
 
 def test_get_chunks_without_embeddings(temp_db):
     """Test get_chunks_without_embeddings method"""
-    import numpy as np
     import sqlite3
     from datetime import datetime
+
+    import numpy as np
 
     file_path = "test_file.pdf"
     chunk_size = 500
@@ -286,9 +287,10 @@ def test_get_chunks_without_embeddings(temp_db):
 
 def test_has_chunk_scoring(temp_db):
     """Test has_chunk_scoring method"""
-    import numpy as np
     import sqlite3
     from datetime import datetime
+
+    import numpy as np
 
     file_path = "test_file.pdf"
     config = {

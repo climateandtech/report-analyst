@@ -360,9 +360,10 @@ class FlowOrchestrator:
             AnalysisResult with answers and top chunks
         """
         try:
-            from .external_service_handler import ExternalServiceHandler
-            from .external_service_delivery import ExternalServiceDelivery
             from report_analyst.core.analyzer import DocumentAnalyzer
+
+            from .external_service_delivery import ExternalServiceDelivery
+            from .external_service_handler import ExternalServiceHandler
 
             handler = ExternalServiceHandler()
             delivery = ExternalServiceDelivery()

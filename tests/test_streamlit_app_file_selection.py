@@ -5,6 +5,7 @@ Tests that file paths are correctly resolved from file:// URIs.
 
 import tempfile
 from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
 
 

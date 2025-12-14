@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 import yaml
 
-from report_analyst_jobs.event_router import EventContext, EventRouter, IGNORE_ACTION
+from report_analyst_jobs.event_router import IGNORE_ACTION, EventContext, EventRouter
 
 
 @pytest.fixture

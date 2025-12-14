@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from report_analyst_jobs.event_router import (
+    IGNORE_ACTION,
     EventActionRule,
     EventContext,
     EventRouter,
-    IGNORE_ACTION,
 )
 
 

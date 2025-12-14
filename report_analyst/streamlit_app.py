@@ -12,7 +12,6 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import streamlit as st
-from streamlit_card import card
 from dotenv import load_dotenv
 from pandas.api.types import (
     is_categorical_dtype,
@@ -20,6 +19,7 @@ from pandas.api.types import (
     is_numeric_dtype,
     is_object_dtype,
 )
+from streamlit_card import card
 
 # Add parent directory to path for backend integration
 current_dir = Path(__file__).parent

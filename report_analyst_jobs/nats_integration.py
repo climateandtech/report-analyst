@@ -403,6 +403,7 @@ class NATSJobCoordinator:
         try:
             # Use BackendService to store results (synchronous, so run in executor)
             import asyncio
+
             from report_analyst_search_backend.backend_service import BackendService
             from report_analyst_search_backend.config import BackendConfig
 
