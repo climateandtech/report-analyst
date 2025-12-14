@@ -47,7 +47,13 @@ class CacheManager:
         # Initialize database manager
         self.db_manager = DatabaseManager(db_url)
         logger.info(f"Initializing CacheManager with database: {self.db_manager._mask_url(db_url)}")
-        self.init_db()
+        
+        # Check if we should use Alembic migrations instead of auto-creation
+        use_alembic = os.getenv("USE_ALEMBIC_MIGRATIONS", "false").lower() == "true"
+        if use_alembic and self.db_manager.is_postgres():
+            logger.info("Using Alembic migrations - skipping auto table creation")
+        else:
+            self.init_db()
 
         # In-memory vector store for current document
         self.vector_store = None
