@@ -71,6 +71,7 @@ logger.info(f"Added {current_dir} to Python path")
 
 # Keep relative imports
 from report_analyst.core.analyzer import DocumentAnalyzer
+from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
     create_combined_dataframe,
@@ -274,7 +275,7 @@ class ReportAnalyzer:
 
 
 def save_uploaded_file(uploaded_file) -> Optional[str]:
-    """Save uploaded file to temp directory"""
+    """Save uploaded file to temp directory or PostgreSQL"""
     try:
         if uploaded_file is None:
             logger.warning("No file was uploaded")
@@ -289,10 +290,50 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
         if file_key in st.session_state:
             return st.session_state[file_key]
 
-        # Otherwise, handle it as an UploadedFile
+        # Get file bytes
+        file_bytes = uploaded_file.getbuffer()
+        
+        # Check if PostgreSQL file storage is enabled
+        use_postgres_storage = st.session_state.get("use_postgres_file_storage", False)
+        
+        if use_postgres_storage:
+            try:
+                from report_analyst.core.file_storage import get_file_storage
+                
+                # Get database URL from session state or environment
+                database_url = st.session_state.get("database_url")
+                file_storage = get_file_storage(database_url)
+                
+                if file_storage:
+                    # Store in PostgreSQL
+                    file_id = file_storage.store_file(
+                        file_bytes,
+                        uploaded_file.name,
+                        uploaded_file.type
+                    )
+                    
+                    # Save to temp for processing (retrieve from DB)
+                    temp_path = file_storage.save_to_temp(file_id)
+                    
+                    if temp_path:
+                        # Store both file_id and path in session state
+                        st.session_state[file_key] = temp_path
+                        st.session_state[f"{file_key}_id"] = file_id
+                        logger.info(f"Stored file {uploaded_file.name} in PostgreSQL (ID: {file_id})")
+                        st.session_state.file_processed = False
+                        return temp_path
+                    else:
+                        logger.warning("Failed to save file from PostgreSQL to temp, falling back to local")
+                else:
+                    logger.warning("PostgreSQL file storage not available, falling back to local")
+            except Exception as e:
+                logger.warning(f"PostgreSQL file storage failed: {str(e)}, falling back to local")
+        
+        # Fallback to local file storage
         file_path = Path("temp") / uploaded_file.name
+        file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+            f.write(file_bytes)
         logger.info(f"Successfully saved file: {file_path}")
 
         # Store the path in session state
@@ -1556,6 +1597,9 @@ def main():
         if "use_s3_upload" not in st.session_state:
             st.session_state.use_s3_upload = os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
 
+        # Sync API keys from session state to environment at startup
+        APIKeyManager.sync_api_keys_to_env(st.session_state)
+
         st.set_page_config(page_title="Report Analyst", layout="wide")
 
         # Inject Material Icons link tag at the top
@@ -1595,13 +1639,9 @@ def main():
                 margin-right: 8px;
             }
             
-            /* Add Material Icon to all notifications (unified - using info icon for all) */
-            .stAlert [data-testid="stMarkdownContainer"]::before,
-            [data-testid="stNotification"] [data-testid="stMarkdownContainer"]::before,
-            .stInfo [data-testid="stMarkdownContainer"]::before,
-            .stSuccess [data-testid="stMarkdownContainer"]::before,
-            .stError [data-testid="stMarkdownContainer"]::before,
-            .stWarning [data-testid="stMarkdownContainer"]::before {
+            /* Add Material Icon to stAlert elements - only ONE icon per alert */
+            /* Add icon only to the markdown container, NOT to paragraphs to avoid duplicates */
+            [data-testid="stAlert"] [data-testid="stMarkdownContainer"]::before {
                 content: 'info';
                 font-family: 'Material Icons';
                 font-size: 20px;
@@ -1610,19 +1650,26 @@ def main():
                 display: inline-block;
             }
             
-            /* Alternative selectors for notifications without markdown container */
-            .stAlert p::before,
-            [data-testid="stNotification"] p::before,
-            .stInfo p::before,
-            .stSuccess p::before,
-            .stError p::before,
-            .stWarning p::before {
+            /* Remove icons from paragraphs inside stAlert to prevent double icons */
+            [data-testid="stAlert"] p::before {
+                content: none !important;
+                display: none !important;
+            }
+            
+            /* Add icons to custom notifications */
+            [data-testid="stNotification"] [data-testid="stMarkdownContainer"]::before {
                 content: 'info';
                 font-family: 'Material Icons';
                 font-size: 20px;
                 vertical-align: middle;
                 margin-right: 8px;
                 display: inline-block;
+            }
+            
+            /* Remove icons from paragraphs in custom notifications too */
+            [data-testid="stNotification"] p::before {
+                content: none !important;
+                display: none !important;
             }
             
             /* Settings expander icon in sidebar */
@@ -2756,8 +2803,8 @@ def main():
             with st.sidebar:
                 nav_page = option_menu(
                     menu_title=None,
-                    options=["Upload Report", "Report Analyst", "All Results"],
-                    icons=["house", "file-text", "bar-chart"],
+                    options=["Upload Report", "Report Analyst", "All Results", "Settings"],
+                    icons=["house", "file-text", "bar-chart", "gear"],
                     menu_icon=None,
                     default_index=0,
                     orientation="vertical",
@@ -2784,7 +2831,7 @@ def main():
                 )
         except ImportError:
             # Fallback to regular radio if package not installed
-            nav_options = ["Upload Report", "Report Analyst", "All Results"]
+            nav_options = ["Upload Report", "Report Analyst", "All Results", "Settings"]
             nav_page = st.sidebar.radio(
                 "",
                 nav_options,
@@ -2792,26 +2839,241 @@ def main():
                 label_visibility="collapsed"
             )
         
-        # Settings section in sidebar (consolidates all integration settings)
-        st.sidebar.markdown("---")
-        with st.sidebar.expander("Settings", expanded=False):
-            # Show Enterprise Mode status at the top
-            use_s3_upload = st.session_state.get("use_s3_upload", False)
-            if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
-                st.caption("Enterprise mode")
+        # Show page-specific content based on navigation
+        if nav_page == "Settings":
+            st.title("Settings")
+            st.caption("Configure application settings and integrations")
             
-            # Enterprise Integration (S3+NATS) - always shown first, outside of backend config
+            # Open Source Modules Section
+            st.header("Open Source Modules")
+            st.caption("Core features available in the open source edition")
+            
+            # API Keys Configuration
+            st.subheader("API Keys")
+            st.caption("Enter your API keys to enable LLM features. Keys are stored in session state only and not persisted.")
+            
+            # Check if keys exist in environment but not in session state
+            env_openai_key = os.getenv("OPENAI_API_KEY")
+            env_google_key = os.getenv("GOOGLE_API_KEY")
+            session_openai_key = st.session_state.get("api_key_openai_api_key")
+            session_google_key = st.session_state.get("api_key_google_api_key")
+            
+            has_env_openai = env_openai_key and not session_openai_key
+            has_env_google = env_google_key and not session_google_key
+            
+            # Get current values (from session state or environment)
+            current_openai_key = APIKeyManager.get_api_key("OPENAI_API_KEY", st.session_state)
+            current_google_key = APIKeyManager.get_api_key("GOOGLE_API_KEY", st.session_state)
+            
+            # OpenAI API Key section
+            with st.expander("OpenAI API Key", expanded=not has_env_openai or st.session_state.get("override_openai_key", False)):
+                # Show status for OpenAI key
+                if has_env_openai and not st.session_state.get("override_openai_key", False):
+                    st.info("API key is set from environment variable")
+                    if st.button("Override with new key", key="btn_override_openai"):
+                        st.session_state.override_openai_key = True
+                        st.rerun()
+                elif current_openai_key:
+                    masked_openai = f"{current_openai_key[:8]}...{current_openai_key[-4:]}" if len(current_openai_key) > 12 else "***"
+                    st.caption(f"Current key: `{masked_openai}`")
+                
+                # Track override state
+                override_openai = st.session_state.get("override_openai_key", False)
+                
+                if not has_env_openai or override_openai:
+                    # Track previous values to detect changes
+                    prev_openai_key = st.session_state.get("prev_openai_key", current_openai_key)
+                    
+                    # OpenAI API Key input
+                    openai_key_input = st.text_input(
+                        "OpenAI API Key",
+                        value="",  # Never show the actual key in the input
+                        type="password",
+                        key="openai_api_key_input",
+                        help="Enter your OpenAI API key to use GPT models. Leave empty to use existing key from environment.",
+                        placeholder="sk-..." if not current_openai_key else "Enter new key to update"
+                    )
+                    
+                    # Update API key if user entered a new value (different from current)
+                    if openai_key_input and openai_key_input != current_openai_key:
+                        APIKeyManager.set_api_key("OPENAI_API_KEY", openai_key_input, st.session_state)
+                        st.session_state.prev_openai_key = openai_key_input
+                        st.session_state.override_openai_key = False  # Reset override state
+                        st.success("OpenAI API key updated")
+                    elif openai_key_input == "" and current_openai_key and not has_env_openai:
+                        # User cleared the input - keep existing key (only if not from env)
+                        st.session_state.prev_openai_key = current_openai_key
+                    else:
+                        st.session_state.prev_openai_key = current_openai_key
+                    
+                    # Cancel override button
+                    if override_openai:
+                        if st.button("Cancel Override", key="cancel_override_openai"):
+                            st.session_state.override_openai_key = False
+                            st.rerun()
+            
+            # Google/Gemini API Key section
+            with st.expander("Google/Gemini API Key", expanded=not has_env_google or st.session_state.get("override_google_key", False)):
+                # Show status for Google key
+                if has_env_google and not st.session_state.get("override_google_key", False):
+                    st.info("API key is set from environment variable")
+                    if st.button("Override with new key", key="btn_override_google"):
+                        st.session_state.override_google_key = True
+                        st.rerun()
+                elif current_google_key:
+                    masked_google = f"{current_google_key[:8]}...{current_google_key[-4:]}" if len(current_google_key) > 12 else "***"
+                    st.caption(f"Current key: `{masked_google}`")
+                
+                # Track override state
+                override_google = st.session_state.get("override_google_key", False)
+                
+                if not has_env_google or override_google:
+                    # Track previous values to detect changes
+                    prev_google_key = st.session_state.get("prev_google_key", current_google_key)
+                    
+                    # Google/Gemini API Key input
+                    google_key_input = st.text_input(
+                        "Google/Gemini API Key",
+                        value="",  # Never show the actual key in the input
+                        type="password",
+                        key="google_api_key_input",
+                        help="Enter your Google API key to use Gemini models. Leave empty to use existing key from environment.",
+                        placeholder="Enter your Google API key" if not current_google_key else "Enter new key to update"
+                    )
+                    
+                    # Update API key if user entered a new value (different from current)
+                    if google_key_input and google_key_input != current_google_key:
+                        APIKeyManager.set_api_key("GOOGLE_API_KEY", google_key_input, st.session_state)
+                        st.session_state.prev_google_key = google_key_input
+                        st.session_state.override_google_key = False  # Reset override state
+                        st.success("Google API key updated")
+                    elif google_key_input == "" and current_google_key and not has_env_google:
+                        # User cleared the input - keep existing key (only if not from env)
+                        st.session_state.prev_google_key = current_google_key
+                    else:
+                        st.session_state.prev_google_key = current_google_key
+                    
+                    # Cancel override button
+                    if override_google:
+                        if st.button("Cancel Override", key="cancel_override_google"):
+                            st.session_state.override_google_key = False
+                            st.rerun()
+                
+                # Show clear button if key exists (only for session state keys, not env)
+                if current_google_key and not has_env_google:
+                    if st.button("Clear Google Key", key="clear_google_key"):
+                        APIKeyManager.set_api_key("GOOGLE_API_KEY", None, st.session_state)
+                        st.rerun()
+            
+            # Show clear button for OpenAI if key exists (only for session state keys, not env)
+            if current_openai_key and not has_env_openai:
+                if st.button("Clear OpenAI Key", key="clear_openai_key"):
+                    APIKeyManager.set_api_key("OPENAI_API_KEY", None, st.session_state)
+                    st.rerun()
+            
+            st.divider()
+            
+            # Database Configuration (read-only, from environment variables)
+            st.subheader("Database Configuration")
+            
+            # Get database URL from environment or default
+            database_url = os.getenv("DATABASE_URL")
+            if database_url is None:
+                # Default to SQLite
+                storage_path = os.getenv("STORAGE_PATH", "./storage")
+                db_path = str(Path(storage_path) / "cache" / "analysis.db")
+                database_url = f"sqlite:///{db_path}"
+                database_type = "SQLite"
+                st.info(f"**Type:** {database_type}\n\n**Path:** `{db_path}`\n\n*Configure via `STORAGE_PATH` environment variable*")
+            else:
+                # Parse PostgreSQL URL to show connection details (masked)
+                database_type = "PostgreSQL"
+                try:
+                    # Mask password in display
+                    if "@" in database_url:
+                        parts = database_url.split("@")
+                        if len(parts) == 2:
+                            user_pass = parts[0].split("://")[-1]
+                            if ":" in user_pass:
+                                user = user_pass.split(":")[0]
+                                masked_url = database_url.replace(user_pass, f"{user}:***")
+                            else:
+                                masked_url = database_url
+                        else:
+                            masked_url = database_url
+                    else:
+                        masked_url = database_url
+                    
+                    # Extract connection details for display
+                    if "postgresql://" in database_url or "postgres://" in database_url:
+                        url_part = database_url.split("://")[-1]
+                        if "@" in url_part:
+                            auth, host_db = url_part.split("@")
+                            user = auth.split(":")[0] if ":" in auth else auth
+                            if ":" in host_db:
+                                host, port_db = host_db.split(":")
+                                if "/" in port_db:
+                                    port, db = port_db.split("/", 1)
+                                else:
+                                    port = port_db
+                                    db = "?"
+                            else:
+                                if "/" in host_db:
+                                    host, db = host_db.split("/", 1)
+                                    port = "5432"
+                                else:
+                                    host = host_db
+                                    port = "5432"
+                                    db = "?"
+                            
+                            st.info(f"**Type:** {database_type}\n\n**Host:** `{host}`\n**Port:** `{port}`\n**Database:** `{db}`\n**User:** `{user}`\n\n*Configure via `DATABASE_URL` environment variable*")
+                        else:
+                            st.info(f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*")
+                    else:
+                        st.info(f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*")
+                except Exception:
+                    st.info(f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*")
+            
+            # Store in session state for use by DocumentAnalyzer
+            st.session_state.database_url = database_url
+            
+            st.divider()
+            st.divider()
+            
+            # Enterprise Modules Section
+            st.header("Enterprise Modules")
+            st.caption("Features available in the enterprise edition")
+            
+            # Enterprise Integration (S3+NATS)
             st.subheader("Enterprise Integration")
+            # In Streamlit, when a widget has a 'key', it automatically syncs with session state
+            # The widget's return value is the current value from session state (or default if not set)
+            # IMPORTANT: Don't provide 'value' parameter when using 'key' - let Streamlit manage it
+            # The widget return value is the source of truth for the current render
+            st.markdown("""
+            <style>
+            div[data-testid="stCheckbox"] label {
+                font-family: 'Afacad', sans-serif !important;
+                white-space: nowrap !important;
+                min-width: 250px !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
             use_s3_upload = st.checkbox(
                 "Enable S3+NATS Upload",
-                value=st.session_state.use_s3_upload,
                 key="use_s3_upload",
                 help="Upload documents via S3 and process via NATS for enterprise integration",
             )
             
+            # Show Enterprise Mode status only if checkbox is checked AND backend is available
+            # Check AFTER widget render - use widget return value which reflects current state
+            # The widget return value is the authoritative source for the current render cycle
+            if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
+                st.info("Enterprise mode enabled")
+            
             st.divider()
             
-            # Backend Integration
+            # Backend Integration (Enterprise feature)
             if BACKEND_INTEGRATION_AVAILABLE:
                 config = configure_backend_integration()
                 # Store config in session state for access across pages
@@ -2821,6 +3083,36 @@ def main():
                 st.warning("Backend integration modules not available")
                 config = None
                 st.session_state.backend_config = None
+            
+            st.divider()
+            
+            # File Storage Configuration (Enterprise feature)
+            st.subheader("File Storage")
+            st.caption("Configure where uploaded files are stored (Enterprise feature)")
+            
+            # Get database URL from session state (set above in Database Configuration)
+            database_url_enterprise = st.session_state.get("database_url")
+            is_postgres_enterprise = database_url_enterprise and database_url_enterprise.startswith(("postgresql://", "postgres://"))
+            
+            # Initialize use_postgres_file_storage from session state or env
+            if "use_postgres_file_storage" not in st.session_state:
+                st.session_state.use_postgres_file_storage = os.getenv("USE_POSTGRES_FILE_STORAGE", "false").lower() == "true"
+            
+            if is_postgres_enterprise:
+                use_postgres_storage = st.checkbox(
+                    "Store files in PostgreSQL",
+                    value=st.session_state.get("use_postgres_file_storage", False),
+                    key="use_postgres_file_storage",
+                    help="Store uploaded files in PostgreSQL database (useful for Heroku deployments). Files are stored as BYTEA/BLOB. This is an enterprise feature.",
+                )
+                
+                if use_postgres_storage:
+                    st.info("📦 Files will be stored in PostgreSQL database")
+                else:
+                    st.caption("Files will be stored in local temp directory")
+            else:
+                st.info("PostgreSQL file storage requires a PostgreSQL database. Currently using SQLite.")
+                st.caption("Files are stored in local temp directory")
 
         # Show page-specific content based on navigation
         if nav_page == "Report Analyst":
@@ -3683,12 +3975,82 @@ def main():
             </style>
             """, unsafe_allow_html=True)
             
+            # Try to import JSON Schema form component (enterprise feature)
+            try:
+                # Use the proper Streamlit custom component
+                from report_analyst_enterprise.components.streamlit_component.backend import json_schema_form
+                import json
+                # Path is already imported at the top of the file
+                
+                JSON_SCHEMA_FORM_AVAILABLE = True
+                
+                # Load PDF upload schema
+                schema_path = Path(__file__).parent.parent / "report_analyst_enterprise" / "components" / "schemas" / "pdf_upload_schema.json"
+                ui_schema_path = Path(__file__).parent.parent / "report_analyst_enterprise" / "components" / "schemas" / "pdf_upload_ui_schema.json"
+                
+                if schema_path.exists() and ui_schema_path.exists():
+                    with open(schema_path) as f:
+                        pdf_upload_schema = json.load(f)
+                    with open(ui_schema_path) as f:
+                        pdf_upload_ui_schema = json.load(f)
+                else:
+                    JSON_SCHEMA_FORM_AVAILABLE = False
+                    pdf_upload_schema = None
+                    pdf_upload_ui_schema = None
+            except ImportError:
+                JSON_SCHEMA_FORM_AVAILABLE = False
+                pdf_upload_schema = None
+                pdf_upload_ui_schema = None
+            
+            # File upload with optional metadata form
             uploaded_file = st.file_uploader(
                 "Choose a PDF file", 
                 type="pdf", 
                 key="file_uploader",
                 help="Limit 200MB per file • PDF"
             )
+            
+            # Show metadata form if JSON Schema form is available
+            pdf_metadata = None
+            company_metadata = None
+            
+            if JSON_SCHEMA_FORM_AVAILABLE:
+                # ESRS Company Information Form
+                esrs_schema_path = Path(__file__).parent.parent / "report_analyst_enterprise" / "components" / "schemas" / "esrs_company_schema.json"
+                esrs_ui_schema_path = Path(__file__).parent.parent / "report_analyst_enterprise" / "components" / "schemas" / "esrs_company_ui_schema.json"
+                
+                if esrs_schema_path.exists() and esrs_ui_schema_path.exists():
+                    with open(esrs_schema_path) as f:
+                        esrs_company_schema = json.load(f)
+                    with open(esrs_ui_schema_path) as f:
+                        esrs_company_ui_schema = json.load(f)
+                    
+                    with st.expander("ESRS Company Information", expanded=True):
+                        st.caption("Enter company data aligned with ESRS XBRL taxonomy requirements")
+                        company_metadata = json_schema_form(
+                            schema=esrs_company_schema,
+                            ui_schema=esrs_company_ui_schema,
+                            key="esrs_company_form",
+                            height=700
+                        )
+                        if company_metadata and company_metadata.get("type") == "submit":
+                            st.success("Company information saved!")
+                            st.session_state.esrs_company_metadata = company_metadata.get("formData", company_metadata)
+                
+                # Basic PDF metadata form
+                if pdf_upload_schema:
+                    with st.expander("Add Document Metadata (Optional)", expanded=False):
+                        st.caption("Add metadata like category, tags, and description to help organize your documents.")
+                        pdf_metadata = json_schema_form(
+                            schema=pdf_upload_schema,
+                            ui_schema=pdf_upload_ui_schema,
+                            key="pdf_metadata_form",
+                            height=500
+                        )
+                        if pdf_metadata:
+                            st.success("Metadata saved!")
+                            # Store in session state for use after upload
+                            st.session_state.pdf_metadata = pdf_metadata
             
             if uploaded_file:
                 # Handle upload based on mode
@@ -3791,9 +4153,9 @@ def main():
             )
 
             if selected_set:
-                # Show question set description
+                # Show question set description (without info icon to avoid double icons)
                 if selected_set in question_sets:
-                    st.info(question_sets[selected_set]["description"])
+                    st.caption(question_sets[selected_set]["description"])
 
                 # Only show consolidated results
                 display_consolidated_results(analyzer, selected_set)
