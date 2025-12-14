@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 class ValidationResult:
     """Result of service contract validation"""
 
-    def __init__(self, is_valid: bool, errors: List[str] = None, warnings: List[str] = None):
+    def __init__(
+        self, is_valid: bool, errors: List[str] = None, warnings: List[str] = None
+    ):
         self.is_valid = is_valid
         self.errors = errors or []
         self.warnings = warnings or []
@@ -49,7 +51,7 @@ class ServiceValidator:
     def __init__(self, schema_dir: Optional[Path] = None):
         """
         Initialize validator with schema directory.
-        
+
         Args:
             schema_dir: Directory containing service contract schemas.
                        Defaults to schemas/service-discovery/ in project root.
@@ -57,7 +59,7 @@ class ServiceValidator:
         if schema_dir is None:
             # Find schema directory relative to this module (in enterprise module)
             schema_dir = Path(__file__).parent / "schemas" / "service-discovery"
-        
+
         self.schema_dir = Path(schema_dir)
         self._contract_schema = None
         self._asyncapi_schema = None
@@ -72,19 +74,19 @@ class ServiceValidator:
             if contract_path.exists():
                 with open(contract_path) as f:
                     self._contract_schema = json.load(f)
-            
+
             # Load AsyncAPI schema (YAML)
             asyncapi_path = self.schema_dir / "asyncapi.yaml"
             if asyncapi_path.exists():
                 with open(asyncapi_path) as f:
                     self._asyncapi_schema = yaml.safe_load(f)
-            
+
             # Load OpenAPI schema (YAML)
             openapi_path = self.schema_dir / "openapi.yaml"
             if openapi_path.exists():
                 with open(openapi_path) as f:
                     self._openapi_schema = yaml.safe_load(f)
-            
+
             logger.info(f"Loaded service contract schemas from {self.schema_dir}")
         except Exception as e:
             logger.error(f"Failed to load schemas: {e}")
@@ -93,10 +95,10 @@ class ServiceValidator:
     def validate_service(self, service_manifest: Dict[str, Any]) -> ValidationResult:
         """
         Validate a service manifest against the service contract schema.
-        
+
         Args:
             service_manifest: Service manifest dictionary (must match service-contract.json schema)
-        
+
         Returns:
             ValidationResult with validation status and any errors/warnings
         """
@@ -113,7 +115,9 @@ class ServiceValidator:
         try:
             jsonschema.validate(instance=service_manifest, schema=self._contract_schema)
         except jsonschema.ValidationError as e:
-            errors.append(f"Schema validation error: {e.message} (path: {'.'.join(str(p) for p in e.path)})")
+            errors.append(
+                f"Schema validation error: {e.message} (path: {'.'.join(str(p) for p in e.path)})"
+            )
         except jsonschema.SchemaError as e:
             errors.append(f"Schema error: {e.message}")
 
@@ -143,14 +147,16 @@ class ServiceValidator:
             )
 
         # Validate NATS channels exist in AsyncAPI schema
-        if self._asyncapi_schema and manifest.get("protocols", {}).get("nats", {}).get("enabled"):
+        if self._asyncapi_schema and manifest.get("protocols", {}).get("nats", {}).get(
+            "enabled"
+        ):
             nats_channels = manifest.get("nats_channels", {})
             published = [ch["channel"] for ch in nats_channels.get("publishes", [])]
             subscribed = [ch["channel"] for ch in nats_channels.get("subscribes", [])]
-            
+
             all_channels = published + subscribed
             asyncapi_channels = self._asyncapi_schema.get("channels", {})
-            
+
             for channel in all_channels:
                 if channel not in asyncapi_channels:
                     warnings.append(
@@ -159,17 +165,19 @@ class ServiceValidator:
                     )
 
         # Validate HTTP endpoints exist in OpenAPI schema
-        if self._openapi_schema and manifest.get("protocols", {}).get("http", {}).get("enabled"):
+        if self._openapi_schema and manifest.get("protocols", {}).get("http", {}).get(
+            "enabled"
+        ):
             http_endpoints = manifest.get("http_endpoints", {})
             required_endpoints = http_endpoints.get("required", [])
-            
+
             openapi_paths = self._openapi_schema.get("paths", {})
-            
+
             for endpoint in required_endpoints:
                 path = endpoint.get("path")
                 method = endpoint.get("method", "GET").lower()
                 operation_id = endpoint.get("operation_id")
-                
+
                 # Check if path exists in OpenAPI
                 if path not in openapi_paths:
                     errors.append(
@@ -191,18 +199,20 @@ class ServiceValidator:
                                 f"manifest has '{operation_id}', OpenAPI has '{operation.get('operationId')}'"
                             )
 
-        return ValidationResult(is_valid=len(errors) == 0, errors=errors, warnings=warnings)
+        return ValidationResult(
+            is_valid=len(errors) == 0, errors=errors, warnings=warnings
+        )
 
     def get_required_channels(self) -> Dict[str, List[str]]:
         """
         Get list of required NATS channels from AsyncAPI schema.
-        
+
         Returns:
             Dictionary with 'publish' and 'subscribe' channel lists
         """
         if not self._asyncapi_schema:
             return {"publish": [], "subscribe": []}
-        
+
         channels = self._asyncapi_schema.get("channels", {})
         return {
             "publish": list(channels.keys()),
@@ -212,33 +222,35 @@ class ServiceValidator:
     def get_required_endpoints(self) -> List[Dict[str, str]]:
         """
         Get list of required HTTP endpoints from OpenAPI schema.
-        
+
         Returns:
             List of endpoint dictionaries with 'method' and 'path'
         """
         if not self._openapi_schema:
             return []
-        
+
         endpoints = []
         paths = self._openapi_schema.get("paths", {})
-        
+
         for path, path_item in paths.items():
             for method in ["get", "post", "put", "delete", "patch"]:
                 if method in path_item:
                     operation = path_item[method]
-                    endpoints.append({
-                        "method": method.upper(),
-                        "path": path,
-                        "operation_id": operation.get("operationId", ""),
-                        "summary": operation.get("summary", ""),
-                    })
-        
+                    endpoints.append(
+                        {
+                            "method": method.upper(),
+                            "path": path,
+                            "operation_id": operation.get("operationId", ""),
+                            "summary": operation.get("summary", ""),
+                        }
+                    )
+
         return endpoints
 
     def generate_service_template(self) -> Dict[str, Any]:
         """
         Generate a template service manifest based on the contract schema.
-        
+
         Returns:
             Template dictionary that can be filled in by service implementers
         """
@@ -291,18 +303,18 @@ class ServiceValidator:
 def validate_service_from_file(manifest_path: Path) -> ValidationResult:
     """
     Convenience function to validate a service manifest from a file.
-    
+
     Args:
         manifest_path: Path to service manifest JSON file
-    
+
     Returns:
         ValidationResult
     """
     validator = ServiceValidator()
-    
+
     with open(manifest_path) as f:
         manifest = json.load(f)
-    
+
     return validator.validate_service(manifest)
 
 
@@ -311,15 +323,14 @@ if __name__ == "__main__":
     # Generate template
     validator = ServiceValidator()
     template = validator.generate_service_template()
-    
+
     print("Service Contract Template:")
     print(json.dumps(template, indent=2))
-    
+
     print("\nRequired NATS Channels:")
     channels = validator.get_required_channels()
     print(json.dumps(channels, indent=2))
-    
+
     print("\nRequired HTTP Endpoints:")
     endpoints = validator.get_required_endpoints()
     print(json.dumps(endpoints, indent=2))
-

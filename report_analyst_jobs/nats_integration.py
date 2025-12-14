@@ -76,7 +76,7 @@ class AnalysisJob:
 class DocumentReadyProcessingConfig:
     """
     Configuration for automatic document.ready event processing.
-    
+
     Controls how document.ready events are handled:
     - Whether to pull chunks from backend or use provided chunks
     - Whether to run analysis
@@ -87,32 +87,34 @@ class DocumentReadyProcessingConfig:
     # Chunk retrieval strategy
     pull_chunks: bool = True
     """Whether to pull chunks from backend. If False, chunks must be provided in event."""
-    
+
     # Analysis configuration
     question_set: str = "tcfd"
     """Question set to use for analysis"""
-    
-    analysis_config: Dict[str, Any] = field(default_factory=lambda: {
-        "model": "gpt-4o-mini",
-        "temperature": 0.1,
-    })
+
+    analysis_config: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "model": "gpt-4o-mini",
+            "temperature": 0.1,
+        }
+    )
     """Analysis configuration (model, temperature, etc.)"""
-    
+
     # Result storage
     store_to_backend: bool = True
     """Whether to store analysis results back to backend"""
-    
+
     # Error handling
     ack_on_error: bool = True
     """Whether to acknowledge message even on error (prevents redelivery loops)"""
-    
+
     # Chunk retrieval options (when pull_chunks=True)
     chunk_retrieval_method: str = "search"  # "search" or "direct"
     """Method to retrieve chunks: 'search' uses /search/ endpoint, 'direct' uses /resources/{id}/chunks"""
-    
+
     max_chunks: Optional[int] = None
     """Maximum number of chunks to retrieve (None = no limit)"""
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         return {
@@ -298,7 +300,9 @@ class NATSJobCoordinator:
             # Step 1: Get chunks (pull from backend or use provided)
             chunks = None
             if config.pull_chunks:
-                logger.info(f"Pulling chunks from backend for resource {event.resource_id}")
+                logger.info(
+                    f"Pulling chunks from backend for resource {event.resource_id}"
+                )
                 chunks = await self._get_chunks_for_resource(
                     event.resource_id, config.chunk_retrieval_method, config.max_chunks
                 )
@@ -307,7 +311,9 @@ class NATSJobCoordinator:
                     if config.ack_on_error:
                         await msg.ack()
                     return
-                logger.info(f"Retrieved {len(chunks)} chunks for resource {event.resource_id}")
+                logger.info(
+                    f"Retrieved {len(chunks)} chunks for resource {event.resource_id}"
+                )
             else:
                 # Check if chunks are provided in event metadata
                 if hasattr(event, "chunks") and event.chunks:
@@ -354,12 +360,12 @@ class NATSJobCoordinator:
     ) -> List[Dict[str, Any]]:
         """
         Get chunks for a resource using specified method.
-        
+
         Args:
             resource_id: Resource ID
             method: "search" (use /search/ endpoint) or "direct" (use /resources/{id}/chunks)
             max_chunks: Maximum number of chunks to return (None = no limit)
-        
+
         Returns:
             List of chunk dictionaries
         """

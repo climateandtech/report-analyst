@@ -33,16 +33,16 @@ class EventActionRule:
 
     event_pattern: str
     """NATS subject pattern (supports wildcards like 'document.*' or 'analysis.job.>')"""
-    
+
     action: Union[str, Callable]
     """Action to take: callable handler function, or 'ignore' to skip"""
-    
+
     description: Optional[str] = None
     """Optional description of what this rule does"""
-    
+
     enabled: bool = True
     """Whether this rule is enabled"""
-    
+
     priority: int = 0
     """Priority for matching (higher = checked first)"""
 
@@ -53,16 +53,16 @@ class EventContext:
 
     subject: str
     """NATS subject/channel the event came from"""
-    
+
     data: Dict[str, Any]
     """Parsed event data"""
-    
+
     raw_data: bytes
     """Raw message data"""
-    
+
     message: Any
     """Original NATS message object"""
-    
+
     metadata: Dict[str, Any] = field(default_factory=dict)
     """Additional metadata"""
 
@@ -70,23 +70,23 @@ class EventContext:
 class EventRouter:
     """
     Simple event-action router for NATS events.
-    
+
     Maps event patterns to actions using a table-based configuration.
     Actions can be handler functions or "ignore" to skip processing.
-    
+
     Example:
         router = EventRouter(nats_url="nats://localhost:4222")
-        
+
         # Define actions
         async def handle_document_ready(ctx: EventContext):
             print(f"Document ready: {ctx.data}")
             await ctx.message.ack()
-        
+
         # Configure routing table
         router.add_rule("document.ready", handle_document_ready)
         router.add_rule("document.*", "ignore")  # Ignore other document events
         router.add_rule("analysis.job.submit", handle_analysis_job)
-        
+
         # Start processing
         await router.connect()
         await router.start()
@@ -125,7 +125,7 @@ class EventRouter:
     ):
         """
         Add an event-action rule to the routing table.
-        
+
         Args:
             event_pattern: NATS subject pattern (supports wildcards)
             action: Handler function or "ignore"
@@ -171,16 +171,19 @@ class EventRouter:
         """
         if pattern == subject:
             return True
-        
+
         # Handle wildcards
         if pattern.endswith(".*"):
             prefix = pattern[:-2]
-            return subject.startswith(prefix + ".") and "." not in subject[len(prefix) + 1 :]
-        
+            return (
+                subject.startswith(prefix + ".")
+                and "." not in subject[len(prefix) + 1 :]
+            )
+
         if pattern.endswith(".>"):
             prefix = pattern[:-2]
             return subject.startswith(prefix + ".")
-        
+
         return False
 
     def _find_rule(self, subject: str) -> Optional[EventActionRule]:
@@ -207,7 +210,9 @@ class EventRouter:
 
             # Check if action is "ignore"
             if rule.action == IGNORE_ACTION:
-                logger.debug(f"Ignoring event on subject: {subject} (rule: {rule.event_pattern})")
+                logger.debug(
+                    f"Ignoring event on subject: {subject} (rule: {rule.event_pattern})"
+                )
                 await msg.ack()
                 return
 
@@ -236,14 +241,18 @@ class EventRouter:
                     else:
                         rule.action(context)
                 except Exception as e:
-                    logger.error(f"Error executing handler for {subject}: {e}", exc_info=True)
+                    logger.error(
+                        f"Error executing handler for {subject}: {e}", exc_info=True
+                    )
                     # Handler should ack/nak, but if it doesn't, we ack to avoid redelivery loops
                     try:
                         await msg.ack()
                     except:
                         pass
             else:
-                logger.warning(f"Invalid action for rule {rule.event_pattern}: {rule.action}")
+                logger.warning(
+                    f"Invalid action for rule {rule.event_pattern}: {rule.action}"
+                )
                 await msg.ack()
 
         except Exception as e:
@@ -256,7 +265,7 @@ class EventRouter:
     async def start(self, subjects: Optional[List[str]] = None):
         """
         Start processing events.
-        
+
         Args:
             subjects: Optional list of subjects to subscribe to.
                      If None, automatically subscribes to all subjects mentioned in rules.
@@ -291,7 +300,7 @@ class EventRouter:
         for subject in subjects:
             if subject in self._subscribed_subjects:
                 continue
-            
+
             try:
                 await self.js.subscribe(subject, cb=self._handle_message)
                 self._subscribed_subjects.add(subject)
@@ -299,7 +308,9 @@ class EventRouter:
             except Exception as e:
                 logger.error(f"Failed to subscribe to {subject}: {e}")
 
-        logger.info(f"Event router started, listening to {len(self._subscribed_subjects)} subjects")
+        logger.info(
+            f"Event router started, listening to {len(self._subscribed_subjects)} subjects"
+        )
 
         # Keep running
         try:
@@ -329,28 +340,28 @@ class EventRouter:
     ) -> "EventRouter":
         """
         Create EventRouter from YAML configuration file.
-        
+
         Args:
             yaml_path: Path to YAML config file. If None, looks for event_routing.yaml
                       in the same directory as this module.
             handler_registry: Optional dict mapping handler names to callable functions.
                             If None, tries to import handlers from paths specified in YAML.
-        
+
         Returns:
             Configured EventRouter instance
         """
         router = cls()
-        
+
         # Default YAML path
         if yaml_path is None:
             yaml_path = Path(__file__).parent / "event_routing.yaml"
         else:
             yaml_path = Path(yaml_path)
-        
+
         if not yaml_path.exists():
             logger.warning(f"YAML config file not found: {yaml_path}")
             return router
-        
+
         # Load YAML
         try:
             with open(yaml_path, "r", encoding="utf-8") as f:
@@ -358,7 +369,7 @@ class EventRouter:
         except Exception as e:
             logger.error(f"Failed to load YAML config: {e}")
             return router
-        
+
         # Load handler registry
         if handler_registry is None:
             handler_registry = {}
@@ -369,8 +380,10 @@ class EventRouter:
                     handler = cls._load_handler(handler_path)
                     handler_registry[handler_name] = handler
                 except Exception as e:
-                    logger.warning(f"Failed to load handler {handler_name} from {handler_path}: {e}")
-        
+                    logger.warning(
+                        f"Failed to load handler {handler_name} from {handler_path}: {e}"
+                    )
+
         # Load routing rules
         routing_rules = config.get("routing", [])
         for rule_config in routing_rules:
@@ -379,20 +392,22 @@ class EventRouter:
             description = rule_config.get("description")
             enabled = rule_config.get("enabled", True)
             priority = rule_config.get("priority", 0)
-            
+
             if not pattern or not action_name:
                 logger.warning(f"Invalid rule config: {rule_config}")
                 continue
-            
+
             # Resolve action
             if action_name == IGNORE_ACTION:
                 action = IGNORE_ACTION
             elif action_name in handler_registry:
                 action = handler_registry[action_name]
             else:
-                logger.warning(f"Handler not found for action: {action_name}, ignoring rule")
+                logger.warning(
+                    f"Handler not found for action: {action_name}, ignoring rule"
+                )
                 continue
-            
+
             router.add_rule(
                 event_pattern=pattern,
                 action=action,
@@ -400,30 +415,29 @@ class EventRouter:
                 enabled=enabled,
                 priority=priority,
             )
-        
+
         logger.info(f"Loaded {len(router.rules)} routing rules from {yaml_path}")
         return router
-    
+
     @staticmethod
     def _load_handler(handler_path: str) -> Callable:
         """
         Load handler function from module path string.
-        
+
         Args:
             handler_path: String like "module.path.to.function"
-        
+
         Returns:
             Callable handler function
         """
         parts = handler_path.split(".")
         module_path = ".".join(parts[:-1])
         function_name = parts[-1]
-        
+
         module = importlib.import_module(module_path)
         handler = getattr(module, function_name)
-        
+
         if not callable(handler):
             raise ValueError(f"{handler_path} is not callable")
-        
-        return handler
 
+        return handler

@@ -86,10 +86,10 @@ def configure_backend_integration() -> BackendConfig:
 
     # Backend URL (shown even if backend is disabled, for future use)
     backend_url = st.text_input(
-        "Backend URL", 
-        value=os.getenv("BACKEND_URL", "http://localhost:8000"), 
+        "Backend URL",
+        value=os.getenv("BACKEND_URL", "http://localhost:8000"),
         help="Search backend API URL",
-        disabled=not use_backend
+        disabled=not use_backend,
     )
 
     if not use_backend:
@@ -125,7 +125,9 @@ def configure_backend_integration() -> BackendConfig:
     )
 
     nats_url = st.text_input(
-        "NATS URL", value=os.getenv("NATS_URL", "nats://localhost:4222"), help="URL of your NATS server"
+        "NATS URL",
+        value=os.getenv("NATS_URL", "nats://localhost:4222"),
+        help="URL of your NATS server",
     )
 
     # Data lake configuration

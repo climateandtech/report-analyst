@@ -59,8 +59,7 @@ class ExternalServiceHandler:
         """Initialize S3 client if credentials are available"""
         try:
             if all(
-                os.getenv(var)
-                for var in ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+                os.getenv(var) for var in ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
             ):
                 self.s3_client = boto3.client(
                     "s3",
@@ -107,17 +106,13 @@ class ExternalServiceHandler:
 
             if notification.content_type == "s3_url":
                 if not notification.s3_url:
-                    return ProcessingResult(
-                        success=False, error="S3 URL not provided"
-                    )
+                    return ProcessingResult(success=False, error="S3 URL not provided")
                 chunks = await self._process_s3_url(notification.s3_url)
                 return ProcessingResult(success=True, chunks=chunks)
 
             elif notification.content_type == "chunks":
                 if not notification.chunks:
-                    return ProcessingResult(
-                        success=False, error="Chunks not provided"
-                    )
+                    return ProcessingResult(success=False, error="Chunks not provided")
                 chunks = await self._process_provided_chunks(
                     notification.chunks, rechunk_mode
                 )
@@ -125,9 +120,7 @@ class ExternalServiceHandler:
 
             elif notification.content_type == "pages":
                 if not notification.pages:
-                    return ProcessingResult(
-                        success=False, error="Pages not provided"
-                    )
+                    return ProcessingResult(success=False, error="Pages not provided")
                 chunks = await self._process_provided_pages(
                     notification.pages, rechunk_mode
                 )
@@ -334,4 +327,3 @@ class ExternalServiceHandler:
         has_id = "id" in first_chunk or "chunk_id" in first_chunk
 
         return has_text and has_id
-

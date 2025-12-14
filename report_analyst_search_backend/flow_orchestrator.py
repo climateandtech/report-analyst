@@ -396,9 +396,7 @@ class FlowOrchestrator:
                 )
 
             if not processing_result.success:
-                return AnalysisResult(
-                    success=False, error=processing_result.error
-                )
+                return AnalysisResult(success=False, error=processing_result.error)
 
             chunks = processing_result.chunks
             if not chunks:
@@ -424,7 +422,9 @@ class FlowOrchestrator:
             if "chunk_size" in analysis_config:
                 analyzer.chunk_params["chunk_size"] = analysis_config["chunk_size"]
             if "chunk_overlap" in analysis_config:
-                analyzer.chunk_params["chunk_overlap"] = analysis_config["chunk_overlap"]
+                analyzer.chunk_params["chunk_overlap"] = analysis_config[
+                    "chunk_overlap"
+                ]
             if "top_k" in analysis_config:
                 analyzer.chunk_params["top_k"] = analysis_config["top_k"]
 

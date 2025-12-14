@@ -143,4 +143,3 @@ class ExternalServiceDelivery:
     def clear_results(self, request_id: str):
         """Clear stored results (cleanup)"""
         self._result_storage.pop(request_id, None)
-

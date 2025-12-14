@@ -16,18 +16,20 @@ async def main():
     """Example: Start event router from YAML configuration"""
     # Load router from YAML file (event_routing.yaml)
     router = EventRouter.from_yaml()
-    
+
     # Or specify custom path
     # router = EventRouter.from_yaml("path/to/custom_routing.yaml")
-    
+
     # Connect to NATS
     await router.connect()
-    
+
     # Print routing table for inspection
     print("\nRouting Table:")
     for rule in router.get_routing_table():
-        print(f"  {rule['pattern']:30} -> {rule['action']:20} (priority: {rule['priority']})")
-    
+        print(
+            f"  {rule['pattern']:30} -> {rule['action']:20} (priority: {rule['priority']})"
+        )
+
     # Start processing events
     print("\nStarting event router...")
     await router.start()
@@ -36,4 +38,3 @@ async def main():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
-

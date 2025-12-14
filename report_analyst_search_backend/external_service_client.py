@@ -114,9 +114,7 @@ class ExternalServiceClient:
         else:
             return await self._notify_via_http(notification)
 
-    async def _notify_via_nats(
-        self, notification: ExternalServiceReadyEvent
-    ) -> bool:
+    async def _notify_via_nats(self, notification: ExternalServiceReadyEvent) -> bool:
         """Send notification via NATS"""
         try:
             await self.connect_nats()
@@ -148,9 +146,7 @@ class ExternalServiceClient:
             logger.error(f"Failed to notify via NATS: {e}")
             return False
 
-    async def _notify_via_http(
-        self, notification: ExternalServiceReadyEvent
-    ) -> bool:
+    async def _notify_via_http(self, notification: ExternalServiceReadyEvent) -> bool:
         """Send notification via HTTP"""
         try:
             url = f"{self.base_url}/external/services/{notification.service_id}/notify"
@@ -271,7 +267,9 @@ class ExternalServiceClient:
                     if response.status == 200:
                         result = await response.json()
                         request_id = result.get("request_id")
-                        logger.info(f"Submitted analysis request via HTTP: {request_id}")
+                        logger.info(
+                            f"Submitted analysis request via HTTP: {request_id}"
+                        )
                         return request_id
                     else:
                         error_text = await response.text()
@@ -319,4 +317,3 @@ class ExternalServiceClient:
         except Exception as e:
             logger.error(f"Error polling for results: {e}")
             return None
-
