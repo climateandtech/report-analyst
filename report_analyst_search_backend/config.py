@@ -78,6 +78,15 @@ def configure_backend_integration() -> BackendConfig:
     # Note: Enterprise Integration (S3+NATS) is now shown in the main Settings section above
 
     # Basic backend toggle
+    st.markdown("""
+    <style>
+    div[data-testid="stCheckbox"] label {
+        font-family: 'Afacad', sans-serif !important;
+        white-space: nowrap !important;
+        min-width: 200px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     use_backend = st.checkbox(
         "Use Search Backend",
         value=False,
