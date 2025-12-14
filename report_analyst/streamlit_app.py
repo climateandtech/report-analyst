@@ -12,6 +12,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import streamlit as st
+from streamlit_card import card
 from dotenv import load_dotenv
 from pandas.api.types import (
     is_categorical_dtype,
@@ -1671,14 +1672,24 @@ def main():
                 display: inline-block;
             }
             
-            /* Settings expander icon in sidebar */
-            [data-testid="stSidebar"] [data-testid="stExpander"] summary::before {
-                content: 'settings';
-                font-family: 'Material Icons';
-                font-size: 20px;
-                vertical-align: middle;
-                margin-right: 8px;
-                display: inline-block;
+            /* Remove Settings expander icon CSS - it was causing rendering conflicts with Streamlit's built-in expander arrow */
+            
+            /* Fix Streamlit Material Icons - ensure they use Material Icons font */
+            [data-testid="stIconMaterial"],
+            span[data-testid="stIconMaterial"] {
+                font-family: 'Material Icons' !important;
+                font-weight: normal !important;
+                font-style: normal !important;
+                font-size: 20px !important;
+                line-height: 1 !important;
+                letter-spacing: normal !important;
+                text-transform: none !important;
+                display: inline-block !important;
+                white-space: nowrap !important;
+                word-wrap: normal !important;
+                direction: ltr !important;
+                -webkit-font-feature-settings: 'liga' !important;
+                -webkit-font-smoothing: antialiased !important;
             }
             
             /* Active navigation item - light purple background with dark purple text */
@@ -3153,133 +3164,53 @@ def main():
                     if "processing_steps_slider" not in st.session_state:
                         st.session_state.processing_steps_slider = "Answer"
                     
-                    # Add CSS to make slider labels more visible
-                    st.markdown("""
-                    <style>
-                    /* Style select slider labels to be more visible */
-                    div[data-testid="stSlider"] label,
-                    div[data-testid="stSlider"] p {
-                        color: #170843 !important;
-                        font-weight: 500 !important;
-                        font-size: 14px !important;
-                        font-family: 'Afacad', sans-serif !important;
-                    }
-                    
-                    /* Make all slider tick labels visible */
-                    [data-baseweb="slider"] [role="slider"] ~ div,
-                    [data-baseweb="slider"] div[role="slider"] ~ div,
-                    [data-baseweb="slider"] div[role="slider"] + div,
-                    [data-baseweb="slider"] > div > div > div {
-                        color: #170843 !important;
-                        font-size: 12px !important;
-                        font-family: 'Afacad', sans-serif !important;
-                        font-weight: 500 !important;
-                        opacity: 1 !important;
-                        visibility: visible !important;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-                    
-                    # Create select slider for step selection
-                    selected_step = st.select_slider(
-                        "Select processing steps",
+                    # Use Streamlit's built-in pills widget
+                    selected_step = st.pills(
+                        "Select processing step",
                         options=step_options,
-                        value=st.session_state.processing_steps_slider,
+                        format_func=lambda x: step_full_names[x],
+                        default=st.session_state.processing_steps_slider if st.session_state.processing_steps_slider in step_options else "Answer",
                         key="processing_steps_slider",
-                        help="Select how many processing steps to execute",
-                        label_visibility="collapsed"
+                        help="Select which processing step to execute",
+                        label_visibility="collapsed",
+                        selection_mode="single"
                     )
-                    
-                    # Display all step labels below the slider
-                    step_cols = st.columns(4)
-                    selected_index = step_options.index(selected_step) if selected_step in step_options else len(step_options) - 1
-                    
-                    # Map step names to status keys
-                    step_status_map = {
-                        "Chunk": step_status.get("chunks", False),
-                        "Embed": step_status.get("embeddings", False),
-                        "Map": step_status.get("scoring", False),
-                        "Answer": step_status.get("analysis", False),
-                    }
-                    
-                    # Check if there's any stored data for this file
-                    # Reuse the file_path_for_status from the step_status check above
-                    has_stored_data = False
-                    if "analyzer" in st.session_state:
-                        try:
-                            # Use file_path_for_status if it was set in the step_status check above
-                            file_to_check = None
-                            if previous_files and "previous_file" in st.session_state:
-                                # Try to find the selected file
-                                selected_file_obj = None
-                                prev_file = st.session_state.previous_file
-                                
-                                # Handle both dict and string formats
-                                if isinstance(prev_file, dict):
-                                    for f in previous_files:
-                                        if (f["name"] == prev_file.get("name") or 
-                                            f.get("path") == prev_file.get("path")):
-                                            selected_file_obj = f
-                                            break
-                                else:
-                                    for f in previous_files:
-                                        if f["name"] == prev_file or f.get("path") == prev_file:
-                                            selected_file_obj = f
-                                            break
-                                
-                                if selected_file_obj:
-                                    selected_uri = selected_file_obj.get("uri", selected_file_obj.get("path", ""))
-                                    is_backend = selected_uri.startswith("urn:report-analyst:backend:")
-                                    if is_backend:
-                                        file_to_check = None  # Backend resources don't have local file paths
-                                    else:
-                                        file_to_check = Path(selected_file_obj["path"])
-                            
-                            # If we have a file path, check for stored data
-                            if file_to_check and file_to_check.exists():
-                                cache_entries = st.session_state.analyzer.analyzer.cache_manager.check_cache_status(
-                                    str(file_to_check)
-                                )
-                                # check_cache_status returns a list of tuples, so check if it has any entries
-                                has_stored_data = bool(cache_entries) and len(cache_entries) > 0
-                        except Exception as e:
-                            logger.debug(f"Error checking stored data: {str(e)}")
-                            has_stored_data = False
-                    
-                    for idx, step_short in enumerate(step_options):
-                        with step_cols[idx]:
-                            step_full = step_full_names[step_short]
-                            is_selected = idx <= selected_index
-                            is_complete = step_status_map.get(step_short, False)
-                            
-                            # Show checkmark if complete, circle if incomplete
-                            indicator = "✓" if is_complete else "○"
-                            
-                            # Visual styling for selected steps
-                            if is_selected:
-                                highlight_style = "background-color: rgba(192, 196, 250, 0.1); border: 1px solid #4313C8; color: #4313C8;"
-                            else:
-                                highlight_style = "background-color: rgba(192, 196, 250, 0.05); border: 1px solid rgba(67, 19, 200, 0.3); color: #718096;"
-                            
-                            # Add status badge next to Chunking step - always show
-                            status_badge = ""
-                            if step_short == "Chunk":
-                                badge_text = "Stored" if has_stored_data else "New"
-                                badge_bg = "rgba(192, 196, 250, 0.3)" if has_stored_data else "rgba(192, 196, 250, 0.15)"
-                                status_badge = f'<span style="background-color: {badge_bg}; color: #4313C8; border: 1px solid #4313C8; border-radius: 12px; padding: 2px 8px; font-size: 9px; margin-left: 6px; font-family: \'Cousine\', monospace; display: inline-block;">{badge_text}</span>'
-                            
-                            st.markdown(f"""
-                            <div style="{highlight_style} border-radius: 8px; padding: 0.5rem; text-align: center; font-size: 11px; font-family: 'Afacad', sans-serif;">
-                                <span>{indicator} {step_full}</span>{status_badge}
-                            </div>
-                            """, unsafe_allow_html=True)
 
                 # Right column: Advanced Parameters
                 with col3:
-                    st.markdown("**Advanced Parameters**")
+                    # Get current values for display
+                    current_top_k = st.session_state.get("new_top_k", 5)
+                    current_chunk_size = st.session_state.get("new_chunk_size", 500)
+                    current_overlap = st.session_state.get("new_overlap", 20)
+                    current_model = st.session_state.get("new_llm_model", "gpt-4o-mini")
                     
-                    # Use 2 columns for Advanced Parameters to make it more compact
-                    adv_col1, adv_col2 = st.columns(2)
+                    # Format model name for display
+                    if 'gpt-4o-mini' in current_model:
+                        model_display = 'GPT-4o Mini'
+                    elif 'gpt-4o' in current_model:
+                        model_display = 'GPT-4o'
+                    elif 'gpt-4' in current_model:
+                        model_display = 'GPT-4'
+                    elif 'gemini' in current_model.lower():
+                        model_display = 'Gemini'
+                    else:
+                        model_display = current_model
+                    
+                    # Show compact metrics as info widgets (always visible)
+                    metric_cols = st.columns(4)
+                    with metric_cols[0]:
+                        st.metric("Model", model_display)
+                    with metric_cols[1]:
+                        st.metric("Chunk", current_chunk_size)
+                    with metric_cols[2]:
+                        st.metric("Overlap", current_overlap)
+                    with metric_cols[3]:
+                        st.metric("Top-K", current_top_k)
+                    
+                    # Create expander for the controls
+                    with st.expander("Advanced Parameters", expanded=False):
+                        # Use 2 columns for Advanced Parameters to make it more compact
+                        adv_col1, adv_col2 = st.columns(2)
                     
                     with adv_col1:
                         new_top_k = st.number_input(
@@ -3982,21 +3913,90 @@ def main():
                         st.warning("No stored results found for the selected question set")
                         selected_file_path = None
                 
-                # 2. Configuration selector below
+                # 2. Configuration selector - horizontal styled cards
                 if selected_file_path and file_configs:
                     configs = file_configs[selected_file_path]
-                    config_options = []
-                    for config in configs:
-                        label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
-                        config_options.append({"label": label, "config": config})
                     
-                    st.subheader("Configuration")
-                    selected_config = st.selectbox(
-                        "Select Configuration",
-                        options=config_options,
-                        format_func=lambda x: x["label"],
-                        key="consolidated_config",
-                    )
+                    st.markdown("##### Configuration")
+                    
+                    # Create config cards using columns
+                    num_configs = len(configs)
+                    if num_configs > 0:
+                        # Initialize selected config from session state
+                        if "selected_config_idx" not in st.session_state:
+                            st.session_state.selected_config_idx = 0
+                        
+                        # Ensure index is valid
+                        if st.session_state.selected_config_idx >= num_configs:
+                            st.session_state.selected_config_idx = 0
+                        
+                        # Create fixed-width columns: each card is 1 unit, fill rest with spacer
+                        # This ensures cards don't stretch too wide
+                        col_spec = [1] * num_configs  # card columns
+                        remaining_space = max(0, 4 - num_configs)  # spacer to fill remaining width
+                        if remaining_space > 0:
+                            col_spec.append(remaining_space)
+                        
+                        all_cols = st.columns(col_spec)
+                        config_cols = all_cols[:num_configs]  # only card columns
+                        
+                        for idx, config in enumerate(configs):
+                            with config_cols[idx]:
+                                    # Format model name nicely
+                                    model_name = config['model']
+                                    if 'gpt-4o-mini' in model_name:
+                                        model_display = 'GPT-4o Mini'
+                                    elif 'gpt-4o' in model_name:
+                                        model_display = 'GPT-4o'
+                                    elif 'gpt-4' in model_name:
+                                        model_display = 'GPT-4'
+                                    elif 'gemini' in model_name.lower():
+                                        model_display = 'Gemini'
+                                    else:
+                                        model_display = model_name
+                                    
+                                    # Check if this config is selected
+                                    is_selected = (idx == st.session_state.selected_config_idx)
+                                    
+                                    # Create clickable card
+                                    clicked = card(
+                                        title=model_display,
+                                        text=f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · Top-K: {config['top_k']}",
+                                        key=f"config_card_{idx}",
+                                        styles={
+                                            "card": {
+                                                "width": "100%",
+                                                "height": "85px",
+                                                "border-radius": "10px",
+                                                "box-shadow": "0 2px 8px rgba(0,0,0,0.08)" if not is_selected else "0 4px 16px rgba(67,19,200,0.25)",
+                                                "background-color": "#4313C8" if is_selected else "#FFFFFF",
+                                                "border": "2px solid #4313C8" if is_selected else "1px solid #E5E7EB",
+                                                "padding": "10px",
+                                                "margin": "0",
+                                            },
+                                            "title": {
+                                                "font-size": "15px",
+                                                "font-weight": "600",
+                                                "color": "white" if is_selected else "#1F2937",
+                                                "font-family": "'Afacad', sans-serif",
+                                                "margin-bottom": "2px",
+                                            },
+                                            "text": {
+                                                "font-size": "11px",
+                                                "color": "rgba(255,255,255,0.85)" if is_selected else "#6B7280",
+                                                "font-family": "'Afacad', sans-serif",
+                                            },
+                                        }
+                                    )
+                                    
+                                    if clicked:
+                                        st.session_state.selected_config_idx = idx
+                                        st.rerun()
+                        
+                        # Get the selected config
+                        selected_config = {"label": "", "config": configs[st.session_state.selected_config_idx]}
+                    else:
+                        selected_config = None
                 else:
                     selected_config = None
                 
