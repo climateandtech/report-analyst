@@ -843,8 +843,17 @@ def display_analysis_results(
         st.error(f"Error displaying results: {str(e)}")
 
 
-def display_consolidated_results(analyzer, question_set):
-    """Display consolidated results for all analyzed documents"""
+def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
+    """Display consolidated results for all analyzed documents
+    
+    Args:
+        analyzer: ReportAnalyzer instance
+        question_set: Selected question set identifier
+        file_path: Optional file path. If provided, skip file selection and use this file.
+                   If None, will attempt to get file from cache (backward compatibility).
+        selected_config: Optional configuration dict. If provided, skip config selection and use this config.
+                        If None, will attempt to get config from cache (backward compatibility).
+    """
     try:
         # Create mapping from question set names to database identifiers
         question_set_mapping = {
@@ -860,71 +869,108 @@ def display_consolidated_results(analyzer, question_set):
             f"Mapping question set '{question_set}' to database identifier '{db_question_set}'"
         )
 
-        # Get all available cache configurations
-        cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
-        logger.info(f"Found cache configs: {cache_configs}")
+        # If file_path is not provided, try to get it from cache (backward compatibility)
+        if file_path is None:
+            # Get all available cache configurations
+            cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
+            logger.info(f"Found cache configs: {cache_configs}")
 
-        if not cache_configs:
-            st.warning("No stored analyses found")
-            return
+            if not cache_configs:
+                st.warning("No stored analyses found")
+                return
 
-        # Group configurations by file
-        file_configs = {}
-        for config in cache_configs:
-            if len(config) == 6:  # Full config row from cache_status
-                file_path, chunk_size, chunk_overlap, top_k, model, qs = config
-                if (
-                    qs == db_question_set
-                ):  # Only show configs for selected question set using database identifier
-                    if file_path not in file_configs:
-                        file_configs[file_path] = []
-                    file_configs[file_path].append(
-                        {
-                            "chunk_size": chunk_size,
-                            "chunk_overlap": chunk_overlap,
-                            "top_k": top_k,
-                            "model": model,
-                            "question_set": qs,
-                        }
-                    )
+            # Group configurations by file
+            file_configs = {}
+            for config in cache_configs:
+                if len(config) == 6:  # Full config row from cache_status
+                    fp, chunk_size, chunk_overlap, top_k, model, qs = config
+                    if qs == db_question_set:
+                        if fp not in file_configs:
+                            file_configs[fp] = []
+                        file_configs[fp].append(
+                            {
+                                "chunk_size": chunk_size,
+                                "chunk_overlap": chunk_overlap,
+                                "top_k": top_k,
+                                "model": model,
+                                "question_set": qs,
+                            }
+                        )
 
-        if not file_configs:
-            st.warning(f"No stored results found for question set: {question_set}")
-            return
+            if not file_configs:
+                st.warning(f"No stored results found for question set: {question_set}")
+                return
 
-        # File selection
-        st.subheader("Select Report and Configuration")
-        file_path = st.selectbox(
-            "Select Report",
-            options=list(file_configs.keys()),
-            format_func=lambda x: Path(x).name,
-        )
+            # File selection (backward compatibility)
+            st.subheader("Select Report and Configuration")
+            file_path = st.selectbox(
+                "Select Report",
+                options=list(file_configs.keys()),
+                format_func=lambda x: Path(x).name,
+            )
+            
+            if not file_path:
+                return
+            
+            # Get configs for selected file
+            configs = file_configs[file_path]
+        else:
+            # File path provided, get configs for this file and question set (if not already provided)
+            if selected_config is None:
+                cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
+                configs = []
+                for config in cache_configs:
+                    if len(config) == 6:
+                        fp, chunk_size, chunk_overlap, top_k, model, qs = config
+                        if fp == file_path and qs == db_question_set:
+                            configs.append({
+                                "chunk_size": chunk_size,
+                                "chunk_overlap": chunk_overlap,
+                                "top_k": top_k,
+                                "model": model,
+                                "question_set": qs,
+                            })
+                
+                if not configs:
+                    st.warning(f"No stored results found for {Path(file_path).name} with question set: {question_set}")
+                    return
+            else:
+                # Config already provided, wrap it in a list for consistency
+                configs = [selected_config]
 
         if file_path:
-            # Show configurations for selected file
-            configs = file_configs[file_path]
-            config_options = []
-            for config in configs:
-                label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
-                config_options.append({"label": label, "config": config})
+            # If selected_config is provided, use it; otherwise show selector (backward compatibility)
+            if selected_config is None:
+                # Show configurations for selected file
+                config_options = []
+                for config in configs:
+                    label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
+                    config_options.append({"label": label, "config": config})
 
-            selected_config = st.selectbox(
-                "Select Configuration",
-                options=config_options,
-                format_func=lambda x: x["label"],
-            )
+                st.subheader("Select Configuration")
+                selected_config_obj = st.selectbox(
+                    "Select Configuration",
+                    options=config_options,
+                    format_func=lambda x: x["label"],
+                )
+                
+                if selected_config_obj:
+                    selected_config = selected_config_obj["config"]
+                else:
+                    return
 
             if selected_config:
+                # selected_config is now always the config dict (not wrapped)
                 logger.info(
-                    f"Getting results for {Path(file_path).name} with config: {selected_config['config']}"
+                    f"Getting results for {Path(file_path).name} with config: {selected_config}"
                 )
 
                 # Add similarity search section for document chunks
                 try:
                     raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
                         file_path=file_path,
-                        chunk_size=selected_config["config"]["chunk_size"],
-                        chunk_overlap=selected_config["config"]["chunk_overlap"],
+                        chunk_size=selected_config["chunk_size"],
+                        chunk_overlap=selected_config["chunk_overlap"],
                     )
 
                     if raw_chunks:
@@ -1176,7 +1222,7 @@ def display_consolidated_results(analyzer, question_set):
 
                 # Get cached results
                 cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                    file_path=file_path, config=selected_config["config"]
+                    file_path=file_path, config=selected_config
                 )
 
                 if cached_results:
@@ -1246,7 +1292,7 @@ def display_consolidated_results(analyzer, question_set):
                         )
 
                         # Display results using the existing display function
-                        file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
+                        file_key = f"{Path(file_path).stem}_cs{selected_config['chunk_size']}"
                         display_analysis_results(analysis_df, chunks_df, file_key)
                     else:
                         st.warning("No results found in stored for this configuration")
@@ -1773,7 +1819,7 @@ def main():
                 background-color: #E8F5E9 !important;
                 border-radius: 12px !important;
                 padding: 1rem 1.5rem !important;
-                margin: 1rem 0 1.5rem 0 !important;
+                margin: 0.5rem 0 1.5rem 0 !important;
             }
             
             /* Target the horizontal block inside the container (for columns) */
@@ -1865,6 +1911,56 @@ def main():
             
             .st-key-file-display-panel [data-baseweb="select"] svg path,
             .st-key-file-display-panel [data-baseweb="select"] svg polygon {
+                stroke-width: 4 !important;
+                stroke: #1B9E6B !important;
+                fill: #1B9E6B !important;
+            }
+            
+            /* Question Set Display Panel - same styling as file display panel */
+            [data-testid="stVerticalBlock"].st-key-question-set-display-panel,
+            .st-key-question-set-display-panel[data-testid="stVerticalBlock"] {
+                background-color: #E8F5E9 !important;
+                border-radius: 12px !important;
+                padding: 1rem 1.5rem !important;
+                margin: 1rem 0 0.5rem 0 !important;
+            }
+            
+            .st-key-question-set-display-panel [data-testid="stHorizontalBlock"] {
+                background-color: transparent !important;
+            }
+            
+            .st-key-question-set-display-panel [data-testid="column"] {
+                background-color: transparent !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] {
+                min-width: 300px !important;
+                max-width: 500px !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] > div {
+                background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] div[value],
+            .st-key-question-set-display-panel [data-baseweb="select"] [class*="st-dn"],
+            .st-key-question-set-display-panel [data-baseweb="select"] > div > div > div[value],
+            .st-key-question-set-display-panel [data-baseweb="select"] > div > div > div[class*="st-dn"] {
+                font-size: 22px !important;
+                font-weight: 800 !important;
+                color: #1B9E6B !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] svg {
+                color: #1B9E6B !important;
+                width: 28px !important;
+                height: 28px !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] svg path,
+            .st-key-question-set-display-panel [data-baseweb="select"] svg polygon {
                 stroke-width: 4 !important;
                 stroke: #1B9E6B !important;
                 fill: #1B9E6B !important;
@@ -3782,21 +3878,131 @@ def main():
             st.header("View All Results")
             st.write("View and export consolidated results for all analyzed reports")
 
-            # Question set selection for consolidated view
-            selected_set = st.selectbox(
-                "Select Question Set",
-                options=list(question_sets.keys()),
-                format_func=lambda x: question_sets[x]["name"],
-                key="consolidated_set",
-            )
+            # Initialize selected_set from session state if available
+            if "consolidated_set" not in st.session_state:
+                st.session_state.consolidated_set = list(question_sets.keys())[0] if question_sets else None
+            
+            # 1. Question set and report selectors side by side (green containers)
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                # Question set selector in green container
+                with st.container(key="question-set-display-panel"):
+                    icon_col, content_col = st.columns([0.1, 0.9])
+                    
+                    with icon_col:
+                        st.markdown("""
+                        <div class="pdf-icon-box">
+                            <i class="material-icons">help_outline</i>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with content_col:
+                        # Question set selector
+                        selected_set = st.selectbox(
+                            "Select Question Set",
+                            options=list(question_sets.keys()),
+                            format_func=lambda x: question_sets[x]["name"],
+                            key="consolidated_set",
+                            label_visibility="collapsed"
+                        )
+                        
+                        # Show question set description
+                        if selected_set and selected_set in question_sets:
+                            st.caption(question_sets[selected_set]["description"])
 
+            # Get file configs if question set is selected
+            file_configs = {}
             if selected_set:
-                # Show question set description
-                if selected_set in question_sets:
-                    st.info(question_sets[selected_set]["description"])
-
-                # Only show consolidated results
-                display_consolidated_results(analyzer, selected_set)
+                # Create mapping from question set names to database identifiers
+                question_set_mapping = {
+                    "tcfd": "tcfd",
+                    "s4m": "s4m",
+                    "lucia": "lucia",
+                    "everest": "ev",  # Everest questions use 'ev_' prefix, so database stores as 'ev'
+                }
+                
+                # Get the database identifier for the selected question set
+                db_question_set = question_set_mapping.get(selected_set, selected_set)
+                
+                # Get all available cache configurations
+                cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
+                
+                # Group configurations by file for the selected question set
+                if cache_configs:
+                    for config in cache_configs:
+                        if len(config) == 6:  # Full config row from cache_status
+                            file_path, chunk_size, chunk_overlap, top_k, model, qs = config
+                            if qs == db_question_set:
+                                if file_path not in file_configs:
+                                    file_configs[file_path] = []
+                                file_configs[file_path].append(
+                                    {
+                                        "chunk_size": chunk_size,
+                                        "chunk_overlap": chunk_overlap,
+                                        "top_k": top_k,
+                                        "model": model,
+                                        "question_set": qs,
+                                    }
+                                )
+                
+                with col2:
+                    # Report selector in green container
+                    if file_configs:
+                        with st.container(key="file-display-panel"):
+                            icon_col, content_col = st.columns([0.1, 0.9])
+                            
+                            with icon_col:
+                                st.markdown("""
+                                <div class="pdf-icon-box">
+                                    <i class="material-icons">description</i>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            with content_col:
+                                selected_file_path = st.selectbox(
+                                    "Select Report",
+                                    options=list(file_configs.keys()),
+                                    format_func=lambda x: Path(x).name,
+                                    key="consolidated_file",
+                                    label_visibility="collapsed"
+                                )
+                                
+                                # Show file info
+                                if selected_file_path:
+                                    file_path_str = str(selected_file_path)
+                                    if not file_path_str.startswith("file://"):
+                                        file_path_display = Path(file_path_str)
+                                        if file_path_display.exists():
+                                            import datetime
+                                            mod_time = file_path_display.stat().st_mtime
+                                            upload_date = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y")
+                                            st.markdown(f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>', unsafe_allow_html=True)
+                    else:
+                        st.warning("No stored results found for the selected question set")
+                        selected_file_path = None
+                
+                # 2. Configuration selector below
+                if selected_file_path and file_configs:
+                    configs = file_configs[selected_file_path]
+                    config_options = []
+                    for config in configs:
+                        label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
+                        config_options.append({"label": label, "config": config})
+                    
+                    st.subheader("Configuration")
+                    selected_config = st.selectbox(
+                        "Select Configuration",
+                        options=config_options,
+                        format_func=lambda x: x["label"],
+                        key="consolidated_config",
+                    )
+                else:
+                    selected_config = None
+                
+                # 3. Display consolidated results
+                if selected_file_path and selected_config:
+                    display_consolidated_results(analyzer, selected_set, selected_file_path, selected_config["config"])
 
         # Add Climate+Tech footer at the bottom of sidebar
         # Get current theme for logo selection and encode image as base64
