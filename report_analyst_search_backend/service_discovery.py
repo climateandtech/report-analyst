@@ -6,7 +6,7 @@ the Report Analyst service contract schemas (AsyncAPI for NATS, OpenAPI for HTTP
 
 Usage:
     from report_analyst.core.service_discovery import ServiceValidator
-    
+
     validator = ServiceValidator()
     result = validator.validate_service(service_manifest)
     if result.is_valid:
