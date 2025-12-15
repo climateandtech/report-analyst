@@ -21,46 +21,46 @@ logger = logging.getLogger(__name__)
 def get_alembic_config(database_url: Optional[str] = None) -> Config:
     """
     Get Alembic configuration.
-    
+
     Args:
         database_url: Database connection string. If None, uses environment variable.
-        
+
     Returns:
         Alembic Config object
     """
     alembic_ini_path = os.getenv("ALEMBIC_CONFIG", "alembic.ini")
     config = Config(alembic_ini_path)
-    
+
     # Set database URL if provided
     if database_url:
         config.set_main_option("sqlalchemy.url", database_url)
     elif os.getenv("DATABASE_URL"):
         config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
-    
+
     return config
 
 
 def get_current_revision(database_url: Optional[str] = None) -> Optional[str]:
     """
     Get the current database revision.
-    
+
     Args:
         database_url: Database connection string. If None, uses environment variable.
-        
+
     Returns:
         Current revision string, or None if no migrations have been applied
     """
     try:
         config = get_alembic_config(database_url)
-        
+
         # Get database manager to create engine
         if database_url:
             db_manager = DatabaseManager(database_url)
         else:
             db_manager = DatabaseManager()
-        
+
         engine = db_manager.get_engine()
-        
+
         with engine.connect() as connection:
             context = MigrationContext.configure(connection)
             current_rev = context.get_current_revision()
@@ -73,7 +73,7 @@ def get_current_revision(database_url: Optional[str] = None) -> Optional[str]:
 def get_head_revision() -> Optional[str]:
     """
     Get the head (latest) migration revision.
-    
+
     Returns:
         Head revision string, or None if no migrations exist
     """
@@ -90,25 +90,25 @@ def get_head_revision() -> Optional[str]:
 def needs_migration(database_url: Optional[str] = None) -> bool:
     """
     Check if database needs migration.
-    
+
     Args:
         database_url: Database connection string. If None, uses environment variable.
-        
+
     Returns:
         True if migration is needed, False otherwise
     """
     try:
         current_rev = get_current_revision(database_url)
         head_rev = get_head_revision()
-        
+
         if head_rev is None:
             # No migrations exist
             return False
-        
+
         if current_rev is None:
             # Database has no migrations applied
             return True
-        
+
         return current_rev != head_rev
     except Exception as e:
         logger.error(f"Error checking migration status: {str(e)}")
@@ -118,21 +118,21 @@ def needs_migration(database_url: Optional[str] = None) -> bool:
 def check_migration_status(database_url: Optional[str] = None) -> dict:
     """
     Check migration status and return detailed information.
-    
+
     Args:
         database_url: Database connection string. If None, uses environment variable.
-        
+
     Returns:
         Dictionary with migration status information
     """
     try:
         current_rev = get_current_revision(database_url)
         head_rev = get_head_revision()
-        
+
         return {
             "current_revision": current_rev,
             "head_revision": head_rev,
-            "is_up_to_date": current_rev == head_rev if (current_rev and head_rev) else False,
+            "is_up_to_date": (current_rev == head_rev if (current_rev and head_rev) else False),
             "needs_migration": needs_migration(database_url),
         }
     except Exception as e:
@@ -149,11 +149,11 @@ def check_migration_status(database_url: Optional[str] = None) -> dict:
 def run_migrations(database_url: Optional[str] = None, revision: str = "head") -> bool:
     """
     Run database migrations.
-    
+
     Args:
         database_url: Database connection string. If None, uses environment variable.
         revision: Target revision (default: "head")
-        
+
     Returns:
         True if successful, False otherwise
     """
@@ -165,4 +165,3 @@ def run_migrations(database_url: Optional[str] = None, revision: str = "head") -
     except Exception as e:
         logger.error(f"Error running migrations: {str(e)}")
         return False
-

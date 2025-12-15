@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 import yaml
 
-from report_analyst_jobs.event_router import EventContext, EventRouter, IGNORE_ACTION
+from report_analyst_jobs.event_router import IGNORE_ACTION, EventContext, EventRouter
 
 
 @pytest.fixture
@@ -333,4 +333,3 @@ async def test_e2e_routing_table_inspection(temp_yaml_file):
     document_upload_rule = next(r for r in table if r["pattern"] == "document.upload")
     assert document_upload_rule["action"] == IGNORE_ACTION
     assert document_upload_rule["enabled"] is True
-

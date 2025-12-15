@@ -22,12 +22,15 @@ def check_pgvector_available(connection) -> bool:
     """
     try:
         from sqlalchemy import text
+
         result = connection.execute(
-            text("""
+            text(
+                """
                 SELECT EXISTS(
                     SELECT 1 FROM pg_extension WHERE extname = 'vector'
                 )
-            """)
+            """
+            )
         )
         available = result.fetchone()[0]
         if available:
@@ -52,6 +55,7 @@ def setup_pgvector_extension(connection) -> bool:
     """
     try:
         from sqlalchemy import text
+
         # Check if already exists
         if check_pgvector_available(connection):
             return True
@@ -76,10 +80,11 @@ def create_vector_type(dimension: Optional[int] = None):
     Returns:
         SQLAlchemy TypeEngine for vector type
     """
-    from sqlalchemy import TypeDecorator, Text
+    from sqlalchemy import Text, TypeDecorator
 
     class VectorType(TypeDecorator):
         """Custom type for pgvector vector column"""
+
         impl = Text
         cache_ok = True
 
@@ -103,6 +108,7 @@ def create_vector_type(dimension: Optional[int] = None):
                 return None
             # Parse string format back to list
             import ast
+
             return ast.literal_eval(value)
 
     return VectorType()
@@ -128,7 +134,7 @@ def get_vector_distance_func(embedding_column_name: str, query_vector, distance_
     # Map distance type to pgvector operator
     operators = {
         "cosine": "<=>",  # Cosine distance
-        "l2": "<->",      # L2 distance
+        "l2": "<->",  # L2 distance
         "inner_product": "<#>",  # Inner product (negative)
     }
 
@@ -142,4 +148,3 @@ def get_vector_distance_func(embedding_column_name: str, query_vector, distance_
     # Format: embedding <=> '[1,2,3]'::vector
     sql_expr = f"{embedding_column_name} {operator} :query_vector::vector"
     return sql_expr, {"query_vector": query_str}
-

@@ -101,4 +101,3 @@ class DatabaseManager:
     def is_sqlite(self) -> bool:
         """Check if using SQLite."""
         return not self._is_postgres
-

@@ -16,7 +16,7 @@ class APIKeyManager:
     def set_api_key(key_name: str, value: Optional[str], session_state: dict) -> None:
         """
         Set an API key in session state and environment variables.
-        
+
         Args:
             key_name: The environment variable name (e.g., 'OPENAI_API_KEY')
             value: The API key value (None to clear)
@@ -43,15 +43,15 @@ class APIKeyManager:
     def get_api_key(key_name: str, session_state: dict) -> Optional[str]:
         """
         Get an API key from session state or environment.
-        
+
         Priority:
         1. Session state (user-entered value)
         2. Environment variable (from .env or system)
-        
+
         Args:
             key_name: The environment variable name (e.g., 'OPENAI_API_KEY')
             session_state: Streamlit session state dictionary
-            
+
         Returns:
             The API key value or None
         """
@@ -67,7 +67,7 @@ class APIKeyManager:
         """
         Sync all API keys from session state to environment variables.
         Called at startup to ensure environment has current values.
-        
+
         Args:
             session_state: Streamlit session state dictionary
         """
@@ -78,4 +78,3 @@ class APIKeyManager:
                 value = session_state[session_key]
                 if value:
                     os.environ[key_name] = value
-

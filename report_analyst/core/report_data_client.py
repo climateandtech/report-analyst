@@ -35,7 +35,7 @@ class ReportResource:
 
     def parse_backend_urn(self) -> Optional[Dict[str, str]]:
         """Parse URN: urn:report-analyst:backend:host:resource_id
-        
+
         Handles both with and without ports:
         - urn:report-analyst:backend:localhost:8000:abc-123 (host:port:resource_id)
         - urn:report-analyst:backend:api.example.com:abc-123 (host:resource_id)
@@ -64,11 +64,7 @@ class ReportResource:
         if not parsed:
             return None
         # Determine protocol (http vs https) - could be config-based
-        protocol = (
-            "http"
-            if "localhost" in parsed["host"] or "127.0.0.1" in parsed["host"]
-            else "https"
-        )
+        protocol = "http" if "localhost" in parsed["host"] or "127.0.0.1" in parsed["host"] else "https"
         return f"{protocol}://{parsed['host']}/resources/{parsed['resource_id']}"
 
 
@@ -79,9 +75,7 @@ class ReportDataClient:
         self.temp_dir = temp_dir
         self._backend_clients: Dict[str, Any] = {}  # Cache backend clients by host
 
-    def list_reports(
-        self, backend_configs: Optional[List[Any]] = None
-    ) -> List[ReportResource]:
+    def list_reports(self, backend_configs: Optional[List[Any]] = None) -> List[ReportResource]:
         """
         List all available sustainability reports from all sources.
 
@@ -117,9 +111,7 @@ class ReportDataClient:
 
             file_size = file.stat().st_size
             if file_size < 100:  # Minimum size for a valid PDF
-                logger.warning(
-                    f"Skipping {file.name}: file too small ({file_size} bytes), likely invalid"
-                )
+                logger.warning(f"Skipping {file.name}: file too small ({file_size} bytes), likely invalid")
                 continue
 
             # Try to validate it's a real PDF by attempting to open it
@@ -130,14 +122,10 @@ class ReportDataClient:
                 page_count = doc.page_count
                 doc.close()
                 if page_count == 0:
-                    logger.warning(
-                        f"Skipping {file.name}: PDF has 0 pages, likely invalid"
-                    )
+                    logger.warning(f"Skipping {file.name}: PDF has 0 pages, likely invalid")
                     continue
             except Exception as e:
-                logger.warning(
-                    f"Skipping {file.name}: cannot open as PDF ({str(e)})"
-                )
+                logger.warning(f"Skipping {file.name}: cannot open as PDF ({str(e)})")
                 continue
 
             # Create file:// URI
@@ -151,9 +139,7 @@ class ReportDataClient:
                     metadata={"path": str(file.resolve()), "pages": page_count},
                 )
             )
-            logger.info(
-                f"Found valid PDF: {file.name}, size: {file_size} bytes, pages: {page_count}"
-            )
+            logger.info(f"Found valid PDF: {file.name}, size: {file_size} bytes, pages: {page_count}")
 
         return files
 
@@ -170,9 +156,7 @@ class ReportDataClient:
             return []
 
 
-def get_backend_service_for_urn(
-    urn: str, backend_configs: List[Any]
-) -> Optional[Any]:
+def get_backend_service_for_urn(urn: str, backend_configs: List[Any]) -> Optional[Any]:
     """Get BackendService instance for a given backend URN"""
     if not urn.startswith("urn:report-analyst:backend:"):
         return None
@@ -195,9 +179,7 @@ def get_backend_service_for_urn(
     return None
 
 
-def get_chunks_for_backend_resource(
-    urn: str, backend_configs: List[Any]
-) -> Optional[List[Dict[str, Any]]]:
+def get_chunks_for_backend_resource(urn: str, backend_configs: List[Any]) -> Optional[List[Dict[str, Any]]]:
     """
     Get chunks for a backend resource identified by URN.
 
@@ -219,4 +201,3 @@ def get_chunks_for_backend_resource(
 
     # Use BackendService to get chunks
     return backend_service.get_chunks(parsed["resource_id"])
-

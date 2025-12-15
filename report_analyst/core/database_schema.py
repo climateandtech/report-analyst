@@ -95,7 +95,12 @@ chunk_relevance = Table(
     "chunk_relevance",
     metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("question_analysis_id", Integer, ForeignKey("question_analysis.id"), nullable=False),
+    Column(
+        "question_analysis_id",
+        Integer,
+        ForeignKey("question_analysis.id"),
+        nullable=False,
+    ),
     Column("document_chunk_id", Integer, ForeignKey("document_chunks.id"), nullable=False),
     Column("chunk_order", Integer, nullable=False),
     Column("similarity_score", Float, nullable=True),
@@ -115,4 +120,3 @@ indexes = [
     # Index on chunk parameters
     "CREATE INDEX IF NOT EXISTS idx_chunk_params ON document_chunks(chunk_size, chunk_overlap)",
 ]
-

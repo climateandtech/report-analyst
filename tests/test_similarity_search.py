@@ -1,13 +1,14 @@
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
-import numpy as np
-from pathlib import Path
-import tempfile
-import shutil
 import json
+import shutil
+import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
-from report_analyst.core.cache_manager import CacheManager
+import numpy as np
+import pytest
+
 from report_analyst.core.analyzer import DocumentAnalyzer
+from report_analyst.core.cache_manager import CacheManager
 
 
 @pytest.fixture
@@ -126,9 +127,7 @@ def test_similarity_search_ordering(temp_db, sample_chunks):
         mock_node3.embedding = sample_chunks[2]["embedding"]
 
         # Nodes should be returned in descending order by score
-        mock_retriever.aretrieve = AsyncMock(
-            return_value=[mock_node1, mock_node2, mock_node3]
-        )
+        mock_retriever.aretrieve = AsyncMock(return_value=[mock_node1, mock_node2, mock_node3])
 
         temp_db.vector_store = Mock()
         temp_db.vector_store.as_retriever.return_value = mock_retriever
@@ -199,5 +198,3 @@ async def test_chunk_ordering_in_analysis():
     assert chunks[0]["chunk_order"] == 0  # Highest similarity = first position
     assert chunks[1]["chunk_order"] == 1  # Second highest = second position
     assert chunks[2]["chunk_order"] == 2  # Lowest = last position
-
-

@@ -20,6 +20,7 @@ def setup_test_env():
     # Cleanup after tests
     if Path(os.environ["STORAGE_PATH"]).exists():
         import shutil
+
         shutil.rmtree(os.environ["STORAGE_PATH"])
     # Restore original
     if original_storage:
@@ -45,7 +46,7 @@ def temp_db_both(request):
     For PostgreSQL, requires DATABASE_URL environment variable or skips test.
     """
     temp_dir = tempfile.mkdtemp()
-    
+
     if request.param == "sqlite":
         db_path = Path(temp_dir) / "test_cache.db"
         cache_manager = CacheManager(db_path=str(db_path))
@@ -57,7 +58,7 @@ def temp_db_both(request):
             pytest.skip("TEST_POSTGRES_URL not set, skipping PostgreSQL test")
         cache_manager = CacheManager(database_url=database_url)
         yield cache_manager
-    
+
     shutil.rmtree(temp_dir)
 
 
@@ -245,14 +246,16 @@ def test_get_chunks_without_embeddings(temp_db):
     # Insert chunks directly into database (some without embeddings, some with)
     with temp_db.db_manager.get_connection() as conn:
         timestamp = datetime.now().isoformat()
-        
+
         # Insert chunks without embeddings
         conn.execute(
-            text("""
+            text(
+                """
                 INSERT INTO document_chunks
                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                 VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
-            """),
+            """
+            ),
             {
                 "file_path": file_path,
                 "chunk_text": "Chunk 1 without embedding",
@@ -264,11 +267,13 @@ def test_get_chunks_without_embeddings(temp_db):
             },
         )
         conn.execute(
-            text("""
+            text(
+                """
                 INSERT INTO document_chunks
                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                 VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
-            """),
+            """
+            ),
             {
                 "file_path": file_path,
                 "chunk_text": "Chunk 2 without embedding",
@@ -279,15 +284,17 @@ def test_get_chunks_without_embeddings(temp_db):
                 "created_at": timestamp,
             },
         )
-        
+
         # Insert chunk with embedding
         embedding_bytes = np.array([0.1, 0.2, 0.3], dtype=np.float32).tobytes()
         conn.execute(
-            text("""
+            text(
+                """
                 INSERT INTO document_chunks
                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                 VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
-            """),
+            """
+            ),
             {
                 "file_path": file_path,
                 "chunk_text": "Chunk 3 with embedding",
@@ -300,9 +307,7 @@ def test_get_chunks_without_embeddings(temp_db):
         )
 
     # Get chunks without embeddings
-    result = temp_db.get_chunks_without_embeddings(
-        file_path, chunk_size, chunk_overlap
-    )
+    result = temp_db.get_chunks_without_embeddings(file_path, chunk_size, chunk_overlap)
 
     # Should return only chunks without embeddings
     assert len(result) == 2
@@ -332,11 +337,13 @@ def test_has_chunk_scoring(temp_db):
     with temp_db.db_manager.get_connection() as conn:
         timestamp = datetime.now().isoformat()
         conn.execute(
-            text("""
+            text(
+                """
                 INSERT INTO document_chunks
                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                 VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
-            """),
+            """
+            ),
             {
                 "file_path": file_path,
                 "chunk_text": chunk_text,

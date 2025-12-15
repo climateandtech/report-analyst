@@ -70,9 +70,7 @@ async def test_process_document_ready_event(mock_chunks, mock_analysis_result):
     # Mock search backend client
     coordinator.search_backend = Mock()
     coordinator.search_backend.base_url = "http://localhost:8000"
-    coordinator.search_backend.get_resource_chunks = AsyncMock(
-        return_value=mock_chunks
-    )
+    coordinator.search_backend.get_resource_chunks = AsyncMock(return_value=mock_chunks)
 
     # Mock _get_chunks_for_resource (which calls get_resource_chunks)
     coordinator._get_chunks_for_resource = AsyncMock(return_value=mock_chunks)
@@ -113,19 +111,13 @@ async def test_process_document_ready_event(mock_chunks, mock_analysis_result):
     await coordinator._handle_document_ready(mock_msg, config)
 
     # Verify chunks were retrieved
-    coordinator._get_chunks_for_resource.assert_called_once_with(
-        "test-resource-123", "search", None
-    )
+    coordinator._get_chunks_for_resource.assert_called_once_with("test-resource-123", "search", None)
 
     # Verify analysis was run
-    coordinator._run_analysis.assert_called_once_with(
-        mock_chunks, "tcfd", {"model": "gpt-4o-mini"}
-    )
+    coordinator._run_analysis.assert_called_once_with(mock_chunks, "tcfd", {"model": "gpt-4o-mini"})
 
     # Verify results were stored
-    coordinator._store_analysis_to_backend.assert_called_once_with(
-        "test-resource-123", mock_analysis_result, "tcfd"
-    )
+    coordinator._store_analysis_to_backend.assert_called_once_with("test-resource-123", mock_analysis_result, "tcfd")
 
     # Verify message was acked
     mock_msg.ack.assert_called_once()
@@ -190,14 +182,10 @@ async def test_process_document_ready_with_provided_chunks(mock_analysis_result)
     coordinator._get_chunks_for_resource.assert_not_called()
 
     # Verify analysis was run with provided chunks
-    coordinator._run_analysis.assert_called_once_with(
-        provided_chunks, "tcfd", {"model": "gpt-4o-mini"}
-    )
+    coordinator._run_analysis.assert_called_once_with(provided_chunks, "tcfd", {"model": "gpt-4o-mini"})
 
     # Verify results were stored
-    coordinator._store_analysis_to_backend.assert_called_once_with(
-        "test-resource-123", mock_analysis_result, "tcfd"
-    )
+    coordinator._store_analysis_to_backend.assert_called_once_with("test-resource-123", mock_analysis_result, "tcfd")
 
     # Verify message was acked
     mock_msg.ack.assert_called_once()
@@ -258,9 +246,7 @@ async def test_store_analysis_to_backend(mock_analysis_result):
     coordinator.search_backend = Mock()
     coordinator.search_backend.base_url = "http://localhost:8000"
 
-    with patch(
-        "report_analyst_search_backend.backend_service.BackendService.store_analysis_results"
-    ) as mock_store:
+    with patch("report_analyst_search_backend.backend_service.BackendService.store_analysis_results") as mock_store:
         mock_store.return_value = "stored-result-id-123"
 
         await coordinator._store_analysis_to_backend(
@@ -306,4 +292,3 @@ async def test_config_options():
     assert config_dict["pull_chunks"] is False
     assert config_dict["chunk_retrieval_method"] == "direct"
     assert config_dict["max_chunks"] == 100
-

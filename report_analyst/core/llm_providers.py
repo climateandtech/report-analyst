@@ -34,12 +34,8 @@ def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
     if model_name.startswith("gpt-"):
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            logger.error(
-                f"Cannot initialize OpenAI model '{model_name}' - OPENAI_API_KEY environment variable is not set"
-            )
-            raise ValueError(
-                "OPENAI_API_KEY environment variable is required for OpenAI models"
-            )
+            logger.error(f"Cannot initialize OpenAI model '{model_name}' - OPENAI_API_KEY environment variable is not set")
+            raise ValueError("OPENAI_API_KEY environment variable is required for OpenAI models")
 
         return OpenAI(
             model=model_name,
@@ -53,12 +49,8 @@ def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
     elif model_name.startswith("gemini-") or model_name.startswith("models/gemini-"):
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            logger.error(
-                f"Cannot initialize Gemini model '{model_name}' - GOOGLE_API_KEY environment variable is not set"
-            )
-            raise ValueError(
-                "GOOGLE_API_KEY environment variable is required for Gemini models"
-            )
+            logger.error(f"Cannot initialize Gemini model '{model_name}' - GOOGLE_API_KEY environment variable is not set")
+            raise ValueError("GOOGLE_API_KEY environment variable is required for Gemini models")
 
         # Use the full model path if provided, otherwise prefix with "models/"
         full_model_name = model_name

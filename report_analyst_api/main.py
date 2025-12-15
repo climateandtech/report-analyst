@@ -84,9 +84,7 @@ async def get_question_sets():
         # Convert to API response format
         question_sets = []
         for qset in question_sets_data.values():
-            question_sets.append(
-                QuestionSet(id=qset.id, name=qset.name, description=qset.description)
-            )
+            question_sets.append(QuestionSet(id=qset.id, name=qset.name, description=qset.description))
 
         return question_sets
     except Exception as e:

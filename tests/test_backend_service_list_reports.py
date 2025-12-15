@@ -15,9 +15,7 @@ from report_analyst_search_backend.config import BackendConfig
 @pytest.fixture
 def backend_config():
     """Create test backend configuration"""
-    return BackendConfig(
-        use_backend=True, backend_url="http://localhost:8000"
-    )
+    return BackendConfig(use_backend=True, backend_url="http://localhost:8000")
 
 
 @pytest.fixture
@@ -62,7 +60,7 @@ def test_backend_service_list_reports(backend_config, mock_backend_resources):
 def test_backend_service_list_reports_with_https(backend_config, mock_backend_resources):
     """Test URN generation with HTTPS backend URL"""
     backend_config.backend_url = "https://api.example.com"
-    
+
     with patch("requests.get") as mock_get:
         mock_response = Mock()
         mock_response.json.return_value = mock_backend_resources
@@ -81,7 +79,7 @@ def test_backend_service_list_reports_with_https(backend_config, mock_backend_re
 def test_backend_service_list_reports_with_port(backend_config, mock_backend_resources):
     """Test URN generation with port in backend URL"""
     backend_config.backend_url = "http://localhost:8080"
-    
+
     with patch("requests.get") as mock_get:
         mock_response = Mock()
         mock_response.json.return_value = mock_backend_resources
@@ -125,15 +123,13 @@ def test_backend_service_list_reports_empty_response(backend_config):
 
 def test_backend_service_normalize_backend_url():
     """Test URL normalization for URN"""
-    backend_config = BackendConfig(
-        use_backend=True, backend_url="https://api.example.com:443"
-    )
+    backend_config = BackendConfig(use_backend=True, backend_url="https://api.example.com:443")
     service = BackendService(backend_config)
-    
+
     normalized = service._normalize_backend_url("https://api.example.com:443")
     assert normalized == "api.example.com:443"
     assert "https://" not in normalized
-    
+
     normalized = service._normalize_backend_url("http://localhost:8000")
     assert normalized == "localhost:8000"
     assert "http://" not in normalized
@@ -141,24 +137,22 @@ def test_backend_service_normalize_backend_url():
 
 def test_backend_service_parse_date():
     """Test date parsing for timestamps"""
-    backend_config = BackendConfig(
-        use_backend=True, backend_url="http://localhost:8000"
-    )
+    backend_config = BackendConfig(use_backend=True, backend_url="http://localhost:8000")
     service = BackendService(backend_config)
-    
+
     # Test ISO format with Z
     timestamp = service._parse_date("2024-01-01T00:00:00Z")
     assert timestamp is not None
     assert isinstance(timestamp, float)
-    
+
     # Test ISO format without Z
     timestamp = service._parse_date("2024-01-01T00:00:00")
     assert timestamp is not None
-    
+
     # Test None
     timestamp = service._parse_date(None)
     assert timestamp is None
-    
+
     # Test invalid format
     timestamp = service._parse_date("invalid-date")
     assert timestamp is None
@@ -177,4 +171,3 @@ def test_backend_service_get_resources_public(backend_config, mock_backend_resou
 
         assert len(resources) == 2
         assert resources[0]["id"] == "test-resource-1"
-

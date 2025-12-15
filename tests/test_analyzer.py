@@ -49,6 +49,7 @@ def clean_db(test_db):
     print(f"\nCleaning database at: {test_db}")  # Debug print
     # Use CacheManager to clean the database
     from report_analyst.core.cache_manager import CacheManager
+
     cache_manager = CacheManager(db_path=str(test_db))
     cache_manager.clear_cache()  # Clear all cache
     return test_db
@@ -230,10 +231,7 @@ def test_load_questions(analyzer):
     questions = analyzer._load_questions()
     assert len(questions) == 11  # TCFD has 11 questions
     assert "tcfd_1" in questions
-    assert (
-        questions["tcfd_1"]["text"]
-        == "How does the company's board oversee climate-related risks and opportunities?"
-    )
+    assert questions["tcfd_1"]["text"] == "How does the company's board oversee climate-related risks and opportunities?"
     assert "guidelines" in questions["tcfd_1"]
 
 
@@ -241,10 +239,7 @@ def test_get_question_by_number(analyzer):
     """Test getting question by number"""
     question = analyzer.get_question_by_number(1)
     assert question is not None
-    assert (
-        question["text"]
-        == "How does the company's board oversee climate-related risks and opportunities?"
-    )
+    assert question["text"] == "How does the company's board oversee climate-related risks and opportunities?"
     assert "guidelines" in question
 
 
@@ -305,9 +300,7 @@ async def test_process_document_with_cache(analyzer):
     }
 
     # Add to cache
-    analyzer.cache_manager.save_analysis(
-        file_path="test.pdf", question_id="tcfd_1", result=test_answer, config=config
-    )
+    analyzer.cache_manager.save_analysis(file_path="test.pdf", question_id="tcfd_1", result=test_answer, config=config)
 
     # Process document
     results = []
@@ -317,9 +310,7 @@ async def test_process_document_with_cache(analyzer):
             assert result["status"] in ["processing", "complete", "cached"]
 
     # Verify we got the cached result
-    cached_result = analyzer.cache_manager.get_analysis(
-        file_path="test.pdf", config=config, question_ids=["tcfd_1"]
-    )
+    cached_result = analyzer.cache_manager.get_analysis(file_path="test.pdf", config=config, question_ids=["tcfd_1"])
     assert cached_result is not None
     assert cached_result["tcfd_1"]["result"]["ANSWER"] == test_answer["ANSWER"]
 
@@ -338,7 +329,7 @@ def test_update_llm_model(analyzer):
 
 def test_cache_key_generation_with_none_llm(analyzer):
     """Test cache key generation when llm is None (no API keys available)
-    
+
     This test would have failed before the fix that handles None llm gracefully.
     Before the fix, accessing self.llm.model would raise:
     AttributeError: 'NoneType' object has no attribute 'model'
@@ -346,14 +337,14 @@ def test_cache_key_generation_with_none_llm(analyzer):
     # Simulate the case where no API keys are available (llm is None)
     analyzer.llm = None
     analyzer.default_model = "gpt-3.5-turbo-1106"  # Set a default model
-    
+
     # This should not crash - it should fall back to default_model
     analyzer.update_parameters(500, 20, 5)
-    
+
     # Before the fix, this would raise: AttributeError: 'NoneType' object has no attribute 'model'
     # After the fix, it should work and use default_model
     key = analyzer._get_cache_key("test.pdf")
-    
+
     # Verify the cache key contains expected components
     assert "cs500" in key
     assert "ov20" in key
@@ -365,7 +356,7 @@ def test_cache_key_generation_with_none_llm(analyzer):
 
 def test_process_document_config_with_none_llm(analyzer, test_env):
     """Test that process_document creates config dict correctly when llm is None
-    
+
     This test would have failed before the fix that handles None llm in config creation.
     """
     # Simulate the case where no API keys are available (llm is None)
@@ -373,36 +364,36 @@ def test_process_document_config_with_none_llm(analyzer, test_env):
     analyzer.default_model = "gpt-3.5-turbo-1106"
     analyzer.update_parameters(500, 20, 5)
     analyzer.question_set = "tcfd"
-    
+
     # Create a minimal test PDF file
     test_file = test_env["storage_path"] / "test_report.pdf"
     test_file.write_bytes(b"%PDF-1.4\n%Test PDF")
-    
+
     # Mock the document processing to avoid actual LLM calls
     # We just want to verify the config dict creation doesn't crash
-    with patch.object(analyzer, '_create_chunks', return_value=[]):
+    with patch.object(analyzer, "_create_chunks", return_value=[]):
         # This should not crash when creating the config dict
         # The actual processing will fail, but config creation should work
         try:
             # We'll catch the error after config is created
             results = []
+
             async def collect_results():
-                async for result in analyzer.process_document(
-                    str(test_file), [1], force_recompute=True
-                ):
+                async for result in analyzer.process_document(str(test_file), [1], force_recompute=True):
                     results.append(result)
                     # Stop after we see the first error or status
                     if "error" in result or "status" in result:
                         break
-            
+
             import asyncio
+
             asyncio.run(collect_results())
-            
+
             # The important thing is that we didn't crash with AttributeError
             # about 'NoneType' object has no attribute 'model'
             # If we got here, the config creation worked
             assert True  # Test passes if no AttributeError was raised
-            
+
         except AttributeError as e:
             if "'NoneType' object has no attribute 'model'" in str(e):
                 pytest.fail("Config creation failed with None llm - this should be fixed!")
@@ -414,7 +405,7 @@ async def test_process_document_pre_retrieved_chunks(analyzer, test_env):
     """Test processing document with pre-retrieved chunks"""
     test_file = test_env["storage_path"] / "test_report.pdf"
     test_file.write_bytes(b"%PDF-1.4\n%Test PDF")
-    
+
     # Pre-retrieved chunks in backend format
     pre_chunks = [
         {
@@ -426,13 +417,13 @@ async def test_process_document_pre_retrieved_chunks(analyzer, test_env):
             "chunk_metadata": {"page": 2, "source": "backend"},
         },
     ]
-    
+
     # Mock LLM to avoid actual API calls
     with patch.object(analyzer, "llm") as mock_llm:
         mock_response = Mock()
         mock_response.message.content = "Test answer"
         mock_llm.achat = AsyncMock(return_value=mock_response)
-        
+
         results = []
         async for result in analyzer.process_document(
             str(test_file),
@@ -443,7 +434,7 @@ async def test_process_document_pre_retrieved_chunks(analyzer, test_env):
             results.append(result)
             if "error" in result or len(results) > 5:  # Limit iterations
                 break
-        
+
         # Should use pre-retrieved chunks instead of creating new ones
         assert len(results) > 0
         # Check that chunks were used (status message should indicate chunks loaded)
@@ -460,18 +451,21 @@ async def test_process_document_s3_url_support(analyzer, test_env):
     s3_chunks = [
         {
             "chunk_text": "Content downloaded from S3 bucket.",
-            "chunk_metadata": {"source": "s3", "url": "http://s3.example.com/bucket/file.pdf"},
+            "chunk_metadata": {
+                "source": "s3",
+                "url": "http://s3.example.com/bucket/file.pdf",
+            },
         },
     ]
-    
+
     # Use a temporary file path as identifier
     s3_file_path = "s3://bucket/file.pdf"
-    
+
     with patch.object(analyzer, "llm") as mock_llm:
         mock_response = Mock()
         mock_response.message.content = "Test answer from S3 content"
         mock_llm.achat = AsyncMock(return_value=mock_response)
-        
+
         results = []
         async for result in analyzer.process_document(
             s3_file_path,
@@ -482,7 +476,7 @@ async def test_process_document_s3_url_support(analyzer, test_env):
             results.append(result)
             if "error" in result or len(results) > 5:
                 break
-        
+
         # Should process S3 chunks successfully
         assert len(results) > 0
 
@@ -517,9 +511,7 @@ def test_get_all_cached_answers(analyzer):
 
     # Save answers to database
     for qid, answer in test_answers.items():
-        analyzer.cache_manager.save_analysis(
-            file_path=f"test_{qid}.pdf", question_id=qid, result=answer, config=config
-        )
+        analyzer.cache_manager.save_analysis(file_path=f"test_{qid}.pdf", question_id=qid, result=answer, config=config)
 
     # Get all cached answers and verify
     answers = analyzer.get_all_cached_answers("tcfd")
@@ -559,9 +551,7 @@ async def test_document_analysis_workflow(test_env):
 
         # 2. Process document
         results = []
-        async for result in analyzer.process_document(
-            str(test_env["test_file"]), ["tcfd_1", "tcfd_2"]
-        ):
+        async for result in analyzer.process_document(str(test_env["test_file"]), ["tcfd_1", "tcfd_2"]):
             results.append(result)
             # Handle both status and error results
             if "status" in result:

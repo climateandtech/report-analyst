@@ -95,14 +95,10 @@ class QuestionSetLoader:
 
                 question_sets[question_set_id] = question_set
 
-                logger.info(
-                    f"[QUESTION_LOADER] ✓ Loaded {len(questions)} questions for {question_set_id}"
-                )
+                logger.info(f"[QUESTION_LOADER] ✓ Loaded {len(questions)} questions for {question_set_id}")
 
             except Exception as e:
-                logger.error(
-                    f"[QUESTION_LOADER] Error loading question set from {yaml_file}: {str(e)}"
-                )
+                logger.error(f"[QUESTION_LOADER] Error loading question set from {yaml_file}: {str(e)}")
                 continue
 
         if not question_sets:
@@ -129,10 +125,7 @@ class QuestionSetLoader:
     def get_question_set_info(self) -> Dict[str, Dict[str, str]]:
         """Get question set info (name and description) for UI display"""
         question_sets = self.get_question_sets()
-        return {
-            qset.id: {"name": qset.name, "description": qset.description}
-            for qset in question_sets.values()
-        }
+        return {qset.id: {"name": qset.name, "description": qset.description} for qset in question_sets.values()}
 
     def get_questions(self, question_set_id: str) -> Dict[str, Dict[str, str]]:
         """Get questions for a specific question set"""
@@ -146,9 +139,7 @@ class QuestionSetLoader:
     def reload(self):
         """Force reload of question sets"""
         self._question_sets = None
-        logger.info(
-            "[QUESTION_LOADER] Question sets cache cleared, will reload on next access"
-        )
+        logger.info("[QUESTION_LOADER] Question sets cache cleared, will reload on next access")
 
 
 # Global singleton instance

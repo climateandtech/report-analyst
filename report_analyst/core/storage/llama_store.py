@@ -49,9 +49,7 @@ class LlamaVectorStore(BaseVectorStore):
 
             # Load the existing index
             logger.info(f"Loading vector store from {self.storage_path}")
-            self.storage_context = StorageContext.from_defaults(
-                persist_dir=str(self.storage_path)
-            )
+            self.storage_context = StorageContext.from_defaults(persist_dir=str(self.storage_path))
             self.store = load_index_from_storage(storage_context=self.storage_context)
             logger.info("Successfully loaded existing vector store")
             return True
@@ -124,10 +122,7 @@ class LlamaVectorStore(BaseVectorStore):
 
             # Get nodes and convert to Document format with scores
             nodes = retriever.retrieve(query)
-            return [
-                (Document(text=node.node.text, metadata=node.node.metadata), node.score)
-                for node in nodes
-            ]
+            return [(Document(text=node.node.text, metadata=node.node.metadata), node.score) for node in nodes]
 
         except Exception as e:
             logger.error(f"Error during similarity search: {e}")

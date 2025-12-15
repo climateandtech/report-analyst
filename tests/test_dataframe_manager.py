@@ -1,6 +1,10 @@
-import pytest
 import pandas as pd
-from report_analyst.core.dataframe_manager import create_analysis_dataframes, format_list_field
+import pytest
+
+from report_analyst.core.dataframe_manager import (
+    create_analysis_dataframes,
+    format_list_field,
+)
 
 
 def test_format_list_field_with_evidence():
@@ -90,10 +94,7 @@ def test_create_analysis_dataframes_with_evidence():
     # Check that analysis dataframe was created correctly
     assert len(analysis_df) == 1
     assert analysis_df.iloc[0]["Question ID"] == "ev_24"
-    assert (
-        analysis_df.iloc[0]["Analysis"]
-        == "No data reported for Scope 1 CO₂ emissions for the year 2022."
-    )
+    assert analysis_df.iloc[0]["Analysis"] == "No data reported for Scope 1 CO₂ emissions for the year 2022."
     assert analysis_df.iloc[0]["Score"] == 2
 
     # Most importantly, check that Key Evidence is properly formatted
@@ -171,4 +172,3 @@ def test_create_analysis_dataframes_with_chunks():
     assert chunks_df.iloc[1]["Is Evidence"] == False  # Use == instead of is for pandas bool
     assert pd.isna(chunks_df.iloc[0]["LLM Score"])  # None should become NaN
     assert chunks_df.iloc[1]["LLM Score"] == 0.8
-

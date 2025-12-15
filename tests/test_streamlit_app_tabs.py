@@ -84,9 +84,7 @@ def test_consolidated_results_tab():
             break
 
     # The selectbox should exist for question set selection
-    assert (
-        has_consolidated_selectbox
-    ), "Question set selectbox not found in All Results page"
+    assert has_consolidated_selectbox, "Question set selectbox not found in All Results page"
     assert not at.exception
 
 
@@ -147,18 +145,14 @@ def test_question_set_selection():
     assert question_selectbox is not None, "Question set selectbox not found"
 
     # Check that it has multiple options
-    assert (
-        len(question_selectbox.options) >= 4
-    ), f"Expected at least 4 question sets, got {len(question_selectbox.options)}"
+    assert len(question_selectbox.options) >= 4, f"Expected at least 4 question sets, got {len(question_selectbox.options)}"
 
     # Verify key question sets are present
     options_lower = [str(opt).lower() for opt in question_selectbox.options]
     expected_sets = ["tcfd", "everest", "denali", "kilimanjaro"]
 
     for expected_set in expected_sets:
-        assert any(
-            expected_set in opt for opt in options_lower
-        ), f"Question set '{expected_set}' not found in options"
+        assert any(expected_set in opt for opt in options_lower), f"Question set '{expected_set}' not found in options"
 
     assert not at.exception
 
@@ -174,13 +168,13 @@ def test_analysis_controls():
     # They only appear when a file is selected and questions are loaded
     # Since setting file selection in session state causes format_func issues in AppTest,
     # we verify the app loads correctly and the page structure is there
-    
+
     assert not at.exception, "App should load without errors"
-    
+
     # Verify we're on the Report Analyst page
     assert "nav_page" in at.session_state, "Navigation page should be set"
     assert at.session_state["nav_page"] == "Report Analyst", "Should be on Report Analyst page"
-    
+
     # Note: UI elements like buttons and checkboxes are conditionally rendered
     # and may not appear until a file is selected. This is expected behavior.
     # The important thing is that the app loads correctly and handles the page navigation.
@@ -208,7 +202,7 @@ def test_session_state_initialization():
     # Navigate to Report Analyst page to check for title
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
-    
+
     # Check that the app has the expected structure
     assert len(at.title) > 0, "App title not found"
     assert len(at.expander) > 0, "No expanders found"

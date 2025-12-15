@@ -15,4 +15,3 @@ __all__ = [
     "get_vector_distance_func",
     "setup_pgvector_extension",
 ]
-

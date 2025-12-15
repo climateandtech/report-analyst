@@ -6,4 +6,3 @@ Licensed under Climate+Tech Open License for Good.
 """
 
 __version__ = "0.1.0"
-

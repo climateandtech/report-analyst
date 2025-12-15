@@ -4,10 +4,10 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from report_analyst.core.database_manager import DatabaseManager
 
 # Import our database schema
 from report_analyst.core.database_schema import metadata as db_metadata
-from report_analyst.core.database_manager import DatabaseManager
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -31,9 +31,10 @@ else:
 # Set the database URL in config
 config.set_main_option("sqlalchemy.url", database_url)
 
-# Combine metadata from database_schema and file_storage
-from sqlalchemy import MetaData, Table, Column, String, Text, DateTime, LargeBinary
 from datetime import datetime
+
+# Combine metadata from database_schema and file_storage
+from sqlalchemy import Column, DateTime, LargeBinary, MetaData, String, Table, Text
 
 # Use the database_schema metadata as base
 target_metadata = db_metadata
@@ -96,9 +97,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

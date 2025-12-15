@@ -38,9 +38,7 @@ def temp_dir():
 @pytest.fixture
 def backend_config():
     """Create test backend configuration"""
-    return BackendConfig(
-        use_backend=True, backend_url="http://localhost:8000"
-    )
+    return BackendConfig(use_backend=True, backend_url="http://localhost:8000")
 
 
 @pytest.fixture
@@ -78,9 +76,7 @@ def mock_backend_chunks():
     ]
 
 
-def test_full_roundtrip_list_and_select_backend_resource(
-    backend_config, mock_backend_resources
-):
+def test_full_roundtrip_list_and_select_backend_resource(backend_config, mock_backend_resources):
     """Test Step 1 & 2: List backend resources and verify URN format"""
     with patch("requests.get") as mock_get:
         mock_response = Mock()
@@ -94,9 +90,7 @@ def test_full_roundtrip_list_and_select_backend_resource(
 
         # Verify backend resource is listed
         assert len(resources) >= 1
-        backend_resource = next(
-            (r for r in resources if r.is_backend_resource), None
-        )
+        backend_resource = next((r for r in resources if r.is_backend_resource), None)
         assert backend_resource is not None
 
         # Step 2: Verify URN format
@@ -111,9 +105,7 @@ def test_full_roundtrip_list_and_select_backend_resource(
         assert parsed["resource_id"] == "test-resource-1"
 
 
-def test_full_roundtrip_retrieve_chunks(
-    backend_config, mock_backend_chunks
-):
+def test_full_roundtrip_retrieve_chunks(backend_config, mock_backend_chunks):
     """Test Step 3: Retrieve chunks from backend resource"""
     urn = "urn:report-analyst:backend:localhost:8000:test-resource-1"
 
@@ -157,9 +149,7 @@ def test_full_roundtrip_retrieve_chunks(
         assert chunks[1]["chunk_text"] == mock_backend_chunks[1]["chunk_text"]
 
 
-def test_full_roundtrip_analyzer_with_backend_chunks(
-    temp_dir, backend_config, mock_backend_chunks
-):
+def test_full_roundtrip_analyzer_with_backend_chunks(temp_dir, backend_config, mock_backend_chunks):
     """Test Step 4: Use backend chunks in analyzer"""
     # Create cache manager
     cache_path = temp_dir / "cache"
@@ -176,6 +166,7 @@ def test_full_roundtrip_analyzer_with_backend_chunks(
 
     # Convert backend chunks to analyzer format with mock embeddings
     import numpy as np
+
     backend_chunks = [
         {
             "chunk_id": "chunk-1",
@@ -238,6 +229,7 @@ def test_full_roundtrip_cache_compatibility(temp_dir, backend_config):
 
     # Create test chunks with mock embeddings (required by cache manager)
     import numpy as np
+
     test_chunks = [
         {
             "text": "Test chunk 1",
@@ -288,9 +280,7 @@ def test_full_roundtrip_cache_compatibility(temp_dir, backend_config):
     assert urn_cached[0]["text"] == test_chunks[0]["text"]
 
 
-def test_full_roundtrip_combined_local_and_backend(
-    temp_dir, backend_config, mock_backend_resources
-):
+def test_full_roundtrip_combined_local_and_backend(temp_dir, backend_config, mock_backend_resources):
     """Test combined listing of local and backend resources"""
     # Create local PDF
     test_pdf = temp_dir / "local_report.pdf"
@@ -322,4 +312,3 @@ def test_full_roundtrip_combined_local_and_backend(
         # Verify sorting (most recent first)
         dates = [r.date for r in resources if r.date is not None]
         assert dates == sorted(dates, reverse=True)
-

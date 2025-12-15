@@ -135,9 +135,7 @@ class S3UploadService:
 
             # Simple NATS publish - reliable delivery
             message_data = json.dumps(control_message).encode()
-            logger.info(
-                f"🔍 Publishing {len(message_data)} bytes to subject: {subject}"
-            )
+            logger.info(f"🔍 Publishing {len(message_data)} bytes to subject: {subject}")
 
             try:
                 # Use JetStream publish (CLI --jetstream works)
@@ -245,7 +243,7 @@ class S3UploadService:
             # Since they're imported at module level, check the module reference
             # The test patches the module to None, so we check for that
             from report_analyst_search_backend import s3_upload_service
-            
+
             if s3_upload_service.boto3 is None or s3_upload_service.nats is None:
                 return False
 
@@ -259,9 +257,7 @@ class S3UploadService:
 
 
 # Convenience function for backward compatibility
-async def upload_pdf_via_s3_nats(
-    config: BackendConfig, file_bytes: bytes, filename: str
-) -> str:
+async def upload_pdf_via_s3_nats(config: BackendConfig, file_bytes: bytes, filename: str) -> str:
     """
     Convenience function to upload PDF via S3+NATS.
 

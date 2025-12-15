@@ -76,7 +76,7 @@ class AnalysisJob:
 class DocumentReadyProcessingConfig:
     """
     Configuration for automatic document.ready event processing.
-    
+
     Controls how document.ready events are handled:
     - Whether to pull chunks from backend or use provided chunks
     - Whether to run analysis
@@ -87,32 +87,34 @@ class DocumentReadyProcessingConfig:
     # Chunk retrieval strategy
     pull_chunks: bool = True
     """Whether to pull chunks from backend. If False, chunks must be provided in event."""
-    
+
     # Analysis configuration
     question_set: str = "tcfd"
     """Question set to use for analysis"""
-    
-    analysis_config: Dict[str, Any] = field(default_factory=lambda: {
-        "model": "gpt-4o-mini",
-        "temperature": 0.1,
-    })
+
+    analysis_config: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "model": "gpt-4o-mini",
+            "temperature": 0.1,
+        }
+    )
     """Analysis configuration (model, temperature, etc.)"""
-    
+
     # Result storage
     store_to_backend: bool = True
     """Whether to store analysis results back to backend"""
-    
+
     # Error handling
     ack_on_error: bool = True
     """Whether to acknowledge message even on error (prevents redelivery loops)"""
-    
+
     # Chunk retrieval options (when pull_chunks=True)
     chunk_retrieval_method: str = "search"  # "search" or "direct"
     """Method to retrieve chunks: 'search' uses /search/ endpoint, 'direct' uses /resources/{id}/chunks"""
-    
+
     max_chunks: Optional[int] = None
     """Maximum number of chunks to retrieve (None = no limit)"""
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         return {
@@ -151,14 +153,10 @@ class SearchBackendClient:
                                     {
                                         "id": chunk_data["chunk"]["id"],
                                         "text": chunk_data["chunk"]["chunk_text"],
-                                        "metadata": chunk_data["chunk"][
-                                            "chunk_metadata"
-                                        ],
+                                        "metadata": chunk_data["chunk"]["chunk_metadata"],
                                     }
                                 )
-                    logger.info(
-                        f"Retrieved {len(chunks)} chunks for resource {resource_id}"
-                    )
+                    logger.info(f"Retrieved {len(chunks)} chunks for resource {resource_id}")
                     return chunks
                 else:
                     raise Exception(f"Failed to get chunks: {response.status}")
@@ -199,9 +197,7 @@ class NATSJobCoordinator:
             logger.info("Disconnected from NATS")
 
     # For Search Backend to publish when PDF processing is complete
-    async def publish_document_ready(
-        self, resource_id: str, document_url: str, chunks_count: int
-    ):
+    async def publish_document_ready(self, resource_id: str, document_url: str, chunks_count: int):
         """Publish document ready event (called from search backend)"""
         event = DocumentReadyEvent(
             resource_id=resource_id,
@@ -210,16 +206,12 @@ class NATSJobCoordinator:
             status="ready",
         )
 
-        await self.js.publish(
-            "document.ready", json.dumps(asdict(event), default=str).encode()
-        )
+        await self.js.publish("document.ready", json.dumps(asdict(event), default=str).encode())
 
         logger.info(f"Published document ready event for resource {resource_id}")
 
     # For Clients to request analysis
-    async def submit_analysis_job(
-        self, resource_id: str, question_set: str, analysis_config: Dict[str, Any]
-    ) -> str:
+    async def submit_analysis_job(self, resource_id: str, question_set: str, analysis_config: Dict[str, Any]) -> str:
         """Submit analysis job for a resource that's already processed"""
         job_id = str(uuid.uuid4())
         job = AnalysisJob(
@@ -230,9 +222,7 @@ class NATSJobCoordinator:
         )
 
         # Send job to NATS
-        await self.js.publish(
-            "analysis.job.submit", json.dumps(asdict(job), default=str).encode()
-        )
+        await self.js.publish("analysis.job.submit", json.dumps(asdict(job), default=str).encode())
 
         logger.info(f"Submitted analysis job {job_id} for resource {resource_id}")
         return job_id
@@ -265,12 +255,8 @@ class NATSJobCoordinator:
         if config is None:
             config = DocumentReadyProcessingConfig()
 
-        await self.js.subscribe(
-            "document.ready", cb=lambda msg: self._handle_document_ready(msg, config)
-        )
-        logger.info(
-            f"Started processing document.ready events from NATS with config: {config.to_dict()}"
-        )
+        await self.js.subscribe("document.ready", cb=lambda msg: self._handle_document_ready(msg, config))
+        logger.info(f"Started processing document.ready events from NATS with config: {config.to_dict()}")
 
         # Keep processing
         try:
@@ -314,32 +300,22 @@ class NATSJobCoordinator:
                     chunks = event.chunks
                     logger.info(f"Using {len(chunks)} chunks provided in event")
                 else:
-                    logger.warning(
-                        f"No chunks provided and pull_chunks=False for resource {event.resource_id}"
-                    )
+                    logger.warning(f"No chunks provided and pull_chunks=False for resource {event.resource_id}")
                     if config.ack_on_error:
                         await msg.ack()
                     return
 
             # Step 2: Run analysis
             logger.info(f"Running analysis for resource {event.resource_id}")
-            analysis_result = await self._run_analysis(
-                chunks, config.question_set, config.analysis_config
-            )
+            analysis_result = await self._run_analysis(chunks, config.question_set, config.analysis_config)
 
             # Step 3: Store results back to backend (if configured)
             if config.store_to_backend:
-                logger.info(
-                    f"Storing analysis results back to backend for resource {event.resource_id}"
-                )
-                await self._store_analysis_to_backend(
-                    event.resource_id, analysis_result, config.question_set
-                )
+                logger.info(f"Storing analysis results back to backend for resource {event.resource_id}")
+                await self._store_analysis_to_backend(event.resource_id, analysis_result, config.question_set)
 
             await msg.ack()
-            logger.info(
-                f"Successfully processed document.ready for resource {event.resource_id}"
-            )
+            logger.info(f"Successfully processed document.ready for resource {event.resource_id}")
 
         except Exception as e:
             logger.error(f"Error processing document.ready event: {e}", exc_info=True)
@@ -354,12 +330,12 @@ class NATSJobCoordinator:
     ) -> List[Dict[str, Any]]:
         """
         Get chunks for a resource using specified method.
-        
+
         Args:
             resource_id: Resource ID
             method: "search" (use /search/ endpoint) or "direct" (use /resources/{id}/chunks)
             max_chunks: Maximum number of chunks to return (None = no limit)
-        
+
         Returns:
             List of chunk dictionaries
         """
@@ -367,9 +343,7 @@ class NATSJobCoordinator:
             # Try direct endpoint first
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        f"{self.search_backend.base_url}/resources/{resource_id}/chunks"
-                    ) as response:
+                    async with session.get(f"{self.search_backend.base_url}/resources/{resource_id}/chunks") as response:
                         if response.status == 200:
                             data = await response.json()
                             chunks = data.get("chunks", [])
@@ -377,9 +351,7 @@ class NATSJobCoordinator:
                                 chunks = chunks[:max_chunks]
                             return chunks
             except Exception as e:
-                logger.warning(
-                    f"Direct chunk retrieval failed for {resource_id}, falling back to search: {e}"
-                )
+                logger.warning(f"Direct chunk retrieval failed for {resource_id}, falling back to search: {e}")
 
         # Default: use search endpoint (existing method)
         chunks = await self.search_backend.get_resource_chunks(resource_id)
@@ -397,13 +369,12 @@ class NATSJobCoordinator:
         try:
             # Use BackendService to store results (synchronous, so run in executor)
             import asyncio
+
             from report_analyst_search_backend.backend_service import BackendService
             from report_analyst_search_backend.config import BackendConfig
 
             # Create BackendService from the base_url
-            config = BackendConfig(
-                use_backend=True, backend_url=self.search_backend.base_url
-            )
+            config = BackendConfig(use_backend=True, backend_url=self.search_backend.base_url)
             backend_service = BackendService(config)
 
             # Run synchronous store_analysis_results in executor
@@ -418,13 +389,9 @@ class NATSJobCoordinator:
             )
 
             if result_id:
-                logger.info(
-                    f"Stored analysis results for resource {resource_id}: {result_id}"
-                )
+                logger.info(f"Stored analysis results for resource {resource_id}: {result_id}")
             else:
-                logger.warning(
-                    f"Failed to store analysis results for resource {resource_id}"
-                )
+                logger.warning(f"Failed to store analysis results for resource {resource_id}")
 
         except Exception as e:
             logger.error(f"Error storing analysis to backend: {e}")
@@ -435,26 +402,20 @@ class NATSJobCoordinator:
             job_data = json.loads(msg.data.decode())
             job = AnalysisJob(**job_data)
 
-            logger.info(
-                f"Processing analysis job {job.id} for resource {job.resource_id}"
-            )
+            logger.info(f"Processing analysis job {job.id} for resource {job.resource_id}")
 
             # Update job status
             job.status = JobStatus.PROCESSING
             job.updated_at = datetime.utcnow()
 
             # Send status update
-            await self.js.publish(
-                "analysis.job.status", json.dumps(asdict(job), default=str).encode()
-            )
+            await self.js.publish("analysis.job.status", json.dumps(asdict(job), default=str).encode())
 
             # Get chunks from search backend (already processed)
             chunks = await self.search_backend.get_resource_chunks(job.resource_id)
 
             # Run analysis using report analyst toolkit
-            analysis_result = await self._run_analysis(
-                chunks, job.question_set, job.analysis_config
-            )
+            analysis_result = await self._run_analysis(chunks, job.question_set, job.analysis_config)
 
             # Complete job
             job.status = JobStatus.COMPLETED
@@ -467,9 +428,7 @@ class NATSJobCoordinator:
             job.updated_at = datetime.utcnow()
 
             # Send completion notification
-            await self.js.publish(
-                "analysis.job.completed", json.dumps(asdict(job), default=str).encode()
-            )
+            await self.js.publish("analysis.job.completed", json.dumps(asdict(job), default=str).encode())
 
             await msg.ack()
             logger.info(f"Analysis job {job.id} completed successfully")
@@ -482,15 +441,11 @@ class NATSJobCoordinator:
             job.error = str(e)
             job.updated_at = datetime.utcnow()
 
-            await self.js.publish(
-                "analysis.job.failed", json.dumps(asdict(job), default=str).encode()
-            )
+            await self.js.publish("analysis.job.failed", json.dumps(asdict(job), default=str).encode())
 
             await msg.ack()
 
-    async def _run_analysis(
-        self, chunks: List[Dict[str, Any]], question_set: str, config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _run_analysis(self, chunks: List[Dict[str, Any]], question_set: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Run the actual analysis using report analyst toolkit"""
         # Import here to avoid circular imports
         from .analysis_toolkit import analyze_document_with_chunks
@@ -498,14 +453,10 @@ class NATSJobCoordinator:
         # Convert chunks to the format expected by analysis toolkit
         formatted_chunks = []
         for chunk in chunks:
-            formatted_chunks.append(
-                {"text": chunk["text"], "metadata": chunk["metadata"]}
-            )
+            formatted_chunks.append({"text": chunk["text"], "metadata": chunk["metadata"]})
 
         # Run analysis
-        result = await analyze_document_with_chunks(
-            chunks=formatted_chunks, question_set=question_set, config=config
-        )
+        result = await analyze_document_with_chunks(chunks=formatted_chunks, question_set=question_set, config=config)
 
         return result
 
@@ -523,13 +474,9 @@ class NATSSearchBackendPublisher:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.coordinator.disconnect()
 
-    async def notify_document_ready(
-        self, resource_id: str, document_url: str, chunks_count: int
-    ):
+    async def notify_document_ready(self, resource_id: str, document_url: str, chunks_count: int):
         """Notify that document processing is complete"""
-        await self.coordinator.publish_document_ready(
-            resource_id, document_url, chunks_count
-        )
+        await self.coordinator.publish_document_ready(resource_id, document_url, chunks_count)
 
 
 class NATSAnalysisWorker:
@@ -559,32 +506,20 @@ class NATSAnalysisClient:
     async def __aenter__(self):
         await self.coordinator.connect()
         # Subscribe to job results
-        await self.coordinator.js.subscribe(
-            "analysis.job.completed", cb=self._handle_completed
-        )
-        await self.coordinator.js.subscribe(
-            "analysis.job.failed", cb=self._handle_failed
-        )
-        await self.coordinator.js.subscribe(
-            "analysis.job.status", cb=self._handle_status
-        )
+        await self.coordinator.js.subscribe("analysis.job.completed", cb=self._handle_completed)
+        await self.coordinator.js.subscribe("analysis.job.failed", cb=self._handle_failed)
+        await self.coordinator.js.subscribe("analysis.job.status", cb=self._handle_status)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.coordinator.disconnect()
 
-    async def analyze_resource(
-        self, resource_id: str, question_set: str, analysis_config: Dict[str, Any]
-    ) -> str:
+    async def analyze_resource(self, resource_id: str, question_set: str, analysis_config: Dict[str, Any]) -> str:
         """Submit analysis job for a resource that's already processed"""
-        job_id = await self.coordinator.submit_analysis_job(
-            resource_id, question_set, analysis_config
-        )
+        job_id = await self.coordinator.submit_analysis_job(resource_id, question_set, analysis_config)
         return job_id
 
-    async def wait_for_completion(
-        self, job_id: str, timeout: int = 300
-    ) -> Dict[str, Any]:
+    async def wait_for_completion(self, job_id: str, timeout: int = 300) -> Dict[str, Any]:
         """Wait for job completion"""
         start_time = datetime.utcnow()
 
@@ -595,9 +530,7 @@ class NATSAnalysisClient:
                     return result
 
             if (datetime.utcnow() - start_time).seconds > timeout:
-                raise TimeoutError(
-                    f"Job {job_id} did not complete within {timeout} seconds"
-                )
+                raise TimeoutError(f"Job {job_id} did not complete within {timeout} seconds")
 
             await asyncio.sleep(2)
 

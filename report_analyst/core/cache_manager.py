@@ -47,7 +47,7 @@ class CacheManager:
         # Initialize database manager
         self.db_manager = DatabaseManager(db_url)
         logger.info(f"Initializing CacheManager with database: {self.db_manager._mask_url(db_url)}")
-        
+
         # Check if we should use Alembic migrations instead of auto-creation
         use_alembic = os.getenv("USE_ALEMBIC_MIGRATIONS", "false").lower() == "true"
         if use_alembic and self.db_manager.is_postgres():
@@ -65,7 +65,7 @@ class CacheManager:
             engine = self.db_manager.get_engine()
             # Create all tables
             metadata.create_all(engine)
-            
+
             # Create indexes (using raw SQL for IF NOT EXISTS support)
             # Note: Some databases may not support IF NOT EXISTS in CREATE INDEX
             # We'll try to create them and ignore errors if they already exist
@@ -77,7 +77,7 @@ class CacheManager:
                         # Index might already exist, which is fine
                         logger.debug(f"Index creation (may already exist): {e}")
                 conn.commit()
-            
+
             logger.info("Database schema initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing database schema: {str(e)}", exc_info=True)
@@ -113,9 +113,7 @@ class CacheManager:
             )
             self.current_file_path = file_path
 
-            logger.info(
-                f"Loaded {len(documents)} chunks into vector store for {file_path}"
-            )
+            logger.info(f"Loaded {len(documents)} chunks into vector store for {file_path}")
 
         except Exception as e:
             logger.error(f"Error loading vector store: {str(e)}", exc_info=True)
@@ -155,9 +153,7 @@ class CacheManager:
             for node in nodes:
                 # Ensure we have a valid similarity score
                 similarity_score = (
-                    node.score
-                    if hasattr(node, "score")
-                    else node.get_score() if hasattr(node, "get_score") else 0.0
+                    node.score if hasattr(node, "score") else node.get_score() if hasattr(node, "get_score") else 0.0
                 )
 
                 chunk = {
@@ -169,9 +165,7 @@ class CacheManager:
                     "similarity_score": similarity_score,  # Also store as 'similarity_score' for backward compatibility
                 }
                 chunks.append(chunk)
-                logger.debug(
-                    f"Found chunk with similarity score: {similarity_score:.4f}"
-                )
+                logger.debug(f"Found chunk with similarity score: {similarity_score:.4f}")
 
             logger.info(f"Retrieved {len(chunks)} similar chunks for {file_path}")
             if chunks:
@@ -185,9 +179,7 @@ class CacheManager:
             logger.error(f"Error getting similar chunks: {str(e)}", exc_info=True)
             return []
 
-    def save_analysis(
-        self, file_path: str, question_id: str, result: Dict, config: Dict
-    ):
+    def save_analysis(self, file_path: str, question_id: str, result: Dict, config: Dict):
         """Save analysis result to cache with improved logging"""
         try:
             logger.info(f"Saving analysis for {file_path} - {question_id}")
@@ -198,14 +190,14 @@ class CacheManager:
 
             with self.db_manager.get_connection() as conn:
                 # Ensure question exists in questions table
-                logger.info(
-                    f"Ensuring question {question_id} exists in questions table"
-                )
+                logger.info(f"Ensuring question {question_id} exists in questions table")
                 result_obj = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id FROM questions 
                         WHERE question_id = :question_id AND question_set = :question_set
-                    """),
+                    """
+                    ),
                     {"question_id": question_id, "question_set": question_set},
                 )
                 row = result_obj.fetchone()
@@ -218,14 +210,16 @@ class CacheManager:
                     if self.db_manager.is_postgres():
                         # PostgreSQL: ON CONFLICT
                         result_obj = conn.execute(
-                            text("""
+                            text(
+                                """
                                 INSERT INTO questions (question_id, question_set, question_text, guidelines)
                                 VALUES (:question_id, :question_set, :question_text, :guidelines)
                                 ON CONFLICT (question_id, question_set) DO UPDATE
                                 SET question_text = EXCLUDED.question_text,
                                     guidelines = EXCLUDED.guidelines
                                 RETURNING id
-                            """),
+                            """
+                            ),
                             {
                                 "question_id": question_id,
                                 "question_set": question_set,
@@ -236,10 +230,12 @@ class CacheManager:
                     else:
                         # SQLite: INSERT OR REPLACE
                         result_obj = conn.execute(
-                            text("""
+                            text(
+                                """
                                 INSERT OR REPLACE INTO questions (question_id, question_set, question_text, guidelines)
                                 VALUES (:question_id, :question_set, :question_text, :guidelines)
-                            """),
+                            """
+                            ),
                             {
                                 "question_id": question_id,
                                 "question_set": question_set,
@@ -259,7 +255,8 @@ class CacheManager:
                 logger.info("Saving main analysis result")
                 if self.db_manager.is_postgres():
                     result_obj = conn.execute(
-                        text("""
+                        text(
+                            """
                             INSERT INTO question_analysis
                             (file_path, question_id, model, top_k, analysis_result, version, created_at)
                             VALUES (:file_path, :question_id, :model, :top_k, :analysis_result, :version, :created_at)
@@ -267,7 +264,8 @@ class CacheManager:
                             SET analysis_result = EXCLUDED.analysis_result,
                                 created_at = EXCLUDED.created_at
                             RETURNING id
-                        """),
+                        """
+                        ),
                         {
                             "file_path": str(file_path),
                             "question_id": question_db_id,
@@ -280,11 +278,13 @@ class CacheManager:
                     )
                 else:
                     result_obj = conn.execute(
-                        text("""
+                        text(
+                            """
                             INSERT OR REPLACE INTO question_analysis
                             (file_path, question_id, model, top_k, analysis_result, version, created_at)
                             VALUES (:file_path, :question_id, :model, :top_k, :analysis_result, :version, :created_at)
-                        """),
+                        """
+                        ),
                         {
                             "file_path": str(file_path),
                             "question_id": question_db_id,
@@ -297,11 +297,13 @@ class CacheManager:
                     )
                     # Get ID separately for SQLite
                     result_obj = conn.execute(
-                        text("""
+                        text(
+                            """
                             SELECT id FROM question_analysis
                             WHERE file_path = :file_path AND question_id = :question_id
                             AND model = :model AND top_k = :top_k AND version = :version
-                        """),
+                        """
+                        ),
                         {
                             "file_path": str(file_path),
                             "question_id": question_db_id,
@@ -315,18 +317,18 @@ class CacheManager:
 
                 # Save chunk relevance information
                 if "chunks" in result:
-                    logger.info(
-                        f"Processing {len(result['chunks'])} chunks for relevance"
-                    )
+                    logger.info(f"Processing {len(result['chunks'])} chunks for relevance")
                     for chunk in result["chunks"]:
                         logger.debug(f"Processing chunk: {json.dumps(chunk, indent=2)}")
 
                         # Get chunk ID from document_chunks table
                         result_obj = conn.execute(
-                            text("""
+                            text(
+                                """
                                 SELECT id FROM document_chunks 
                                 WHERE file_path = :file_path AND chunk_text = :chunk_text
-                            """),
+                            """
+                            ),
                             {"file_path": str(file_path), "chunk_text": chunk["text"]},
                         )
                         row = result_obj.fetchone()
@@ -337,7 +339,8 @@ class CacheManager:
                             # Save chunk relevance with all available information
                             if self.db_manager.is_postgres():
                                 conn.execute(
-                                    text("""
+                                    text(
+                                        """
                                         INSERT INTO chunk_relevance
                                         (question_analysis_id, document_chunk_id, chunk_order,
                                          similarity_score, llm_score, is_evidence, evidence_order, metadata)
@@ -350,7 +353,8 @@ class CacheManager:
                                             is_evidence = EXCLUDED.is_evidence,
                                             evidence_order = EXCLUDED.evidence_order,
                                             metadata = EXCLUDED.metadata
-                                    """),
+                                    """
+                                    ),
                                     {
                                         "question_analysis_id": analysis_id,
                                         "document_chunk_id": chunk_id,
@@ -364,13 +368,15 @@ class CacheManager:
                                 )
                             else:
                                 conn.execute(
-                                    text("""
+                                    text(
+                                        """
                                         INSERT OR REPLACE INTO chunk_relevance
                                         (question_analysis_id, document_chunk_id, chunk_order,
                                          similarity_score, llm_score, is_evidence, evidence_order, metadata)
                                         VALUES (:question_analysis_id, :document_chunk_id, :chunk_order,
                                                 :similarity_score, :llm_score, :is_evidence, :evidence_order, :metadata)
-                                    """),
+                                    """
+                                    ),
                                     {
                                         "question_analysis_id": analysis_id,
                                         "document_chunk_id": chunk_id,
@@ -386,15 +392,14 @@ class CacheManager:
                                 f"Saving raw values to DB - similarity_score: {chunk.get('similarity_score')}, llm_score: {chunk.get('llm_score')}, is_evidence: {chunk.get('is_evidence')}"
                             )
                         else:
-                            logger.warning(
-                                f"Could not find chunk in document_chunks table"
-                            )
+                            logger.warning(f"Could not find chunk in document_chunks table")
 
                 # Save to analysis cache
                 logger.info("Saving to analysis cache")
                 if self.db_manager.is_postgres():
                     conn.execute(
-                        text("""
+                        text(
+                            """
                             INSERT INTO analysis_cache
                             (file_path, question_id, chunk_size, chunk_overlap, top_k,
                              model, question_set, result, created_at)
@@ -403,7 +408,8 @@ class CacheManager:
                             ON CONFLICT (file_path, question_id, chunk_size, chunk_overlap, top_k, model, question_set) DO UPDATE
                             SET result = EXCLUDED.result,
                                 created_at = EXCLUDED.created_at
-                        """),
+                        """
+                        ),
                         {
                             "file_path": str(file_path),
                             "question_id": question_id,
@@ -418,13 +424,15 @@ class CacheManager:
                     )
                 else:
                     conn.execute(
-                        text("""
+                        text(
+                            """
                             INSERT OR REPLACE INTO analysis_cache
                             (file_path, question_id, chunk_size, chunk_overlap, top_k,
                              model, question_set, result, created_at)
                             VALUES (:file_path, :question_id, :chunk_size, :chunk_overlap, :top_k,
                                     :model, :question_set, :result, :created_at)
-                        """),
+                        """
+                        ),
                         {
                             "file_path": str(file_path),
                             "question_id": question_id,
@@ -444,9 +452,7 @@ class CacheManager:
             logger.error(f"Error saving analysis: {str(e)}", exc_info=True)
             raise
 
-    def get_analysis(
-        self, file_path: str, config: Dict, question_ids: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+    def get_analysis(self, file_path: str, config: Dict, question_ids: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Get analysis results matching the exact configuration.
 
@@ -472,9 +478,7 @@ class CacheManager:
                     "s4m": "s4m",
                     "lucia": "lucia",
                 }
-                db_question_set = question_set_mapping.get(
-                    config["question_set"], config["question_set"]
-                )
+                db_question_set = question_set_mapping.get(config["question_set"], config["question_set"])
 
                 # First get the analysis results from the cache table
                 query = """
@@ -582,12 +586,8 @@ class CacheManager:
 
                     # Sort chunks by their order
                     for question_id in results:
-                        results[question_id]["chunks"].sort(
-                            key=lambda x: x["chunk_order"]
-                        )
-                        logger.info(
-                            f"Question {question_id}: {len(results[question_id]['chunks'])} chunks"
-                        )
+                        results[question_id]["chunks"].sort(key=lambda x: x["chunk_order"])
+                        logger.info(f"Question {question_id}: {len(results[question_id]['chunks'])} chunks")
                         if results[question_id]["chunks"]:
                             logger.info(
                                 f"  Similarity range: {min(c['similarity_score'] for c in results[question_id]['chunks']):.4f} - {max(c['similarity_score'] for c in results[question_id]['chunks']):.4f}"
@@ -606,9 +606,7 @@ class CacheManager:
 
             # Get chunk parameters from first chunk's metadata
             chunk_size = chunks[0]["metadata"].get("chunk_size", 0) if chunks else 0
-            chunk_overlap = (
-                chunks[0]["metadata"].get("chunk_overlap", 0) if chunks else 0
-            )
+            chunk_overlap = chunks[0]["metadata"].get("chunk_overlap", 0) if chunks else 0
             logger.info(f"Chunk parameters: size={chunk_size}, overlap={chunk_overlap}")
 
             with self.db_manager.get_connection() as conn:
@@ -629,19 +627,19 @@ class CacheManager:
                         metadata_with_shape["embedding_dtype"] = str(embedding.dtype)
 
                         # Prepare chunk data
-                        chunk_data.append({
-                            "file_path": file_path,
-                            "chunk_text": chunk["text"],
-                            "chunk_size": chunk_size,
-                            "chunk_overlap": chunk_overlap,
-                            "embedding": embedding_bytes,
-                            "metadata": json.dumps(metadata_with_shape),
-                            "created_at": datetime.now().isoformat(),
-                        })
-                    except Exception as e:
-                        logger.warning(
-                            f"Error preparing chunk {i} for storage: {str(e)}"
+                        chunk_data.append(
+                            {
+                                "file_path": file_path,
+                                "chunk_text": chunk["text"],
+                                "chunk_size": chunk_size,
+                                "chunk_overlap": chunk_overlap,
+                                "embedding": embedding_bytes,
+                                "metadata": json.dumps(metadata_with_shape),
+                                "created_at": datetime.now().isoformat(),
+                            }
                         )
+                    except Exception as e:
+                        logger.warning(f"Error preparing chunk {i} for storage: {str(e)}")
                         continue
 
                 if chunk_data:
@@ -650,7 +648,8 @@ class CacheManager:
                         # PostgreSQL: ON CONFLICT
                         for chunk_row in chunk_data:
                             conn.execute(
-                                text("""
+                                text(
+                                    """
                                     INSERT INTO document_chunks
                                     (file_path, chunk_text, chunk_size, chunk_overlap,
                                      embedding, metadata, created_at)
@@ -660,26 +659,27 @@ class CacheManager:
                                     SET embedding = EXCLUDED.embedding,
                                         metadata = EXCLUDED.metadata,
                                         created_at = EXCLUDED.created_at
-                                """),
+                                """
+                                ),
                                 chunk_row,
                             )
                     else:
                         # SQLite: INSERT OR REPLACE
                         for chunk_row in chunk_data:
                             conn.execute(
-                                text("""
+                                text(
+                                    """
                                     INSERT OR REPLACE INTO document_chunks
                                     (file_path, chunk_text, chunk_size, chunk_overlap,
                                      embedding, metadata, created_at)
                                     VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap,
                                             :embedding, :metadata, :created_at)
-                                """),
+                                """
+                                ),
                                 chunk_row,
                             )
 
-                    logger.info(
-                        f"Successfully saved all {len(chunk_data)} chunks to database"
-                    )
+                    logger.info(f"Successfully saved all {len(chunk_data)} chunks to database")
 
                     # Verify the insertion
                     result_obj = conn.execute(
@@ -687,9 +687,7 @@ class CacheManager:
                         {"file_path": file_path},
                     )
                     count = result_obj.fetchone()[0]
-                    logger.info(
-                        f"Verification: Found {count} chunks in database for {file_path}"
-                    )
+                    logger.info(f"Verification: Found {count} chunks in database for {file_path}")
                 else:
                     logger.warning("No valid chunks to save")
 
@@ -702,11 +700,13 @@ class CacheManager:
         try:
             with self.db_manager.get_connection() as conn:
                 result_obj = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT chunk_text, embedding, metadata
                         FROM document_chunks
                         WHERE file_path = :file_path
-                    """),
+                    """
+                    ),
                     {"file_path": str(file_path)},
                 )
                 chunks = []
@@ -722,9 +722,7 @@ class CacheManager:
                             dtype = metadata_dict.get("embedding_dtype", "float32")
 
                             if shape:
-                                embedding = np.frombuffer(row[1], dtype=dtype).reshape(
-                                    shape
-                                )
+                                embedding = np.frombuffer(row[1], dtype=dtype).reshape(shape)
                             else:
                                 # Fallback to default shape if not stored
                                 embedding = np.frombuffer(row[1], dtype=np.float32)
@@ -734,9 +732,7 @@ class CacheManager:
 
                     # Remove embedding metadata from the returned metadata
                     clean_metadata = {
-                        k: v
-                        for k, v in metadata_dict.items()
-                        if k not in ["embedding_shape", "embedding_dtype"]
+                        k: v for k, v in metadata_dict.items() if k not in ["embedding_shape", "embedding_dtype"]
                     }
 
                     chunks.append(
@@ -780,20 +776,24 @@ class CacheManager:
                 if file_path:
                     logger.info(f"Checking cache for file: {file_path}")
                     result_obj = conn.execute(
-                        text("""
+                        text(
+                            """
                             SELECT DISTINCT chunk_size, chunk_overlap, top_k, model, question_set
                             FROM analysis_cache
                             WHERE file_path = :file_path
-                        """),
+                        """
+                        ),
                         {"file_path": str(file_path)},
                     )
                 else:
                     logger.info("Checking all cache entries")
                     result_obj = conn.execute(
-                        text("""
+                        text(
+                            """
                             SELECT DISTINCT file_path, chunk_size, chunk_overlap, top_k, model, question_set
                             FROM analysis_cache
-                        """)
+                        """
+                        )
                     )
 
                 rows = result_obj.fetchall()
@@ -813,7 +813,8 @@ class CacheManager:
             with self.db_manager.get_connection() as conn:
                 # First get all analysis results
                 result_obj = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT ac.question_id, ac.result,
                                dc.chunk_text, dc.metadata as chunk_metadata,
                                cr.chunk_order, cr.similarity_score,
@@ -826,7 +827,8 @@ class CacheManager:
                         LEFT JOIN document_chunks dc ON cr.document_chunk_id = dc.id
                         WHERE ac.question_set = :question_set
                         ORDER BY ac.question_id, cr.chunk_order
-                    """),
+                    """
+                    ),
                     {"question_set": question_set},
                 )
 
@@ -862,21 +864,15 @@ class CacheManager:
 
                 # Sort chunks by their order for each result
                 for question_id in results:
-                    results[question_id]["chunks"].sort(
-                        key=lambda x: x.get("chunk_order", 0)
-                    )
+                    results[question_id]["chunks"].sort(key=lambda x: x.get("chunk_order", 0))
 
                 return results
 
         except Exception as e:
-            logger.error(
-                f"Error retrieving answers for question set {question_set}: {e}"
-            )
+            logger.error(f"Error retrieving answers for question set {question_set}: {e}")
             raise
 
-    def save_document_chunks(
-        self, file_path: str, chunks: List[Dict], chunk_size: int, chunk_overlap: int
-    ) -> None:
+    def save_document_chunks(self, file_path: str, chunks: List[Dict], chunk_size: int, chunk_overlap: int) -> None:
         """Save document chunks to cache with their embeddings."""
         try:
             logger.info(f"Starting to save {len(chunks)} chunks for {file_path}")
@@ -900,7 +896,8 @@ class CacheManager:
 
                     if self.db_manager.is_postgres():
                         conn.execute(
-                            text("""
+                            text(
+                                """
                                 INSERT INTO document_chunks
                                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                                 VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
@@ -908,7 +905,8 @@ class CacheManager:
                                 SET embedding = EXCLUDED.embedding,
                                     metadata = EXCLUDED.metadata,
                                     created_at = EXCLUDED.created_at
-                            """),
+                            """
+                            ),
                             {
                                 "file_path": str(file_path),
                                 "chunk_text": chunk["text"],
@@ -921,11 +919,13 @@ class CacheManager:
                         )
                     else:
                         conn.execute(
-                            text("""
+                            text(
+                                """
                                 INSERT OR REPLACE INTO document_chunks
                                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                                 VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
-                            """),
+                            """
+                            ),
                             {
                                 "file_path": str(file_path),
                                 "chunk_text": chunk["text"],
@@ -941,10 +941,12 @@ class CacheManager:
 
                 # Verify chunks were saved
                 result_obj = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(*) FROM document_chunks 
                         WHERE file_path = :file_path AND chunk_size = :chunk_size AND chunk_overlap = :chunk_overlap
-                    """),
+                    """
+                    ),
                     {
                         "file_path": str(file_path),
                         "chunk_size": chunk_size,
@@ -952,25 +954,19 @@ class CacheManager:
                     },
                 )
                 count = result_obj.fetchone()[0]
-                logger.info(
-                    f"Verification: Found {count} chunks in database for {file_path}"
-                )
+                logger.info(f"Verification: Found {count} chunks in database for {file_path}")
 
         except Exception as e:
             logger.error(f"Error saving document chunks: {str(e)}", exc_info=True)
             raise
 
-    def get_document_chunks(
-        self, file_path: str, chunk_size: int = None, chunk_overlap: int = None
-    ) -> List[Dict]:
+    def get_document_chunks(self, file_path: str, chunk_size: int = None, chunk_overlap: int = None) -> List[Dict]:
         """
         Get document chunks from cache with improved logging.
         """
         try:
             logger.info(f"Retrieving chunks for {file_path}")
-            logger.info(
-                f"Filters: chunk_size={chunk_size}, chunk_overlap={chunk_overlap}"
-            )
+            logger.info(f"Filters: chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
 
             with self.db_manager.get_connection() as conn:
                 query = """
@@ -1012,9 +1008,7 @@ class CacheManager:
                     embedding = None
                     if embedding_bytes:
                         embedding = np.frombuffer(embedding_bytes, dtype=np.float32)
-                        logger.debug(
-                            f"Converted embedding bytes to numpy array, shape: {embedding.shape}"
-                        )
+                        logger.debug(f"Converted embedding bytes to numpy array, shape: {embedding.shape}")
                     else:
                         logger.debug("No embedding found for chunk")
 
@@ -1022,9 +1016,7 @@ class CacheManager:
                     metadata = {}
                     if metadata_json:
                         metadata = json.loads(metadata_json)
-                        logger.debug(
-                            f"Parsed metadata: {json.dumps(metadata, indent=2)}"
-                        )
+                        logger.debug(f"Parsed metadata: {json.dumps(metadata, indent=2)}")
 
                     chunks.append(
                         {
@@ -1038,24 +1030,18 @@ class CacheManager:
                     )
 
                 logger.info(f"Retrieved {len(chunks)} chunks")
-                logger.debug(
-                    f"Chunks have embeddings: {sum(1 for c in chunks if c['embedding'] is not None)}/{len(chunks)}"
-                )
+                logger.debug(f"Chunks have embeddings: {sum(1 for c in chunks if c['embedding'] is not None)}/{len(chunks)}")
                 return chunks
 
         except Exception as e:
             logger.error(f"Error getting document chunks: {str(e)}", exc_info=True)
             return []
 
-    def get_chunks_without_embeddings(
-        self, file_path: str, chunk_size: int = None, chunk_overlap: int = None
-    ) -> List[Dict]:
+    def get_chunks_without_embeddings(self, file_path: str, chunk_size: int = None, chunk_overlap: int = None) -> List[Dict]:
         """Get chunks without embeddings (where embedding IS NULL)"""
         try:
             logger.info(f"Retrieving chunks without embeddings for {file_path}")
-            logger.info(
-                f"Filters: chunk_size={chunk_size}, chunk_overlap={chunk_overlap}"
-            )
+            logger.info(f"Filters: chunk_size={chunk_size}, chunk_overlap={chunk_overlap}")
 
             with self.db_manager.get_connection() as conn:
                 query = """
@@ -1103,9 +1089,7 @@ class CacheManager:
                 return chunks
 
         except Exception as e:
-            logger.error(
-                f"Error getting chunks without embeddings: {str(e)}", exc_info=True
-            )
+            logger.error(f"Error getting chunks without embeddings: {str(e)}", exc_info=True)
             return []
 
     def has_chunk_scoring(self, file_path: str, config: Dict) -> bool:
@@ -1113,13 +1097,15 @@ class CacheManager:
         try:
             with self.db_manager.get_connection() as conn:
                 result_obj = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(DISTINCT q.question_id)
                         FROM questions q
                         JOIN question_analysis qa ON qa.question_id = q.id
                         JOIN chunk_relevance cr ON cr.question_analysis_id = qa.id
                         WHERE qa.file_path = :file_path AND qa.model = :model AND qa.top_k = :top_k
-                    """),
+                    """
+                    ),
                     {
                         "file_path": str(file_path),
                         "model": config["model"],

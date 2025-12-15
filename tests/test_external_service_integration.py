@@ -14,8 +14,10 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+
 try:
     from aioresponses import aioresponses
+
     HAS_AIORESPONSES = True
 except ImportError:
     HAS_AIORESPONSES = False
@@ -42,9 +44,7 @@ def external_handler():
 @pytest.fixture
 def external_client():
     """Create external service client"""
-    return ExternalServiceClient(
-        base_url="http://localhost:8000", nats_url="nats://localhost:4222"
-    )
+    return ExternalServiceClient(base_url="http://localhost:8000", nats_url="nats://localhost:4222")
 
 
 @pytest.fixture
@@ -111,9 +111,7 @@ class TestExternalServiceHandler:
         external_handler.s3_client = mock_s3_client
 
         # Mock PyMuPDFReader
-        with patch(
-            "llama_index.readers.file.PyMuPDFReader"
-        ) as mock_reader:
+        with patch("llama_index.readers.file.PyMuPDFReader") as mock_reader:
             mock_doc = Mock()
             mock_doc.text = "Test PDF content"
             mock_doc.metadata = {}
@@ -121,9 +119,7 @@ class TestExternalServiceHandler:
             mock_reader_instance.load.return_value = [mock_doc]
             mock_reader.return_value = mock_reader_instance
 
-            result = await external_handler.handle_external_notification(
-                "service-x", notification
-            )
+            result = await external_handler.handle_external_notification("service-x", notification)
 
             assert isinstance(result, ProcessingResult)
             # Should process S3 URL (may fail if S3 client not initialized, but structure is correct)
@@ -138,9 +134,7 @@ class TestExternalServiceHandler:
             chunks=sample_chunks,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification, rechunk_mode="never"
-        )
+        result = await external_handler.handle_external_notification("service-x", notification, rechunk_mode="never")
 
         assert result.success
         assert result.chunks is not None
@@ -157,9 +151,7 @@ class TestExternalServiceHandler:
             pages=sample_pages,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification
-        )
+        result = await external_handler.handle_external_notification("service-x", notification)
 
         assert result.success
         assert result.chunks is not None
@@ -176,9 +168,7 @@ class TestExternalServiceHandler:
             chunks=sample_chunks,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification, rechunk_mode="never"
-        )
+        result = await external_handler.handle_external_notification("service-x", notification, rechunk_mode="never")
 
         assert result.success
         assert len(result.chunks) == 2
@@ -194,9 +184,7 @@ class TestExternalServiceHandler:
             chunks=sample_chunks,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification, rechunk_mode="auto"
-        )
+        result = await external_handler.handle_external_notification("service-x", notification, rechunk_mode="auto")
 
         assert result.success
         assert result.chunks is not None
@@ -338,7 +326,10 @@ class TestExternalServiceDelivery:
             service_id="service-x",
             request_id="req-123",
             external_request_id="ext-req-123",
-            results={"answers": [{"question_id": "q1", "answer": "test"}], "top_chunks": []},
+            results={
+                "answers": [{"question_id": "q1", "answer": "test"}],
+                "top_chunks": [],
+            },
             response_method="poll",
         )
 
@@ -384,9 +375,7 @@ class TestExternalServiceIntegration:
             chunks=sample_chunks,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification, rechunk_mode="never"
-        )
+        result = await external_handler.handle_external_notification("service-x", notification, rechunk_mode="never")
 
         assert result.success
         assert result.chunks is not None
@@ -419,4 +408,3 @@ class TestExternalServiceIntegration:
 
         assert not result2.success
         assert "S3 URL not provided" in result2.error
-
