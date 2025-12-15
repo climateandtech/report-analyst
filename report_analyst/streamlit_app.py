@@ -1639,6 +1639,25 @@ def main():
                 margin-right: 8px;
             }
             
+            /* Fix Material Icons rendering issues for Streamlit's stIconMaterial component */
+            [data-testid="stIconMaterial"] {
+                font-family: 'Material Icons' !important;
+                font-feature-settings: 'liga' !important;
+                -webkit-font-feature-settings: 'liga' !important;
+                font-weight: normal !important;
+                font-style: normal !important;
+                text-transform: none !important;
+                letter-spacing: normal !important;
+            }
+            
+            /* @font-face fallback for Material Icons */
+            @font-face {
+                font-family: 'Material Icons';
+                font-style: normal;
+                font-weight: 400;
+                src: url(https://fonts.gstatic.com/s/materialicons/v142/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2) format('woff2');
+            }
+            
             /* Add Material Icon to stAlert elements - only ONE icon per alert */
             /* Add icon only to the markdown container, NOT to paragraphs to avoid duplicates */
             [data-testid="stAlert"] [data-testid="stMarkdownContainer"]::before {
