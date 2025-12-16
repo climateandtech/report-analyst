@@ -19,6 +19,7 @@ from pandas.api.types import (
     is_numeric_dtype,
     is_object_dtype,
 )
+from streamlit_card import card
 
 # Add parent directory to path for backend integration
 current_dir = Path(__file__).parent
@@ -842,8 +843,17 @@ def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame,
         st.error(f"Error displaying results: {str(e)}")
 
 
-def display_consolidated_results(analyzer, question_set):
-    """Display consolidated results for all analyzed documents"""
+def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
+    """Display consolidated results for all analyzed documents
+
+    Args:
+        analyzer: ReportAnalyzer instance
+        question_set: Selected question set identifier
+        file_path: Optional file path. If provided, skip file selection and use this file.
+                   If None, will attempt to get file from cache (backward compatibility).
+        selected_config: Optional configuration dict. If provided, skip config selection and use this config.
+                        If None, will attempt to get config from cache (backward compatibility).
+    """
     try:
         # Create mapping from question set names to database identifiers
         question_set_mapping = {
@@ -1792,6 +1802,56 @@ def main():
             
             .st-key-file-display-panel [data-baseweb="select"] svg path,
             .st-key-file-display-panel [data-baseweb="select"] svg polygon {
+                stroke-width: 4 !important;
+                stroke: #1B9E6B !important;
+                fill: #1B9E6B !important;
+            }
+            
+            /* Question Set Display Panel - same styling as file display panel */
+            [data-testid="stVerticalBlock"].st-key-question-set-display-panel,
+            .st-key-question-set-display-panel[data-testid="stVerticalBlock"] {
+                background-color: #E8F5E9 !important;
+                border-radius: 12px !important;
+                padding: 1rem 1.5rem !important;
+                margin: 1rem 0 0.5rem 0 !important;
+            }
+            
+            .st-key-question-set-display-panel [data-testid="stHorizontalBlock"] {
+                background-color: transparent !important;
+            }
+            
+            .st-key-question-set-display-panel [data-testid="column"] {
+                background-color: transparent !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] {
+                min-width: 300px !important;
+                max-width: 500px !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] > div {
+                background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] div[value],
+            .st-key-question-set-display-panel [data-baseweb="select"] [class*="st-dn"],
+            .st-key-question-set-display-panel [data-baseweb="select"] > div > div > div[value],
+            .st-key-question-set-display-panel [data-baseweb="select"] > div > div > div[class*="st-dn"] {
+                font-size: 22px !important;
+                font-weight: 800 !important;
+                color: #1B9E6B !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] svg {
+                color: #1B9E6B !important;
+                width: 28px !important;
+                height: 28px !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] svg path,
+            .st-key-question-set-display-panel [data-baseweb="select"] svg polygon {
                 stroke-width: 4 !important;
                 stroke: #1B9E6B !important;
                 fill: #1B9E6B !important;
@@ -4063,21 +4123,221 @@ def main():
             st.header("View All Results")
             st.write("View and export consolidated results for all analyzed reports")
 
-            # Question set selection for consolidated view
-            selected_set = st.selectbox(
-                "Select Question Set",
-                options=list(question_sets.keys()),
-                format_func=lambda x: question_sets[x]["name"],
-                key="consolidated_set",
-            )
+            # Initialize selected_set from session state if available
+            if "consolidated_set" not in st.session_state:
+                st.session_state.consolidated_set = list(question_sets.keys())[0] if question_sets else None
 
+            # 1. Question set and report selectors side by side (green containers)
+            col1, col2 = st.columns([1, 1])
+
+            with col1:
+                # Question set selector in green container
+                with st.container(key="question-set-display-panel"):
+                    icon_col, content_col = st.columns([0.1, 0.9])
+
+                    with icon_col:
+                        st.markdown(
+                            """
+                        <div class="pdf-icon-box">
+                            <i class="material-icons">help_outline</i>
+                        </div>
+                        """,
+                            unsafe_allow_html=True,
+                        )
+
+                    with content_col:
+                        # Question set selector
+                        selected_set = st.selectbox(
+                            "Select Question Set",
+                            options=list(question_sets.keys()),
+                            format_func=lambda x: question_sets[x]["name"],
+                            key="consolidated_set",
+                            label_visibility="collapsed",
+                        )
+
+                        # Show question set description
+                        if selected_set and selected_set in question_sets:
+                            st.caption(question_sets[selected_set]["description"])
+
+            # Get file configs if question set is selected
+            file_configs = {}
             if selected_set:
-                # Show question set description (without info icon to avoid double icons)
-                if selected_set in question_sets:
-                    st.caption(question_sets[selected_set]["description"])
+                # Create mapping from question set names to database identifiers
+                question_set_mapping = {
+                    "tcfd": "tcfd",
+                    "s4m": "s4m",
+                    "lucia": "lucia",
+                    "everest": "ev",
+                }
 
-                # Only show consolidated results
-                display_consolidated_results(analyzer, selected_set)
+                # Get the database identifier for the selected question set
+                db_question_set = question_set_mapping.get(selected_set, selected_set)
+
+                # Get all available cache configurations
+                cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
+
+                # Group configurations by file for the selected question set
+                if cache_configs:
+                    for config in cache_configs:
+                        if len(config) == 6:
+                            file_path, chunk_size, chunk_overlap, top_k, model, qs = config
+                            if qs == db_question_set:
+                                if file_path not in file_configs:
+                                    file_configs[file_path] = []
+                                file_configs[file_path].append(
+                                    {
+                                        "chunk_size": chunk_size,
+                                        "chunk_overlap": chunk_overlap,
+                                        "top_k": top_k,
+                                        "model": model,
+                                        "question_set": qs,
+                                    }
+                                )
+
+                with col2:
+                    # Report selector in green container
+                    if file_configs:
+                        with st.container(key="file-display-panel"):
+                            icon_col, content_col = st.columns([0.1, 0.9])
+
+                            with icon_col:
+                                st.markdown(
+                                    """
+                                <div class="pdf-icon-box">
+                                    <i class="material-icons">description</i>
+                                </div>
+                                """,
+                                    unsafe_allow_html=True,
+                                )
+
+                            with content_col:
+                                selected_file_path = st.selectbox(
+                                    "Select Report",
+                                    options=list(file_configs.keys()),
+                                    format_func=lambda x: Path(x).name,
+                                    key="consolidated_file",
+                                    label_visibility="collapsed",
+                                )
+
+                                # Show file info
+                                if selected_file_path:
+                                    file_path_str = str(selected_file_path)
+                                    if not file_path_str.startswith("file://"):
+                                        file_path_display = Path(file_path_str)
+                                        if file_path_display.exists():
+                                            import datetime
+
+                                            mod_time = file_path_display.stat().st_mtime
+                                            upload_date = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y")
+                                            st.markdown(
+                                                f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>',
+                                                unsafe_allow_html=True,
+                                            )
+                    else:
+                        st.warning("No stored results found for the selected question set")
+                        selected_file_path = None
+
+                # 2. Configuration selector - horizontal styled cards
+                if selected_file_path and file_configs:
+                    configs = file_configs[selected_file_path]
+
+                    st.markdown("##### Configuration")
+
+                    # Create config cards using columns
+                    num_configs = len(configs)
+                    if num_configs > 0:
+                        # Initialize selected config from session state
+                        if "selected_config_idx" not in st.session_state:
+                            st.session_state.selected_config_idx = 0
+
+                        # Ensure index is valid
+                        if st.session_state.selected_config_idx >= num_configs:
+                            st.session_state.selected_config_idx = 0
+
+                        # Create fixed-width columns
+                        col_spec = [1] * num_configs
+                        remaining_space = max(0, 4 - num_configs)
+                        if remaining_space > 0:
+                            col_spec.append(remaining_space)
+
+                        all_cols = st.columns(col_spec)
+                        config_cols = all_cols[:num_configs]
+
+                        for idx, config in enumerate(configs):
+                            with config_cols[idx]:
+                                # Format model name nicely
+                                model_name = config["model"]
+                                if "gpt-4o-mini" in model_name:
+                                    model_display = "GPT-4o Mini"
+                                elif "gpt-4o" in model_name:
+                                    model_display = "GPT-4o"
+                                elif "gpt-4" in model_name:
+                                    model_display = "GPT-4"
+                                elif "gemini" in model_name.lower():
+                                    model_display = "Gemini"
+                                else:
+                                    model_display = model_name
+
+                                # Check if this config is selected
+                                is_selected = idx == st.session_state.selected_config_idx
+
+                                # Create clickable card
+                                clicked = card(
+                                    title=model_display,
+                                    text=f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · Top-K: {config['top_k']}",
+                                    key=f"config_card_{idx}",
+                                    styles={
+                                        "card": {
+                                            "width": "100%",
+                                            "height": "85px",
+                                            "border-radius": "10px",
+                                            "box-shadow": (
+                                                "0 2px 8px rgba(0,0,0,0.08)"
+                                                if not is_selected
+                                                else "0 4px 16px rgba(67,19,200,0.25)"
+                                            ),
+                                            "background-color": "#4313C8" if is_selected else "#FFFFFF",
+                                            "border": "2px solid #4313C8" if is_selected else "1px solid #E5E7EB",
+                                            "padding": "10px",
+                                            "margin": "0",
+                                        },
+                                        "title": {
+                                            "font-size": "15px",
+                                            "font-weight": "600",
+                                            "color": "white" if is_selected else "#1F2937",
+                                            "font-family": "'Afacad', sans-serif",
+                                            "margin-bottom": "2px",
+                                        },
+                                        "text": {
+                                            "font-size": "11px",
+                                            "color": "rgba(255,255,255,0.85)" if is_selected else "#6B7280",
+                                            "font-family": "'Afacad', sans-serif",
+                                        },
+                                    },
+                                )
+
+                                if clicked:
+                                    st.session_state.selected_config_idx = idx
+                                    st.rerun()
+
+                        # Get the selected config
+                        selected_config = {
+                            "label": "",
+                            "config": configs[st.session_state.selected_config_idx],
+                        }
+                    else:
+                        selected_config = None
+                else:
+                    selected_config = None
+
+                # 3. Display consolidated results
+                if selected_file_path and selected_config:
+                    display_consolidated_results(
+                        analyzer,
+                        selected_set,
+                        selected_file_path,
+                        selected_config["config"],
+                    )
 
         # Add Climate+Tech footer at the bottom of sidebar
         # Get current theme for logo selection and encode image as base64

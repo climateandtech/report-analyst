@@ -206,19 +206,7 @@ class DocumentAnalyzer:
         # Add a cache for loaded answers
         self._answers_cache = {}
 
-        # Get database URL from environment or session state (for Streamlit)
-        database_url = os.getenv("DATABASE_URL")
-        if database_url is None:
-            # Try to get from session state if available (Streamlit context)
-            try:
-                import streamlit as st
-
-                database_url = st.session_state.get("database_url")
-            except (ImportError, RuntimeError):
-                # Not in Streamlit context or streamlit not available
-                pass
-
-        self.cache_manager = CacheManager(database_url=database_url)
+        self.cache_manager = CacheManager()
         logger.info("Initialized DocumentAnalyzer with cache manager")
 
         self._initialized = True

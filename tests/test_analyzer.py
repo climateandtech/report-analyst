@@ -3,6 +3,7 @@ import os
 import shutil
 import sqlite3
 import tempfile
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
@@ -16,69 +17,58 @@ from report_analyst.core.cache_manager import CacheManager
 
 
 @pytest.fixture(scope="session")
-def test_db():
-    """Create a test database that persists for the entire test session"""
+def test_db_template():
+    """Create a template test database that persists for the entire test session"""
     temp_dir = tempfile.mkdtemp()
-    db_path = Path(temp_dir) / "analysis.db"
-    print(f"\nCreating test database at: {db_path}")  # Debug print
+    db_path = Path(temp_dir) / "analysis_template.db"
+    print(f"\nCreating template test database at: {db_path}")
 
     try:
-        # Use CacheManager to create the database with all required tables
-        from report_analyst.core.cache_manager import CacheManager
-
         cache_manager = CacheManager(str(db_path))
-        print(f"Database created successfully at {db_path}")  # Debug print
+        print(f"Template database created successfully at {db_path}")
 
-        # Verify database exists and is accessible
         if not db_path.exists():
             raise Exception(f"Database file not created at {db_path}")
 
         yield db_path
 
     except Exception as e:
-        print(f"Error setting up test database: {e}")  # Debug print
+        print(f"Error setting up template test database: {e}")
         raise
     finally:
-        print(f"Cleaning up test database at {temp_dir}")  # Debug print
+        print(f"Cleaning up template test database at {temp_dir}")
         shutil.rmtree(temp_dir)
 
 
 @pytest.fixture(scope="function")
-def clean_db(test_db):
-    """Provide a clean database for each test function"""
-    print(f"\nCleaning database at: {test_db}")  # Debug print
-    # Use CacheManager to clean the database
-    from report_analyst.core.cache_manager import CacheManager
+def clean_db(test_db_template):
+    """Provide a clean, unique database copy for each test function"""
+    temp_dir = tempfile.mkdtemp()
+    unique_db_path = Path(temp_dir) / f"analysis_{uuid.uuid4().hex}.db"
+    shutil.copy2(test_db_template, unique_db_path)
+    print(f"\nCreating unique database copy at: {unique_db_path}")
 
-    cache_manager = CacheManager(db_path=str(test_db))
-    cache_manager.clear_cache()  # Clear all cache
-    return test_db
+    yield unique_db_path
+
+    print(f"Cleaning up unique database at {temp_dir}")
+    shutil.rmtree(temp_dir)
 
 
 @pytest.fixture
 def test_env(clean_db):
     """Setup test environment with all necessary files and mocks"""
     temp_dir = tempfile.mkdtemp()
-    print(f"\nSetting up test environment in: {temp_dir}")  # Debug print
+    print(f"\nSetting up test environment in: {temp_dir}")
 
     # Create storage structure
     storage_path = Path(temp_dir) / "storage"
     (storage_path / "cache").mkdir(parents=True)
     (storage_path / "llm_cache").mkdir(parents=True)
 
-    # Create symlink to test database
+    # Copy the unique database to the expected location
     db_link = storage_path / "cache" / "analysis.db"
-    print(f"Creating symlink: {db_link} -> {clean_db}")  # Debug print
-    try:
-        if db_link.exists() or db_link.is_symlink():
-            db_link.unlink()
-        db_link.symlink_to(clean_db)
-        print(f"Symlink created successfully")  # Debug print
-    except Exception as e:
-        print(f"Error creating symlink: {e}")  # Debug print
-        # Fallback to copy if symlink fails
-        print(f"Falling back to copy")  # Debug print
-        shutil.copy2(clean_db, db_link)
+    shutil.copy2(clean_db, db_link)
+    print(f"Copied database to: {db_link}")
 
     # Create test questions
     questions_dir = Path(temp_dir) / "questionsets"
@@ -194,8 +184,8 @@ def analyzer(test_env, clean_db):
         analyzer.cache_path = analyzer.storage_path / "cache"
         analyzer.llm_cache_path = analyzer.storage_path / "llm_cache"
 
-        # Explicitly set the database path for the cache manager
-        analyzer.cache_manager.db_path = Path(clean_db)  # Use clean_db directly
+        # Reinitialize CacheManager with the unique database copy
+        analyzer.cache_manager = CacheManager(db_path=str(clean_db))
         # Set the mocked LLM instance
         analyzer.llm = mock_llm_instance
         # Force reload questions from test file

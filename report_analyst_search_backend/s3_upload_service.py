@@ -24,7 +24,6 @@ from typing import Any, Dict, Optional
 import boto3
 import nats
 from botocore.config import Config
-from config.nats_config import config as nats_config
 
 from .config import BackendConfig
 
@@ -130,8 +129,8 @@ class S3UploadService:
             }
 
             # Use centralized subject pattern (backend will forward docs.* → docs.process.*)
-            upload_pattern = nats_config["subject_patterns"]["upload"]
-            subject = upload_pattern.format(request_id=request_id)
+            # Default subject pattern for document uploads
+            subject = f"docs.upload.{request_id}"
 
             # Simple NATS publish - reliable delivery
             message_data = json.dumps(control_message).encode()
