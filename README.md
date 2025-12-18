@@ -105,6 +105,40 @@ Models will only be available in the UI if you have the corresponding API key co
    - Ask questions about documents
    - Generate structured reports
 
+## Running Benchmarks
+
+The project includes support for benchmarking retrieval and extraction systems against reference datasets.
+
+### ClimRetrieve Benchmark
+
+Run the ClimRetrieve benchmark to evaluate your retrieval system against expert-annotated datasets:
+
+```bash
+# Activate virtual environment
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Run the benchmark (downloads datasets automatically)
+python scripts/test_climretrieve_benchmark.py
+```
+
+This will:
+1. Download ClimRetrieve datasets from GitHub to `data/climretrieve/`
+2. Transform datasets to the required format
+3. Compare reference (ground truth) vs input (your results) datasets
+4. Display evaluation metrics (MAP, MRR, Precision@K, Recall@K, F1@K, NDCG@K)
+
+**Options:**
+- `--skip-download`: Use existing downloaded datasets
+- `--reference-path PATH`: Specify custom reference dataset path
+- `--input-path PATH`: Specify custom input dataset path
+- `--k-values 1 5 10 20`: Custom K values for metrics
+
+**Requirements:**
+- `openpyxl` for Excel file support (install with `pip install openpyxl`)
+- Internet connection for initial download
+
+For more details, see `scripts/README_CLIMRETRIEVE.md`.
+
 ## Customizing Prompts
 
 The `prompts` directory contains modular prompt templates that can be customized for different use cases. Each prompt is a separate file that can be modified without affecting the core functionality.
