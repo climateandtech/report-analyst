@@ -278,16 +278,22 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
         if isinstance(uploaded_file, (str, Path)):
             return str(uploaded_file)
 
-        # Check if file was already saved in this session
+        # Check if PostgreSQL file storage is enabled (check both keys for persistence)
+        use_postgres_storage = st.session_state.get("postgres_file_storage_enabled", False) or st.session_state.get(
+            "use_postgres_file_storage", False
+        )
+
+        # Check if file was already saved in this session with the SAME storage mode
         file_key = f"saved_file_{uploaded_file.name}"
-        if file_key in st.session_state:
+        storage_mode_key = f"saved_file_mode_{uploaded_file.name}"
+        cached_mode = st.session_state.get(storage_mode_key)
+
+        # Only use cache if storage mode matches
+        if file_key in st.session_state and cached_mode == ("postgres" if use_postgres_storage else "local"):
             return st.session_state[file_key]
 
         # Get file bytes
         file_bytes = uploaded_file.getbuffer()
-
-        # Check if PostgreSQL file storage is enabled
-        use_postgres_storage = st.session_state.get("use_postgres_file_storage", False)
 
         if use_postgres_storage:
             try:
@@ -298,7 +304,22 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
                 file_storage = get_file_storage(database_url)
 
                 if file_storage:
-                    # Store in PostgreSQL
+                    # Check if file already exists in PostgreSQL
+                    existing_file_id = file_storage.find_by_filename(uploaded_file.name)
+                    if existing_file_id:
+                        # Retrieve from PostgreSQL instead of re-uploading
+                        temp_path = file_storage.save_to_temp(existing_file_id)
+                        if temp_path:
+                            st.session_state[file_key] = temp_path
+                            st.session_state[f"{file_key}_id"] = existing_file_id
+                            st.session_state[storage_mode_key] = "postgres"
+                            logger.info(
+                                f"Retrieved existing file {uploaded_file.name} from PostgreSQL (ID: {existing_file_id})"
+                            )
+                            st.session_state.file_processed = False
+                            return temp_path
+
+                    # Store new file in PostgreSQL
                     file_id = file_storage.store_file(file_bytes, uploaded_file.name, uploaded_file.type)
 
                     # Save to temp for processing (retrieve from DB)
@@ -308,6 +329,7 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
                         # Store both file_id and path in session state
                         st.session_state[file_key] = temp_path
                         st.session_state[f"{file_key}_id"] = file_id
+                        st.session_state[storage_mode_key] = "postgres"
                         logger.info(f"Stored file {uploaded_file.name} in PostgreSQL (ID: {file_id})")
                         st.session_state.file_processed = False
                         return temp_path
@@ -1465,8 +1487,11 @@ def main():
             st.session_state.analysis_complete = False  # Initialize analysis complete flag
 
         # Initialize use_s3_upload in session state if not already set
+        # Respect override_s3_upload if user has temporarily disabled it
         if "use_s3_upload" not in st.session_state:
-            st.session_state.use_s3_upload = os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+            env_s3_upload = os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+            override = st.session_state.get("override_s3_upload", False)
+            st.session_state.use_s3_upload = env_s3_upload and not override
 
         # Sync API keys from session state to environment at startup
         APIKeyManager.sync_api_keys_to_env(st.session_state)
@@ -2823,7 +2848,13 @@ def main():
                     masked_openai = (
                         f"{current_openai_key[:8]}...{current_openai_key[-4:]}" if len(current_openai_key) > 12 else "***"
                     )
-                    st.caption(f"Current key: `{masked_openai}`")
+                    # Show source of key
+                    if session_openai_key:
+                        st.success(f"✓ API key set in session: `{masked_openai}`")
+                    elif env_openai_key:
+                        st.info(f"API key from environment: `{masked_openai}`")
+                    else:
+                        st.caption(f"Current key: `{masked_openai}`")
 
                 # Track override state
                 override_openai = st.session_state.get("override_openai_key", False)
@@ -3009,31 +3040,42 @@ def main():
 
             # Enterprise Integration (S3+NATS)
             st.subheader("Enterprise Integration")
-            # In Streamlit, when a widget has a 'key', it automatically syncs with session state
-            # The widget's return value is the current value from session state (or default if not set)
-            # IMPORTANT: Don't provide 'value' parameter when using 'key' - let Streamlit manage it
-            # The widget return value is the source of truth for the current render
-            st.markdown(
-                """
-            <style>
-            div[data-testid="stCheckbox"] label {
-                font-family: 'Afacad', sans-serif !important;
-                white-space: nowrap !important;
-                min-width: 250px !important;
-            }
-            </style>
-            """,
-                unsafe_allow_html=True,
-            )
-            use_s3_upload = st.checkbox(
-                "Enable S3+NATS Upload",
-                key="use_s3_upload",
-                help="Upload documents via S3 and process via NATS for enterprise integration",
-            )
 
-            # Show Enterprise Mode status only if checkbox is checked AND backend is available
-            # Check AFTER widget render - use widget return value which reflects current state
-            # The widget return value is the authoritative source for the current render cycle
+            # Check if USE_S3_UPLOAD is set from environment
+            env_s3_upload = os.getenv("USE_S3_UPLOAD", "").lower() == "true"
+
+            # Show env var status like API keys
+            if env_s3_upload and not st.session_state.get("override_s3_upload", False):
+                st.info("S3+NATS upload is enabled via `USE_S3_UPLOAD` environment variable")
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    if st.button("Disable temporarily", key="btn_override_s3"):
+                        st.session_state.override_s3_upload = True
+                        st.session_state.use_s3_upload = False
+                        st.rerun()
+                use_s3_upload = True
+            else:
+                st.markdown(
+                    """
+                <style>
+                div[data-testid="stCheckbox"] label {
+                    font-family: 'Afacad', sans-serif !important;
+                    white-space: nowrap !important;
+                    min-width: 250px !important;
+                }
+                </style>
+                """,
+                    unsafe_allow_html=True,
+                )
+                use_s3_upload = st.checkbox(
+                    "Enable S3+NATS Upload",
+                    key="use_s3_upload",
+                    help="Upload documents via S3 and process via NATS for enterprise integration",
+                )
+                if not env_s3_upload:
+                    st.caption("*Or set `USE_S3_UPLOAD=true` in environment*")
+
+            # Show Enterprise Mode status only if enabled AND backend is available
             if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
                 st.info("Enterprise mode enabled")
 
@@ -3062,17 +3104,21 @@ def main():
                 ("postgresql://", "postgres://")
             )
 
-            # Initialize use_postgres_file_storage from session state or env
-            if "use_postgres_file_storage" not in st.session_state:
-                st.session_state.use_postgres_file_storage = os.getenv("USE_POSTGRES_FILE_STORAGE", "false").lower() == "true"
+            # Initialize postgres_file_storage_enabled from session state or env
+            if "postgres_file_storage_enabled" not in st.session_state:
+                st.session_state.postgres_file_storage_enabled = (
+                    os.getenv("USE_POSTGRES_FILE_STORAGE", "false").lower() == "true"
+                )
 
             if is_postgres_enterprise:
                 use_postgres_storage = st.checkbox(
                     "Store files in PostgreSQL",
-                    value=st.session_state.get("use_postgres_file_storage", False),
+                    value=st.session_state.get("postgres_file_storage_enabled", False),
                     key="use_postgres_file_storage",
                     help="Store uploaded files in PostgreSQL database (useful for Heroku deployments). Files are stored as BYTEA/BLOB. This is an enterprise feature.",
                 )
+                # Store in a separate key that persists across page navigation
+                st.session_state.postgres_file_storage_enabled = use_postgres_storage
 
                 if use_postgres_storage:
                     st.info("📦 Files will be stored in PostgreSQL database")
@@ -3839,8 +3885,14 @@ def main():
 
         # Upload Report page
         elif nav_page == "Upload Report":
-            # Check if S3+NATS enterprise integration is enabled (from UI checkbox)
-            use_s3_upload = st.session_state.get("use_s3_upload", False)
+            # Check if S3+NATS enterprise integration is enabled
+            # Respect override_s3_upload if user has temporarily disabled it
+            if st.session_state.get("override_s3_upload", False):
+                use_s3_upload = False
+            else:
+                use_s3_upload = (
+                    st.session_state.get("use_s3_upload", False) or os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+                )
 
             # Initialize backend integration with S3+NATS enabled if needed
             if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:

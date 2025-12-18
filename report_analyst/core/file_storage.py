@@ -203,6 +203,28 @@ class PostgreSQLFileStorage:
             logger.error(f"Error deleting file {file_id}: {str(e)}")
             return False
 
+    def find_by_filename(self, filename: str) -> Optional[str]:
+        """
+        Find a file by filename and return its ID.
+
+        Args:
+            filename: Original filename to search for
+
+        Returns:
+            file_id if found, None otherwise
+        """
+        try:
+            with self.db_manager.get_connection() as conn:
+                query = text("SELECT id FROM stored_files WHERE filename = :filename ORDER BY created_at DESC LIMIT 1")
+                result = conn.execute(query, {"filename": filename})
+                row = result.fetchone()
+                if row:
+                    return row[0]
+                return None
+        except Exception as e:
+            logger.error(f"Error finding file by filename {filename}: {str(e)}")
+            return None
+
     def save_to_temp(self, file_id: str, temp_dir: Path = Path("temp")) -> Optional[str]:
         """
         Retrieve file from PostgreSQL and save to temporary directory.
