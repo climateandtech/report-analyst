@@ -7,7 +7,10 @@ from ...models.benchmark import (
     BenchmarkDatasetContent, 
     EvaluationMetrics, 
     RetrievalConfig,
-    BenchmarkEvaluation
+    BenchmarkEvaluation,
+    RetrievalResultsDataset,
+    BenchmarkDataset,
+    DatasetType
 )
 
 logger = logging.getLogger(__name__)
@@ -233,3 +236,248 @@ class EvaluationEngine:
                 comparison[f'ndcg_at_{k}_improvement'] = eval2.ndcg_at_k[k] - eval1.ndcg_at_k[k]
         
         return comparison
+    
+    def compare_flexible_datasets(
+        self,
+        reference_dataset: BenchmarkDataset,
+        input_dataset: BenchmarkDataset,
+        k_values: Optional[List[int]] = None
+    ) -> EvaluationMetrics:
+        """
+        Compare two flexible benchmark datasets (supports both IR and IE).
+        
+        The reference dataset is treated as ground truth (e.g., "climretrieve", "chatreport").
+        The input dataset contains the actual results to evaluate.
+        
+        For IR datasets: Compares retrieved chunks (by chunk_id and position).
+        For IE datasets: Compares answers/analysis (by query_id, comparing text similarity).
+        
+        Args:
+            reference_dataset: Reference dataset (ground truth)
+            input_dataset: Input dataset (actual results) to evaluate
+            k_values: List of K values to compute metrics for (only used for IR)
+            
+        Returns:
+            EvaluationMetrics comparing input_dataset against reference_dataset
+        """
+        if reference_dataset.dataset_type != input_dataset.dataset_type:
+            logger.warning(
+                f"Dataset type mismatch: reference={reference_dataset.dataset_type.value}, "
+                f"input={input_dataset.dataset_type.value}. Attempting comparison anyway."
+            )
+        
+        if reference_dataset.dataset_type == DatasetType.INFORMATION_RETRIEVAL:
+            return self._compare_ir_datasets(reference_dataset, input_dataset, k_values)
+        elif reference_dataset.dataset_type == DatasetType.INFORMATION_EXTRACTION:
+            return self._compare_ie_datasets(reference_dataset, input_dataset)
+        else:
+            raise ValueError(f"Unsupported dataset type: {reference_dataset.dataset_type}")
+    
+    def _compare_ir_datasets(
+        self,
+        reference_dataset: BenchmarkDataset,
+        input_dataset: BenchmarkDataset,
+        k_values: Optional[List[int]] = None
+    ) -> EvaluationMetrics:
+        """Compare two Information Retrieval datasets"""
+        if k_values is None:
+            k_values = self.default_k_values
+        
+        # Get common queries
+        reference_queries = set(reference_dataset.get_unique_queries())
+        input_queries = set(input_dataset.get_unique_queries())
+        common_queries = reference_queries.intersection(input_queries)
+        
+        if not common_queries:
+            logger.warning("No common queries found between reference and input datasets")
+            return EvaluationMetrics()
+        
+        logger.info(f"Found {len(common_queries)} common queries for IR comparison")
+        
+        # Collect results per question
+        question_results = []
+        for query_id in common_queries:
+            # Get reference results (ground truth)
+            reference_results = reference_dataset.get_results_by_query(query_id)
+            reference_results = sorted(reference_results, key=lambda x: x.get_position() or 999)
+            
+            # Build ground truth mapping: chunk_id -> relevance_score
+            ground_truth = {}
+            for i, ref_result in enumerate(reference_results):
+                chunk_id = ref_result.get_chunk_id()
+                if chunk_id:
+                    score = ref_result.get_score()
+                    # Use score if available, otherwise use inverse position
+                    relevance_score = score if score is not None else max(0.0, 1.0 - (i * 0.1))
+                    ground_truth[chunk_id] = relevance_score
+            
+            # Get input results (actual retrieval)
+            input_results = input_dataset.get_results_by_query(query_id)
+            input_results = sorted(input_results, key=lambda x: x.get_position() or 999)
+            
+            # Convert to format expected by _evaluate_single_question
+            retrieved_chunks = []
+            for result in input_results:
+                chunk_id = result.get_chunk_id()
+                score = result.get_score() or 0.0
+                position = result.get_position() or 999
+                
+                chunk_dict = {
+                    'id': chunk_id or f"unknown_{position}",
+                    'chunk_id': chunk_id or f"unknown_{position}",
+                    'score': score,
+                    'position': position
+                }
+                retrieved_chunks.append(chunk_dict)
+            
+            # Evaluate this question
+            result = self._evaluate_single_question(
+                retrieved_chunks, ground_truth, k_values
+            )
+            question_results.append(result)
+        
+        # Aggregate metrics
+        return self._aggregate_metrics(question_results, k_values)
+    
+    def _compare_ie_datasets(
+        self,
+        reference_dataset: BenchmarkDataset,
+        input_dataset: BenchmarkDataset
+    ) -> EvaluationMetrics:
+        """
+        Compare two Information Extraction datasets.
+        
+        Compares answers/analysis text using similarity metrics.
+        For structured fields (categories, extracted values), uses exact match.
+        """
+        # Get common queries
+        reference_queries = set(reference_dataset.get_unique_queries())
+        input_queries = set(input_dataset.get_unique_queries())
+        common_queries = reference_queries.intersection(input_queries)
+        
+        if not common_queries:
+            logger.warning("No common queries found between reference and input datasets")
+            return EvaluationMetrics()
+        
+        logger.info(f"Found {len(common_queries)} common queries for IE comparison")
+        
+        # For IE, we compare answers/analysis per query
+        # Metrics: Exact match, F1 (token-level), BLEU, ROUGE, etc.
+        exact_matches = 0
+        total_queries = len(common_queries)
+        
+        # Simple comparison: exact match for now
+        # TODO: Add more sophisticated metrics (F1, BLEU, ROUGE, semantic similarity)
+        for query_id in common_queries:
+            reference_results = reference_dataset.get_results_by_query(query_id)
+            input_results = input_dataset.get_results_by_query(query_id)
+            
+            if not reference_results or not input_results:
+                continue
+            
+            # Get first result for each (assuming one answer per query)
+            ref_answer = reference_results[0].get_answer()
+            input_answer = input_results[0].get_answer()
+            
+            if ref_answer and input_answer:
+                # Normalize and compare
+                ref_normalized = ref_answer.strip().lower()
+                input_normalized = input_answer.strip().lower()
+                
+                if ref_normalized == input_normalized:
+                    exact_matches += 1
+        
+        # Create metrics (simplified for IE)
+        metrics = EvaluationMetrics()
+        if total_queries > 0:
+            exact_match_rate = exact_matches / total_queries
+            # For IE, we use exact_match_rate as the primary metric
+            # Map to precision@1 for consistency with IR metrics
+            metrics.precision_at_k[1] = exact_match_rate
+            metrics.mean_average_precision = exact_match_rate
+            metrics.mean_reciprocal_rank = exact_match_rate if exact_matches > 0 else 0.0
+        
+        logger.info(f"IE comparison complete. Exact match rate: {exact_matches}/{total_queries} = {metrics.precision_at_k.get(1, 0.0):.3f}")
+        
+        return metrics
+    
+    def compare_datasets(
+        self,
+        reference_dataset: RetrievalResultsDataset,
+        input_dataset: RetrievalResultsDataset,
+        k_values: Optional[List[int]] = None,
+        match_on_chunk_id: bool = True
+    ) -> EvaluationMetrics:
+        """
+        Compare two retrieval results datasets.
+        
+        The reference dataset is treated as ground truth (e.g., "climretrieve").
+        The input dataset contains the actual retrieval results to evaluate.
+        
+        Args:
+            reference_dataset: Reference dataset (ground truth) - e.g., climretrieve
+            input_dataset: Input dataset (actual retrieval results) to evaluate
+            k_values: List of K values to compute metrics for
+            match_on_chunk_id: If True, match chunks by chunk_id. If False, match by position only.
+            
+        Returns:
+            EvaluationMetrics comparing input_dataset against reference_dataset
+        """
+        if k_values is None:
+            k_values = self.default_k_values
+        
+        logger.info(f"Comparing datasets: reference='{reference_dataset.dataset_id}' vs input='{input_dataset.dataset_id}'")
+        
+        # Get common queries
+        reference_queries = set(reference_dataset.get_unique_queries())
+        input_queries = set(input_dataset.get_unique_queries())
+        common_queries = reference_queries.intersection(input_queries)
+        
+        if not common_queries:
+            logger.warning("No common queries found between reference and input datasets")
+            return EvaluationMetrics()
+        
+        logger.info(f"Found {len(common_queries)} common queries")
+        
+        # Collect results per question
+        question_results = []
+        for query_id in common_queries:
+            # Get reference results (ground truth)
+            reference_results = reference_dataset.get_results_by_query(query_id)
+            # Sort by position to get ground truth order
+            reference_results = sorted(reference_results, key=lambda x: x.position)
+            
+            # Build ground truth mapping: chunk_id -> relevance_score
+            # Use position as relevance score (higher position = lower relevance)
+            # Or use actual score if available
+            ground_truth = {}
+            for i, ref_result in enumerate(reference_results):
+                chunk_id = ref_result.chunk_id
+                # Use score if available, otherwise use inverse position (1.0 for position 1, 0.9 for position 2, etc.)
+                relevance_score = ref_result.score if ref_result.score > 0 else max(0.0, 1.0 - (i * 0.1))
+                ground_truth[chunk_id] = relevance_score
+            
+            # Get input results (actual retrieval)
+            input_results = input_dataset.get_results_by_query(query_id)
+            # Sort by position
+            input_results = sorted(input_results, key=lambda x: x.position)
+            
+            # Convert to format expected by _evaluate_single_question
+            retrieved_chunks = []
+            for result in input_results:
+                chunk_dict = {
+                    'id': result.chunk_id,
+                    'chunk_id': result.chunk_id,
+                    'score': result.score,
+                    'position': result.position
+                }
+                retrieved_chunks.append(chunk_dict)
+            
+            # Evaluate this question
+            result = self._evaluate_single_question(
+                retrieved_chunks, ground_truth, k_values
+            )
+            question_results.append(result)
+        
+        # Aggregate metrics
+        return self._aggregate_metrics(question_results, k_values)
