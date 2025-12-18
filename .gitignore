@@ -2,6 +2,7 @@
 .env
 *.log
 venv/
+venv2/
 
 .gradio
 __pycache__/

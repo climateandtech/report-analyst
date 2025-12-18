@@ -139,7 +139,7 @@ primp==0.14.0
 propcache==0.2.1
 protobuf==4.25.3
 psutil==7.0.0
-pulsar-client==3.6.0
+pulsar-client==3.6.1
 pyarrow==19.0.0
 pyasn1==0.6.1
 pyasn1_modules==0.4.1
