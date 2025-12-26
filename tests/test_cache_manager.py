@@ -105,6 +105,79 @@ def test_save_and_get_analysis(temp_db):
     assert len(cached[question_id]["result"]["EVIDENCE"]) == 2
 
 
+def test_save_and_get_analysis_with_chunks(temp_db):
+    """Test saving and retrieving analysis results with chunks - full flow"""
+    import numpy as np
+    
+    # Test data
+    file_path = "test_doc.pdf"
+    question_id = "tcfd_1"
+    chunk_text = "This is a test chunk with some content."
+    
+    # First, save the chunk to document_chunks table (required for chunk_relevance)
+    embedding_bytes = np.array([0.1, 0.2, 0.3], dtype=np.float32).tobytes()
+    with temp_db.db_manager.get_connection() as conn:
+        timestamp = datetime.now().isoformat()
+        conn.execute(
+            text("""
+                INSERT INTO document_chunks
+                (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
+            """),
+            {
+                "file_path": file_path,
+                "chunk_text": chunk_text,
+                "chunk_size": 500,
+                "chunk_overlap": 20,
+                "embedding": embedding_bytes,
+                "metadata": json.dumps({"page_number": 1}),
+                "created_at": timestamp,
+            },
+        )
+    
+    result = {
+        "ANSWER": "Test answer",
+        "SCORE": 7,
+        "EVIDENCE": ["evidence1"],
+        "chunks": [
+            {
+                "text": chunk_text,
+                "similarity_score": 0.85,
+                "llm_score": 0.75,
+                "is_evidence": True,
+                "chunk_order": 0,
+                "metadata": {"page_number": 1},
+            }
+        ],
+    }
+    config = {
+        "chunk_size": 500,
+        "chunk_overlap": 20,
+        "top_k": 5,
+        "model": "gpt-4",
+        "question_set": "tcfd",
+    }
+
+    # Save analysis with chunks
+    temp_db.save_analysis(file_path, question_id, result, config)
+
+    # Retrieve analysis
+    cached = temp_db.get_analysis(file_path, config, [question_id])
+
+    assert question_id in cached
+    assert cached[question_id]["result"]["ANSWER"] == "Test answer"
+    
+    # Verify chunks are retrieved
+    chunks = cached[question_id]["chunks"]
+    assert len(chunks) == 1, f"Expected 1 chunk, got {len(chunks)}"
+    assert chunks[0]["text"] == chunk_text
+    assert chunks[0]["similarity_score"] == 0.85
+    assert chunks[0]["llm_score"] == 0.75
+    assert chunks[0]["is_evidence"] is True
+    assert chunks[0]["chunk_order"] == 0
+    assert chunks[0]["metadata"]["page_number"] == 1
+
+
 def test_save_and_get_vectors(temp_db):
     """Test saving and retrieving vector embeddings"""
     import numpy as np
@@ -369,3 +442,13 @@ def test_has_chunk_scoring(temp_db):
 
     # Now should be True
     assert temp_db.has_chunk_scoring(file_path, config) is True
+    
+    # Verify chunks can be retrieved via get_analysis
+    retrieved = temp_db.get_analysis(file_path, config, [question_id])
+    assert question_id in retrieved
+    retrieved_chunks = retrieved[question_id]["chunks"]
+    assert len(retrieved_chunks) == 1, f"Expected 1 chunk, got {len(retrieved_chunks)}"
+    assert retrieved_chunks[0]["text"] == chunk_text
+    assert retrieved_chunks[0]["similarity_score"] == 0.8
+    assert retrieved_chunks[0]["llm_score"] == 0.7
+    assert retrieved_chunks[0]["is_evidence"] is True

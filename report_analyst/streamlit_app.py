@@ -266,10 +266,11 @@ class ReportAnalyzer:
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ):
         """Delegate to the analyzer's process_document method"""
         return self.analyzer.process_document(
-            file_path, selected_questions, use_llm_scoring, single_call, force_recompute
+            file_path, selected_questions, use_llm_scoring, single_call, force_recompute, pre_retrieved_chunks
         )
 
 
@@ -741,13 +742,21 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
 
 
 def display_analysis_results(
-    analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str = None
+    analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str = None, file_path: str = None, question_set: str = None
 ) -> None:
     """Display analysis results in a consistent format for both individual and consolidated views"""
     try:
         if analysis_df.empty:
             st.warning("No analysis results to display")
             return
+
+        # Try to import and use PDF viewer component if available
+        pdf_viewer_available = False
+        try:
+            from report_analyst_enterprise.components.streamlit_component.backend import pdf_viewer
+            pdf_viewer_available = True
+        except ImportError:
+            pass
 
         # Analysis Results Table
         st.subheader("Analysis Results")
@@ -782,6 +791,100 @@ def display_analysis_results(
                 ),
             },
         )
+
+        # PDF Viewer with Chunks (if available and file_path provided)
+        if pdf_viewer_available and file_path and not chunks_df.empty:
+            try:
+                # Get question set if not provided
+                if not question_set:
+                    question_set = st.session_state.get("question_set", "tcfd")
+                
+                # Load questions
+                question_set_obj = question_loader.get_question_set(question_set)
+                questions_data = {}
+                if question_set_obj:
+                    for q_id, q_data in question_set_obj.questions.items():
+                        questions_data[q_id] = q_data.get("text", q_id)
+                
+                # Try to get chunks with full metadata from cache if available
+                # Otherwise, reconstruct from dataframe (without page_number)
+                chunks_by_question = {}
+                try:
+                    # Try to get from analyzer cache if available
+                    from report_analyst.core.analyzer import DocumentAnalyzer
+                    analyzer = DocumentAnalyzer()
+                    
+                    # Get config from session state
+                    config = {
+                        "chunk_size": st.session_state.get("chunk_size", 500),
+                        "chunk_overlap": st.session_state.get("chunk_overlap", 0),
+                        "top_k": st.session_state.get("top_k", 10),
+                        "model": st.session_state.get("llm_model", "gpt-4o-mini"),
+                        "question_set": question_set,
+                    }
+                    
+                    # Get cached results with full chunk metadata
+                    cached_results = analyzer.cache_manager.get_analysis(
+                        file_path=file_path,
+                        config=config
+                    )
+                    
+                    if cached_results:
+                        # Extract chunks with full metadata and normalize page numbers
+                        for q_id, data in cached_results.items():
+                            if q_id not in chunks_by_question:
+                                chunks_by_question[q_id] = []
+                            chunks = data.get("chunks", [])
+                            # Normalize page_number in metadata (convert from 'source' if needed)
+                            for chunk in chunks:
+                                if chunk.get("metadata"):
+                                    metadata = chunk["metadata"]
+                                    # PyMuPDFReader uses 'source' as page number string, normalize to 'page_number' as integer
+                                    if "page_number" not in metadata and "source" in metadata:
+                                        try:
+                                            metadata["page_number"] = int(metadata["source"])
+                                        except (ValueError, TypeError):
+                                            metadata["page_number"] = 1
+                                    elif "page_number" in metadata:
+                                        # Ensure it's an integer
+                                        try:
+                                            metadata["page_number"] = int(metadata["page_number"])
+                                        except (ValueError, TypeError):
+                                            metadata["page_number"] = 1
+                                    else:
+                                        # Default to page 1 if no page info
+                                        metadata["page_number"] = 1
+                            chunks_by_question[q_id].extend(chunks)
+                except Exception as cache_error:
+                    logger.debug(f"Could not get chunks from cache: {cache_error}")
+                    # Fallback: reconstruct from dataframe (without page_number)
+                    for _, row in chunks_df.iterrows():
+                        q_id = row.get("Question ID", "")
+                        if q_id not in chunks_by_question:
+                            chunks_by_question[q_id] = []
+                        
+                        chunk = {
+                            "text": row.get("Chunk Text", ""),
+                            "metadata": {},  # No metadata available from dataframe
+                            "is_evidence": row.get("Is Evidence", False),
+                            "similarity_score": row.get("Vector Similarity", 0.0),
+                            "llm_score": row.get("LLM Score"),
+                            "chunk_order": row.get("Position", 0),
+                        }
+                        chunks_by_question[q_id].append(chunk)
+                
+                # Display PDF viewer in a tab or expander
+                with st.expander("📄 PDF Viewer with Chunks", expanded=False):
+                    pdf_viewer(
+                        pdf_path=file_path,
+                        chunks_data=chunks_by_question,
+                        questions_data=questions_data,
+                        height=800,
+                        key=f"pdf_viewer_{file_key}" if file_key else "pdf_viewer"
+                    )
+            except Exception as e:
+                logger.warning(f"Could not display PDF viewer: {e}", exc_info=True)
+                # Fall back to table view
 
         # Document Chunks Table
         if not chunks_df.empty:
@@ -1247,7 +1350,13 @@ def display_consolidated_results(analyzer, question_set):
 
                         # Display results using the existing display function
                         file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
-                        display_analysis_results(analysis_df, chunks_df, file_key)
+                        display_analysis_results(
+                            analysis_df, 
+                            chunks_df, 
+                            file_key, 
+                            file_path=file_path,
+                            question_set=question_set
+                        )
                     else:
                         st.warning("No results found in stored for this configuration")
                 else:
@@ -1415,7 +1524,11 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         if cached_results and not st.session_state.get("force_recompute", False):
             logger.info(f"[CACHE] Cache HIT for config: {config}")
             progress_text.success("Found stored results!")
-            st.session_state.results = cached_results
+            # Convert cached_results to the expected format: {"answers": {question_id: result}}
+            if "results" not in st.session_state:
+                st.session_state.results = {"answers": {}}
+            for question_id, data in cached_results.items():
+                st.session_state.results["answers"][question_id] = data
             logger.info(
                 f"[ANALYSIS] Writing results to session state for file: {file_path}"
             )
@@ -1504,7 +1617,11 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         logger.info(
             f"[ANALYSIS] Writing results to session state for file: {file_path}"
         )
-        st.session_state.results = final_results
+        # Convert final_results to the expected format: {"answers": {question_id: result}}
+        if "results" not in st.session_state:
+            st.session_state.results = {"answers": {}}
+        for question_id, data in final_results.items():
+            st.session_state.results["answers"][question_id] = data
         logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
         progress_text.success("Analysis complete!")
 
@@ -2756,8 +2873,8 @@ def main():
             with st.sidebar:
                 nav_page = option_menu(
                     menu_title=None,
-                    options=["Upload Report", "Report Analyst", "All Results"],
-                    icons=["house", "file-text", "bar-chart"],
+                    options=["Upload Report", "Report Analyst", "View Report", "All Results"],
+                    icons=["house", "file-text", "file-pdf", "bar-chart"],
                     menu_icon=None,
                     default_index=0,
                     orientation="vertical",
@@ -2784,7 +2901,7 @@ def main():
                 )
         except ImportError:
             # Fallback to regular radio if package not installed
-            nav_options = ["Upload Report", "Report Analyst", "All Results"]
+            nav_options = ["Upload Report", "Report Analyst", "View Report", "All Results"]
             nav_page = st.sidebar.radio(
                 "",
                 nav_options,
@@ -3548,8 +3665,13 @@ def main():
                                             create_analysis_dataframes(all_results)
                                         )
                                         file_key = Path(file_path).stem
+                                        question_set = config.get("question_set", st.session_state.get("question_set", "tcfd"))
                                         display_analysis_results(
-                                            analysis_df, chunks_df, file_key
+                                            analysis_df, 
+                                            chunks_df, 
+                                            file_key,
+                                            file_path=str(file_path),
+                                            question_set=question_set
                                         )
                                         progress_text.success(
                                             f"✓ Analysis complete for {len(selected_questions)} questions"
@@ -3571,6 +3693,216 @@ def main():
                         st.error("File not found: No file path available. Please select a valid file.")
                     else:
                         st.error(f"File not found: {file_path}. Please ensure the file exists.")
+            
+            # Display results if they exist - check both session state and database
+            # First, check if we have results in session state
+            has_dataframes = (
+                "analysis_df" in st.session_state and 
+                "chunks_df" in st.session_state and
+                not st.session_state.analysis_df.empty
+            )
+            has_raw_results = (
+                "results" in st.session_state and 
+                "answers" in st.session_state.results and
+                len(st.session_state.results["answers"]) > 0
+            )
+            
+            # Always try to load from database/cache manager when a file is selected (even if session state has results, database is source of truth)
+            if previous_files and "previous_file" in st.session_state:
+                try:
+                    # Get the selected file
+                    prev_file = st.session_state.previous_file
+                    selected_file_obj = None
+                    if isinstance(prev_file, dict):
+                        selected_file_obj = prev_file
+                    else:
+                        for f in previous_files:
+                            if f["name"] == prev_file or f.get("path") == prev_file:
+                                selected_file_obj = f
+                                break
+                    
+                    if selected_file_obj and "analyzer" in st.session_state:
+                        # Get file path
+                        selected_uri = selected_file_obj.get("uri", selected_file_obj.get("path", ""))
+                        is_backend = selected_uri.startswith("urn:report-analyst:backend:")
+                        
+                        if is_backend:
+                            file_path_for_cache = selected_uri
+                        else:
+                            file_path_for_cache = selected_file_obj.get("path", "")
+                            if file_path_for_cache.startswith("file://"):
+                                file_path_for_cache = file_path_for_cache.replace("file://", "")
+                            
+                            # Normalize path - resolve to absolute path for comparison
+                            try:
+                                file_path_for_cache = str(Path(file_path_for_cache).resolve())
+                            except Exception:
+                                pass  # Keep original if resolve fails
+                        
+                        # Get question set
+                        question_set = st.session_state.get("new_question_set", "tcfd")
+                        
+                        # Map question set to database identifier
+                        question_set_mapping = {
+                            "tcfd": "tcfd",
+                            "s4m": "s4m",
+                            "lucia": "lucia",
+                            "everest": "ev",
+                        }
+                        db_question_set = question_set_mapping.get(question_set, question_set)
+                        
+                        # Get current config
+                        config = {
+                            "chunk_size": st.session_state.get("new_chunk_size", 500),
+                            "chunk_overlap": st.session_state.get("new_overlap", 20),
+                            "top_k": st.session_state.get("new_top_k", 5),
+                            "model": st.session_state.get("new_llm_model", "gpt-4o-mini"),
+                            "question_set": question_set,
+                        }
+                        
+                        # Get all question IDs for this question set to load all results
+                        try:
+                            # Use global question_loader or create a new one
+                            from report_analyst.core.question_loader import get_question_loader
+                            q_loader = get_question_loader()
+                            question_set_obj = q_loader.get_question_set(question_set)
+                            all_question_ids = list(question_set_obj.questions.keys()) if question_set_obj else []
+                        except Exception:
+                            all_question_ids = None
+                        
+                        # Try to load results from database with current config
+                        logger.info(f"Attempting to load results from database for file: {file_path_for_cache}, config: {config}")
+                        cached_results = st.session_state.analyzer.analyzer.cache_manager.get_analysis(
+                            file_path=file_path_for_cache,
+                            config=config,
+                            question_ids=all_question_ids
+                        )
+                        
+                        # If no results with exact config match, try to find any config for this file and question set
+                        if not cached_results:
+                            cache_configs = st.session_state.analyzer.analyzer.cache_manager.check_cache_status()
+                            matching_configs = []
+                            for cache_config in cache_configs:
+                                if len(cache_config) == 6:
+                                    cfg_file_path, chunk_size, chunk_overlap, top_k, model, qs = cache_config
+                                    # Normalize both paths for comparison
+                                    try:
+                                        cfg_path_normalized = str(Path(str(cfg_file_path)).resolve())
+                                        file_path_normalized = str(Path(file_path_for_cache).resolve())
+                                    except Exception:
+                                        cfg_path_normalized = str(cfg_file_path)
+                                        file_path_normalized = file_path_for_cache
+                                    
+                                    if cfg_path_normalized == file_path_normalized and qs == db_question_set:
+                                        matching_configs.append({
+                                            "chunk_size": chunk_size,
+                                            "chunk_overlap": chunk_overlap,
+                                            "top_k": top_k,
+                                            "model": model,
+                                            "question_set": question_set,
+                                        })
+                            
+                            # If we found any matching configs, use the first one
+                            if matching_configs:
+                                logger.info(f"Found {len(matching_configs)} matching configs, using first one")
+                                config = matching_configs[0]
+                                cached_results = st.session_state.analyzer.analyzer.cache_manager.get_analysis(
+                                    file_path=file_path_for_cache,
+                                    config=config,
+                                    question_ids=all_question_ids
+                                )
+                        
+                        # If we have results, load them
+                        if cached_results:
+                            logger.info(f"Successfully loaded {len(cached_results)} results from database")
+                            # Store in session state
+                            if "results" not in st.session_state:
+                                st.session_state.results = {"answers": {}}
+                            for question_id, data in cached_results.items():
+                                st.session_state.results["answers"][question_id] = data
+                            
+                            # Create dataframes
+                            file_key = generate_file_key(file_path_for_cache, st)
+                            analysis_df, chunks_df = create_analysis_dataframes(
+                                st.session_state.results["answers"],
+                                file_key
+                            )
+                            st.session_state.analysis_df = analysis_df
+                            st.session_state.chunks_df = chunks_df
+                            st.session_state.analysis_complete = True
+                            
+                            has_dataframes = True
+                            has_raw_results = True
+                            logger.info(f"Created dataframes: analysis_df has {len(analysis_df)} rows, chunks_df has {len(chunks_df)} rows")
+                        else:
+                            logger.info(f"No cached results found for file: {file_path_for_cache} with config: {config}")
+                except Exception as e:
+                    logger.error(f"Error loading results from database: {e}", exc_info=True)
+            
+            # Display results if we have them
+            if has_dataframes or has_raw_results:
+                # If we have raw results but no dataframes, create them
+                if has_raw_results and not has_dataframes:
+                    try:
+                        # Get file path for generating file key
+                        display_file_path = None
+                        if previous_files and "previous_file" in st.session_state:
+                            prev_file = st.session_state.previous_file
+                            if isinstance(prev_file, dict):
+                                display_file_path = prev_file.get("path", "")
+                            else:
+                                for f in previous_files:
+                                    if f["name"] == prev_file or f.get("path") == prev_file:
+                                        display_file_path = f.get("path", "")
+                                        break
+                        
+                        file_key = generate_file_key(display_file_path, st) if display_file_path else "analysis"
+                        
+                        # Create dataframes from raw results
+                        analysis_df, chunks_df = create_analysis_dataframes(
+                            st.session_state.results["answers"],
+                            file_key
+                        )
+                        st.session_state.analysis_df = analysis_df
+                        st.session_state.chunks_df = chunks_df
+                        st.session_state.analysis_complete = True
+                        has_dataframes = True
+                    except Exception as e:
+                        logger.error(f"Error creating dataframes from session state results: {e}", exc_info=True)
+                        st.warning("Results found but could not be displayed. Please re-run analysis.")
+                        has_dataframes = False
+                
+                # Display results if we have dataframes
+                if has_dataframes:
+                    # Get file path for display
+                    display_file_path = None
+                    if previous_files and "previous_file" in st.session_state:
+                        prev_file = st.session_state.previous_file
+                        if isinstance(prev_file, dict):
+                            display_file_path = prev_file.get("path", "")
+                        else:
+                            for f in previous_files:
+                                if f["name"] == prev_file or f.get("path") == prev_file:
+                                    display_file_path = f.get("path", "")
+                                    break
+                    
+                    # Get question set
+                    question_set = st.session_state.get("new_question_set", "tcfd")
+                    
+                    # Generate file key
+                    if display_file_path:
+                        file_key = Path(display_file_path).stem
+                    else:
+                        file_key = "analysis"
+                    
+                    # Display the results
+                    display_analysis_results(
+                        st.session_state.analysis_df,
+                        st.session_state.chunks_df,
+                        file_key=file_key,
+                        file_path=display_file_path,
+                        question_set=question_set
+                    )
             else:
                 st.info("No previously analyzed reports found")
 
@@ -3848,6 +4180,317 @@ def main():
                             st.rerun()
 
         # All Results page
+        elif nav_page == "View Report":
+            st.header("View Report")
+            st.write("View PDF with chunks and analysis results by question")
+
+            # Get file list for dropdown (including backend resources if enabled)
+            backend_config = st.session_state.get("backend_config")
+            previous_files = get_uploaded_files_history(backend_config=backend_config)
+
+            if not previous_files:
+                st.info("No reports available. Please upload a report first.")
+            else:
+                # File selector
+                selected_file_dropdown = st.selectbox(
+                    "Select Report",
+                    options=previous_files,
+                    format_func=lambda x: x["name"],
+                    key="view_report_file",
+                )
+
+                if selected_file_dropdown:
+                    selected_uri = selected_file_dropdown.get("uri", selected_file_dropdown.get("path", ""))
+                    is_backend = selected_uri.startswith("urn:report-analyst:backend:")
+                    
+                    # Determine file path: use URI for backend, absolute path for local files
+                    if is_backend:
+                        file_path = selected_uri  # Use URN for backend resources
+                    else:
+                        file_path = selected_file_dropdown.get("path", "")
+                        # Handle file:// URI format
+                        if file_path.startswith("file://"):
+                            file_path = file_path.replace("file://", "")
+                        # Resolve to absolute path (same as Report Analyst)
+                        file_path = str(Path(file_path).resolve()) if file_path else file_path
+                    
+                    # Question set selection
+                    selected_set = st.selectbox(
+                        "Select Question Set",
+                        options=list(question_sets.keys()),
+                        format_func=lambda x: question_sets[x]["name"],
+                        key="view_report_set",
+                    )
+
+                    if selected_set and file_path:
+                        # Load questions (always needed for PDF viewer)
+                        # Use global question_loader (imported at module level)
+                        from report_analyst.core.question_loader import get_question_loader
+                        q_loader = get_question_loader()
+                        question_set_obj = q_loader.get_question_set(selected_set)
+                        questions_data = {}
+                        if question_set_obj:
+                            for q_id, q_data in question_set_obj.questions.items():
+                                questions_data[q_id] = q_data.get("text", q_id)
+                        
+                        # Try to get cached results (optional - PDF will show even without them)
+                        cached_results = None
+                        selected_config = None
+                        chunks_by_question = {}
+                        analysis_by_question = {}
+                        
+                        try:
+                            # Map question set to database identifier
+                            question_set_mapping = {
+                                "tcfd": "tcfd",
+                                "s4m": "s4m",
+                                "lucia": "lucia",
+                                "everest": "ev",
+                            }
+                            db_question_set = question_set_mapping.get(selected_set, selected_set)
+                            
+                            # Get all cache configs
+                            cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
+                            logger.info(f"Found {len(cache_configs)} total cache configs")
+                            logger.info(f"Looking for file_path: {file_path}, question_set: {db_question_set}")
+                            
+                            # Filter configs for this file and question set
+                            matching_configs = []
+                            for config in cache_configs:
+                                if len(config) == 6:
+                                    cfg_file_path, chunk_size, chunk_overlap, top_k, model, qs = config
+                                    # Match file path and question set
+                                    # Compare both as strings to handle path variations
+                                    if str(cfg_file_path) == str(file_path) and qs == db_question_set:
+                                        matching_configs.append({
+                                            "chunk_size": chunk_size,
+                                            "chunk_overlap": chunk_overlap,
+                                            "top_k": top_k,
+                                            "model": model,
+                                            "question_set": selected_set,  # Use original question set ID - get_analysis will map it internally
+                                        })
+                            
+                            logger.info(f"Found {len(matching_configs)} matching configs for file and question set")
+                            
+                            if matching_configs:
+                                # Let user select config if multiple, otherwise use first
+                                if len(matching_configs) > 1:
+                                    config_options = [
+                                        f"Chunk: {cfg['chunk_size']}, Overlap: {cfg['chunk_overlap']}, Top-K: {cfg['top_k']}, Model: {cfg['model']}"
+                                        for cfg in matching_configs
+                                    ]
+                                    selected_config_idx = st.selectbox(
+                                        "Select Configuration",
+                                        options=range(len(matching_configs)),
+                                        format_func=lambda i: config_options[i],
+                                        key="view_report_config",
+                                    )
+                                    selected_config = matching_configs[selected_config_idx]
+                                else:
+                                    selected_config = matching_configs[0]
+                                
+                                # Get cached results with the selected config
+                                # Note: get_analysis will map question_set internally, so we pass the ID
+                                logger.info(f"Retrieving cached results with config: {selected_config}")
+                                # Get all question IDs for this question set
+                                all_question_ids = list(questions_data.keys())
+                                logger.info(f"Retrieving chunks for {len(all_question_ids)} questions: {all_question_ids}")
+                                cached_results = analyzer.analyzer.cache_manager.get_analysis(
+                                    file_path=file_path,
+                                    config=selected_config,
+                                    question_ids=all_question_ids
+                                )
+                                logger.info(f"Retrieved cached results for {len(cached_results) if cached_results else 0} questions")
+                                
+                                if cached_results:
+                                    # Prepare chunks by question and normalize page numbers
+                                    for q_id, data in cached_results.items():
+                                        chunks = data.get("chunks", [])
+                                        # Normalize page_number in metadata (convert from 'source' if needed)
+                                        for chunk in chunks:
+                                            if chunk.get("metadata"):
+                                                metadata = chunk["metadata"]
+                                                # PyMuPDFReader uses 'source' as page number string, normalize to 'page_number' as integer
+                                                if "page_number" not in metadata and "source" in metadata:
+                                                    try:
+                                                        metadata["page_number"] = int(metadata["source"])
+                                                    except (ValueError, TypeError):
+                                                        metadata["page_number"] = 1
+                                                elif "page_number" in metadata:
+                                                    # Ensure it's an integer
+                                                    try:
+                                                        metadata["page_number"] = int(metadata["page_number"])
+                                                    except (ValueError, TypeError):
+                                                        metadata["page_number"] = 1
+                                                else:
+                                                    # Default to page 1 if no page info
+                                                    metadata["page_number"] = 1
+                                        chunks_by_question[q_id] = chunks
+                                        logger.info(f"Question {q_id}: Found {len(chunks)} chunks")
+                                        if chunks:
+                                            logger.debug(f"First chunk sample for {q_id}: {chunks[0] if chunks else 'None'}")
+                                        result = data.get("result", {})
+                                        # Ensure score is a number, not a string
+                                        score = result.get("SCORE", 0)
+                                        try:
+                                            score = float(score) if score is not None else 0
+                                        except (ValueError, TypeError):
+                                            score = 0
+                                        
+                                        analysis_by_question[q_id] = {
+                                            "answer": result.get("ANSWER", ""),
+                                            "score": score,
+                                            "evidence": result.get("EVIDENCE", []),
+                                            "gaps": result.get("GAPS", []),
+                                        }
+                                    
+                                    # Log total chunks for debugging
+                                    total_chunks = sum(len(chunks) for chunks in chunks_by_question.values())
+                                    logger.info(f"Total chunks prepared for PDF viewer: {total_chunks}")
+                                else:
+                                    st.info("No cached analysis results found. PDF will display without chunks.")
+                            else:
+                                st.info(f"No cached results found for this file and question set '{selected_set}'. PDF will display without chunks. Run analysis in 'Report Analyst' tab to see chunks.")
+                                
+                        except Exception as e:
+                            logger.error(f"Error getting cached results: {e}", exc_info=True)
+                            st.warning(f"Could not load cached results: {str(e)}. PDF will display without chunks.")
+
+                        # Try to import PDF viewer
+                        pdf_viewer_available = False
+                        try:
+                            from report_analyst_enterprise.components.streamlit_component.backend import pdf_viewer
+                            pdf_viewer_available = True
+                        except ImportError:
+                            pass
+
+                        # Create two-column layout: questions on left, PDF viewer on right
+                        if pdf_viewer_available:
+                            left_col, right_col = st.columns([1, 1])
+                        else:
+                            left_col = st.container()
+                            right_col = None
+
+                        with left_col:
+                            st.subheader("Questions & Chunks")
+                            
+                            if cached_results and chunks_by_question:
+                                # Sort questions by question_id for consistent display
+                                sorted_question_ids = sorted(questions_data.keys())
+                                
+                                for q_id in sorted_question_ids:
+                                    question_text = questions_data[q_id]
+                                    chunks = chunks_by_question.get(q_id, [])
+                                    analysis = analysis_by_question.get(q_id, {})
+
+                                    with st.expander(f"**{q_id}**: {question_text[:80]}{'...' if len(question_text) > 80 else ''}", expanded=False):
+                                        if chunks:
+                                            # Sort chunks: evidence first, then by score (higher is better)
+                                            sorted_chunks = sorted(
+                                                chunks,
+                                                key=lambda c: (
+                                                    not c.get("is_evidence", False),  # Evidence first (False < True)
+                                                    -(c.get("llm_score") if c.get("llm_score") is not None else c.get("similarity_score", 0))  # Higher scores first
+                                                )
+                                            )
+
+                                            # Create dataframe for chunks with chunk IDs for navigation
+                                            chunk_rows = []
+                                            chunk_id_map = {}  # Map row index to chunk_id
+                                            for idx, chunk in enumerate(sorted_chunks):
+                                                chunk_order = chunk.get('chunk_order', 0)
+                                                # Generate chunk ID: "question_id_chunk_order"
+                                                chunk_id = f"{q_id}_{chunk_order}"
+                                                chunk_id_map[idx] = chunk_id
+                                                chunk_rows.append({
+                                                    "Chunk": f"Chunk {chunk_order + 1}",
+                                                    "Text": chunk.get("text", "")[:200] + ("..." if len(chunk.get("text", "")) > 200 else ""),
+                                                    "Page": chunk.get("metadata", {}).get("page_number", "N/A"),
+                                                    "Evidence": "✓" if chunk.get("is_evidence", False) else "",
+                                                    "Similarity": f"{chunk.get('similarity_score', 0):.3f}",
+                                                    "LLM Score": f"{chunk.get('llm_score', 0):.3f}" if chunk.get("llm_score") else "N/A",
+                                                })
+
+                                            chunks_df = pd.DataFrame(chunk_rows)
+                                            
+                                            # Use session state to track selected chunk for this question
+                                            chunk_selection_key = f"selected_chunk_{q_id}_{selected_set}"
+                                            
+                                            # Add a "Select" column with buttons for each chunk
+                                            select_buttons = []
+                                            for idx in range(len(chunks_df)):
+                                                chunk_id = chunk_id_map[idx]
+                                                select_buttons.append(chunk_id)
+                                            
+                                            # Display chunks with clickable select buttons
+                                            for idx, row in chunks_df.iterrows():
+                                                chunk_id = chunk_id_map[idx]
+                                                col1, col2 = st.columns([0.12, 0.88])
+                                                with col1:
+                                                    if st.button("📍", key=f"select_chunk_{chunk_id}", help="Click to highlight this chunk in PDF", use_container_width=True):
+                                                        st.session_state[chunk_selection_key] = chunk_id
+                                                        st.rerun()
+                                                with col2:
+                                                    st.markdown(f"**{row['Chunk']}** | Page {row['Page']} | {row['Evidence']} | Similarity: {row['Similarity']}")
+                                                    st.caption(row['Text'])
+                                            
+                                            # Also show as compact dataframe for overview
+                                            st.dataframe(
+                                                chunks_df,
+                                                use_container_width=True,
+                                                hide_index=True,
+                                                column_config={
+                                                    "Chunk": st.column_config.TextColumn("Chunk", width="small"),
+                                                    "Text": st.column_config.TextColumn("Text", width="large"),
+                                                    "Page": st.column_config.TextColumn("Page", width="small"),
+                                                    "Evidence": st.column_config.TextColumn("Evidence", width="small"),
+                                                    "Similarity": st.column_config.TextColumn("Similarity", width="small"),
+                                                    "LLM Score": st.column_config.TextColumn("LLM Score", width="small"),
+                                                }
+                                            )
+
+                                            # Show analysis result below chunks
+                                            st.markdown("---")
+                                            st.markdown("**Analysis Result:**")
+                                            if analysis.get("answer"):
+                                                st.write(analysis["answer"])
+                                            if analysis.get("score") is not None:
+                                                # Handle score as either number or string
+                                                try:
+                                                    score_value = float(analysis["score"])
+                                                    st.metric("Score", f"{score_value:.1f}")
+                                                except (ValueError, TypeError):
+                                                    # If score is not a number, display as-is
+                                                    st.metric("Score", str(analysis["score"]))
+                                        else:
+                                            st.info("No chunks available for this question.")
+                            else:
+                                st.info("No cached analysis results available. Run analysis in 'Report Analyst' tab to see chunks and analysis.")
+
+                        # PDF viewer on the right - always show if file is selected
+                        if pdf_viewer_available and right_col:
+                            with right_col:
+                                st.subheader("PDF Viewer")
+                                
+                                # Get selected chunk ID from session state (check all questions)
+                                selected_chunk_id = None
+                                for q_id_check in questions_data.keys():
+                                    chunk_key = f"selected_chunk_{q_id_check}_{selected_set}"
+                                    if chunk_key in st.session_state:
+                                        selected_chunk_id = st.session_state[chunk_key]
+                                        break  # Use first found, or could use most recent
+                                
+                                pdf_viewer(
+                                    pdf_path=file_path,
+                                    chunks_data=chunks_by_question,
+                                    questions_data=questions_data,
+                                    highlight_chunk_id=selected_chunk_id,
+                                    height=800,
+                                    key=f"view_report_pdf_viewer_{selected_set}"
+                                )
+                        elif not pdf_viewer_available:
+                            st.info("PDF viewer component not available. Install enterprise components to enable PDF viewing.")
+
         elif nav_page == "All Results":
             st.header("View All Results")
             st.write("View and export consolidated results for all analyzed reports")

@@ -823,7 +823,25 @@ Output only the scores, one per line, in order:"""
                     else:
                         logger.warning("No EVIDENCE field found in result")
 
-                    # 5. Save complete analysis
+                    # 5. Add chunks to result before saving
+                    # Prepare chunks with all metadata for saving
+                    result_chunks = []
+                    for i, chunk in enumerate(similar_chunks):
+                        chunk_data = {
+                            "text": chunk.get("text", ""),
+                            "chunk_order": i,
+                            "similarity_score": chunk.get("similarity_score", chunk.get("score", 0.0)),
+                            "llm_score": chunk.get("llm_score"),
+                            "is_evidence": chunk.get("is_evidence", False),
+                            "evidence_order": chunk.get("evidence_order"),
+                            "metadata": chunk.get("metadata", {}),
+                        }
+                        result_chunks.append(chunk_data)
+                    
+                    result["chunks"] = result_chunks
+                    logger.info(f"[ANALYSIS] Added {len(result_chunks)} chunks to result for saving")
+
+                    # 6. Save complete analysis
                     logger.info(
                         f"[ANALYSIS] Saving analysis result for question {question_id}"
                     )
@@ -839,7 +857,7 @@ Output only the scores, one per line, in order:"""
                         "question_set": self.question_set,
                     }
 
-                    # Save analysis result
+                    # Save analysis result (includes chunks)
                     self.cache_manager.save_analysis(
                         file_path=file_path,
                         question_id=question_id,
@@ -1067,6 +1085,15 @@ Output only the scores, one per line, in order:"""
 
             # Get LLM response
             try:
+                if self.llm is None:
+                    logger.error("LLM not initialized - cannot analyze chunks")
+                    return {
+                        "ANSWER": "Error: LLM not initialized. Please check your API keys and configuration.",
+                        "SCORE": 0,
+                        "EVIDENCE": [],
+                        "GAPS": ["LLM service unavailable"],
+                        "SOURCES": [],
+                    }
                 response = await self.llm.achat(messages)
                 response_text = (
                     response.message.content
@@ -1416,6 +1443,11 @@ Output only the scores, one per line, in order:"""
         """
         try:
             logger.info(f"Getting similar chunks for query: {query_text[:50]}...")
+
+            # Check if embeddings are available
+            if self.embeddings is None:
+                logger.error("Embeddings not initialized - cannot get similar chunks")
+                return []
 
             # Get embedding for the query
             query_embedding = self.embeddings.get_text_embedding(query_text)
