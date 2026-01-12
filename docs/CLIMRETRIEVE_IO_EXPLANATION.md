@@ -1,0 +1,134 @@
+# ClimRetrieve IO Module Explanation
+
+## Overview
+
+The `climretrieve_io.py` module is responsible for loading and preparing two datasets needed for benchmarking:
+1. **Labels (Ground Truth)** - Expert-annotated relevance scores
+2. **Results (Model Output)** - Your retrieval system's output
+
+## Datasets Required
+
+### 1. Labels Dataset (Ground Truth)
+
+**Purpose**: Contains expert-annotated relevance judgments for evaluation.
+
+**Required Columns**:
+- `report` - Report/document identifier (e.g., "2022 Microsoft Environmental Sustainability Report.pdf")
+- `question` - Question/query text
+- `paragraph` - Paragraph/chunk text or identifier
+- `relevance` - Relevance score (0-3, where 0=not relevant, 3=highly relevant)
+
+**Example CSV Structure**:
+```csv
+report,question,paragraph,relevance
+2022 Microsoft Environmental Sustainability Report.pdf,"Do the environmental/sustainability targets...","2022 Environmental Sustainability Report...",3.0
+2022 Microsoft Environmental Sustainability Report.pdf,"Do the environmental/sustainability targets...","Color PaletteNames are TBC...",0.0
+```
+
+**Function**: `load_climretrieve_labels()`
+- Reads the CSV file
+- Validates required columns exist
+- Extracts only the 4 required columns
+- Ensures `relevance` is numeric (0-3, integers)
+- Returns a cleaned DataFrame
+
+### 2. Results Dataset (Model Output)
+
+**Purpose**: Contains your retrieval system's ranked results.
+
+**Required Columns**:
+- `report` - Report/document identifier (must match labels)
+- `question` - Question/query text (must match labels)
+- `<paragraph_col>` - Paragraph/chunk text or identifier (default: "paragraph")
+- `<score_col>` - Retrieval score (default: "score", higher = better)
+
+**Example CSV Structure**:
+```csv
+report,question,paragraph,score,position
+2022 Microsoft Environmental Sustainability Report.pdf,"Do the environmental/sustainability targets...","How we workFor any organization's...",18.008659285716462,1
+2022 Microsoft Environmental Sustainability Report.pdf,"Do the environmental/sustainability targets...","ForewordEnabling sustainability...",17.04235442308339,2
+```
+
+**Function**: `load_climretrieve_results()`
+- Reads the CSV file
+- Validates required columns exist
+- Extracts only the 4 required columns
+- Renames columns to standardized names (`paragraph`, `score`)
+- Converts `score` to numeric (invalid values become `-inf`)
+- Returns a cleaned DataFrame
+
+**Flexibility**: You can customize column names:
+- `--score-col` parameter (default: "score")
+- `--paragraph-col` parameter (default: "paragraph")
+
+### 3. Combined Input Object
+
+**Function**: `load_inputs()`
+- Convenience function that loads both datasets
+- Returns a `ClimRetrieveInputs` dataclass containing:
+  - `labels`: DataFrame with ground truth
+  - `results`: DataFrame with model results
+
+## Data Flow
+
+```
+Labels CSV                    Results CSV
+    |                            |
+    v                            v
+load_climretrieve_labels()  load_climretrieve_results()
+    |                            |
+    v                            v
+[report, question,           [report, question,
+ paragraph, relevance]        paragraph, score]
+    |                            |
+    +----------------------------+
+                |
+                v
+         ClimRetrieveInputs
+         (labels + results)
+                |
+                v
+         evaluate_climretrieve()
+         (compares results vs labels)
+```
+
+## Key Requirements
+
+1. **Column Matching**: The `report` and `question` columns must match between labels and results (used for joining)
+2. **Paragraph Matching**: The `paragraph` column values must match between labels and results (used for relevance assignment)
+3. **Relevance Scores**: Labels must have integer relevance scores (0-3)
+4. **Retrieval Scores**: Results must have numeric scores (higher = better)
+
+## Error Handling
+
+- **Missing Columns**: Raises `ValueError` with details of missing columns
+- **Invalid Data Types**: Converts with `fillna()` - relevance becomes 0, scores become `-inf`
+- **File Not Found**: Standard pandas `FileNotFoundError`
+
+## Example Usage
+
+```python
+from app.core.benchmark.climretrieve_io import load_inputs
+
+# Load both datasets
+inputs = load_inputs(
+    labels_csv="data/climretrieve/labels/ClimRetrieve_ReportLevel_V1.csv",
+    results_csv="data/climretrieve/results/results_IR_three.csv",
+    score_col="score",          # Optional: customize column names
+    paragraph_col="paragraph"   # Optional: customize column names
+)
+
+# Access the DataFrames
+labels_df = inputs.labels      # Ground truth
+results_df = inputs.results    # Model output
+```
+
+## Where to Get These Datasets
+
+1. **Labels**: ClimRetrieve Report-Level dataset (ground truth annotations)
+   - Typically: `data/climretrieve/labels/ClimRetrieve_ReportLevel_V1.csv`
+   - Source: ClimRetrieve benchmark repository
+
+2. **Results**: Generated by your retrieval system
+   - Output from your embedding experiment (e.g., `results_IR_three.csv`)
+   - Must have the required columns matching the labels format

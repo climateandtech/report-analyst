@@ -15,7 +15,7 @@ import pandas as pd
 import yaml
 from dotenv import load_dotenv
 from langchain.chains import RetrievalQA
-from langchain_core.prompts import PromptTemplate
+from langchain.prompts import PromptTemplate
 from langchain.chains.summarize import load_summarize_chain
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.ingestion import IngestionCache

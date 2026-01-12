@@ -62,8 +62,13 @@ Export retrieval results from our internal tools to CSV/SQLite format.
 ### Example: Export to CSV
 
 ```python
+<<<<<<< HEAD
 from report_analyst.core.benchmark.retrieval_results_loader import export_retrieval_results_to_csv
 from report_analyst.models.benchmark import RetrievalResultsDataset, RetrievalResultRow
+=======
+from app.core.benchmark.retrieval_results_loader import export_retrieval_results_to_csv
+from app.models.benchmark import RetrievalResultsDataset, RetrievalResultRow
+>>>>>>> 78285f2b (added s4m benchmark)
 
 # Create dataset from our retrieval results
 results = [
@@ -97,7 +102,11 @@ Load retrieval results from CSV file or content. This function is designed to be
 ### Function: `load_retrieval_results_from_csv`
 
 ```python
+<<<<<<< HEAD
 from report_analyst.core.benchmark.retrieval_results_loader import load_retrieval_results_from_csv
+=======
+from app.core.benchmark.retrieval_results_loader import load_retrieval_results_from_csv
+>>>>>>> 78285f2b (added s4m benchmark)
 
 # Option 1: Load from file path
 dataset = load_retrieval_results_from_csv(
@@ -122,7 +131,11 @@ dataset = load_retrieval_results_from_csv(
 
 ```python
 from fastapi import FastAPI, UploadFile, File
+<<<<<<< HEAD
 from report_analyst.core.benchmark.retrieval_results_loader import load_retrieval_results_from_csv
+=======
+from app.core.benchmark.retrieval_results_loader import load_retrieval_results_from_csv
+>>>>>>> 78285f2b (added s4m benchmark)
 
 app = FastAPI()
 
@@ -143,7 +156,11 @@ async def upload_retrieval_results(file: UploadFile = File(...)):
 ## Flow C: Load from SQLite
 
 ```python
+<<<<<<< HEAD
 from report_analyst.core.benchmark.retrieval_results_loader import load_retrieval_results_from_sqlite
+=======
+from app.core.benchmark.retrieval_results_loader import load_retrieval_results_from_sqlite
+>>>>>>> 78285f2b (added s4m benchmark)
 
 dataset = load_retrieval_results_from_sqlite(
     db_path="retrieval_results.db",
@@ -161,8 +178,13 @@ Compare a reference dataset (ground truth) against an input dataset (actual resu
 ### Example
 
 ```python
+<<<<<<< HEAD
 from report_analyst.core.benchmark.evaluation_engine import EvaluationEngine
 from report_analyst.core.benchmark.retrieval_results_loader import (
+=======
+from app.core.benchmark.evaluation_engine import EvaluationEngine
+from app.core.benchmark.retrieval_results_loader import (
+>>>>>>> 78285f2b (added s4m benchmark)
     load_retrieval_results_from_csv,
     load_retrieval_results_from_sqlite
 )

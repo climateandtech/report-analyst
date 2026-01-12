@@ -78,12 +78,13 @@ class BenchmarkStore:
             return BenchmarkDataset(
                 dataset_id=row['dataset_id'],
                 name=row['name'],
-                description=row['description'],
-                version=row['version'],
-                question_set=row['question_set'],
-                file_path=row['file_path'],
+                description=row['description'] or None,
+                version=row['version'] or None,
+                question_set=row['question_set'] or None,
+                file_path=row['file_path'] or None,
                 created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
-                updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else None
+                updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else None,
+                source="database"
             )
     
     def list_datasets(self) -> List[BenchmarkDataset]:
@@ -99,9 +100,10 @@ class BenchmarkStore:
                 datasets.append(BenchmarkDataset(
                     dataset_id=row['dataset_id'],
                     name=row['name'],
-                    description=row['description'],
-                    version=row['version'],
-                    question_set=row['question_set'],
+                    description=row['description'] or None,
+                    version=row['version'] or None,
+                    question_set=row['question_set'] or None,
+                    source="database",
                     file_path=row['file_path'],
                     created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
                     updated_at=datetime.fromisoformat(row['updated_at']) if row['updated_at'] else None

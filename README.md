@@ -78,6 +78,7 @@ In the web UI you can:
   - Evidence and sources
   - Gaps and uncertainties
 
+<<<<<<< HEAD
 ## Running Benchmarks
 
 The project includes support for benchmarking retrieval and extraction systems against reference datasets.
@@ -112,7 +113,47 @@ This will:
 
 For more details, see `scripts/README_CLIMRETRIEVE.md`.
 
+=======
+<<<<<<< HEAD
+>>>>>>> 78285f2b (added s4m benchmark)
 For more detailed setup options (API, search backend, jobs), see `INSTALL.md`.
+=======
+## Running Benchmarks
+
+The project includes support for benchmarking retrieval and extraction systems against reference datasets.
+
+### ClimRetrieve Benchmark
+
+Run the ClimRetrieve benchmark to evaluate your retrieval system against expert-annotated datasets:
+
+```bash
+# Activate virtual environment
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Run the benchmark (downloads datasets automatically)
+python scripts/test_climretrieve_benchmark.py
+```
+
+This will:
+1. Download ClimRetrieve datasets from GitHub to `data/climretrieve/`
+2. Transform datasets to the required format
+3. Compare reference (ground truth) vs input (your results) datasets
+4. Display evaluation metrics (MAP, MRR, Precision@K, Recall@K, F1@K, NDCG@K)
+
+**Options:**
+- `--skip-download`: Use existing downloaded datasets
+- `--reference-path PATH`: Specify custom reference dataset path
+- `--input-path PATH`: Specify custom input dataset path
+- `--k-values 1 5 10 20`: Custom K values for metrics
+
+**Requirements:**
+- `openpyxl` for Excel file support (install with `pip install openpyxl`)
+- Internet connection for initial download
+
+For more details, see `scripts/README_CLIMRETRIEVE.md`.
+
+## Customizing Prompts
+>>>>>>> 5064f286 (added s4m benchmark)
 
 ---
 
