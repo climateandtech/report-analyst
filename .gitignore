@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 /data
 data/
+=======
+*.env
+env
+>>>>>>> f95d946d (adding data for benchmarking)
 .env
 *.log
 venv/
