@@ -2,8 +2,8 @@ import pytest
 import numpy as np
 from unittest.mock import Mock
 
-from app.core.benchmark.evaluation_engine import EvaluationEngine
-from app.models.benchmark import BenchmarkDatasetContent, BenchmarkQuestion, GroundTruthChunk, RetrievalConfig, EvaluationMetrics
+from report_analyst.core.benchmark.evaluation_engine import EvaluationEngine
+from report_analyst.models.benchmark import BenchmarkDatasetContent, BenchmarkQuestion, GroundTruthChunk, RetrievalConfig, EvaluationMetrics
 
 class TestEvaluationEngine:
     """Test suite for evaluation engine metrics calculation"""

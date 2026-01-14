@@ -1,6 +1,8 @@
-# Report Analyst Jobs
+# Open Sustainability Analyst – Jobs & Integrations
 
 Universal analysis functions that use the same core logic as the Streamlit app.
+
+Part of the **Open Sustainability Analysis** project by **Climate+Tech**.
 
 ## 🚀 Quick Start
 
@@ -60,7 +62,15 @@ See `integration_examples.py` for complete examples of:
 
 ## ⚖️ License
 
-This module has a separate license from the core `report_analyst` package.
+This module is part of the **Open Sustainability Analysis** project by **Climate+Tech**.
+
+- **Core engine** (`report_analyst/`) is licensed under the **Reciprocal Public License (RPL)**
+- **`report_analyst_jobs/`** is provided under the **Climate+Tech Open License for Good**, and can be **dual-licensed** for commercial or custom deployments upon request
+
+See the main `README.md` for an overview and links, or contact Climate+Tech via:
+
+- [OpenSustainability Analysis Framework](https://climateandtech.com/en/climate-ai-solutions/opensustainability-analysis-framework)
+- [AI Benchmark for Sustainability Report Analysis](https://climateandtech.com/en/research-projects/sustainability-ai-benchmark-and-dataset)
 
 ## 🔗 Dependencies
 

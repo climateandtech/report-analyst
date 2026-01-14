@@ -1,8 +1,0 @@
-**/__pycache__/
-**/__pycache__/
-*.pyc
-__pycache__/
-*.pyo
-*.pyd
-.Python
-*.py[cod]

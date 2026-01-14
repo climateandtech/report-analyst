@@ -1,0 +1,99 @@
+# Event-Action Routing Configuration
+#
+# Maps NATS event patterns to actions.
+# Actions can be handler function names or "ignore" to skip processing.
+#
+# Pattern matching:
+#   - Exact: "document.ready" matches only "document.ready"
+#   - Single wildcard: "document.*" matches "document.ready" but not "document.ready.status"
+#   - Multi-wildcard: "document.>" matches "document.ready" and "document.ready.status"
+#
+# Priority: Higher priority rules are checked first. More specific patterns should have higher priority.
+
+routing:
+  # Document processing events
+  - pattern: "document.ready"
+    action: "handle_document_ready"
+    description: "Process document ready events - pull chunks, run analysis, store results"
+    enabled: true
+    priority: 10
+
+  - pattern: "document.upload"
+    action: "ignore"
+    description: "Ignore document upload events"
+    enabled: true
+    priority: 5
+
+  - pattern: "document.*"
+    action: "ignore"
+    description: "Ignore other document events"
+    enabled: true
+    priority: 1
+
+  # Analysis job events
+  - pattern: "analysis.job.submit"
+    action: "handle_analysis_job"
+    description: "Process analysis job submissions"
+    enabled: true
+    priority: 10
+
+  - pattern: "analysis.job.completed"
+    action: "ignore"
+    description: "Ignore analysis job completion notifications"
+    enabled: true
+    priority: 5
+
+  - pattern: "analysis.job.*"
+    action: "ignore"
+    description: "Ignore other analysis job events"
+    enabled: true
+    priority: 1
+
+  # LLM service events
+  - pattern: "llm.request"
+    action: "handle_llm_request"
+    description: "Process LLM requests"
+    enabled: true
+    priority: 10
+
+  - pattern: "llm.response"
+    action: "ignore"
+    description: "Ignore LLM responses (handled by client)"
+    enabled: true
+    priority: 5
+
+  - pattern: "llm.*"
+    action: "ignore"
+    description: "Ignore other LLM events"
+    enabled: true
+    priority: 1
+
+  # External service events
+  - pattern: "external.service.ready"
+    action: "handle_external_service_ready"
+    description: "Process external service ready notifications"
+    enabled: true
+    priority: 10
+
+  - pattern: "external.service.analysis.request"
+    action: "handle_external_service_analysis"
+    description: "Process external service analysis requests"
+    enabled: true
+    priority: 10
+
+  - pattern: "external.service.*"
+    action: "ignore"
+    description: "Ignore other external service events"
+    enabled: true
+    priority: 1
+
+# Handler function mappings
+# Maps action names to Python handler functions
+# These should be imported or defined in your application
+handlers:
+  handle_document_ready: "report_analyst_jobs.event_handlers.handle_document_ready"
+  handle_analysis_job: "report_analyst_jobs.event_handlers.handle_analysis_job"
+  handle_llm_request: "report_analyst_jobs.event_handlers.handle_llm_request"
+  handle_external_service_ready: "report_analyst_jobs.event_handlers.handle_external_service_ready"
+  handle_external_service_analysis: "report_analyst_jobs.event_handlers.handle_external_service_analysis"
+

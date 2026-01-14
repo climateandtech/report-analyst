@@ -1,6 +1,9 @@
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
+
 from .requests import DocumentMetadata
+
 
 class AnalysisResponse(BaseModel):
     document_id: str
@@ -10,11 +13,9 @@ class AnalysisResponse(BaseModel):
     topics: List[Dict[str, float]]
     metadata: DocumentMetadata
     confidence_score: float = Field(
-        ...,
-        ge=0.0,
-        le=1.0,
-        description="Confidence score of the analysis"
+        ..., ge=0.0, le=1.0, description="Confidence score of the analysis"
     )
+
 
 class QuestionResponse(BaseModel):
     document_id: str
@@ -22,17 +23,15 @@ class QuestionResponse(BaseModel):
     answer: str
     context_used: Optional[str] = None
     confidence_score: float = Field(
-        ...,
-        ge=0.0,
-        le=1.0,
-        description="Confidence score of the answer"
+        ..., ge=0.0, le=1.0, description="Confidence score of the answer"
     )
     relevant_quotes: List[str] = Field(
         default_factory=list,
-        description="Relevant quotes from the document supporting the answer"
+        description="Relevant quotes from the document supporting the answer",
     )
+
 
 class ErrorResponse(BaseModel):
     detail: str
     error_code: str
-    additional_info: Optional[Dict] = None 
+    additional_info: Optional[Dict] = None

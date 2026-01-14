@@ -1,0 +1,368 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Report Analyst Service Contract",
+  "description": "Service discovery schema defining the contract that compatible backend services must implement. This combines NATS (AsyncAPI) and HTTP REST (OpenAPI) requirements.",
+  "version": "1.0.0",
+  "type": "object",
+  "required": [
+    "service_name",
+    "version",
+    "protocols",
+    "nats_channels",
+    "http_endpoints"
+  ],
+  "properties": {
+    "service_name": {
+      "type": "string",
+      "description": "Name of the service (e.g., 'search-backend', 'llm-worker')",
+      "example": "search-backend"
+    },
+    "version": {
+      "type": "string",
+      "description": "Service version (must match contract version)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "example": "1.0.0"
+    },
+    "contract_version": {
+      "type": "string",
+      "description": "Version of this service contract schema",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "example": "1.0.0"
+    },
+    "protocols": {
+      "type": "object",
+      "description": "Protocols supported by this service",
+      "properties": {
+        "nats": {
+          "type": "object",
+          "description": "NATS protocol configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether NATS is enabled"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "NATS server URL",
+              "example": "nats://localhost:4222"
+            },
+            "jetstream": {
+              "type": "boolean",
+              "description": "Whether JetStream is enabled",
+              "default": true
+            },
+            "streams": {
+              "type": "array",
+              "description": "Required JetStream streams",
+              "items": {
+                "type": "string"
+              },
+              "example": ["DOCUMENTS", "ANALYSIS_JOBS", "LLM_REQUESTS"]
+            }
+          },
+          "required": ["enabled", "url"]
+        },
+        "http": {
+          "type": "object",
+          "description": "HTTP REST API configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether HTTP REST API is enabled"
+            },
+            "base_url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Base URL for HTTP API",
+              "example": "http://localhost:8000"
+            },
+            "api_version": {
+              "type": "string",
+              "description": "API version",
+              "example": "v1"
+            }
+          },
+          "required": ["enabled", "base_url"]
+        }
+      },
+      "required": ["nats", "http"]
+    },
+    "nats_channels": {
+      "type": "object",
+      "description": "NATS channels that this service publishes to or subscribes to",
+      "properties": {
+        "publishes": {
+          "type": "array",
+          "description": "Channels this service publishes to",
+          "items": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string",
+                "description": "NATS subject/channel name",
+                "pattern": "^[a-z]+(\\.[a-z]+)*$",
+                "examples": [
+                  "document.ready",
+                  "analysis.job.completed",
+                  "llm.response"
+                ]
+              },
+              "message_schema": {
+                "type": "string",
+                "description": "Reference to message schema (see AsyncAPI schema)",
+                "example": "#/components/messages/DocumentReadyEvent"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of when/why this channel is used"
+              }
+            },
+            "required": ["channel", "message_schema"]
+          }
+        },
+        "subscribes": {
+          "type": "array",
+          "description": "Channels this service subscribes to",
+          "items": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string",
+                "description": "NATS subject/channel name",
+                "pattern": "^[a-z]+(\\.[a-z]+)*$",
+                "examples": [
+                  "document.upload",
+                  "analysis.job.submit",
+                  "llm.request"
+                ]
+              },
+              "message_schema": {
+                "type": "string",
+                "description": "Reference to message schema (see AsyncAPI schema)",
+                "example": "#/components/messages/DocumentUploadEvent"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of when/why this channel is used"
+              }
+            },
+            "required": ["channel", "message_schema"]
+          }
+        }
+      },
+      "required": ["publishes", "subscribes"]
+    },
+    "http_endpoints": {
+      "type": "object",
+      "description": "HTTP REST endpoints that this service implements",
+      "properties": {
+        "required": {
+          "type": "array",
+          "description": "Required endpoints (must be implemented)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+              },
+              "path": {
+                "type": "string",
+                "description": "Endpoint path",
+                "pattern": "^/[a-z/_{}]+$",
+                "examples": [
+                  "/resources/",
+                  "/search/",
+                  "/analysis/jobs/",
+                  "/resources/{resource_id}",
+                  "/analysis/jobs/{job_id}/results"
+                ]
+              },
+              "operation_id": {
+                "type": "string",
+                "description": "OpenAPI operation ID",
+                "example": "listResources"
+              },
+              "description": {
+                "type": "string",
+                "description": "Endpoint description"
+              }
+            },
+            "required": ["method", "path", "operation_id"]
+          }
+        },
+        "optional": {
+          "type": "array",
+          "description": "Optional endpoints (may be implemented)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+              },
+              "path": {
+                "type": "string",
+                "description": "Endpoint path"
+              },
+              "operation_id": {
+                "type": "string",
+                "description": "OpenAPI operation ID"
+              },
+              "description": {
+                "type": "string",
+                "description": "Endpoint description"
+              }
+            },
+            "required": ["method", "path", "operation_id"]
+          }
+        }
+      },
+      "required": ["required"]
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "Service capabilities and features",
+      "properties": {
+        "document_processing": {
+          "type": "boolean",
+          "description": "Can process documents (chunking, embedding)"
+        },
+        "semantic_search": {
+          "type": "boolean",
+          "description": "Provides semantic search functionality"
+        },
+        "llm_processing": {
+          "type": "boolean",
+          "description": "Provides LLM processing (question answering, summarization)"
+        },
+        "analysis_jobs": {
+          "type": "boolean",
+          "description": "Can execute analysis jobs"
+        },
+        "s3_upload": {
+          "type": "boolean",
+          "description": "Supports S3+NATS upload pattern"
+        },
+        "data_lake": {
+          "type": "boolean",
+          "description": "Provides data lake integration"
+        },
+        "external_service_integration": {
+          "type": "boolean",
+          "description": "Supports external service integration (receive notifications, process S3 URLs or chunks, return analysis results)"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about the service",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Service description"
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        },
+        "deployment": {
+          "type": "object",
+          "properties": {
+            "environment": {
+              "type": "string",
+              "enum": ["development", "staging", "production"]
+            },
+            "region": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "service_name": "search-backend",
+      "version": "1.0.0",
+      "contract_version": "1.0.0",
+      "protocols": {
+        "nats": {
+          "enabled": true,
+          "url": "nats://localhost:4222",
+          "jetstream": true,
+          "streams": ["DOCUMENTS", "ANALYSIS_JOBS"]
+        },
+        "http": {
+          "enabled": true,
+          "base_url": "http://localhost:8000",
+          "api_version": "v1"
+        }
+      },
+      "nats_channels": {
+        "publishes": [
+          {
+            "channel": "document.ready",
+            "message_schema": "#/components/messages/DocumentReadyEvent",
+            "description": "Published when document processing is complete"
+          }
+        ],
+        "subscribes": [
+          {
+            "channel": "document.upload",
+            "message_schema": "#/components/messages/DocumentUploadEvent",
+            "description": "Subscribes to document upload requests"
+          }
+        ]
+      },
+      "http_endpoints": {
+        "required": [
+          {
+            "method": "GET",
+            "path": "/resources/",
+            "operation_id": "listResources",
+            "description": "List all resources"
+          },
+          {
+            "method": "POST",
+            "path": "/search/",
+            "operation_id": "searchResources",
+            "description": "Search resources"
+          }
+        ]
+      },
+      "capabilities": {
+        "document_processing": true,
+        "semantic_search": true,
+        "llm_processing": false,
+        "analysis_jobs": false,
+        "s3_upload": true,
+        "data_lake": false
+      },
+      "metadata": {
+        "description": "Search backend service for document processing and semantic search",
+        "contact": {
+          "name": "Search Backend Team",
+          "url": "https://github.com/your-org/search-backend"
+        },
+        "deployment": {
+          "environment": "development"
+        }
+      }
+    }
+  ]
+}
+

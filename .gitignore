@@ -20,3 +20,35 @@ report_analyst/temp/*
 
 # Cursor IDE files
 .cursor/
+
+# Coverage and test artifacts
+.coverage
+.pytest_cache/
+
+# Temporary files and diffs
+*.diff
+analyzer.diff
+streamlit.diff
+
+# Database files
+cache.db
+*.db
+
+# Environment and backup files
+.env.backup
+inputlucia
+
+# macOS system files
+.DS_Store
+
+# Deployment guides and assessments (keep local, don't commit)
+CLOUDFLARE_ASSESSMENT.md
+CLOUDFLARE_QUICK_SUMMARY.md
+DEPLOYMENT_GUIDE.md
+FREE_TIER_DEPLOYMENT.md
+GRADIO_VERCEL_ASSESSMENT.md
+NETLIFY_ASSESSMENT.md
+THEME_SWITCHING.md
+VERCEL_CHANGES_SUMMARY.md
+VERCEL_DEPLOYMENT_ASSESSMENT.md
+VERCEL_MIGRATION_GUIDE.md

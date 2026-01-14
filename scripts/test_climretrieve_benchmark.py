@@ -20,9 +20,9 @@ from typing import Optional
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.core.benchmark.retrieval_results_loader import load_flexible_dataset_from_csv
-from app.core.benchmark.evaluation_engine import EvaluationEngine
-from app.models.benchmark import BenchmarkDataset, DatasetType
+from report_analyst.core.benchmark.retrieval_results_loader import load_flexible_dataset_from_csv
+from report_analyst.core.benchmark.evaluation_engine import EvaluationEngine
+from report_analyst.models.benchmark import BenchmarkDataset, DatasetType
 
 
 def download_file_from_github(
