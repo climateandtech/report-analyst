@@ -1624,6 +1624,14 @@ def main():
                 os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
             )
 
+        # Initialize processing_steps_slider to prevent invalid values from test framework
+        valid_steps = ["Chunk", "Embed", "Map", "Answer"]
+        if (
+            "processing_steps_slider" not in st.session_state
+            or st.session_state.get("processing_steps_slider") not in valid_steps
+        ):
+            st.session_state.processing_steps_slider = "Answer"
+
         st.set_page_config(page_title="Report Analyst", layout="wide")
 
         # Inject Material Icons link tag at the top
@@ -2886,7 +2894,12 @@ def main():
             with st.sidebar:
                 nav_page = option_menu(
                     menu_title=None,
-                    options=["Upload Report", "Report Analyst", "All Results", "Benchmarking"],
+                    options=[
+                        "Upload Report",
+                        "Report Analyst",
+                        "All Results",
+                        "Benchmarking",
+                    ],
                     icons=["house", "file-text", "bar-chart", "target"],
                     menu_icon=None,
                     default_index=0,
@@ -2917,7 +2930,12 @@ def main():
                 )
         except ImportError:
             # Fallback to regular radio if package not installed
-            nav_options = ["Upload Report", "Report Analyst", "All Results", "Benchmarking"]
+            nav_options = [
+                "Upload Report",
+                "Report Analyst",
+                "All Results",
+                "Benchmarking",
+            ]
             nav_page = st.sidebar.radio(
                 "", nav_options, key="nav_page", label_visibility="collapsed"
             )
@@ -3220,20 +3238,28 @@ def main():
                         "Answer": "Question Answering",
                     }
 
-                    # Initialize selected step in session state if not exists
-                    if "processing_steps_slider" not in st.session_state:
+                    # Initialize selected step in session state if not exists or invalid
+                    if (
+                        "processing_steps_slider" not in st.session_state
+                        or st.session_state.processing_steps_slider not in step_options
+                    ):
                         st.session_state.processing_steps_slider = "Answer"
 
                     # Use Streamlit's built-in pills widget
+                    # format_func must only return values that are in step_options
+                    # to avoid test framework errors with invalid values
+                    def safe_format_func(x):
+                        """Format function that only returns valid option values"""
+                        if x in step_options:
+                            return step_full_names.get(x, x)
+                        # If invalid value, return a valid default
+                        return step_full_names.get("Answer", "Answer")
+
                     selected_step = st.pills(
                         "Select processing step",
                         options=step_options,
-                        format_func=lambda x: step_full_names[x],
-                        default=(
-                            st.session_state.processing_steps_slider
-                            if st.session_state.processing_steps_slider in step_options
-                            else "Answer"
-                        ),
+                        format_func=safe_format_func,
+                        default=st.session_state.processing_steps_slider,
                         key="processing_steps_slider",
                         help="Select which processing step to execute",
                         label_visibility="collapsed",
@@ -4181,41 +4207,44 @@ def main():
         # Benchmarking page
         elif nav_page == "Benchmarking":
             st.header("🎯 Benchmarking")
-            st.write("Evaluate retrieval and extraction systems against reference datasets")
-            
+            st.write(
+                "Evaluate retrieval and extraction systems against reference datasets"
+            )
+
             try:
                 from report_analyst.ui.benchmarking import BenchmarkingUI
-                
+
                 # Initialize analyzer if not already in session state
                 if "analyzer" not in st.session_state:
                     # Create a minimal analyzer for cache_manager access
                     from report_analyst.core.analyzer import DocumentAnalyzer
                     from report_analyst.core.cache_manager import CacheManager
+
                     cache_manager = CacheManager()
                     analyzer = DocumentAnalyzer(cache_manager=cache_manager)
                     st.session_state.analyzer = analyzer
                 else:
                     analyzer = st.session_state.analyzer
-                
+
                 benchmark_ui = BenchmarkingUI(analyzer.cache_manager)
-                
+
                 # Sub-tabs for benchmarking features
-                dataset_tab, eval_tab, results_tab, annotation_tab = st.tabs([
-                    "📊 Datasets", "🎯 Evaluate", "📈 Results", "✍️ Annotate"
-                ])
-                
+                dataset_tab, eval_tab, results_tab, annotation_tab = st.tabs(
+                    ["📊 Datasets", "🎯 Evaluate", "📈 Results", "✍️ Annotate"]
+                )
+
                 with dataset_tab:
                     benchmark_ui.render_dataset_management()
-                
+
                 with eval_tab:
                     benchmark_ui.render_benchmarking_interface()
-                
+
                 with results_tab:
                     benchmark_ui.render_results_dashboard()
-                
+
                 with annotation_tab:
                     benchmark_ui.render_annotation_interface()
-                    
+
             except ImportError as e:
                 st.error(f"Benchmarking functionality not available: {e}")
                 st.exception(e)
