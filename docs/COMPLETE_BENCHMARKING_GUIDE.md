@@ -154,6 +154,10 @@ The script outputs metrics for each K value:
 - **F1@K**: Harmonic mean of Precision and Recall
 - **nDCG@K**: Normalized Discounted Cumulative Gain (ranking quality)
 
+#### All Metrics Visualization
+
+![All Metrics Plot](../plots/all_metrics.png)
+
 ## Data Matching Requirements
 
 For benchmarking to work, your results must match the labels:

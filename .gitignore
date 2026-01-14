@@ -25,6 +25,10 @@ report_analyst/temp/*
 
 # Cursor IDE files
 .cursor/
+<<<<<<< HEAD
+=======
+
+>>>>>>> 58a90b9b (Cleanup docs and data)
 
 # Coverage and test artifacts
 .coverage
@@ -60,3 +64,12 @@ THEME_SWITCHING.md
 VERCEL_CHANGES_SUMMARY.md
 VERCEL_DEPLOYMENT_ASSESSMENT.md
 VERCEL_MIGRATION_GUIDE.md
+<<<<<<< HEAD
+=======
+
+
+# Plots directory
+/plots/
+plots/
+
+>>>>>>> 58a90b9b (Cleanup docs and data)
