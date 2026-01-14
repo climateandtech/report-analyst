@@ -5,8 +5,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 import sqlite3
 
-from app.core.benchmark.dataset_loader import DatasetLoader, DatasetValidationError
-from app.models.benchmark import BenchmarkDatasetContent, BenchmarkQuestion, GroundTruthChunk
+from report_analyst.core.benchmark.dataset_loader import DatasetLoader, DatasetValidationError
+from report_analyst.models.benchmark import BenchmarkDatasetContent, BenchmarkQuestion, GroundTruthChunk
 
 class TestDatasetLoader:
     """Test suite for dataset loading and validation"""

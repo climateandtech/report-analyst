@@ -1,4 +1,5 @@
 name: TCFD Questions
+shortcut: tcfd
 description: Task Force on Climate-related Financial Disclosures (TCFD) question set for analyzing sustainability reports
 
 questions:

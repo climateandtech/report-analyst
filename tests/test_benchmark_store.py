@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-from app.core.storage.benchmark_store import BenchmarkStore
-from app.models.benchmark import (
+from report_analyst.core.storage.benchmark_store import BenchmarkStore
+from report_analyst.models.benchmark import (
     BenchmarkDataset, 
     BenchmarkDatasetContent, 
     BenchmarkQuestion,

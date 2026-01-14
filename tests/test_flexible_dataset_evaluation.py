@@ -1,7 +1,7 @@
 import pytest
-from app.core.benchmark.evaluation_engine import EvaluationEngine
-from app.core.benchmark.retrieval_results_loader import load_flexible_dataset_from_csv
-from app.models.benchmark import BenchmarkDataset, FlexibleDatasetRow, DatasetType
+from report_analyst.core.benchmark.evaluation_engine import EvaluationEngine
+from report_analyst.core.benchmark.retrieval_results_loader import load_flexible_dataset_from_csv
+from report_analyst.models.benchmark import BenchmarkDataset, FlexibleDatasetRow, DatasetType
 
 
 class TestFlexibleDatasetEvaluation:

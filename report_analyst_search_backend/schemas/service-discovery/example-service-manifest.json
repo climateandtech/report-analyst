@@ -1,0 +1,134 @@
+{
+  "service_name": "search-backend",
+  "version": "1.0.0",
+  "contract_version": "1.0.0",
+  "protocols": {
+    "nats": {
+      "enabled": true,
+      "url": "nats://localhost:4222",
+      "jetstream": true,
+      "streams": ["DOCUMENTS", "ANALYSIS_JOBS", "LLM_REQUESTS"]
+    },
+    "http": {
+      "enabled": true,
+      "base_url": "http://localhost:8000",
+      "api_version": "v1"
+    }
+  },
+  "nats_channels": {
+    "publishes": [
+      {
+        "channel": "document.ready",
+        "message_schema": "#/components/messages/DocumentReadyEvent",
+        "description": "Published when document processing is complete"
+      },
+      {
+        "channel": "analysis.job.status",
+        "message_schema": "#/components/messages/AnalysisJobStatus",
+        "description": "Published to update analysis job status"
+      },
+      {
+        "channel": "llm.response",
+        "message_schema": "#/components/messages/LLMResponse",
+        "description": "Published with LLM processing results"
+      }
+    ],
+    "subscribes": [
+      {
+        "channel": "document.upload",
+        "message_schema": "#/components/messages/DocumentUploadEvent",
+        "description": "Subscribes to document upload requests via S3+NATS"
+      },
+      {
+        "channel": "analysis.job.submit",
+        "message_schema": "#/components/messages/AnalysisJobRequest",
+        "description": "Subscribes to analysis job requests"
+      },
+      {
+        "channel": "llm.request",
+        "message_schema": "#/components/messages/LLMRequest",
+        "description": "Subscribes to LLM processing requests"
+      }
+    ]
+  },
+  "http_endpoints": {
+    "required": [
+      {
+        "method": "GET",
+        "path": "/resources/",
+        "operation_id": "listResources",
+        "description": "List all resources"
+      },
+      {
+        "method": "POST",
+        "path": "/resources/text",
+        "operation_id": "uploadResource",
+        "description": "Upload a text resource"
+      },
+      {
+        "method": "GET",
+        "path": "/resources/{resource_id}",
+        "operation_id": "getResource",
+        "description": "Get resource details"
+      },
+      {
+        "method": "POST",
+        "path": "/search/",
+        "operation_id": "searchResources",
+        "description": "Search resources using semantic search"
+      },
+      {
+        "method": "POST",
+        "path": "/analysis/jobs/",
+        "operation_id": "submitAnalysisJob",
+        "description": "Submit an analysis job"
+      },
+      {
+        "method": "GET",
+        "path": "/analysis/jobs/{job_id}",
+        "operation_id": "getAnalysisJobStatus",
+        "description": "Get analysis job status"
+      },
+      {
+        "method": "GET",
+        "path": "/analysis/jobs/{job_id}/results",
+        "operation_id": "getAnalysisResults",
+        "description": "Get analysis results"
+      },
+      {
+        "method": "GET",
+        "path": "/resources/count",
+        "operation_id": "getResourceCount",
+        "description": "Get resource count for health checks"
+      }
+    ],
+    "optional": [
+      {
+        "method": "GET",
+        "path": "/analysis/results",
+        "operation_id": "getAnalysisResultsByResource",
+        "description": "Get analysis results by resource ID"
+      }
+    ]
+  },
+  "capabilities": {
+    "document_processing": true,
+    "semantic_search": true,
+    "llm_processing": true,
+    "analysis_jobs": true,
+    "s3_upload": true,
+    "data_lake": false
+  },
+  "metadata": {
+    "description": "Search backend service for document processing, semantic search, and analysis",
+    "contact": {
+      "name": "Search Backend Team",
+      "url": "https://github.com/your-org/search-backend"
+    },
+    "deployment": {
+      "environment": "development",
+      "region": "us-east-1"
+    }
+  }
+}
+

@@ -4,13 +4,13 @@ import pandas as pd
 from pathlib import Path
 import sqlite3
 
-from app.core.benchmark.retrieval_results_loader import (
+from report_analyst.core.benchmark.retrieval_results_loader import (
     load_flexible_dataset_from_csv,
     load_flexible_dataset_from_sqlite,
     detect_dataset_type,
     export_retrieval_results_to_csv
 )
-from app.models.benchmark import BenchmarkDataset, FlexibleDatasetRow, DatasetType
+from report_analyst.models.benchmark import BenchmarkDataset, FlexibleDatasetRow, DatasetType
 
 
 class TestFlexibleDatasetLoader:
