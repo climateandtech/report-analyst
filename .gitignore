@@ -41,6 +41,9 @@ inputlucia
 # macOS system files
 .DS_Store
 
+# Development notes and assessments (keep local, don't commit)
+.devnotes/
+
 # Deployment guides and assessments (keep local, don't commit)
 CLOUDFLARE_ASSESSMENT.md
 CLOUDFLARE_QUICK_SUMMARY.md
