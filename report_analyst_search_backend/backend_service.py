@@ -125,14 +125,14 @@ class BackendService:
                 for resource in resources:
                     if resource["id"] == resource_id:
                         status = resource.get("status", "UNKNOWN")
-                        status_text.text(f"📊 Processing status: {status}")
+                        status_text.text(f"Processing status: {status}")
 
                         if status == "COMPLETED":
                             progress_bar.progress(100)
                             return True
                         elif status == "FAILED":
                             error_msg = resource.get("error_message", "Unknown error")
-                            st.error(f"❌ Processing failed: {error_msg}")
+                            st.error(f"Processing failed: {error_msg}")
                             return False
 
                         # Update progress
@@ -142,13 +142,13 @@ class BackendService:
                 # Check timeout
                 elapsed = time.time() - start_time
                 if elapsed > timeout:
-                    st.error(f"⏰ Processing timed out after {timeout} seconds")
+                    st.error(f"Processing timed out after {timeout} seconds")
                     return False
 
                 time.sleep(3)
 
             except Exception as e:
-                st.error(f"❌ Error checking status: {str(e)}")
+                st.error(f"Error checking status: {str(e)}")
                 return False
 
     def get_chunks(self, resource_id: str) -> List[Dict[str, Any]]:
@@ -269,7 +269,7 @@ class BackendService:
                     job_data = response.json()
                     status = job_data.get("status", "unknown")
 
-                    status_text.text(f"🔬 Analysis status: {status}")
+                    status_text.text(f"Analysis status: {status}")
 
                     if status == "completed":
                         progress_bar.progress(100)
@@ -336,6 +336,126 @@ class BackendService:
             logger.error(f"Error retrieving analysis results: {e}")
             return None
 
+    def store_analysis_results(
+        self,
+        resource_id: str,
+        analysis_results: Dict[str, Any],
+        question_set: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """
+        Store analysis results back to backend database.
+
+        This is used when automatically processing document.ready events:
+        backend publishes event → we pull chunks → run analysis → store results back.
+
+        Args:
+            resource_id: Resource ID that was analyzed
+            analysis_results: Analysis results dictionary
+            question_set: Question set used for analysis
+            metadata: Additional metadata (optional)
+
+        Returns:
+            Stored result ID if successful, None otherwise
+        """
+        try:
+            if metadata is None:
+                metadata = {}
+
+            store_data = {
+                "resource_id": resource_id,
+                "question_set": question_set,
+                "analysis_results": analysis_results,
+                "status": "completed",
+                "metadata": {
+                    "source": "nats_auto_index",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    **metadata,
+                },
+            }
+
+            # Try POST to /analysis/results/ endpoint
+            response = requests.post(
+                f"{self.config.backend_url}/analysis/results/",
+                json=store_data,
+                timeout=self.timeout,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                result_id = result.get("id") or result.get("result_id")
+                logger.info(
+                    f"Stored analysis results for resource {resource_id}: {result_id}"
+                )
+                return result_id
+            elif response.status_code == 404:
+                # Endpoint doesn't exist, try alternative: use submit_analysis_job pattern
+                logger.warning(
+                    "/analysis/results/ endpoint not found, "
+                    "trying alternative storage method"
+                )
+                # Alternative: Store as a new resource with analysis results
+                return self._store_analysis_as_resource(
+                    resource_id, analysis_results, question_set, metadata
+                )
+            else:
+                error_text = response.text
+                logger.error(
+                    f"Failed to store analysis results: {response.status_code} - {error_text}"
+                )
+                return None
+
+        except requests.RequestException as e:
+            logger.error(f"Error storing analysis results: {e}")
+            return None
+
+    def _store_analysis_as_resource(
+        self,
+        resource_id: str,
+        analysis_results: Dict[str, Any],
+        question_set: str,
+        metadata: Dict[str, Any],
+    ) -> Optional[str]:
+        """Store analysis results as a new resource (fallback method)"""
+        try:
+            analysis_data = {
+                "url": f"analysis://result/{resource_id}",
+                "text": f"Analysis results for resource {resource_id}",
+                "tags": ["analysis_result", question_set],
+                "metadata": {
+                    "type": "analysis_result",
+                    "source_resource_id": resource_id,
+                    "question_set": question_set,
+                    "analysis_data": analysis_results,
+                    "owner": self.config.owner,
+                    "created_at": datetime.utcnow().isoformat(),
+                    **metadata,
+                },
+            }
+
+            response = requests.post(
+                f"{self.config.backend_url}/resources/text",
+                json=analysis_data,
+                timeout=self.timeout,
+            )
+
+            if response.status_code == 200:
+                resource = response.json()
+                result_id = resource.get("id")
+                logger.info(
+                    f"Stored analysis results as resource for {resource_id}: {result_id}"
+                )
+                return result_id
+            else:
+                logger.error(
+                    f"Failed to store analysis as resource: {response.status_code}"
+                )
+                return None
+
+        except requests.RequestException as e:
+            logger.error(f"Error storing analysis as resource: {e}")
+            return None
+
     def _get_resources(self) -> List[Dict[str, Any]]:
         """Get all resources from backend"""
         try:
@@ -345,6 +465,55 @@ class BackendService:
             return response.json() if response.status_code == 200 else []
         except requests.RequestException:
             return []
+
+    def get_resources(self) -> List[Dict[str, Any]]:
+        """Public method to get backend resources (for compatibility)"""
+        return self._get_resources()
+
+    def list_reports(self) -> List[Any]:
+        """List sustainability reports from this backend as ReportResource objects"""
+        from report_analyst.core.report_data_client import ReportResource
+
+        resources = self._get_resources()
+        report_resources = []
+
+        for resource in resources:
+            resource_id = resource["id"]
+            # Normalize backend URL for URN (remove protocol)
+            backend_host = self._normalize_backend_url(self.config.backend_url)
+            # Generate URN: urn:report-analyst:backend:host:resource_id
+            urn = f"urn:report-analyst:backend:{backend_host}:{resource_id}"
+
+            report_resources.append(
+                ReportResource(
+                    name=resource.get("filename", resource.get("id", "Unknown")),
+                    uri=urn,
+                    date=self._parse_date(resource.get("created_at")),
+                    size=resource.get("file_size", 0),
+                    metadata={
+                        "resource_id": resource_id,
+                        "backend_url": self.config.backend_url,
+                        "status": resource.get("status"),
+                    },
+                )
+            )
+
+        return report_resources
+
+    def _normalize_backend_url(self, url: str) -> str:
+        """Normalize backend URL for URN (remove protocol, handle ports)"""
+        url = url.replace("http://", "").replace("https://", "")
+        return url
+
+    def _parse_date(self, date_str: Optional[str]) -> Optional[float]:
+        """Parse ISO date string to timestamp"""
+        if not date_str:
+            return None
+        try:
+            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            return dt.timestamp()
+        except Exception:
+            return None
 
     def _get_progress_for_status(self, status: str) -> int:
         """Map processing status to progress percentage"""
@@ -377,6 +546,6 @@ def create_backend_service(config: BackendConfig) -> BackendService:
 
 def handle_backend_error(error: BackendServiceError, context: str = ""):
     """Standard error handling for backend service errors"""
-    error_msg = f"❌ {context} failed: {str(error)}" if context else f"❌ {str(error)}"
+    error_msg = f"{context} failed: {str(error)}" if context else f"{str(error)}"
     st.error(error_msg)
     logger.error(f"Backend service error: {error}")

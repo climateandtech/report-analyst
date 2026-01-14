@@ -138,7 +138,7 @@ class FlowOrchestrator:
             AnalysisResult: Complete analysis result
         """
         try:
-            st.info("🏭 Using complete backend analysis - backend does all the work!")
+            st.info("Using complete backend analysis - backend does all the work!")
 
             # Step 1: Upload
             with st.spinner("Uploading document to backend..."):
@@ -166,7 +166,7 @@ class FlowOrchestrator:
                 analysis_job_id = self.backend_service.submit_analysis_job(
                     resource_id, question_set
                 )
-                st.success(f"✅ Analysis job submitted! Job ID: {analysis_job_id}")
+                st.success(f"Analysis job submitted! Job ID: {analysis_job_id}")
 
             # Step 5: Wait for analysis
             with st.spinner("Backend is running analysis..."):
@@ -174,8 +174,8 @@ class FlowOrchestrator:
                     analysis_job_id
                 )
 
-            st.success("🎉 Analysis completed and stored in backend database!")
-            st.info("💡 These results are now available to all authorized users")
+            st.success("Analysis completed and stored in backend database!")
+            st.info("These results are now available to all authorized users")
 
             return AnalysisResult(
                 success=True,
@@ -190,7 +190,7 @@ class FlowOrchestrator:
 
     def _process_local(self, uploaded_file) -> ProcessingResult:
         """Process document locally"""
-        st.info("📱 Using local processing")
+        st.info("Using local processing")
 
         with st.spinner("Processing document locally..."):
             # Simulate local processing
@@ -255,7 +255,7 @@ class FlowOrchestrator:
         self, chunks: List[Dict[str, Any]], questions: List[str]
     ) -> AnalysisResult:
         """Analyze locally"""
-        st.info("🔄 Using local analysis")
+        st.info("Using local analysis")
 
         results = []
         for question in questions:
@@ -289,7 +289,7 @@ class FlowOrchestrator:
         """Enhanced analysis with centralized LLM and data lake"""
         # This would use NATS LLM and store in data lake
         # For now, fallback to local analysis
-        st.info("🚀 Enhanced analysis not fully implemented - using local analysis")
+        st.info("Enhanced analysis not fully implemented - using local analysis")
         return self._analyze_local(chunks, questions)
 
     def _configure_question_set(self, default_question_set: str) -> str:
@@ -335,6 +335,186 @@ class FlowOrchestrator:
                 st.info("Custom questions will be sent to backend")
 
         return question_set
+
+    async def external_service_analysis(
+        self,
+        service_id: str,
+        external_request_id: str,
+        content: Union[str, List[Dict[str, Any]]],  # S3 URL or chunks
+        question_set: str,
+        analysis_config: Dict[str, Any],
+        response_method: str = "nats",  # "nats" or "poll"
+    ) -> AnalysisResult:
+        """
+        Analyze content from external service.
+
+        Args:
+            service_id: External service identifier
+            external_request_id: Original request ID from external service
+            content: S3 URL (str) or pre-processed chunks (List[Dict])
+            question_set: Question set identifier (e.g., "tcfd")
+            analysis_config: Analysis configuration
+            response_method: How to deliver results ("nats" or "poll")
+
+        Returns:
+            AnalysisResult with answers and top chunks
+        """
+        try:
+            from report_analyst.core.analyzer import DocumentAnalyzer
+
+            from .external_service_delivery import ExternalServiceDelivery
+            from .external_service_handler import ExternalServiceHandler
+
+            handler = ExternalServiceHandler()
+            delivery = ExternalServiceDelivery()
+
+            # Process content
+            if isinstance(content, str):
+                # S3 URL - download and process
+                from .external_service_handler import ExternalServiceReadyEvent
+
+                notification = ExternalServiceReadyEvent(
+                    service_id=service_id,
+                    request_id=external_request_id,
+                    content_type="s3_url",
+                    s3_url=content,
+                )
+                processing_result = await handler.handle_external_notification(
+                    service_id, notification
+                )
+            else:
+                # Pre-processed chunks
+                from .external_service_handler import ExternalServiceReadyEvent
+
+                notification = ExternalServiceReadyEvent(
+                    service_id=service_id,
+                    request_id=external_request_id,
+                    content_type="chunks",
+                    chunks=content,
+                )
+                processing_result = await handler.handle_external_notification(
+                    service_id, notification
+                )
+
+            if not processing_result.success:
+                return AnalysisResult(success=False, error=processing_result.error)
+
+            chunks = processing_result.chunks
+            if not chunks:
+                return AnalysisResult(
+                    success=False, error="No chunks available for analysis"
+                )
+
+            # Convert chunks to analyzer format
+            analyzer_chunks = [
+                {
+                    "text": chunk.get("chunk_text", chunk.get("text", "")),
+                    "metadata": chunk.get("chunk_metadata", chunk.get("metadata", {})),
+                }
+                for chunk in chunks
+            ]
+
+            # Get analyzer
+            analyzer = DocumentAnalyzer()
+            analyzer.question_set = question_set
+            analyzer.questions = analyzer._load_questions()
+
+            # Update analyzer config from analysis_config
+            if "chunk_size" in analysis_config:
+                analyzer.chunk_params["chunk_size"] = analysis_config["chunk_size"]
+            if "chunk_overlap" in analysis_config:
+                analyzer.chunk_params["chunk_overlap"] = analysis_config[
+                    "chunk_overlap"
+                ]
+            if "top_k" in analysis_config:
+                analyzer.chunk_params["top_k"] = analysis_config["top_k"]
+
+            # Run analysis on all questions
+            all_question_ids = list(analyzer.questions.keys())
+            selected_questions = list(range(1, len(all_question_ids) + 1))
+
+            # Use a temporary file path for cache key
+            temp_file_path = f"external_service_{service_id}_{external_request_id}"
+
+            answers = []
+            top_chunks_by_question = {}
+
+            async for result in analyzer.process_document(
+                file_path=temp_file_path,
+                selected_questions=selected_questions,
+                use_llm_scoring=analysis_config.get("use_llm_scoring", False),
+                single_call=analysis_config.get("single_call", True),
+                pre_retrieved_chunks=analyzer_chunks,
+            ):
+                if "error" in result:
+                    logger.error(f"Analysis error: {result['error']}")
+                    continue
+
+                if "question_id" in result and "answer" in result:
+                    question_id = result["question_id"]
+                    answers.append(
+                        {
+                            "question_id": question_id,
+                            "question_text": result.get("question_text", ""),
+                            "answer": result["answer"],
+                            "confidence_score": result.get("confidence_score"),
+                        }
+                    )
+
+                    # Collect top chunks for this question
+                    evidence_chunks = result.get("evidence_chunks", [])
+                    top_chunks_by_question[question_id] = evidence_chunks
+
+            # Flatten top chunks (one list with all top chunks across questions)
+            top_chunks = []
+            for question_id, chunks_list in top_chunks_by_question.items():
+                for chunk in chunks_list:
+                    top_chunks.append(
+                        {
+                            "chunk_id": chunk.get("id", ""),
+                            "chunk_text": chunk.get("text", ""),
+                            "relevance_score": chunk.get("similarity_score", 0.0),
+                            "question_id": question_id,
+                            "metadata": chunk.get("metadata", {}),
+                        }
+                    )
+
+            # Generate request ID for delivery
+            import uuid
+
+            request_id = str(uuid.uuid4())
+
+            # Deliver results
+            results_data = {
+                "answers": answers,
+                "top_chunks": top_chunks,
+            }
+
+            delivery_success = await delivery.deliver_results(
+                service_id=service_id,
+                request_id=request_id,
+                external_request_id=external_request_id,
+                results=results_data,
+                response_method=response_method,
+                status="completed",
+            )
+
+            if not delivery_success:
+                logger.warning("Failed to deliver results, but analysis completed")
+
+            return AnalysisResult(
+                success=True,
+                results={
+                    "request_id": request_id,
+                    "answers": answers,
+                    "top_chunks": top_chunks,
+                },
+                analysis_job_id=request_id,
+            )
+
+        except Exception as e:
+            logger.error(f"External service analysis failed: {e}")
+            return AnalysisResult(success=False, error=str(e))
 
 
 # Factory function for creating orchestrator

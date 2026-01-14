@@ -13,7 +13,7 @@ import asyncio
 import json
 import logging
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
@@ -43,6 +43,8 @@ class DocumentReadyEvent:
     chunks_count: int
     status: str
     created_at: datetime = None
+    chunks: Optional[List[Dict[str, Any]]] = None
+    """Optional: Pre-processed chunks included in event (if pull_chunks=False)"""
 
     def __post_init__(self):
         if self.created_at is None:
@@ -68,6 +70,62 @@ class AnalysisJob:
             self.created_at = datetime.utcnow()
         if self.updated_at is None:
             self.updated_at = datetime.utcnow()
+
+
+@dataclass
+class DocumentReadyProcessingConfig:
+    """
+    Configuration for automatic document.ready event processing.
+
+    Controls how document.ready events are handled:
+    - Whether to pull chunks from backend or use provided chunks
+    - Whether to run analysis
+    - Whether to store results back to backend
+    - Analysis configuration
+    """
+
+    # Chunk retrieval strategy
+    pull_chunks: bool = True
+    """Whether to pull chunks from backend. If False, chunks must be provided in event."""
+
+    # Analysis configuration
+    question_set: str = "tcfd"
+    """Question set to use for analysis"""
+
+    analysis_config: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "model": "gpt-4o-mini",
+            "temperature": 0.1,
+        }
+    )
+    """Analysis configuration (model, temperature, etc.)"""
+
+    # Result storage
+    store_to_backend: bool = True
+    """Whether to store analysis results back to backend"""
+
+    # Error handling
+    ack_on_error: bool = True
+    """Whether to acknowledge message even on error (prevents redelivery loops)"""
+
+    # Chunk retrieval options (when pull_chunks=True)
+    chunk_retrieval_method: str = "search"  # "search" or "direct"
+    """Method to retrieve chunks: 'search' uses /search/ endpoint, 'direct' uses /resources/{id}/chunks"""
+
+    max_chunks: Optional[int] = None
+    """Maximum number of chunks to retrieve (None = no limit)"""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "pull_chunks": self.pull_chunks,
+            "question_set": self.question_set,
+            "analysis_config": self.analysis_config,
+            "store_to_backend": self.store_to_backend,
+            "ack_on_error": self.ack_on_error,
+            "chunk_retrieval_method": self.chunk_retrieval_method,
+            "max_chunks": self.max_chunks,
+        }
 
 
 class SearchBackendClient:
@@ -193,6 +251,190 @@ class NATSJobCoordinator:
                 await asyncio.sleep(1)
         except KeyboardInterrupt:
             logger.info("Stopping analysis job processor")
+
+    # For Workers to automatically process document.ready events
+    async def process_document_ready_events(
+        self,
+        config: Optional[DocumentReadyProcessingConfig] = None,
+    ):
+        """
+        Automatically process document.ready events based on configuration.
+
+        Args:
+            config: DocumentReadyProcessingConfig with processing options.
+                   If None, uses default configuration (pull chunks, run analysis, store results).
+        """
+        if config is None:
+            config = DocumentReadyProcessingConfig()
+
+        await self.js.subscribe(
+            "document.ready", cb=lambda msg: self._handle_document_ready(msg, config)
+        )
+        logger.info(
+            f"Started processing document.ready events from NATS with config: {config.to_dict()}"
+        )
+
+        # Keep processing
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("Stopping document.ready processor")
+
+    async def _handle_document_ready(
+        self,
+        msg,
+        config: DocumentReadyProcessingConfig,
+    ):
+        """Handle a document.ready event based on configuration"""
+        try:
+            event_data = json.loads(msg.data.decode())
+            event = DocumentReadyEvent(**event_data)
+
+            logger.info(
+                f"Received document.ready for resource {event.resource_id} "
+                f"(config: pull_chunks={config.pull_chunks}, "
+                f"store_to_backend={config.store_to_backend})"
+            )
+
+            # Step 1: Get chunks (pull from backend or use provided)
+            chunks = None
+            if config.pull_chunks:
+                logger.info(
+                    f"Pulling chunks from backend for resource {event.resource_id}"
+                )
+                chunks = await self._get_chunks_for_resource(
+                    event.resource_id, config.chunk_retrieval_method, config.max_chunks
+                )
+                if not chunks:
+                    logger.error(f"No chunks found for resource {event.resource_id}")
+                    if config.ack_on_error:
+                        await msg.ack()
+                    return
+                logger.info(
+                    f"Retrieved {len(chunks)} chunks for resource {event.resource_id}"
+                )
+            else:
+                # Check if chunks are provided in event metadata
+                if hasattr(event, "chunks") and event.chunks:
+                    chunks = event.chunks
+                    logger.info(f"Using {len(chunks)} chunks provided in event")
+                else:
+                    logger.warning(
+                        f"No chunks provided and pull_chunks=False for resource {event.resource_id}"
+                    )
+                    if config.ack_on_error:
+                        await msg.ack()
+                    return
+
+            # Step 2: Run analysis
+            logger.info(f"Running analysis for resource {event.resource_id}")
+            analysis_result = await self._run_analysis(
+                chunks, config.question_set, config.analysis_config
+            )
+
+            # Step 3: Store results back to backend (if configured)
+            if config.store_to_backend:
+                logger.info(
+                    f"Storing analysis results back to backend for resource {event.resource_id}"
+                )
+                await self._store_analysis_to_backend(
+                    event.resource_id, analysis_result, config.question_set
+                )
+
+            await msg.ack()
+            logger.info(
+                f"Successfully processed document.ready for resource {event.resource_id}"
+            )
+
+        except Exception as e:
+            logger.error(f"Error processing document.ready event: {e}", exc_info=True)
+            if config.ack_on_error:
+                await msg.ack()  # Ack even on error to avoid redelivery loops
+
+    async def _get_chunks_for_resource(
+        self,
+        resource_id: str,
+        method: str = "search",
+        max_chunks: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get chunks for a resource using specified method.
+
+        Args:
+            resource_id: Resource ID
+            method: "search" (use /search/ endpoint) or "direct" (use /resources/{id}/chunks)
+            max_chunks: Maximum number of chunks to return (None = no limit)
+
+        Returns:
+            List of chunk dictionaries
+        """
+        if method == "direct":
+            # Try direct endpoint first
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"{self.search_backend.base_url}/resources/{resource_id}/chunks"
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            chunks = data.get("chunks", [])
+                            if max_chunks:
+                                chunks = chunks[:max_chunks]
+                            return chunks
+            except Exception as e:
+                logger.warning(
+                    f"Direct chunk retrieval failed for {resource_id}, falling back to search: {e}"
+                )
+
+        # Default: use search endpoint (existing method)
+        chunks = await self.search_backend.get_resource_chunks(resource_id)
+        if max_chunks and chunks:
+            chunks = chunks[:max_chunks]
+        return chunks
+
+    async def _store_analysis_to_backend(
+        self,
+        resource_id: str,
+        analysis_result: Dict[str, Any],
+        question_set: str,
+    ):
+        """Store analysis results back to backend"""
+        try:
+            # Use BackendService to store results (synchronous, so run in executor)
+            import asyncio
+
+            from report_analyst_search_backend.backend_service import BackendService
+            from report_analyst_search_backend.config import BackendConfig
+
+            # Create BackendService from the base_url
+            config = BackendConfig(
+                use_backend=True, backend_url=self.search_backend.base_url
+            )
+            backend_service = BackendService(config)
+
+            # Run synchronous store_analysis_results in executor
+            loop = asyncio.get_event_loop()
+            result_id = await loop.run_in_executor(
+                None,
+                backend_service.store_analysis_results,
+                resource_id,
+                analysis_result,
+                question_set,
+                {"source": "nats_auto_index"},
+            )
+
+            if result_id:
+                logger.info(
+                    f"Stored analysis results for resource {resource_id}: {result_id}"
+                )
+            else:
+                logger.warning(
+                    f"Failed to store analysis results for resource {resource_id}"
+                )
+
+        except Exception as e:
+            logger.error(f"Error storing analysis to backend: {e}")
 
     async def _process_analysis_job(self, msg):
         """Process a single analysis job"""

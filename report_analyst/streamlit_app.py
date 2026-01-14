@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -18,6 +19,7 @@ from pandas.api.types import (
     is_numeric_dtype,
     is_object_dtype,
 )
+from streamlit_card import card
 
 # Add parent directory to path for backend integration
 current_dir = Path(__file__).parent
@@ -182,8 +184,19 @@ class ReportAnalyzer:
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncGenerator[Dict, None]:
-        """Analyze a document using the provided questions"""
+        """Analyze a document using the provided questions
+
+        Args:
+            file_path: Path to document file or URN for backend resources
+            questions: Dictionary of questions
+            selected_questions: List of selected question IDs
+            use_llm_scoring: Whether to use LLM for chunk scoring
+            single_call: Whether to use single LLM call per question
+            force_recompute: Whether to force recomputation
+            pre_retrieved_chunks: Optional pre-retrieved chunks (e.g., from backend)
+        """
         try:
             log_analysis_step(f"Starting analysis of document: {file_path}")
             log_analysis_step(f"Selected questions: {selected_questions}")
@@ -210,6 +223,7 @@ class ReportAnalyzer:
                 use_llm_scoring,
                 single_call,
                 force_recompute,
+                pre_retrieved_chunks=pre_retrieved_chunks,
             ):
                 # Pass through status and error messages
                 if "status" in result or "error" in result:
@@ -433,7 +447,7 @@ async def analyze_document_and_display(
                 f"Found {len(cached_answers)} cached answers for {file_key}"
             )
             # Show cache info
-            st.info(f"📁 Loading results from cache: {file_key}")
+            st.info(f"📁 Loading results from stored: {file_key}")
 
             # Update results with cached answers
             for q_id, answer in cached_answers.items():
@@ -468,6 +482,9 @@ async def analyze_document_and_display(
             report_analyzer.analyzer.question_set = question_set
 
             # Process only uncached questions
+            # Check if we have pre-retrieved chunks (for backend resources)
+            pre_retrieved_chunks = st.session_state.get("backend_chunks")
+
             async for result in report_analyzer.analyze_document(
                 file_path,
                 questions,
@@ -475,6 +492,7 @@ async def analyze_document_and_display(
                 use_llm_scoring,
                 single_call,
                 force_recompute,
+                pre_retrieved_chunks=pre_retrieved_chunks,
             ):
                 # Add debug logging to see what results we're getting
                 log_analysis_step(f"Received result: {str(result)[:200]}...")
@@ -520,7 +538,7 @@ async def analyze_document_and_display(
             log_analysis_step("All selected questions have cached answers")
             # Show success message for cached results
             st.success(
-                f"✓ All {len(selected_questions_list)} selected questions loaded from cache"
+                f"✓ All {len(selected_questions_list)} selected questions loaded from stored"
             )
 
         # Mark this file as analyzed with current configuration
@@ -688,28 +706,47 @@ def load_question_sets() -> Dict[str, str]:
         return {}
 
 
-def get_uploaded_files_history() -> List[Dict]:
-    """Get list of previously uploaded files from temp directory"""
-    temp_dir = Path("temp")
-    if not temp_dir.exists():
-        return []
+def get_uploaded_files_history(backend_config=None) -> List[Dict]:
+    """Get list of files for Streamlit dropdown (UI adapter)"""
+    from report_analyst.core.report_data_client import ReportDataClient
 
-    files = []
-    for file in temp_dir.glob("*.pdf"):
-        # Verify file exists and is not empty
-        if file.exists() and file.stat().st_size > 0:
-            files.append(
-                {
-                    "name": file.name,
-                    "path": str(file.resolve()),  # Get absolute path
-                    "date": file.stat().st_mtime,
-                    "size": file.stat().st_size,
-                }
-            )
-            logger.info(f"Found file: {file.name}, size: {file.stat().st_size} bytes")
+    client = ReportDataClient()
 
-    # Sort by most recent first
-    return sorted(files, key=lambda x: x["date"], reverse=True)
+    # Collect backend configs (could be multiple backends in future)
+    backend_configs = (
+        [backend_config]
+        if backend_config
+        and hasattr(backend_config, "use_backend")
+        and backend_config.use_backend
+        else []
+    )
+
+    resources = client.list_reports(backend_configs=backend_configs)
+
+    # Convert to dict format for Streamlit selectbox
+    result = []
+    for r in resources:
+        # Extract actual file path from file:// URI for backward compatibility
+        if r.is_local_resource and r.uri.startswith("file://"):
+            # Extract path from file:// URI (remove file:// prefix)
+            actual_path = r.uri.replace("file://", "")
+        elif r.is_local_resource:
+            # Already a direct path
+            actual_path = r.uri
+        else:
+            # Backend resource - keep URI as path for compatibility
+            actual_path = r.uri
+
+        result.append(
+            {
+                "name": r.name,
+                "uri": r.uri,  # Primary identifier (URN or file://)
+                "path": actual_path,  # Actual file path for local files, URI for backend
+                "date": r.date,
+                "size": r.size,
+            }
+        )
+    return result
 
 
 def display_analysis_results(
@@ -815,8 +852,19 @@ def display_analysis_results(
         st.error(f"Error displaying results: {str(e)}")
 
 
-def display_consolidated_results(analyzer, question_set):
-    """Display consolidated results for all analyzed documents"""
+def display_consolidated_results(
+    analyzer, question_set, file_path=None, selected_config=None
+):
+    """Display consolidated results for all analyzed documents
+
+    Args:
+        analyzer: ReportAnalyzer instance
+        question_set: Selected question set identifier
+        file_path: Optional file path. If provided, skip file selection and use this file.
+                   If None, will attempt to get file from cache (backward compatibility).
+        selected_config: Optional configuration dict. If provided, skip config selection and use this config.
+                        If None, will attempt to get config from cache (backward compatibility).
+    """
     try:
         # Create mapping from question set names to database identifiers
         question_set_mapping = {
@@ -832,68 +880,367 @@ def display_consolidated_results(analyzer, question_set):
             f"Mapping question set '{question_set}' to database identifier '{db_question_set}'"
         )
 
-        # Get all available cache configurations
-        cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
-        logger.info(f"Found cache configs: {cache_configs}")
+        # If file_path is not provided, try to get it from cache (backward compatibility)
+        if file_path is None:
+            # Get all available cache configurations
+            cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
+            logger.info(f"Found cache configs: {cache_configs}")
 
-        if not cache_configs:
-            st.warning("No cached analyses found")
-            return
+            if not cache_configs:
+                st.warning("No stored analyses found")
+                return
 
-        # Group configurations by file
-        file_configs = {}
-        for config in cache_configs:
-            if len(config) == 6:  # Full config row from cache_status
-                file_path, chunk_size, chunk_overlap, top_k, model, qs = config
-                if (
-                    qs == db_question_set
-                ):  # Only show configs for selected question set using database identifier
-                    if file_path not in file_configs:
-                        file_configs[file_path] = []
-                    file_configs[file_path].append(
-                        {
-                            "chunk_size": chunk_size,
-                            "chunk_overlap": chunk_overlap,
-                            "top_k": top_k,
-                            "model": model,
-                            "question_set": qs,
-                        }
-                    )
+            # Group configurations by file
+            file_configs = {}
+            for config in cache_configs:
+                if len(config) == 6:  # Full config row from cache_status
+                    fp, chunk_size, chunk_overlap, top_k, model, qs = config
+                    if qs == db_question_set:
+                        if fp not in file_configs:
+                            file_configs[fp] = []
+                        file_configs[fp].append(
+                            {
+                                "chunk_size": chunk_size,
+                                "chunk_overlap": chunk_overlap,
+                                "top_k": top_k,
+                                "model": model,
+                                "question_set": qs,
+                            }
+                        )
 
-        if not file_configs:
-            st.warning(f"No cached results found for question set: {question_set}")
-            return
+            if not file_configs:
+                st.warning(f"No stored results found for question set: {question_set}")
+                return
 
-        # File selection
-        st.subheader("Select Report and Configuration")
-        file_path = st.selectbox(
-            "Select Report",
-            options=list(file_configs.keys()),
-            format_func=lambda x: Path(x).name,
-        )
-
-        if file_path:
-            # Show configurations for selected file
-            configs = file_configs[file_path]
-            config_options = []
-            for config in configs:
-                label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
-                config_options.append({"label": label, "config": config})
-
-            selected_config = st.selectbox(
-                "Select Configuration",
-                options=config_options,
-                format_func=lambda x: x["label"],
+            # File selection (backward compatibility)
+            st.subheader("Select Report and Configuration")
+            file_path = st.selectbox(
+                "Select Report",
+                options=list(file_configs.keys()),
+                format_func=lambda x: Path(x).name,
             )
 
-            if selected_config:
-                logger.info(
-                    f"Getting results for {Path(file_path).name} with config: {selected_config['config']}"
+            if not file_path:
+                return
+
+            # Get configs for selected file
+            configs = file_configs[file_path]
+        else:
+            # File path provided, get configs for this file and question set (if not already provided)
+            if selected_config is None:
+                cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
+                configs = []
+                for config in cache_configs:
+                    if len(config) == 6:
+                        fp, chunk_size, chunk_overlap, top_k, model, qs = config
+                        if fp == file_path and qs == db_question_set:
+                            configs.append(
+                                {
+                                    "chunk_size": chunk_size,
+                                    "chunk_overlap": chunk_overlap,
+                                    "top_k": top_k,
+                                    "model": model,
+                                    "question_set": qs,
+                                }
+                            )
+
+                if not configs:
+                    st.warning(
+                        f"No stored results found for {Path(file_path).name} with question set: {question_set}"
+                    )
+                    return
+            else:
+                # Config already provided, wrap it in a list for consistency
+                configs = [selected_config]
+
+        if file_path:
+            # If selected_config is provided, use it; otherwise show selector (backward compatibility)
+            if selected_config is None:
+                # Show configurations for selected file
+                config_options = []
+                for config in configs:
+                    label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
+                    config_options.append({"label": label, "config": config})
+
+                st.subheader("Select Configuration")
+                selected_config_obj = st.selectbox(
+                    "Select Configuration",
+                    options=config_options,
+                    format_func=lambda x: x["label"],
                 )
+
+                if selected_config_obj:
+                    selected_config = selected_config_obj["config"]
+                else:
+                    return
+
+            if selected_config:
+                # selected_config is now always the config dict (not wrapped)
+                logger.info(
+                    f"Getting results for {Path(file_path).name} with config: {selected_config}"
+                )
+
+                # Add similarity search section for document chunks
+                try:
+                    raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
+                        file_path=file_path,
+                        chunk_size=selected_config["chunk_size"],
+                        chunk_overlap=selected_config["chunk_overlap"],
+                    )
+
+                    if raw_chunks:
+                        # Add similarity search controls
+                        st.subheader("Similarity Search")
+
+                        # Get questions for the current question set
+                        # Make sure analyzer is using the correct question set
+                        if analyzer.analyzer.question_set != question_set:
+                            analyzer.analyzer.update_question_set(question_set)
+                        questions = analyzer.analyzer.questions
+
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            # Question dropdown with shorter, cleaner options
+                            question_options = ["None"] + [
+                                f"{q_id}" for q_id in questions.keys()
+                            ]
+                            selected_question_id = st.selectbox(
+                                "Select a question to sort by similarity:",
+                                options=question_options,
+                                key="chunk_similarity_question",
+                                help="Choose a question from the current question set",
+                            )
+
+                            # Show selected question text below dropdown
+                            if (
+                                selected_question_id != "None"
+                                and selected_question_id in questions
+                            ):
+                                st.caption(
+                                    f"**{selected_question_id}:** {questions[selected_question_id]['text'][:100]}..."
+                                )
+                            selected_question = selected_question_id
+
+                        with col2:
+                            # Free text input
+                            custom_question = st.text_input(
+                                "Or enter custom question:",
+                                placeholder="Enter your own question to compare chunks against...",
+                                key="chunk_similarity_custom",
+                            )
+
+                        # Determine which question to use
+                        query_text = None
+                        if custom_question.strip():
+                            query_text = custom_question.strip()
+                            st.info(f"Using custom question: {query_text[:100]}...")
+                        elif selected_question != "None":
+                            if selected_question in questions:
+                                query_text = questions[selected_question]["text"]
+                                st.info(
+                                    f"Using question {selected_question}: {query_text[:100]}..."
+                                )
+
+                        # Process chunks
+                        chunks_rows = []
+                        chunks_with_embeddings = [
+                            c for c in raw_chunks if c.get("embedding") is not None
+                        ]
+
+                        if query_text and chunks_with_embeddings:
+                            # Compute similarity scores
+                            try:
+                                # Check if embeddings are available
+                                if (
+                                    not analyzer.analyzer.embeddings
+                                    or analyzer.analyzer.use_backend_llm
+                                ):
+                                    st.warning(
+                                        "Embeddings not available for similarity search. Using backend mode or embeddings not initialized."
+                                    )
+                                    query_text = None
+                                else:
+                                    # Get query embedding
+                                    query_embedding = (
+                                        analyzer.analyzer.embeddings.get_text_embedding(
+                                            query_text
+                                        )
+                                    )
+                                    query_embedding = np.array(
+                                        query_embedding, dtype=np.float32
+                                    )
+
+                                    # Compute similarity for each chunk
+                                    similarities = []
+                                    for chunk in raw_chunks:
+                                        if chunk.get("embedding") is not None:
+                                            chunk_embedding = np.frombuffer(
+                                                chunk["embedding"], dtype=np.float32
+                                            )
+                                            # Compute cosine similarity
+                                            similarity = np.dot(
+                                                query_embedding, chunk_embedding
+                                            ) / (
+                                                np.linalg.norm(query_embedding)
+                                                * np.linalg.norm(chunk_embedding)
+                                            )
+                                            similarities.append(similarity)
+                                        else:
+                                            similarities.append(0.0)
+
+                                    # Sort chunks by similarity
+                                    chunk_similarity_pairs = list(
+                                        zip(raw_chunks, similarities)
+                                    )
+                                    chunk_similarity_pairs.sort(
+                                        key=lambda x: x[1], reverse=True
+                                    )
+
+                                    # Create rows with similarity scores
+                                    for i, (chunk, similarity) in enumerate(
+                                        chunk_similarity_pairs
+                                    ):
+                                        chunk_row = {
+                                            "Rank": i + 1,
+                                            "Similarity": similarity,
+                                            "Text": chunk.get(
+                                                "text", chunk.get("chunk_text", "")
+                                            ),
+                                            "Has Embedding": chunk.get("embedding")
+                                            is not None,
+                                            "Chunk Size": chunk.get(
+                                                "chunk_size", "N/A"
+                                            ),
+                                            "Chunk Overlap": chunk.get(
+                                                "chunk_overlap", "N/A"
+                                            ),
+                                        }
+                                        chunks_rows.append(chunk_row)
+
+                                    st.success(
+                                        f"✓ Sorted {len(chunks_rows)} chunks by similarity to query"
+                                    )
+
+                            except Exception as e:
+                                st.error(f"Error computing similarity: {str(e)}")
+                                logger.error(
+                                    f"Error computing similarity: {str(e)}",
+                                    exc_info=True,
+                                )
+                                # Fall back to original display
+                                for i, chunk in enumerate(raw_chunks):
+                                    chunk_row = {
+                                        "Chunk #": i + 1,
+                                        "Text": chunk.get(
+                                            "text", chunk.get("chunk_text", "")
+                                        ),
+                                        "Has Embedding": chunk.get("embedding")
+                                        is not None,
+                                        "Chunk Size": chunk.get("chunk_size", "N/A"),
+                                        "Chunk Overlap": chunk.get(
+                                            "chunk_overlap", "N/A"
+                                        ),
+                                    }
+                                    chunks_rows.append(chunk_row)
+
+                        else:
+                            # No query or no embeddings - show original order
+                            for i, chunk in enumerate(raw_chunks):
+                                chunk_row = {
+                                    "Chunk #": i + 1,
+                                    "Text": chunk.get(
+                                        "text", chunk.get("chunk_text", "")
+                                    ),
+                                    "Has Embedding": chunk.get("embedding") is not None,
+                                    "Chunk Size": chunk.get("chunk_size", "N/A"),
+                                    "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
+                                }
+                                chunks_rows.append(chunk_row)
+
+                            if query_text and not chunks_with_embeddings:
+                                st.warning(
+                                    "No chunks with embeddings found. Run Step 2 to generate embeddings for similarity search."
+                                )
+
+                        # Display chunks
+                        if chunks_rows:
+                            chunks_df = pd.DataFrame(chunks_rows)
+
+                            # Configure columns based on whether we have similarity scores
+                            if query_text and chunks_with_embeddings:
+                                column_config = {
+                                    "Rank": st.column_config.NumberColumn(
+                                        "Rank",
+                                        width="small",
+                                    ),
+                                    "Similarity": st.column_config.NumberColumn(
+                                        "Similarity",
+                                        format="%.4f",
+                                        width="small",
+                                    ),
+                                    "Text": st.column_config.TextColumn(
+                                        "Text",
+                                        width="large",
+                                    ),
+                                    "Has Embedding": st.column_config.CheckboxColumn(
+                                        "Has Embedding",
+                                    ),
+                                    "Chunk Size": st.column_config.NumberColumn(
+                                        "Chunk Size",
+                                        width="small",
+                                    ),
+                                    "Chunk Overlap": st.column_config.NumberColumn(
+                                        "Chunk Overlap",
+                                        width="small",
+                                    ),
+                                }
+                            else:
+                                column_config = {
+                                    "Chunk #": st.column_config.NumberColumn(
+                                        "Chunk #",
+                                        width="small",
+                                    ),
+                                    "Text": st.column_config.TextColumn(
+                                        "Text",
+                                        width="large",
+                                    ),
+                                    "Has Embedding": st.column_config.CheckboxColumn(
+                                        "Has Embedding",
+                                    ),
+                                    "Chunk Size": st.column_config.NumberColumn(
+                                        "Chunk Size",
+                                        width="small",
+                                    ),
+                                    "Chunk Overlap": st.column_config.NumberColumn(
+                                        "Chunk Overlap",
+                                        width="small",
+                                    ),
+                                }
+
+                            st.dataframe(
+                                data=chunks_df,
+                                use_container_width=True,
+                                hide_index=True,
+                                column_config=column_config,
+                            )
+
+                            st.info(
+                                f"✓ Found {len(chunks_rows)} total document chunks in this configuration."
+                            )
+                        else:
+                            st.warning(
+                                "No chunks found. Run Step 1 to generate document chunks first."
+                            )
+
+                except Exception as e:
+                    logger.warning(
+                        f"Error displaying document chunks with similarity search: {str(e)}"
+                    )
+                    # Continue to show analysis results even if chunk display fails
 
                 # Get cached results
                 cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                    file_path=file_path, config=selected_config["config"]
+                    file_path=file_path, config=selected_config
                 )
 
                 if cached_results:
@@ -963,12 +1310,14 @@ def display_consolidated_results(analyzer, question_set):
                         )
 
                         # Display results using the existing display function
-                        file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
+                        file_key = (
+                            f"{Path(file_path).stem}_cs{selected_config['chunk_size']}"
+                        )
                         display_analysis_results(analysis_df, chunks_df, file_key)
                     else:
-                        st.warning("No results found in cache for this configuration")
+                        st.warning("No results found in stored for this configuration")
                 else:
-                    st.warning("No cached results found for this configuration")
+                    st.warning("No stored results found for this configuration")
 
     except Exception as e:
         logger.error(f"Error displaying consolidated results: {str(e)}", exc_info=True)
@@ -977,7 +1326,7 @@ def display_consolidated_results(analyzer, question_set):
 
 def display_cache_selector(file_path: str):
     """Display cache management options"""
-    st.subheader("Cache Management")
+    st.subheader("Stored Data Management")
 
     # Get current configuration
     current_config = {
@@ -1006,12 +1355,12 @@ def display_cache_selector(file_path: str):
                     st.text(f"Current configuration: {current_config}")
 
                 with col2:
-                    if st.button("🔄 Clear Cache for File"):
+                    if st.button("Clear Stored Data for File"):
                         try:
                             st.session_state.analyzer.analyzer.cache_manager.clear_cache(
                                 file_path
                             )
-                            st.success(f"Cache cleared for file.")
+                            st.success(f"Stored data cleared for file.")
                             # Clear results from session state
                             if "results" in st.session_state:
                                 del st.session_state.results
@@ -1022,11 +1371,11 @@ def display_cache_selector(file_path: str):
                             st.session_state.analysis_complete = False
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Error clearing cache: {str(e)}")
+                            st.error(f"Error clearing stored data: {str(e)}")
             else:
-                st.info("No cached analyses available for this file")
+                st.info("No stored analyses available for this file")
         except Exception as e:
-            st.error(f"Error checking cache status: {str(e)}")
+            st.error(f"Error checking stored data status: {str(e)}")
 
 
 def get_current_settings(st) -> dict:
@@ -1067,7 +1416,7 @@ def update_analyzer_parameters():
         # If somehow a Gemini model was selected but no API key exists
         logger.error(f"Attempt to use Gemini model '{llm_model}' without API key")
         st.error(
-            f"⚠️ Cannot use {llm_model} - No Google API key is set. Defaulting to {OPENAI_MODELS[0]}."
+            f"Cannot use {llm_model} - No Google API key is set. Defaulting to {OPENAI_MODELS[0]}."
         )
         # Reset to default OpenAI model
         llm_model = OPENAI_MODELS[0]
@@ -1075,7 +1424,7 @@ def update_analyzer_parameters():
     elif llm_model.startswith("gpt-") and not os.getenv("OPENAI_API_KEY"):
         logger.error(f"Attempt to use OpenAI model '{llm_model}' without API key")
         st.error(
-            f"⚠️ OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly."
+            f"OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly."
         )
 
     # Update the analyzer with the new parameters
@@ -1131,7 +1480,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         )
         if cached_results and not st.session_state.get("force_recompute", False):
             logger.info(f"[CACHE] Cache HIT for config: {config}")
-            progress_text.success("Found cached results!")
+            progress_text.success("Found stored results!")
             st.session_state.results = cached_results
             logger.info(
                 f"[ANALYSIS] Writing results to session state for file: {file_path}"
@@ -1168,6 +1517,9 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
             else:
                 progress_text.warning(f"Invalid question ID format: {q_id}")
 
+        # Check if we have pre-retrieved chunks (for backend resources)
+        pre_retrieved_chunks = st.session_state.get("backend_chunks")
+
         # First update the analyzer's process_document method to use progress_text instead of yielding status
         async for result in analyzer.process_document(
             file_path=file_path,
@@ -1176,6 +1528,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
                 "new_llm_scoring", False
             ),  # Use the checkbox value directly
             force_recompute=st.session_state.get("force_recompute", False),
+            pre_retrieved_chunks=pre_retrieved_chunks,  # Pass backend chunks if available
         ):
             # Handle errors by displaying them but not storing them
             if "error" in result:
@@ -1265,7 +1618,1230 @@ def main():
                 False  # Initialize analysis complete flag
             )
 
+        # Initialize use_s3_upload in session state if not already set
+        if "use_s3_upload" not in st.session_state:
+            st.session_state.use_s3_upload = (
+                os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+            )
+
         st.set_page_config(page_title="Report Analyst", layout="wide")
+
+        # Inject Material Icons link tag at the top
+        st.markdown(
+            '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">',
+            unsafe_allow_html=True,
+        )
+
+        # Inject MINIMAL custom CSS for specific customizations only
+        # Let Streamlit handle most theming automatically
+        try:
+            # Minimal custom CSS - only for active sidebar item styling
+            custom_css = """
+            <style>
+            /* Import fonts from Google Fonts */
+            @import url('https://fonts.googleapis.com/css2?family=Afacad:wght@400;500;600;700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Cousine:wght@400;700&display=swap');
+            @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+            
+            /* Material Icons base styles */
+            .material-icons,
+            i.material-icons {
+                font-family: 'Material Icons';
+                font-weight: normal;
+                font-style: normal;
+                font-size: 24px;
+                line-height: 1;
+                letter-spacing: normal;
+                text-transform: none;
+                display: inline-block;
+                white-space: nowrap;
+                word-wrap: normal;
+                direction: ltr;
+                -webkit-font-feature-settings: 'liga';
+                -webkit-font-smoothing: antialiased;
+                vertical-align: middle;
+                margin-right: 8px;
+            }
+            
+            /* Add Material Icon to all notifications (unified - using info icon for all) */
+            .stAlert [data-testid="stMarkdownContainer"]::before,
+            [data-testid="stNotification"] [data-testid="stMarkdownContainer"]::before,
+            .stInfo [data-testid="stMarkdownContainer"]::before,
+            .stSuccess [data-testid="stMarkdownContainer"]::before,
+            .stError [data-testid="stMarkdownContainer"]::before,
+            .stWarning [data-testid="stMarkdownContainer"]::before {
+                content: 'info';
+                font-family: 'Material Icons';
+                font-size: 20px;
+                vertical-align: middle;
+                margin-right: 8px;
+                display: inline-block;
+            }
+            
+            /* Alternative selectors for notifications without markdown container */
+            .stAlert p::before,
+            [data-testid="stNotification"] p::before,
+            .stInfo p::before,
+            .stSuccess p::before,
+            .stError p::before,
+            .stWarning p::before {
+                content: 'info';
+                font-family: 'Material Icons';
+                font-size: 20px;
+                vertical-align: middle;
+                margin-right: 8px;
+                display: inline-block;
+            }
+            
+            /* Remove Settings expander icon CSS - it was causing rendering conflicts with Streamlit's built-in expander arrow */
+            
+            /* Fix Streamlit Material Icons - ensure they use Material Icons font */
+            [data-testid="stIconMaterial"],
+            span[data-testid="stIconMaterial"] {
+                font-family: 'Material Icons' !important;
+                font-weight: normal !important;
+                font-style: normal !important;
+                font-size: 20px !important;
+                line-height: 1 !important;
+                letter-spacing: normal !important;
+                text-transform: none !important;
+                display: inline-block !important;
+                white-space: nowrap !important;
+                word-wrap: normal !important;
+                direction: ltr !important;
+                -webkit-font-feature-settings: 'liga' !important;
+                -webkit-font-smoothing: antialiased !important;
+            }
+            
+            /* Active navigation item - light purple background with dark purple text */
+            [data-testid="stSidebar"] .nav-link-selected {
+                background-color: rgba(67, 19, 200, 0.15) !important;
+                color: #4313C8 !important;
+                font-weight: 700 !important;
+            }
+            
+            /* Active navigation item icon - dark purple */
+            [data-testid="stSidebar"] .nav-link-selected i {
+                color: #4313C8 !important;
+            }
+            
+            /* Inactive navigation items - gray text and icons */
+            [data-testid="stSidebar"] .nav-link:not(.nav-link-selected) {
+                color: #7872A7 !important;
+            }
+            
+            [data-testid="stSidebar"] .nav-link:not(.nav-link-selected) i {
+                color: #7872A7 !important;
+            }
+            
+            /* Designer Colors - Exact specifications from Daniela */
+            
+            /* ========== LIGHT MODE ========== */
+            
+            /* Main app background - #F5F7FF */
+            .stApp {
+                background-color: #F5F7FF !important;
+                font-family: 'Afacad', sans-serif !important;
+            }
+            
+            /* Primary font - Afacad for titles and body text */
+            body, .main, p, span, div, label {
+                font-family: 'Afacad', sans-serif !important;
+            }
+            
+            /* Titles use Afacad */
+            h1, h2, h3, h4, h5, h6 {
+                font-family: 'Afacad', sans-serif !important;
+            }
+            
+            /* Secondary font - Cousine for UI elements */
+            button, .stButton > button,
+            input, textarea, select,
+            .stTextInput input, .stTextArea textarea, .stSelectbox select,
+            [data-baseweb="select"],
+            [data-baseweb="input"],
+            ::placeholder,
+            .stCaption, small,
+            [data-testid="stCaptionContainer"],
+            code, pre {
+                font-family: 'Cousine', monospace !important;
+            }
+            
+            /* Main container - #FFFFFF */
+            .main .block-container {
+                background-color: #FFFFFF !important;
+            }
+            
+            /* Secondary containers - C0C4FA 10% opacity */
+            [data-testid="stExpander"],
+            .stAlert,
+            [data-testid="stNotification"],
+            .stInfo {
+                background-color: rgba(192, 196, 250, 0.1) !important;
+            }
+            
+            /* Fix text layout - prevent vertical stacking */
+            .stInfo {
+                word-break: normal !important;
+                white-space: normal !important;
+            }
+            
+            .stInfo p,
+            .stInfo span {
+                writing-mode: horizontal-tb !important;
+                text-orientation: mixed !important;
+            }
+            
+            /* Ensure columns don't cause vertical text */
+            [data-testid="column"] {
+                min-width: 0 !important;
+            }
+            
+            [data-testid="column"] * {
+                word-break: normal !important;
+                white-space: normal !important;
+            }
+            
+            /* Titles - #4313C8 */
+            h1, h2, [data-testid="stMarkdownContainer"] h1, [data-testid="stMarkdownContainer"] h2 {
+                color: #4313C8 !important;
+            }
+            
+            /* Subtitles - #979DF6 */
+            h3, h4, [data-testid="stMarkdownContainer"] h3, [data-testid="stMarkdownContainer"] h4 {
+                color: #979DF6 !important;
+            }
+            
+            /* Body text - #170843 */
+            p, span, label {
+                color: #170843 !important;
+            }
+            
+            /* Don't force color on all divs - let them inherit to prevent layout issues */
+            div:not([data-testid="stSidebar"] div):not(.stCheckbox):not([data-testid="stMarkdownContainer"]) {
+                color: #170843 !important;
+            }
+            
+            /* Caption text - #718096 */
+            .stCaption, small, [data-testid="stCaptionContainer"] {
+                color: #718096 !important;
+            }
+            
+            /* Sidebar - white background */
+            [data-testid="stSidebar"] {
+                background-color: #FFFFFF !important;
+            }
+            
+            /* Sidebar text - #7872A7 (exclude option-menu navigation) */
+            [data-testid="stSidebar"] *:not([data-testid="stSidebarNav"] [aria-current="page"] *):not(.nav-link):not(.nav-link-selected):not(.nav-link *):not([class*="nav-link"]) {
+                color: #7872A7 !important;
+            }
+            
+            /* Ensure option-menu navigation styles are not overridden */
+            [data-testid="stSidebar"] .nav-link,
+            [data-testid="stSidebar"] .nav-link-selected {
+                color: inherit !important;
+            }
+            
+            /* File Display Panel - Unique class for green panel styling */
+            /* The key="file-display-panel" creates the class st-key-file-display-panel */
+            /* Target the container element which has the st-key- class */
+            [data-testid="stVerticalBlock"].st-key-file-display-panel,
+            .st-key-file-display-panel[data-testid="stVerticalBlock"] {
+                background-color: #E8F5E9 !important;
+                border-radius: 12px !important;
+                padding: 1rem 1.5rem !important;
+                margin: 0.5rem 0 1.5rem 0 !important;
+            }
+            
+            /* Target the horizontal block inside the container (for columns) */
+            .st-key-file-display-panel [data-testid="stHorizontalBlock"] {
+                background-color: transparent !important;
+            }
+
+            /* Ensure columns inside the file display panel have transparent background */
+            .st-key-file-display-panel [data-testid="column"] {
+                background-color: transparent !important;
+            }
+            
+            /* Keep upload date gray */
+            .st-key-file-display-panel .pdf-upload-date {
+                color: #718096 !important;
+            }
+            
+            .pdf-icon-box {
+                background-color: #C8E6C9;
+                border-radius: 12px;
+                width: 56px;
+                height: 56px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+            
+            .pdf-icon-box .material-icons,
+            .pdf-icon-box i.material-icons {
+                font-size: 28px !important;
+                color: #2E7D32 !important;
+                display: inline-block !important;
+            }
+            
+            .pdf-info-section {
+                flex-grow: 1;
+            }
+            
+            .pdf-upload-date {
+                font-size: 13px;
+                color: #718096;
+                display: block;
+                margin-top: 4px;
+            }
+            
+            /* Style ONLY the PDF selectbox - target it specifically within the file display panel */
+            /* Make the selectbox container bigger */
+            .st-key-file-display-panel [data-baseweb="select"] {
+                min-width: 300px !important;
+                max-width: 500px !important;
+            }
+            
+            /* Target the main selectbox wrapper */
+            .st-key-file-display-panel [data-baseweb="select"] > div {
+                background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            
+            /* Target the div with value attribute (the displayed text) - make it bigger, bolder, and green */
+            .st-key-file-display-panel [data-baseweb="select"] div[value] {
+                font-size: 22px !important;
+                font-weight: 800 !important;
+                color: #1B9E6B !important;
+            }
+            
+            /* Also target by the specific class pattern for the value div */
+            .st-key-file-display-panel [data-baseweb="select"] [class*="st-dn"] {
+                font-size: 22px !important;
+                font-weight: 800 !important;
+                color: #1B9E6B !important;
+            }
+            
+            /* Target nested divs that contain the text */
+            .st-key-file-display-panel [data-baseweb="select"] > div > div > div[value],
+            .st-key-file-display-panel [data-baseweb="select"] > div > div > div[class*="st-dn"] {
+                font-size: 22px !important;
+                font-weight: 800 !important;
+                color: #1B9E6B !important;
+            }
+            
+            /* Make the dropdown arrow bigger, bold, and green */
+            .st-key-file-display-panel [data-baseweb="select"] svg {
+                color: #1B9E6B !important;
+                width: 28px !important;
+                height: 28px !important;
+            }
+            
+            .st-key-file-display-panel [data-baseweb="select"] svg path,
+            .st-key-file-display-panel [data-baseweb="select"] svg polygon {
+                stroke-width: 4 !important;
+                stroke: #1B9E6B !important;
+                fill: #1B9E6B !important;
+            }
+            
+            /* Question Set Display Panel - same styling as file display panel */
+            [data-testid="stVerticalBlock"].st-key-question-set-display-panel,
+            .st-key-question-set-display-panel[data-testid="stVerticalBlock"] {
+                background-color: #E8F5E9 !important;
+                border-radius: 12px !important;
+                padding: 1rem 1.5rem !important;
+                margin: 1rem 0 0.5rem 0 !important;
+            }
+            
+            .st-key-question-set-display-panel [data-testid="stHorizontalBlock"] {
+                background-color: transparent !important;
+            }
+            
+            .st-key-question-set-display-panel [data-testid="column"] {
+                background-color: transparent !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] {
+                min-width: 300px !important;
+                max-width: 500px !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] > div {
+                background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] div[value],
+            .st-key-question-set-display-panel [data-baseweb="select"] [class*="st-dn"],
+            .st-key-question-set-display-panel [data-baseweb="select"] > div > div > div[value],
+            .st-key-question-set-display-panel [data-baseweb="select"] > div > div > div[class*="st-dn"] {
+                font-size: 22px !important;
+                font-weight: 800 !important;
+                color: #1B9E6B !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] svg {
+                color: #1B9E6B !important;
+                width: 28px !important;
+                height: 28px !important;
+            }
+            
+            .st-key-question-set-display-panel [data-baseweb="select"] svg path,
+            .st-key-question-set-display-panel [data-baseweb="select"] svg polygon {
+                stroke-width: 4 !important;
+                stroke: #1B9E6B !important;
+                fill: #1B9E6B !important;
+            }
+            
+            /* Styled Selectboxes - White background, thin border */
+            /* Only target selectboxes that are NOT in the PDF container */
+            /* Target selectboxes inside expanders or other sections, but NOT in PDF container */
+            [data-testid="stExpander"] [data-baseweb="select"] > div,
+            [data-testid="stExpander"] [data-baseweb="select"] > div > div {
+                background-color: #FFFFFF !important;
+                border: 1px solid #E2E8F0 !important;
+                border-radius: 4px !important;
+            }
+            
+            /* Ensure selectboxes in expanders have normal text color (NOT green) */
+            [data-testid="stExpander"] [data-baseweb="select"] > div > div > div {
+                color: #170843 !important;
+            }
+            
+            /* Ensure selectbox arrows in expanders are NOT green */
+            [data-testid="stExpander"] [data-baseweb="select"] svg path,
+            [data-testid="stExpander"] [data-baseweb="select"] svg polygon {
+                stroke: #170843 !important;
+                fill: #170843 !important;
+                stroke-width: 1 !important;
+            }
+            
+            [data-testid="stExpander"] [data-baseweb="select"]:hover > div,
+            [data-testid="stExpander"] [data-baseweb="select"]:hover > div > div {
+                border-color: #4313C8 !important;
+            }
+            
+            /* Styled Questions Table */
+            .questions-table-container {
+                background-color: #FFFFFF;
+                border: 1px solid #E2E8F0;
+                border-radius: 8px;
+                padding: 1rem;
+                margin: 1rem 0;
+            }
+            
+            /* Sidebar accent (active item) - #4313C8 with white text */
+            [data-testid="stSidebarNav"] li[aria-selected="true"],
+            [data-testid="stSidebarNav"] a[aria-selected="true"],
+            [data-testid="stSidebarNav"] li[aria-current="page"],
+            [data-testid="stSidebarNav"] a[aria-current="page"] {
+                background-color: #4313C8 !important;
+                border-radius: 4px !important;
+            }
+            
+            /* Active sidebar item text and icons - white */
+            [data-testid="stSidebarNav"] li[aria-current="page"] *,
+            [data-testid="stSidebarNav"] a[aria-current="page"] * {
+                color: #ffffff !important;
+                fill: #ffffff !important;
+            }
+            
+            /* Sidebar navigation radio buttons - styled like screen design */
+            [data-testid="stSidebar"] [data-baseweb="radio"] {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 4px !important;
+            }
+            
+            /* Hide radio button input circles completely */
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                position: absolute !important;
+                width: 0 !important;
+                height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            /* Hide the radio button circle indicators */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div > div:first-child,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label::before,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label > div:first-child:not(span) {
+                display: none !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] > label {
+                padding: 10px 15px !important;
+                border-radius: 6px !important;
+                margin: 2px 0 !important;
+                transition: all 0.2s ease !important;
+                cursor: pointer !important;
+                background-color: transparent !important;
+                border: none !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] > label:hover {
+                background-color: rgba(67, 19, 200, 0.1) !important;
+            }
+            
+            /* Inactive sidebar items - purple text */
+            [data-testid="stSidebar"] [data-baseweb="radio"] label {
+                color: #4313C8 !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] label span {
+                color: #4313C8 !important;
+                font-family: 'Cousine', monospace !important;
+                font-weight: 400 !important;
+            }
+            
+            /* Active/selected sidebar item - purple background with white text */
+            /* Streamlit uses a div wrapper with data-checked attribute */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label[data-checked="true"],
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked ~ label,
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked + label {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border-radius: 6px !important;
+                font-weight: 700 !important;
+            }
+            
+            /* Also target the parent div when checked */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] {
+                background-color: #4313C8 !important;
+                border-radius: 6px !important;
+            }
+            
+            /* Active sidebar item text - white and bold */
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked ~ label span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked + label span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label[data-checked="true"] span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label[aria-checked="true"] span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div > label[data-checked="true"] span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > label[data-checked="true"] span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] [data-checked="true"] span {
+                color: #ffffff !important;
+                font-weight: 700 !important;
+            }
+            
+            /* Active sidebar item - also target the parent container */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                font-weight: 700 !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label span,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label span {
+                color: #ffffff !important;
+                font-weight: 700 !important;
+            }
+            
+            /* Sidebar Material Icons - match text color */
+            [data-testid="stSidebar"] [data-baseweb="radio"] label .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label .material-icons {
+                color: #4313C8 !important;
+                font-size: 20px !important;
+                margin-right: 8px !important;
+                vertical-align: middle !important;
+            }
+            
+            /* Active sidebar item Material Icons - white */
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label[data-checked="true"] .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked ~ label .nav-material-icon,
+            [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked + label .nav-material-icon {
+                color: #ffffff !important;
+            }
+            
+            /* Keep tooltip icons (help icons) visible and styled */
+            [data-testid="stSidebar"] [data-baseweb="radio"] label [data-testid="stTooltipIcon"] svg,
+            [data-testid="stSidebar"] [data-baseweb="radio"] label [data-testid="stTooltipHoverTarget"] svg {
+                display: inline-block !important;
+                color: #4313C8 !important;
+                stroke: #4313C8 !important;
+            }
+            
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label [data-testid="stTooltipIcon"] svg,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label [data-testid="stTooltipIcon"] svg {
+                color: #ffffff !important;
+                stroke: #ffffff !important;
+            }
+            
+            /* Green accent - #2E9D6F */
+            .stSuccess {
+                background-color: rgba(46, 157, 111, 0.3) !important;
+                border-color: #2E9D6F !important;
+                color: #2E9D6F !important;
+            }
+            
+            /* Green cards - 30% and 10% opacity */
+            [data-testid="stNotification"][data-status="success"] {
+                background-color: rgba(46, 157, 111, 0.1) !important;
+            }
+            
+            /* ========== UNIFIED BUTTON STYLES ========== */
+            
+            /* Help icon button - styled as icon only, no background */
+            div[data-testid="stButton"] button:has-text("ℹ️") {
+                background-color: transparent !important;
+                color: #4313C8 !important;
+                border: none !important;
+                padding: 0 4px !important;
+                min-width: auto !important;
+                width: auto !important;
+                height: auto !important;
+                font-size: 18px !important;
+                cursor: help !important;
+                box-shadow: none !important;
+                line-height: 1 !important;
+            }
+            
+            div[data-testid="stButton"] button:has-text("ℹ️"):hover {
+                background-color: transparent !important;
+                color: #4313C8 !important;
+                opacity: 0.7 !important;
+                transform: none !important;
+            }
+            
+            /* Select All button - small light purple button like processing steps */
+            /* Target primary buttons that appear after "Select Questions" heading */
+            h3:has-text("Select Questions") + div[data-testid="stButton"] button[kind="primary"],
+            /* Fallback: target primary buttons with smaller text */
+            div[data-testid="stButton"] button[kind="primary"] {
+                background-color: rgba(192, 196, 250, 0.1) !important;
+                color: #4313C8 !important;
+                border: 1px solid #4313C8 !important;
+                border-radius: 4px !important;
+                padding: 4px 12px !important;
+                font-size: 12px !important;
+                font-family: 'Cousine', monospace !important;
+                height: auto !important;
+                min-height: 28px !important;
+                width: auto !important;
+                max-width: fit-content !important;
+            }
+            
+            /* Hover state for Select All button */
+            h3:has-text("Select Questions") + div[data-testid="stButton"] button[kind="primary"]:hover,
+            div[data-testid="stButton"] button[kind="primary"]:hover {
+                background-color: rgba(192, 196, 250, 0.2) !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Override for larger primary buttons (like Analyze Selected Questions, Reanalyze) */
+            /* These buttons have more text, so we can target them by their longer text content */
+            div[data-testid="stButton"]:has(button:contains("Analyze")) button,
+            div[data-testid="stButton"]:has(button:contains("Reanalyze")) button {
+                background-color: #4313C8 !important;
+                color: #FFFFFF !important;
+                padding: 10px 24px !important;
+                font-size: 14px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            /* Default: All buttons in main content - white background with purple text (like Browse File) */
+            /* Style all buttons first, then override for sidebar and special buttons */
+            .stButton > button,
+            .stDownloadButton > button,
+            [data-testid="stDownloadButton"] button,
+            button[data-baseweb="button"],
+            [data-baseweb="button"] {
+                background-color: #FFFFFF !important;
+                color: #4313C8 !important;
+                border: 1px solid #4313C8 !important;
+                border-radius: 6px !important;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.04) !important;
+                transition: all 0.2s ease !important;
+                font-family: 'Cousine', monospace !important;
+                font-weight: 400 !important;
+                font-size: 14px !important;
+                padding: 0.5rem 1rem !important;
+                text-align: center !important;
+                width: auto !important;
+                min-width: auto !important;
+            }
+            
+            .stButton > button:hover,
+            .stDownloadButton > button:hover,
+            [data-testid="stDownloadButton"] button:hover,
+            button[data-baseweb="button"]:hover,
+            [data-baseweb="button"]:hover {
+                background-color: #4313C8 !important;
+                color: #FFFFFF !important;
+                border: 1px solid #4313C8 !important;
+                box-shadow: 0 2px 6px rgba(67, 19, 200, 0.25), 0 1px 3px rgba(67, 19, 200, 0.15) !important;
+            }
+            
+            .stButton > button:active,
+            .stButton > button:focus,
+            .stDownloadButton > button:active,
+            .stDownloadButton > button:focus,
+            [data-testid="stDownloadButton"] button:active,
+            [data-testid="stDownloadButton"] button:focus,
+            button[data-baseweb="button"]:active,
+            button[data-baseweb="button"]:focus,
+            [data-baseweb="button"]:active,
+            [data-baseweb="button"]:focus {
+                background-color: #4313C8 !important;
+                color: #FFFFFF !important;
+                border: 1px solid #4313C8 !important;
+                outline: none !important;
+                box-shadow: 0 1px 3px rgba(67, 19, 200, 0.3) !important;
+            }
+            
+            /* Sidebar buttons - override with purple background (higher specificity) */
+            [data-testid="stSidebar"] .stButton > button {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                border-radius: 6px !important;
+                box-shadow: none !important;
+                transition: all 0.2s ease !important;
+                font-family: 'Cousine', monospace !important;
+                font-weight: 400 !important;
+                padding: 0.5rem 1rem !important;
+            }
+            
+            [data-testid="stSidebar"] .stButton > button:hover {
+                background-color: #979DF6 !important;
+                color: #ffffff !important;
+                border: 2px solid #979DF6 !important;
+                box-shadow: none !important;
+            }
+            
+            [data-testid="stSidebar"] .stButton > button:active,
+            [data-testid="stSidebar"] .stButton > button:focus {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            
+            /* Remove all orange/red borders and states from buttons */
+            /* Note: Main button styles are defined above, this just ensures border color */
+            /* Exclude sidebar and file uploader buttons, but include download buttons */
+            button:not([data-testid="stSidebar"] button):not([data-testid*="FileUploader"] button),
+            .stButton > button:not([data-testid="stSidebar"] .stButton > button):not([data-testid*="FileUploader"] button),
+            [data-baseweb="button"]:not([data-testid="stSidebar"] [data-baseweb="button"]):not([data-testid*="FileUploader"] [data-baseweb="button"]) {
+                border-color: #4313C8 !important;
+                outline: none !important;
+            }
+            
+            /* File uploader buttons - purple with white text (keep special styling) */
+            [data-testid="stFileUploader"] button,
+            [data-testid="stFileUploader"] [data-baseweb="button"],
+            .stFileUploader button {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                border-radius: 6px !important;
+                transition: all 0.2s ease !important;
+                font-family: 'Cousine', monospace !important;
+                font-weight: 400 !important;
+                padding: 0.5rem 1rem !important;
+            }
+            
+            [data-testid="stFileUploader"] button:hover,
+            [data-testid="stFileUploader"] [data-baseweb="button"]:hover,
+            .stFileUploader button:hover {
+                background-color: #979DF6 !important;
+                color: #ffffff !important;
+                border: 2px solid #979DF6 !important;
+            }
+            
+            [data-testid="stFileUploader"] button:active,
+            [data-testid="stFileUploader"] button:focus,
+            [data-testid="stFileUploader"] [data-baseweb="button"]:active,
+            .stFileUploader button:active,
+            .stFileUploader button:focus {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+                border: 2px solid #4313C8 !important;
+                outline: none !important;
+            }
+            
+            /* Download buttons - use main content button style (white background, purple text) */
+            /* They inherit from .stButton > button above, no special override needed */
+            
+            /* Secondary buttons - transparent with purple border */
+            button[data-baseweb="button"][kind="secondary"],
+            [data-baseweb="button"][kind="secondary"],
+            button.kind-secondary {
+                background-color: transparent !important;
+                color: #4313C8 !important;
+                border: 2px solid #4313C8 !important;
+                border-radius: 6px !important;
+                font-family: 'Cousine', monospace !important;
+            }
+            
+            button[data-baseweb="button"][kind="secondary"]:hover,
+            [data-baseweb="button"][kind="secondary"]:hover,
+            button.kind-secondary:hover {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+            }
+            
+            /* Checkboxes - purple accent, remove ALL orange, make checkmark visible */
+            .stCheckbox > label > span[data-baseweb="checkbox"],
+            span[data-baseweb="checkbox"],
+            [data-baseweb="checkbox"],
+            .stCheckbox input[type="checkbox"] {
+                background-color: transparent !important;
+                border: 2px solid #4313C8 !important;
+                border-radius: 4px !important;
+                width: 18px !important;
+                height: 18px !important;
+            }
+            
+            .stCheckbox > label > span[data-baseweb="checkbox"][aria-checked="true"],
+            span[data-baseweb="checkbox"][aria-checked="true"],
+            [data-baseweb="checkbox"][aria-checked="true"],
+            .stCheckbox input[type="checkbox"]:checked {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Make checkmark visible - white checkmark on purple background */
+            .stCheckbox > label > span[data-baseweb="checkbox"][aria-checked="true"] svg,
+            span[data-baseweb="checkbox"][aria-checked="true"] svg,
+            [data-baseweb="checkbox"][aria-checked="true"] svg {
+                color: #ffffff !important;
+                fill: #ffffff !important;
+                stroke: #ffffff !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            /* Alternative checkmark using CSS if SVG doesn't work */
+            .stCheckbox > label > span[data-baseweb="checkbox"][aria-checked="true"]::after,
+            span[data-baseweb="checkbox"][aria-checked="true"]::after {
+                content: "✓" !important;
+                color: #ffffff !important;
+                font-size: 16px !important;
+                font-weight: bold !important;
+                display: block !important;
+                position: absolute !important;
+                top: 50% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                line-height: 1 !important;
+            }
+            
+            /* Make checkmark visible in Streamlit's internal checkboxes */
+            span.st-bi[aria-checked="true"] svg,
+            span[class*="st-bi"][aria-checked="true"] svg {
+                color: #ffffff !important;
+                fill: #ffffff !important;
+                stroke: #ffffff !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            /* Question checkboxes - make them visible like in screen design */
+            .stCheckbox {
+                margin-bottom: 12px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .stCheckbox > div {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .stCheckbox label {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: flex-start !important;
+                gap: 8px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                font-family: 'Cousine', monospace !important;
+                box-sizing: border-box !important;
+            }
+            
+            .stCheckbox label > span[data-baseweb="checkbox"] {
+                min-width: 18px !important;
+                width: 18px !important;
+                min-height: 18px !important;
+                height: 18px !important;
+                flex-shrink: 0 !important;
+                flex-grow: 0 !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                margin-top: 2px !important;
+            }
+            
+            /* Fix markdown container - ensure horizontal text and proper responsive layout */
+            .stCheckbox label [data-testid="stMarkdownContainer"] {
+                writing-mode: horizontal-tb !important;
+                text-orientation: mixed !important;
+                flex: 1 1 auto !important;
+                min-width: 0 !important;
+                width: calc(100% - 26px) !important;
+                max-width: calc(100% - 26px) !important;
+                background-color: transparent !important;
+                border: none !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                box-sizing: border-box !important;
+            }
+            
+            .stCheckbox label [data-testid="stMarkdownContainer"] p {
+                writing-mode: horizontal-tb !important;
+                text-orientation: mixed !important;
+                word-break: normal !important;
+                white-space: normal !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                display: block !important;
+                line-height: 1.5 !important;
+                text-align: left !important;
+                background-color: transparent !important;
+                border: none !important;
+                font-family: 'Cousine', monospace !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-wrap: break-word !important;
+                word-wrap: break-word !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Remove any background or border from checkbox label elements */
+            .stCheckbox label,
+            .stCheckbox label *,
+            .stCheckbox label div,
+            .stCheckbox label span,
+            .stCheckbox label p,
+            .stCheckbox label [data-testid="stWidgetLabel"],
+            .stCheckbox label [data-testid="stWidgetLabel"] * {
+                background-color: transparent !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            
+            /* Remove borders from markdown container specifically */
+            .stCheckbox label [data-testid="stMarkdownContainer"],
+            .stCheckbox label [data-testid="stMarkdownContainer"] *,
+            .stCheckbox label [data-testid="stMarkdownContainer"] p,
+            .stCheckbox label [data-testid="stMarkdownContainer"] div {
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+                background-color: transparent !important;
+            }
+            
+            /* Prevent text fragmentation in checkbox labels */
+            .stCheckbox label [data-testid="stMarkdownContainer"] * {
+                word-break: normal !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                background-color: transparent !important;
+                border: none !important;
+            }
+            
+            /* Ensure checkbox container doesn't break text */
+            .stCheckbox > div,
+            .stCheckbox > div > div {
+                width: 100% !important;
+                overflow: visible !important;
+                background-color: transparent !important;
+                border: none !important;
+            }
+            
+            /* Remove borders from all checkbox-related elements */
+            .stCheckbox * {
+                border: none !important;
+            }
+            
+            /* But keep the checkbox itself visible */
+            .stCheckbox label > span[data-baseweb="checkbox"] {
+                border: 2px solid #4313C8 !important;
+            }
+            
+            /* Ensure all checkboxes are visible */
+            input[type="checkbox"] {
+                width: 18px !important;
+                height: 18px !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                display: block !important;
+            }
+            
+            /* Remove orange from Streamlit's internal checkbox elements */
+            span.st-bi,
+            span[class*="st-bi"],
+            span[class*="st-bj"],
+            span[class*="st-bk"],
+            span[class*="st-bl"],
+            span[class*="st-bm"],
+            span[class*="st-bn"],
+            span[class*="st-bo"],
+            span[class*="st-bp"],
+            span[class*="st-bq"],
+            span[class*="st-br"],
+            span[class*="st-bs"],
+            span[class*="st-bt"] {
+                background-color: transparent !important;
+                border: 2px solid #4313C8 !important;
+            }
+            
+            span.st-bi[aria-checked="true"],
+            span[class*="st-bi"][aria-checked="true"] {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Make checkmark visible in Streamlit's internal checkboxes */
+            span.st-bi[aria-checked="true"]::after,
+            span[class*="st-bi"][aria-checked="true"]::after {
+                content: "✓" !important;
+                color: #ffffff !important;
+                font-size: 14px !important;
+                font-weight: bold !important;
+                display: block !important;
+            }
+            
+            /* Force remove #FF4B4B (Streamlit's default orange) from ALL elements */
+            * {
+                --primary-color: #4313C8 !important;
+            }
+            
+            /* Remove orange from ALL elements with #FF4B4B */
+            div[style*="#FF4B4B"],
+            span[style*="#FF4B4B"],
+            div[style*="#ff4b4b"],
+            span[style*="#ff4b4b"],
+            div[style*="rgb(255, 75, 75)"],
+            span[style*="rgb(255, 75, 75)"],
+            *[style*="#FF4B4B"],
+            *[style*="#ff4b4b"] {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+                color: #4313C8 !important;
+            }
+            
+            /* Remove orange from Streamlit's internal div classes */
+            div[class*="st-cu"],
+            div[class*="st-cl"],
+            div[class*="st-f6"],
+            div[class*="st-f7"],
+            div[class*="st-f8"],
+            div[class*="st-f9"],
+            div[class*="st-fo"],
+            div[class*="st-fp"],
+            div[class*="st-b0"],
+            div[class*="st-fq"],
+            div[class*="st-fr"] {
+                background-color: transparent !important;
+                border-color: transparent !important;
+            }
+            
+            /* Specifically hide the orange line element */
+            div.st-cu.st-cl.st-f6.st-f7.st-f8.st-f9.st-fo.st-fp.st-b0.st-fq.st-fr {
+                display: none !important;
+                background-color: transparent !important;
+                border-color: transparent !important;
+            }
+            
+            /* Radio buttons - purple accent */
+            .stRadio > label > div[data-baseweb="radio"] > div {
+                background-color: transparent !important;
+                border-color: #4313C8 !important;
+            }
+            
+            .stRadio > label > div[data-baseweb="radio"][aria-checked="true"] > div:first-child {
+                background-color: #4313C8 !important;
+            }
+            
+            /* Number input buttons */
+            .stNumberInput button {
+                color: #4313C8 !important;
+                background-color: transparent !important;
+            }
+            
+            .stNumberInput button:hover {
+                background-color: rgba(67, 19, 200, 0.1) !important;
+            }
+            
+            /* Tabs - remove orange/red underline completely */
+            .stTabs [data-baseweb="tab"] {
+                color: #170843 !important;
+            }
+            
+            .stTabs [aria-selected="true"],
+            .stTabs [aria-selected="true"] [data-baseweb="tab"] {
+                color: #4313C8 !important;
+                border-bottom-color: #4313C8 !important;
+            }
+            
+            /* Remove all orange/red Streamlit defaults from tabs */
+            [data-baseweb="tab"][aria-selected="true"],
+            [data-baseweb="tab-list"] [aria-selected="true"] {
+                border-bottom: 2px solid #4313C8 !important;
+            }
+            
+            /* Remove orange from tab indicators and underlines */
+            .stTabs [aria-selected="true"]::after,
+            .stTabs [aria-selected="true"]::before,
+            [data-baseweb="tab"][aria-selected="true"]::after,
+            [data-baseweb="tab"][aria-selected="true"]::before {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Target Streamlit's internal tab styling */
+            div[class*="stTabs"] [aria-selected="true"],
+            div[class*="stTabs"] [aria-selected="true"] > div {
+                border-bottom-color: #4313C8 !important;
+            }
+            
+            /* Remove any orange borders/lines from tabs */
+            .stTabs * {
+                border-color: transparent !important;
+            }
+            
+            .stTabs [aria-selected="true"] * {
+                border-bottom-color: #4313C8 !important;
+            }
+            
+            /* Progress bars */
+            .stProgress > div > div > div {
+                background-color: #4313C8 !important;
+            }
+            
+            /* Sliders */
+            [data-baseweb="slider"] [data-baseweb="slider-track"] {
+                background-color: #4313C8 !important;
+            }
+            
+            [data-baseweb="slider"] [data-baseweb="slider-handle"] {
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* File uploader */
+            [data-testid="stFileUploader"] button {
+                background-color: #4313C8 !important;
+                color: #ffffff !important;
+            }
+            
+            /* Remove any orange from links */
+            a:link, a:visited {
+                color: #4313C8 !important;
+            }
+            
+            a:hover {
+                color: #979DF6 !important;
+            }
+            
+            /* Expander icons */
+            .streamlit-expanderHeader {
+                color: #4313C8 !important;
+            }
+            
+            /* Header - remove orange/red bar at top */
+            [data-testid="stHeader"],
+            [data-testid="stHeader"] > div,
+            [data-testid="stHeader"] > div > div {
+                background-color: transparent !important;
+                border-bottom: none !important;
+            }
+            
+            /* Remove orange from progress bars */
+            [data-baseweb="progressbar"],
+            [data-baseweb="progressbar"] > div,
+            [data-baseweb="progressbar"] > div > div {
+                background-color: #4313C8 !important;
+            }
+            
+            /* Remove orange from any remaining Streamlit elements */
+            [style*="rgb(255, 75, 75)"],
+            [style*="rgb(255, 107, 107)"],
+            [style*="#ff4b4b"],
+            [style*="#ff6b6b"],
+            [style*="rgb(255, 99, 71)"],
+            [style*="#ff6347"],
+            [style*="rgb(255, 140, 0)"],
+            [style*="#ff8c00"] {
+                color: #4313C8 !important;
+                background-color: #4313C8 !important;
+                border-color: #4313C8 !important;
+            }
+            
+            /* Force remove orange backgrounds */
+            div[style*="background"][style*="255, 75"],
+            div[style*="background"][style*="255, 107"],
+            div[style*="background"][style*="#ff4b"],
+            div[style*="background"][style*="#ff6b"] {
+                background-color: transparent !important;
+            }
+            
+            /* Links */
+            a {
+                color: #4313C8 !important;
+            }
+            
+            /* Footer styling - in sidebar at bottom */
+            [data-testid="stSidebar"] .footer {
+                text-align: center;
+                padding: 15px 10px;
+                font-size: 11px;
+                border-top: 1px solid rgba(67, 19, 200, 0.1);
+                margin-top: 20px;
+            }
+            
+            [data-testid="stSidebar"] .footer a {
+                color: #4313C8 !important;
+            }
+            
+            [data-testid="stSidebar"] .footer img {
+                height: 25px;
+                max-width: 100%;
+                width: auto;
+                vertical-align: middle;
+                margin-right: 8px;
+                object-fit: contain;
+            }
+            
+            [data-testid="stSidebar"] .footer {
+                overflow: visible;
+                word-wrap: break-word;
+            }
+            
+            [data-testid="stSidebar"] .footer p {
+                margin: 4px 0;
+                color: #7872A7;
+                font-size: 11px;
+            }
+            
+            </style>
+            """
+
+            st.markdown(custom_css, unsafe_allow_html=True)
+        except Exception as e:
+            # Fallback if theme detection fails
+            logger.warning(f"Could not apply custom theme: {str(e)}")
 
         # Initialize analyzer with default question set
         try:
@@ -1279,340 +2855,879 @@ def main():
             st.exception(e)
             return
 
-        st.title("Report Analyst")
-
-        # Backend Integration Section
-        if BACKEND_INTEGRATION_AVAILABLE:
-            with st.expander("🔧 Backend Integration", expanded=False):
-                config = configure_backend_integration()
-                display_config_status(config)
-        else:
-            # Show fallback info
-            with st.expander("🔧 Backend Integration", expanded=False):
-                st.warning("⚠️ Backend integration modules not available")
-                st.info(
-                    "Install backend integration dependencies to enable advanced features"
-                )
-
-        # Settings section - moved below the title
-        with st.expander("Analysis Configuration", expanded=True):
-            # Enterprise Integration Settings
-            if BACKEND_INTEGRATION_AVAILABLE:
-                st.subheader("🚀 Enterprise Integration")
-                col1, col2 = st.columns(2)
-                with col1:
-                    use_s3_upload = st.checkbox(
-                        "Enable S3+NATS Upload",
-                        value=os.getenv("USE_S3_UPLOAD", "false").lower() == "true",
-                        key="use_s3_upload",
-                        help="Upload documents via S3 and process via NATS for enterprise integration with backend",
+        # Add logo to sidebar
+        try:
+            logo_path = (
+                Path(__file__).parent / "assets" / "open-sustainability-analyst.svg"
+            )
+            if logo_path.exists():
+                with open(logo_path, "rb") as f:
+                    logo_data = base64.b64encode(f.read()).decode()
+                    st.sidebar.markdown(
+                        f"""
+                        <div style="text-align: center; padding: 10px 20px 30px 20px; margin-bottom: 20px;">
+                            <img src="data:image/svg+xml;base64,{logo_data}" 
+                                 alt="Open Sustainability Analyst" 
+                                 style="width: 90%; max-width: 200px; height: auto;" />
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
                     )
-                with col2:
-                    if use_s3_upload:
-                        st.success(
-                            "✅ Enterprise mode enabled - documents will be processed via S3+NATS"
-                        )
-                    else:
-                        st.info("📁 Local mode - documents processed locally")
-                st.divider()
+        except Exception as e:
+            logger.warning(f"Could not load sidebar logo: {str(e)}")
 
-            # Question set selection
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                selected_set = st.selectbox(
-                    "Select Question Set",
-                    options=list(question_sets.keys()),
-                    format_func=lambda x: question_sets[x]["name"],
-                    key="new_question_set",
-                    index=0,  # Ensure a default is selected
-                    on_change=update_analyzer_parameters,
+        # Create sidebar navigation using streamlit-option-menu
+        st.sidebar.markdown("---")
+
+        try:
+            from streamlit_option_menu import option_menu
+
+            # Ensure it's in sidebar context
+            with st.sidebar:
+                nav_page = option_menu(
+                    menu_title=None,
+                    options=["Upload Report", "Report Analyst", "All Results"],
+                    icons=["house", "file-text", "bar-chart"],
+                    menu_icon=None,
+                    default_index=0,
+                    orientation="vertical",
+                    key="nav_page",
+                    styles={
+                        "container": {
+                            "padding": "0",
+                            "background-color": "transparent",
+                        },
+                        "icon": {"color": "#7872A7", "font-size": "20px"},
+                        "nav-link": {
+                            "font-family": "'Afacad', sans-serif",
+                            "font-size": "16px",
+                            "text-align": "left",
+                            "margin": "2px 0",
+                            "padding": "10px 15px",
+                            "border-radius": "6px",
+                            "color": "#7872A7",
+                            "background-color": "transparent",
+                        },
+                        "nav-link-selected": {
+                            "background-color": "rgba(67, 19, 200, 0.15)",
+                            "color": "#4313C8",
+                            "font-weight": "700",
+                        },
+                    },
                 )
+        except ImportError:
+            # Fallback to regular radio if package not installed
+            nav_options = ["Upload Report", "Report Analyst", "All Results"]
+            nav_page = st.sidebar.radio(
+                "", nav_options, key="nav_page", label_visibility="collapsed"
+            )
 
-            # Show question set description
-            with col2:
-                if selected_set in question_sets:
-                    st.info(question_sets[selected_set]["description"])
+        # Settings section in sidebar (consolidates all integration settings)
+        st.sidebar.markdown("---")
+        with st.sidebar.expander("Settings", expanded=False):
+            # Show Enterprise Mode status at the top
+            use_s3_upload = st.session_state.get("use_s3_upload", False)
+            if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
+                st.caption("Enterprise mode")
 
-            # Update analyzer's question set
-            analyzer.analyzer.update_question_set(selected_set)
+            # Enterprise Integration (S3+NATS) - always shown first, outside of backend config
+            st.subheader("Enterprise Integration")
+            use_s3_upload = st.checkbox(
+                "Enable S3+NATS Upload",
+                value=st.session_state.use_s3_upload,
+                key="use_s3_upload",
+                help="Upload documents via S3 and process via NATS for enterprise integration",
+            )
 
-            # Clear results if question set changed
-            if (
-                "last_question_set" not in st.session_state
-                or st.session_state.last_question_set != selected_set
-            ):
-                if "results" in st.session_state:
-                    del st.session_state.results
-                st.session_state.last_question_set = selected_set
+            st.divider()
 
-            # LLM settings
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                new_llm_scoring = st.checkbox(
-                    "Use LLM Scoring",
-                    value=False,
-                    key="new_llm_scoring",
-                    on_change=update_analyzer_parameters,
-                )
-            with col2:
-                new_batch_scoring = st.checkbox(
-                    "Batch Scoring",
-                    value=True,
-                    key="new_batch_scoring",
-                    disabled=not st.session_state.get("new_llm_scoring", False),
-                    help="Batch scoring only applies when LLM scoring is enabled. When enabled, all chunks are scored in one API call instead of individual calls.",
-                )
-            with col3:
-                # Display available API info
-                api_info = []
-                if os.getenv("OPENAI_API_KEY"):
-                    api_info.append("OpenAI")
-                if os.getenv("GOOGLE_API_KEY"):
-                    api_info.append("Gemini")
+            # Backend Integration
+            if BACKEND_INTEGRATION_AVAILABLE:
+                config = configure_backend_integration()
+                # Store config in session state for access across pages
+                st.session_state.backend_config = config
+            else:
+                st.subheader("Backend Integration")
+                st.warning("Backend integration modules not available")
+                config = None
+                st.session_state.backend_config = None
 
-                if len(api_info) > 1:
-                    api_status = f"Using {' & '.join(api_info)} models"
-                elif len(api_info) == 1:
-                    api_status = f"Using {api_info[0]} models only"
-                else:
-                    api_status = "No API keys configured"
+        # Show page-specific content based on navigation
+        if nav_page == "Report Analyst":
+            st.title("Report Analyst")
+            st.caption("Analysis parameters tailored to your configurations")
 
-                st.caption(api_status)
+            # Get file list for dropdown (including backend resources if enabled)
+            backend_config = st.session_state.get("backend_config")
+            previous_files = get_uploaded_files_history(backend_config=backend_config)
 
-                new_llm_model = st.selectbox(
-                    "LLM Model",
-                    options=LLM_MODELS,
-                    index=0,  # Ensure a default is selected
-                    key="new_llm_model",
-                    on_change=update_analyzer_parameters,
-                )
-
-            # Chunking parameters
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                new_chunk_size = st.number_input(
-                    "Chunk Size",
-                    min_value=100,
-                    max_value=2000,
-                    value=500,  # Default value
-                    key="new_chunk_size",
-                    on_change=update_analyzer_parameters,
-                )
-            with col2:
-                new_overlap = st.number_input(
-                    "Overlap",
-                    min_value=0,
-                    max_value=100,
-                    value=20,  # Default value
-                    key="new_overlap",
-                    on_change=update_analyzer_parameters,
-                )
-            with col3:
-                new_top_k = st.number_input(
-                    "Top K",
-                    min_value=1,
-                    max_value=20,
-                    value=5,  # Default value
-                    key="new_top_k",
-                    on_change=update_analyzer_parameters,
-                )
-
-        # Create tabs
-        file_tab, upload_tab, consolidated_tab = st.tabs(
-            ["Previous Reports", "Upload New", "Consolidated Results"]
-        )
-
-        # Previous Reports tab
-        with file_tab:
-            previous_files = get_uploaded_files_history()
+            # Determine selected file for display - check session state first
+            selected_file_for_display = None
             if previous_files:
-                selected_file = st.selectbox(
-                    "Select a previously analyzed report",
-                    options=previous_files,
-                    format_func=lambda x: x["name"],
-                    key="previous_file",
-                )
-                if selected_file:
-                    file_path = Path(selected_file["path"])
-                    if file_path.exists():
-                        # Load questions and handle selection
-                        question_set_data = analyzer.load_question_set(
-                            st.session_state.new_question_set
+                if "previous_file" in st.session_state:
+                    prev_file = st.session_state.previous_file
+                    # Handle both dict (from dropdown) and string (from initial state) formats
+                    if isinstance(prev_file, dict):
+                        selected_file_for_display = prev_file
+                    else:
+                        # If it's a string, find the matching file in the list
+                        for f in previous_files:
+                            if f["name"] == prev_file or f.get("path") == prev_file:
+                                selected_file_for_display = f
+                                break
+
+                # If no file selected yet, use first one
+                if not selected_file_for_display and previous_files:
+                    selected_file_for_display = previous_files[0]
+
+            # Green PDF Display Container with integrated file selector
+            if previous_files:
+                # Use container with unique key for green panel styling
+                # The key will be used as CSS class name prefixed with st-key-
+                with st.container(key="file-display-panel"):
+                    # Use columns for layout
+                    icon_col, content_col = st.columns([0.1, 0.9])
+
+                    with icon_col:
+                        st.markdown(
+                            """
+                        <div class="pdf-icon-box">
+                            <i class="material-icons">description</i>
+                        </div>
+                        """,
+                            unsafe_allow_html=True,
                         )
-                        questions = question_set_data["questions"]
 
-                        if question_set_data["description"]:
-                            st.write(question_set_data["description"])
+                    with content_col:
+                        # File selector inside the green container
+                        selected_file_dropdown = st.selectbox(
+                            "Select Report",
+                            options=previous_files,
+                            format_func=lambda x: x["name"],
+                            key="previous_file",
+                            label_visibility="collapsed",
+                        )
 
-                        # Add cache selector
-                        display_cache_selector(str(file_path))
-
-                        # Add question selection UI
-                        st.subheader("Select Questions")
-                        selected_questions = []
-                        for q_id, q_data in questions.items():
-                            if st.checkbox(
-                                f"{q_id}: {q_data['text']}",
-                                key=f"individual_question_{q_id}",
-                            ):
-                                selected_questions.append(q_id)
-
-                        # Analysis button and results
-                        col1, col2 = st.columns([2, 1])
-                        with col1:
-                            analyze_clicked = st.button(
-                                "Analyze Selected Questions", key="analyze_button"
+                        # Upload date below selector
+                        if selected_file_dropdown:
+                            selected_uri = selected_file_dropdown.get(
+                                "uri", selected_file_dropdown.get("path", "")
                             )
-                        with col2:
-                            reanalyze_clicked = st.button(
-                                "🔄 Reanalyze", key="reanalyze_button"
+                            is_backend = selected_uri.startswith(
+                                "urn:report-analyst:backend:"
                             )
 
-                        if analyze_clicked or reanalyze_clicked:
-                            if not selected_questions:
-                                st.warning(
-                                    "Please select at least one question to analyze."
+                            if is_backend:
+                                # For backend resources, show backend info
+                                from report_analyst.core.report_data_client import (
+                                    ReportResource,
                                 )
+
+                                resource = ReportResource(
+                                    name=selected_file_dropdown["name"],
+                                    uri=selected_uri,
+                                )
+                                parsed = resource.parse_backend_urn()
+                                if parsed:
+                                    st.markdown(
+                                        f'<span class="pdf-upload-date">Backend: {parsed["host"]}</span>',
+                                        unsafe_allow_html=True,
+                                    )
                             else:
-                                try:
-                                    # Set force_recompute based on which button was clicked
-                                    st.session_state.force_recompute = reanalyze_clicked
+                                # For local files, show upload date
+                                file_path_str = selected_file_dropdown.get("path", "")
+                                # Handle file:// URI format
+                                if file_path_str.startswith("file://"):
+                                    file_path_str = file_path_str.replace("file://", "")
 
-                                    # Get current configuration
-                                    config = {
-                                        "chunk_size": st.session_state.new_chunk_size,
-                                        "chunk_overlap": st.session_state.new_overlap,
-                                        "top_k": st.session_state.new_top_k,
-                                        "model": st.session_state.new_llm_model,
-                                        "question_set": st.session_state.new_question_set,
-                                    }
+                                file_path_display = Path(file_path_str)
+                                if file_path_display.exists():
+                                    import datetime
 
-                                    # Initialize progress display
-                                    progress_text = st.empty()
+                                    mod_time = file_path_display.stat().st_mtime
+                                    upload_date = datetime.datetime.fromtimestamp(
+                                        mod_time
+                                    ).strftime("%d.%m.%Y")
+                                    st.markdown(
+                                        f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>',
+                                        unsafe_allow_html=True,
+                                    )
 
-                                    if reanalyze_clicked:
-                                        # For reanalysis, skip cache check and analyze all selected questions
-                                        progress_text.info(
-                                            f"Reanalyzing {len(selected_questions)} questions..."
-                                        )
-                                        asyncio.run(
-                                            run_analysis(
-                                                analyzer,
-                                                file_path=str(file_path),
-                                                selected_questions=selected_questions,
-                                                progress_text=progress_text,
+            # Analysis Configuration section - 3 column layout
+            with st.expander("Analysis Configuration", expanded=True):
+                col1, col2, col3 = st.columns([1, 1, 1])
+
+                # Left column: Question Set
+                with col1:
+                    selected_set = st.selectbox(
+                        "Select Question Set",
+                        options=list(question_sets.keys()),
+                        format_func=lambda x: question_sets[x]["name"],
+                        key="new_question_set",
+                        index=0,  # Ensure a default is selected
+                        on_change=update_analyzer_parameters,
+                    )
+
+                    # Show question set description below
+                    if selected_set in question_sets:
+                        st.caption(question_sets[selected_set]["description"])
+
+                # Middle column: Processing Steps
+                with col2:
+                    # Processing Steps heading with help icon and tooltip
+                    st.markdown(
+                        """
+                    <style>
+                    .help-container {
+                        position: relative;
+                        display: inline-block;
+                    }
+                    .help-icon {
+                        display: inline-block !important;
+                        margin-left: 6px;
+                        color: #4313C8 !important;
+                        cursor: help;
+                        font-size: 18px !important;
+                        vertical-align: middle;
+                        opacity: 0.7;
+                        transition: opacity 0.2s;
+                        font-family: 'Material Icons' !important;
+                        font-weight: normal !important;
+                        font-style: normal !important;
+                        line-height: 1 !important;
+                        letter-spacing: normal !important;
+                        text-transform: none !important;
+                        white-space: nowrap !important;
+                        word-wrap: normal !important;
+                        direction: ltr !important;
+                    }
+                    .help-icon:hover {
+                        opacity: 1;
+                    }
+                    .help-tooltip {
+                        visibility: hidden;
+                        opacity: 0;
+                        position: absolute;
+                        bottom: 125%;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background-color: #ffffff;
+                        color: #170843;
+                        text-align: left;
+                        border-radius: 6px;
+                        padding: 12px 16px;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                        z-index: 1000;
+                        width: 320px;
+                        font-size: 13px;
+                        line-height: 1.5;
+                        font-family: 'Afacad', sans-serif;
+                        border: 1px solid rgba(67, 19, 200, 0.2);
+                        transition: opacity 0.2s, visibility 0.2s;
+                        pointer-events: none;
+                    }
+                    .help-tooltip::after {
+                        content: "";
+                        position: absolute;
+                        top: 100%;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        border: 6px solid transparent;
+                        border-top-color: #ffffff;
+                    }
+                    .help-container:hover .help-tooltip {
+                        visibility: visible;
+                        opacity: 1;
+                    }
+                    </style>
+                    <div class="help-container">
+                        <strong>Processing Steps</strong>
+                        <i class="material-icons help-icon">help_outline</i>
+                        <div class="help-tooltip">
+                            You can choose if you want to first only cut the report in pieces (Chunking), make it searchable (Embedding), map text to questions (Question Mapping), or answer the questions (Question Answering). Note: Answering questions incurs LLM API costs.
+                        </div>
+                    </div>
+                    """,
+                        unsafe_allow_html=True,
+                    )
+
+                    # Get step status if file is selected (check if we have a file path)
+                    step_status = {
+                        "chunks": False,
+                        "embeddings": False,
+                        "scoring": False,
+                        "analysis": False,
+                    }
+
+                    # Try to get step status if a file is selected
+                    if previous_files and "previous_file" in st.session_state:
+                        try:
+                            selected_file_obj = None
+                            for f in previous_files:
+                                if (
+                                    f["name"] == st.session_state.previous_file
+                                    or f.get("path") == st.session_state.previous_file
+                                ):
+                                    selected_file_obj = f
+                                    break
+
+                            if selected_file_obj:
+                                selected_uri = selected_file_obj.get(
+                                    "uri", selected_file_obj.get("path", "")
+                                )
+                                is_backend = selected_uri.startswith(
+                                    "urn:report-analyst:backend:"
+                                )
+
+                                if is_backend:
+                                    # For backend resources, use URN for step status check
+                                    try:
+                                        step_status = (
+                                            analyzer.analyzer.check_step_completion(
+                                                selected_uri
                                             )
+                                        )
+                                    except Exception as e:
+                                        logger.warning(
+                                            f"Error checking step completion: {str(e)}"
+                                        )
+                                else:
+                                    file_path_for_status = Path(
+                                        selected_file_obj["path"]
+                                    )
+                                    if file_path_for_status.exists():
+                                        try:
+                                            step_status = (
+                                                analyzer.analyzer.check_step_completion(
+                                                    str(file_path_for_status)
+                                                )
+                                            )
+                                        except Exception as e:
+                                            logger.warning(
+                                                f"Error checking step completion: {str(e)}"
+                                            )
+                        except Exception as e:
+                            logger.warning(f"Error getting step status: {str(e)}")
+
+                    # Define processing steps with shorter labels
+                    step_options = ["Chunk", "Embed", "Map", "Answer"]
+
+                    # Full step names for display
+                    step_full_names = {
+                        "Chunk": "Chunking",
+                        "Embed": "Embedding",
+                        "Map": "Question Mapping",
+                        "Answer": "Question Answering",
+                    }
+
+                    # Initialize selected step in session state if not exists
+                    if "processing_steps_slider" not in st.session_state:
+                        st.session_state.processing_steps_slider = "Answer"
+
+                    # Use Streamlit's built-in pills widget
+                    selected_step = st.pills(
+                        "Select processing step",
+                        options=step_options,
+                        format_func=lambda x: step_full_names[x],
+                        default=(
+                            st.session_state.processing_steps_slider
+                            if st.session_state.processing_steps_slider in step_options
+                            else "Answer"
+                        ),
+                        key="processing_steps_slider",
+                        help="Select which processing step to execute",
+                        label_visibility="collapsed",
+                        selection_mode="single",
+                    )
+
+                # Right column: Advanced Parameters
+                with col3:
+                    # Get current values for display
+                    current_top_k = st.session_state.get("new_top_k", 5)
+                    current_chunk_size = st.session_state.get("new_chunk_size", 500)
+                    current_overlap = st.session_state.get("new_overlap", 20)
+                    current_model = st.session_state.get("new_llm_model", "gpt-4o-mini")
+
+                    # Format model name for display
+                    if "gpt-4o-mini" in current_model:
+                        model_display = "GPT-4o Mini"
+                    elif "gpt-4o" in current_model:
+                        model_display = "GPT-4o"
+                    elif "gpt-4" in current_model:
+                        model_display = "GPT-4"
+                    elif "gemini" in current_model.lower():
+                        model_display = "Gemini"
+                    else:
+                        model_display = current_model
+
+                    # Show compact metrics as info widgets (always visible)
+                    metric_cols = st.columns(4)
+                    with metric_cols[0]:
+                        st.metric("Model", model_display)
+                    with metric_cols[1]:
+                        st.metric("Chunk", current_chunk_size)
+                    with metric_cols[2]:
+                        st.metric("Overlap", current_overlap)
+                    with metric_cols[3]:
+                        st.metric("Top-K", current_top_k)
+
+                    # Create expander for the controls
+                    with st.expander("Advanced Parameters", expanded=False):
+                        # Use 2 columns for Advanced Parameters to make it more compact
+                        adv_col1, adv_col2 = st.columns(2)
+
+                    with adv_col1:
+                        new_top_k = st.number_input(
+                            "Top K",
+                            min_value=1,
+                            max_value=20,
+                            value=5,  # Default value
+                            key="new_top_k",
+                            on_change=update_analyzer_parameters,
+                        )
+
+                        new_chunk_size = st.number_input(
+                            "Chunk Size",
+                            min_value=100,
+                            max_value=2000,
+                            value=500,  # Default value
+                            key="new_chunk_size",
+                            on_change=update_analyzer_parameters,
+                        )
+
+                        new_overlap = st.number_input(
+                            "Overlap",
+                            min_value=0,
+                            max_value=100,
+                            value=20,  # Default value
+                            key="new_overlap",
+                            on_change=update_analyzer_parameters,
+                        )
+
+                    with adv_col2:
+                        new_llm_model = st.selectbox(
+                            "LLM Model",
+                            options=LLM_MODELS,
+                            index=0,  # Ensure a default is selected
+                            key="new_llm_model",
+                            on_change=update_analyzer_parameters,
+                        )
+
+                        new_llm_scoring = st.checkbox(
+                            "LLM Scoring",
+                            value=False,
+                            key="new_llm_scoring",
+                            on_change=update_analyzer_parameters,
+                        )
+
+                        new_batch_scoring = st.checkbox(
+                            "Batch Scoring",
+                            value=True,
+                            key="new_batch_scoring",
+                            disabled=not st.session_state.get("new_llm_scoring", False),
+                            help="Batch scoring only applies when LLM scoring is enabled.",
+                        )
+
+                # Update analyzer's question set
+                analyzer.analyzer.update_question_set(selected_set)
+
+                # Clear results if question set changed
+                if (
+                    "last_question_set" not in st.session_state
+                    or st.session_state.last_question_set != selected_set
+                ):
+                    if "results" in st.session_state:
+                        del st.session_state.results
+                    st.session_state.last_question_set = selected_set
+
+            # Report Analyst page content - questions and analysis
+            if previous_files and selected_file_dropdown:
+                # Check if this is a backend resource (URN) or local file
+                selected_uri = selected_file_dropdown.get(
+                    "uri", selected_file_dropdown.get("path", "")
+                )
+                is_backend_resource = selected_uri.startswith(
+                    "urn:report-analyst:backend:"
+                )
+
+                if is_backend_resource:
+                    # Handle backend resource
+                    from report_analyst.core.report_data_client import (
+                        get_chunks_for_backend_resource,
+                    )
+
+                    backend_config = st.session_state.get("backend_config")
+                    backend_configs = (
+                        [backend_config]
+                        if backend_config
+                        and hasattr(backend_config, "use_backend")
+                        and backend_config.use_backend
+                        else []
+                    )
+
+                    # Get chunks from backend
+                    chunks = get_chunks_for_backend_resource(
+                        selected_uri, backend_configs
+                    )
+                    if chunks:
+                        # Store chunks in session state for analysis
+                        st.session_state.backend_chunks = chunks
+                        st.session_state.backend_resource_uri = selected_uri
+                        # Use URN as file_path for cache (maintains compatibility with cache_manager)
+                        file_path = selected_uri  # Store as string, not Path
+                    else:
+                        st.error("Failed to retrieve chunks from backend resource")
+                        chunks = None
+                        file_path = None
+                else:
+                    # Handle local file - maintain backwards compatibility
+                    # Use absolute path string as before (existing behavior for SQLite cache)
+                    file_path_str = selected_file_dropdown.get("path", "")
+
+                    # Handle file:// URI format - extract actual path
+                    if file_path_str.startswith("file://"):
+                        file_path_str = file_path_str.replace("file://", "")
+
+                    if file_path_str:
+                        file_path_obj = Path(file_path_str)
+                        if file_path_obj.exists():
+                            # Use absolute path string (maintains backwards compatibility with cache)
+                            file_path = str(file_path_obj.resolve())
+                            st.session_state.backend_chunks = None
+                            st.session_state.backend_resource_uri = None
+                        else:
+                            # File path doesn't exist - log warning but don't set file_path to None yet
+                            # This allows the error message to show the actual path
+                            file_path = file_path_str
+                            logger.warning(f"File path does not exist: {file_path_str}")
+                    else:
+                        # No path found in selected file
+                        file_path = None
+                        logger.warning(
+                            f"No path found in selected file: {selected_file_dropdown}"
+                        )
+
+                # Continue with analysis if we have a valid file path or chunks
+                if (
+                    not is_backend_resource and file_path and Path(file_path).exists()
+                ) or (is_backend_resource and chunks):
+                    # Load questions and handle selection
+                    question_set_data = analyzer.load_question_set(
+                        st.session_state.new_question_set
+                    )
+                    questions = question_set_data["questions"]
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # Add question selection UI - styled table format
+                    st.subheader("Select Questions")
+
+                    table_key = f"questions_table_{st.session_state.new_question_set}"
+                    select_all_key = f"select_all_{st.session_state.new_question_set}"
+
+                    # Select All button - styled purple, smaller, below heading
+                    select_all_clicked = st.button(
+                        "Select All", key=select_all_key, type="primary"
+                    )
+
+                    # Handle select all button click - toggle state
+                    if select_all_clicked:
+                        # Toggle the select all state
+                        toggle_key = (
+                            f"select_all_state_{st.session_state.new_question_set}"
+                        )
+                        if toggle_key not in st.session_state:
+                            st.session_state[toggle_key] = False
+                        st.session_state[toggle_key] = not st.session_state[toggle_key]
+
+                    # Get current select all state
+                    toggle_key = f"select_all_state_{st.session_state.new_question_set}"
+                    select_all = st.session_state.get(toggle_key, False)
+
+                    # If select all is active, update all checkboxes
+                    if select_all:
+                        # Set all questions to selected
+                        questions_data = []
+                        for q_id, q_data in questions.items():
+                            questions_data.append(
+                                {
+                                    "Select": True,
+                                    "QID": q_id,
+                                    "QUESTION": q_data["text"],
+                                }
+                            )
+                        questions_df = pd.DataFrame(questions_data)
+                    else:
+                        # Build dataframe - let widget manage its own state, don't sync until analyze is clicked
+                        # Check if widget state exists and has the correct structure
+                        if table_key in st.session_state:
+                            widget_df = st.session_state[table_key]
+                            # Check if widget_df is a DataFrame with the expected columns
+                            if (
+                                isinstance(widget_df, pd.DataFrame)
+                                and "QID" in widget_df.columns
+                                and "Select" in widget_df.columns
+                            ):
+                                # Widget has valid state - use it directly
+                                questions_data = []
+                                for q_id, q_data in questions.items():
+                                    if q_id in widget_df["QID"].values:
+                                        is_selected = bool(
+                                            widget_df[widget_df["QID"] == q_id][
+                                                "Select"
+                                            ].iloc[0]
                                         )
                                     else:
-                                        # For normal analysis, check cache first
-                                        cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                                            file_path=str(file_path),
-                                            config=config,
-                                            question_ids=selected_questions,
-                                        )
+                                        # Question not in widget state yet, default to False
+                                        is_selected = False
 
-                                        if cached_results:
-                                            # Process cached results
-                                            for (
-                                                question_id,
-                                                result,
-                                            ) in cached_results.items():
-                                                st.session_state.results["answers"][
-                                                    question_id
-                                                ] = result
-
-                                            # Generate file key for display
-                                            file_key = generate_file_key(
-                                                str(file_path), st
-                                            )
-
-                                            # Update display
-                                            analysis_df, chunks_df = (
-                                                create_analysis_dataframes(
-                                                    st.session_state.results["answers"],
-                                                    file_key,
-                                                )
-                                            )
-                                            st.session_state.analysis_df = analysis_df
-                                            st.session_state.chunks_df = chunks_df
-                                            st.session_state.analysis_complete = True
-                                        else:
-                                            # Run analysis for uncached questions
-                                            progress_text.info(
-                                                f"Processing {len(selected_questions)} questions..."
-                                            )
-
-                                            try:
-                                                # Run analysis for uncached questions
-                                                asyncio.run(
-                                                    analyze_document_and_display(
-                                                        analyzer,
-                                                        file_path=str(
-                                                            file_path
-                                                        ),  # Use the actual file path
-                                                        questions=questions,
-                                                        selected_questions=selected_questions,
-                                                        use_llm_scoring=st.session_state.new_llm_scoring,
-                                                        single_call=st.session_state.new_batch_scoring,
-                                                    )
-                                                )
-
-                                                progress_text.success(
-                                                    "Analysis complete!"
-                                                )
-
-                                            except Exception as e:
-                                                st.error(
-                                                    f"Error during analysis: {str(e)}"
-                                                )
-                                                st.exception(e)
-
-                                        # Get final results
-                                        all_results = analyzer.analyzer.cache_manager.get_analysis(
-                                            file_path=str(file_path),
-                                            config=config,
-                                            question_ids=selected_questions,
-                                        )
-
-                                        # Process all results into dataframes
-                                        if all_results:
-                                            analysis_df, chunks_df = (
-                                                create_analysis_dataframes(all_results)
-                                            )
-                                            file_key = Path(file_path).stem
-                                            display_analysis_results(
-                                                analysis_df, chunks_df, file_key
-                                            )
-                                            progress_text.success(
-                                                f"✓ Analysis complete for {len(selected_questions)} questions"
-                                            )
-                                        else:
-                                            progress_text.error(
-                                                "No results found after analysis"
-                                            )
-
-                                except Exception as e:
-                                    logger.error(
-                                        f"Error during analysis: {str(e)}",
-                                        exc_info=True,
+                                    questions_data.append(
+                                        {
+                                            "Select": is_selected,
+                                            "QID": q_id,
+                                            "QUESTION": q_data["text"],
+                                        }
                                     )
-                                    st.error(f"Error during analysis: {str(e)}")
+                                questions_df = pd.DataFrame(questions_data)
+                            else:
+                                # Widget state exists but has wrong structure - rebuild from scratch
+                                questions_data = []
+                                for q_id, q_data in questions.items():
+                                    questions_data.append(
+                                        {
+                                            "Select": False,
+                                            "QID": q_id,
+                                            "QUESTION": q_data["text"],
+                                        }
+                                    )
+                                questions_df = pd.DataFrame(questions_data)
+                        else:
+                            # First time - build from scratch (don't use session state to avoid sync issues)
+                            questions_data = []
+                            for q_id, q_data in questions.items():
+                                questions_data.append(
+                                    {
+                                        "Select": False,
+                                        "QID": q_id,
+                                        "QUESTION": q_data["text"],
+                                    }
+                                )
+                            questions_df = pd.DataFrame(questions_data)
+
+                    # Display as editable table - widget manages its own state
+                    edited_df = st.data_editor(
+                        questions_df,
+                        column_config={
+                            "Select": st.column_config.CheckboxColumn(
+                                "Select", width=70
+                            ),
+                            "QID": st.column_config.TextColumn(
+                                "QID", disabled=True, width=120
+                            ),
+                            "QUESTION": st.column_config.TextColumn(
+                                "Question", disabled=True
+                            ),
+                        },
+                        hide_index=True,
+                        use_container_width=True,
+                        key=table_key,
+                        num_rows="fixed",
+                        column_order=["Select", "QID", "QUESTION"],
+                    )
+
+                    # Don't sync to session state here - only sync when analyze button is clicked
+
+                    # Analysis button and results
+                    col1, col2 = st.columns([2, 1])
+                    with col1:
+                        analyze_clicked = st.button(
+                            "Analyze Selected Questions", key="analyze_button"
+                        )
+                    with col2:
+                        reanalyze_clicked = st.button(
+                            "Reanalyze", key="reanalyze_button"
+                        )
+
+                    if analyze_clicked or reanalyze_clicked:
+                        # NOW sync the selection state from the widget
+                        # Get selected questions from the edited dataframe
+                        selected_questions = edited_df[edited_df["Select"] == True][
+                            "QID"
+                        ].tolist()
+
+                        # Update session state for individual question checkboxes (for backward compatibility)
+                        for q_id in questions.keys():
+                            is_selected = q_id in selected_questions
+                            st.session_state[f"individual_question_{q_id}"] = (
+                                is_selected
+                            )
+
+                        if not selected_questions:
+                            st.warning(
+                                "Please select at least one question to analyze."
+                            )
+                        else:
+                            try:
+                                # Set force_recompute based on which button was clicked
+                                st.session_state.force_recompute = reanalyze_clicked
+
+                                # Get current configuration
+                                config = {
+                                    "chunk_size": st.session_state.new_chunk_size,
+                                    "chunk_overlap": st.session_state.new_overlap,
+                                    "top_k": st.session_state.new_top_k,
+                                    "model": st.session_state.new_llm_model,
+                                    "question_set": st.session_state.new_question_set,
+                                }
+
+                                # Initialize progress display
+                                progress_text = st.empty()
+
+                                # Check if this is a backend resource
+                                is_backend = (
+                                    st.session_state.get("backend_chunks") is not None
+                                )
+                                backend_uri = st.session_state.get(
+                                    "backend_resource_uri"
+                                )
+
+                                # Use URN as file_path for backend resources, absolute path string for local files
+                                # This maintains backwards compatibility with SQLite cache
+                                if is_backend and backend_uri:
+                                    analysis_file_path = backend_uri  # URN string
+                                else:
+                                    # Local file - ensure it's absolute path string (backwards compatible)
+                                    analysis_file_path = (
+                                        str(Path(file_path).resolve())
+                                        if file_path
+                                        else file_path
+                                    )
+
+                                if reanalyze_clicked:
+                                    # For reanalysis, skip cache check and analyze all selected questions
+                                    progress_text.info(
+                                        f"Reanalyzing {len(selected_questions)} questions..."
+                                    )
+                                    asyncio.run(
+                                        run_analysis(
+                                            analyzer,
+                                            file_path=analysis_file_path,
+                                            selected_questions=selected_questions,
+                                            progress_text=progress_text,
+                                        )
+                                    )
+                                else:
+                                    # For normal analysis, check cache first
+                                    cached_results = (
+                                        analyzer.analyzer.cache_manager.get_analysis(
+                                            file_path=analysis_file_path,
+                                            config=config,
+                                            question_ids=selected_questions,
+                                        )
+                                    )
+
+                                    if cached_results:
+                                        # Process cached results
+                                        for (
+                                            question_id,
+                                            result,
+                                        ) in cached_results.items():
+                                            st.session_state.results["answers"][
+                                                question_id
+                                            ] = result
+
+                                        # Generate file key for display
+                                        file_key = generate_file_key(
+                                            analysis_file_path, st
+                                        )
+
+                                        # Update display
+                                        analysis_df, chunks_df = (
+                                            create_analysis_dataframes(
+                                                st.session_state.results["answers"],
+                                                file_key,
+                                            )
+                                        )
+                                        st.session_state.analysis_df = analysis_df
+                                        st.session_state.chunks_df = chunks_df
+                                        st.session_state.analysis_complete = True
+                                    else:
+                                        # Run analysis for uncached questions
+                                        progress_text.info(
+                                            f"Processing {len(selected_questions)} questions..."
+                                        )
+
+                                        try:
+                                            # Run analysis for uncached questions
+                                            asyncio.run(
+                                                analyze_document_and_display(
+                                                    analyzer,
+                                                    file_path=analysis_file_path,  # Use URN for backend, file path for local
+                                                    questions=questions,
+                                                    selected_questions=selected_questions,
+                                                    use_llm_scoring=st.session_state.new_llm_scoring,
+                                                    single_call=st.session_state.new_batch_scoring,
+                                                )
+                                            )
+
+                                            progress_text.success("Analysis complete!")
+
+                                        except Exception as e:
+                                            st.error(f"Error during analysis: {str(e)}")
+                                            st.exception(e)
+
+                                    # Get final results
+                                    all_results = (
+                                        analyzer.analyzer.cache_manager.get_analysis(
+                                            file_path=str(file_path),
+                                            config=config,
+                                            question_ids=selected_questions,
+                                        )
+                                    )
+
+                                    # Process all results into dataframes
+                                    if all_results:
+                                        analysis_df, chunks_df = (
+                                            create_analysis_dataframes(all_results)
+                                        )
+                                        file_key = Path(file_path).stem
+                                        display_analysis_results(
+                                            analysis_df, chunks_df, file_key
+                                        )
+                                        progress_text.success(
+                                            f"✓ Analysis complete for {len(selected_questions)} questions"
+                                        )
+                                    else:
+                                        progress_text.error(
+                                            "No results found after analysis"
+                                        )
+
+                            except Exception as e:
+                                logger.error(
+                                    f"Error during analysis: {str(e)}",
+                                    exc_info=True,
+                                )
+                                st.error(f"Error during analysis: {str(e)}")
+                else:
+                    # Show helpful error message
+                    if file_path is None:
+                        st.error(
+                            "File not found: No file path available. Please select a valid file."
+                        )
                     else:
-                        st.error(f"File not found: {file_path}")
+                        st.error(
+                            f"File not found: {file_path}. Please ensure the file exists."
+                        )
             else:
                 st.info("No previously analyzed reports found")
 
-        # Upload New tab
-        with upload_tab:
+        # Upload Report page
+        elif nav_page == "Upload Report":
             # Check if S3+NATS enterprise integration is enabled (from UI checkbox)
             use_s3_upload = st.session_state.get("use_s3_upload", False)
 
+            # Initialize backend integration with S3+NATS enabled if needed
             if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
-                st.info(
-                    "🚀 Enterprise Mode: Using S3+NATS integration for document processing"
-                )
-
-                # Initialize backend integration with S3+NATS enabled
                 if "backend_config" not in st.session_state or not getattr(
                     st.session_state.get("backend_config"), "use_backend", False
                 ):
@@ -1634,13 +3749,106 @@ def main():
                         st.session_state.backend_config
                     )
 
-                uploaded_file = st.file_uploader(
-                    "Choose a PDF file", type="pdf", key="file_uploader"
-                )
-                if uploaded_file:
+            # Unified upload page styling (shows for both enterprise and regular mode)
+            st.markdown(
+                """
+            <style>
+            .upload-icon-box {
+                background-color: rgba(192, 196, 250, 0.1);
+                border-radius: 12px;
+                padding: 50px 40px;
+                margin: 0 auto 40px auto;
+                max-width: 300px;
+                display: inline-block;
+            }
+            .upload-icon-box i.material-icons {
+                font-family: 'Material Icons' !important;
+                font-weight: normal !important;
+                font-style: normal !important;
+                font-size: 80px !important;
+                line-height: 1 !important;
+                letter-spacing: normal !important;
+                text-transform: none !important;
+                display: block !important;
+                white-space: nowrap !important;
+                word-wrap: normal !important;
+                direction: ltr !important;
+                -webkit-font-feature-settings: 'liga' !important;
+                -webkit-font-smoothing: antialiased !important;
+                color: #4313C8 !important;
+            }
+            </style>
+            <div style="text-align: center; padding: 60px 20px 40px 20px;">
+                <div class="upload-icon-box">
+                    <i class="material-icons">cloud_upload</i>
+                </div>
+                <h1 style="color: #4313C8; font-family: 'Afacad', sans-serif; font-weight: 700; margin: 0 0 20px 0; font-size: 32px;">Upload your Sustainability Report</h1>
+                <p style="color: #718096; font-family: 'Cousine', monospace; font-size: 14px; margin: 0 0 40px 0; line-height: 1.5;">Drag and drop your file here, or click to browse.<br>PDF only, limited to 200MB</p>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+            # Style the file uploader (works for both modes)
+            st.markdown(
+                """
+            <style>
+            [data-testid="stFileUploader"] {
+                text-align: center;
+                margin: 0 auto;
+                max-width: 600px;
+            }
+            [data-testid="stFileUploader"] > div:first-child {
+                border: 2px dashed #4313C8 !important;
+                border-radius: 8px !important;
+                background-color: #FFFFFF !important;
+                padding: 40px !important;
+            }
+            [data-testid="stFileUploader"] [data-baseweb="file-uploader"] {
+                border: none !important;
+                background-color: transparent !important;
+            }
+            [data-testid="stFileUploader"] button {
+                background-color: #4313C8 !important;
+                color: #FFFFFF !important;
+                border: none !important;
+                border-radius: 6px !important;
+                font-family: 'Cousine', monospace !important;
+                padding: 10px 24px !important;
+                font-weight: 400 !important;
+                font-size: 14px !important;
+                margin: 0 auto !important;
+                display: block !important;
+                cursor: pointer !important;
+                transition: all 0.2s ease !important;
+            }
+            [data-testid="stFileUploader"] button:hover {
+                background-color: #979DF6 !important;
+            }
+            [data-testid="stFileUploader"] label {
+                font-family: 'Afacad', sans-serif !important;
+                color: #4313C8 !important;
+                font-weight: 600 !important;
+                margin-bottom: 10px !important;
+            }
+            </style>
+            """,
+                unsafe_allow_html=True,
+            )
+
+            uploaded_file = st.file_uploader(
+                "Choose a PDF file",
+                type="pdf",
+                key="file_uploader",
+                help="Limit 200MB per file • PDF",
+            )
+
+            if uploaded_file:
+                # Handle upload based on mode
+                if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
                     # Use S3+NATS enterprise flow
                     with st.spinner(
-                        "🚀 Uploading to S3 and triggering backend processing..."
+                        "Uploading to S3 and triggering backend processing..."
                     ):
                         try:
                             # Debug: Check if backend_service exists
@@ -1675,9 +3883,9 @@ def main():
 
                             if result:
                                 st.success(
-                                    f"✅ File uploaded via S3+NATS: {uploaded_file.name}"
+                                    f"File uploaded via S3+NATS: {uploaded_file.name}"
                                 )
-                                st.info(f"📋 Document ID: {result}")
+                                st.info(f"Document ID: {result}")
                                 st.session_state.current_file = result
                                 st.session_state.uploaded_file = uploaded_file
                                 st.session_state.analysis_complete = False
@@ -1686,95 +3894,324 @@ def main():
                                     del st.session_state.results
                                 st.rerun()
                             else:
-                                st.error("❌ Failed to upload file via S3+NATS")
+                                st.error("Failed to upload file via S3+NATS")
                         except Exception as e:
                             logger.error(
                                 f"[ENTERPRISE] Error in S3+NATS upload: {e}",
                                 exc_info=True,
                             )
-                            st.error(f"❌ Error uploading via S3+NATS: {str(e)}")
-                            st.info("💡 Falling back to local processing...")
+                            st.error(f"Error uploading via S3+NATS: {str(e)}")
+                            st.info("Falling back to local processing...")
                             # Fall through to local processing
                             use_s3_upload = False
 
-            if not use_s3_upload or not BACKEND_INTEGRATION_AVAILABLE:
-                uploaded_file = st.file_uploader(
-                    "Choose a PDF file", type="pdf", key="file_uploader"
-                )
-            if uploaded_file and (
-                not use_s3_upload or not BACKEND_INTEGRATION_AVAILABLE
-            ):
-                file_path = save_uploaded_file(uploaded_file)
-                logger.info(
-                    f"[UPLOAD] Saved uploaded file: {uploaded_file.name} at {file_path}"
-                )
-                if file_path and file_path != st.session_state.get("current_file"):
-                    st.session_state.current_file = file_path
-                    st.session_state.uploaded_file = uploaded_file
-                    st.session_state.analysis_complete = False
-                    st.session_state.analysis_triggered = False
-                    if "results" in st.session_state:
-                        del st.session_state.results
+                # Local processing (when enterprise mode is off or failed)
+                if not use_s3_upload or not BACKEND_INTEGRATION_AVAILABLE:
+                    file_path = save_uploaded_file(uploaded_file)
                     logger.info(
-                        f"[UPLOAD] Added file to session state: {uploaded_file.name}"
+                        f"[UPLOAD] Saved uploaded file: {uploaded_file.name} at {file_path}"
                     )
-                    st.success(f"File uploaded successfully: {uploaded_file.name}")
-                    logger.info(
-                        f"[UPLOAD] Displaying cache selector for file: {file_path}"
-                    )
-                    display_cache_selector(file_path)
-                    if not st.session_state.get("file_processed"):
-                        st.session_state.file_processed = True
-                        st.rerun()
+                    if file_path and file_path != st.session_state.get("current_file"):
+                        st.session_state.current_file = file_path
+                        st.session_state.uploaded_file = uploaded_file
+                        st.session_state.analysis_complete = False
+                        st.session_state.analysis_triggered = False
+                        if "results" in st.session_state:
+                            del st.session_state.results
+                        logger.info(
+                            f"[UPLOAD] Added file to session state: {uploaded_file.name}"
+                        )
+                        st.success(f"File uploaded successfully: {uploaded_file.name}")
+                        logger.info(
+                            f"[UPLOAD] Displaying cache selector for file: {file_path}"
+                        )
+                        # Removed display_cache_selector - stored data status now shown as pill next to Chunking step
+                        if not st.session_state.get("file_processed"):
+                            st.session_state.file_processed = True
+                            st.rerun()
 
-        # Consolidated Results tab
-        with consolidated_tab:
+        # All Results page
+        elif nav_page == "All Results":
             st.header("View All Results")
             st.write("View and export consolidated results for all analyzed reports")
 
-            # Question set selection for consolidated view
-            selected_set = st.selectbox(
-                "Select Question Set",
-                options=list(question_sets.keys()),
-                format_func=lambda x: question_sets[x]["name"],
-                key="consolidated_set",
-            )
+            # Initialize selected_set from session state if available
+            if "consolidated_set" not in st.session_state:
+                st.session_state.consolidated_set = (
+                    list(question_sets.keys())[0] if question_sets else None
+                )
 
+            # 1. Question set and report selectors side by side (green containers)
+            col1, col2 = st.columns([1, 1])
+
+            with col1:
+                # Question set selector in green container
+                with st.container(key="question-set-display-panel"):
+                    icon_col, content_col = st.columns([0.1, 0.9])
+
+                    with icon_col:
+                        st.markdown(
+                            """
+                        <div class="pdf-icon-box">
+                            <i class="material-icons">help_outline</i>
+                        </div>
+                        """,
+                            unsafe_allow_html=True,
+                        )
+
+                    with content_col:
+                        # Question set selector
+                        selected_set = st.selectbox(
+                            "Select Question Set",
+                            options=list(question_sets.keys()),
+                            format_func=lambda x: question_sets[x]["name"],
+                            key="consolidated_set",
+                            label_visibility="collapsed",
+                        )
+
+                        # Show question set description
+                        if selected_set and selected_set in question_sets:
+                            st.caption(question_sets[selected_set]["description"])
+
+            # Get file configs if question set is selected
+            file_configs = {}
             if selected_set:
-                # Show question set description
-                if selected_set in question_sets:
-                    st.info(question_sets[selected_set]["description"])
+                # Create mapping from question set names to database identifiers
+                question_set_mapping = {
+                    "tcfd": "tcfd",
+                    "s4m": "s4m",
+                    "lucia": "lucia",
+                    "everest": "ev",  # Everest questions use 'ev_' prefix, so database stores as 'ev'
+                }
 
-                # Only show consolidated results
-                display_consolidated_results(analyzer, selected_set)
+                # Get the database identifier for the selected question set
+                db_question_set = question_set_mapping.get(selected_set, selected_set)
 
-        # Add Climate+Tech footer at the end
-        footer = """
-        <style>
-        .footer {
-            position: fixed;
-            left: 0;
-            bottom: 0;
-            width: 100%;
-            background-color: #f1f1f1;
-            color: black;
-            text-align: center;
-            padding: 10px;
-            font-size: 14px;
-        }
-        .footer img {
-            height: 30px;
-            vertical-align: middle;
-            margin-right: 10px;
-        }
-        </style>
+                # Get all available cache configurations
+                cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
+
+                # Group configurations by file for the selected question set
+                if cache_configs:
+                    for config in cache_configs:
+                        if len(config) == 6:  # Full config row from cache_status
+                            file_path, chunk_size, chunk_overlap, top_k, model, qs = (
+                                config
+                            )
+                            if qs == db_question_set:
+                                if file_path not in file_configs:
+                                    file_configs[file_path] = []
+                                file_configs[file_path].append(
+                                    {
+                                        "chunk_size": chunk_size,
+                                        "chunk_overlap": chunk_overlap,
+                                        "top_k": top_k,
+                                        "model": model,
+                                        "question_set": qs,
+                                    }
+                                )
+
+                with col2:
+                    # Report selector in green container
+                    if file_configs:
+                        with st.container(key="file-display-panel"):
+                            icon_col, content_col = st.columns([0.1, 0.9])
+
+                            with icon_col:
+                                st.markdown(
+                                    """
+                                <div class="pdf-icon-box">
+                                    <i class="material-icons">description</i>
+                                </div>
+                                """,
+                                    unsafe_allow_html=True,
+                                )
+
+                            with content_col:
+                                selected_file_path = st.selectbox(
+                                    "Select Report",
+                                    options=list(file_configs.keys()),
+                                    format_func=lambda x: Path(x).name,
+                                    key="consolidated_file",
+                                    label_visibility="collapsed",
+                                )
+
+                                # Show file info
+                                if selected_file_path:
+                                    file_path_str = str(selected_file_path)
+                                    if not file_path_str.startswith("file://"):
+                                        file_path_display = Path(file_path_str)
+                                        if file_path_display.exists():
+                                            import datetime
+
+                                            mod_time = file_path_display.stat().st_mtime
+                                            upload_date = (
+                                                datetime.datetime.fromtimestamp(
+                                                    mod_time
+                                                ).strftime("%d.%m.%Y")
+                                            )
+                                            st.markdown(
+                                                f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>',
+                                                unsafe_allow_html=True,
+                                            )
+                    else:
+                        st.warning(
+                            "No stored results found for the selected question set"
+                        )
+                        selected_file_path = None
+
+                # 2. Configuration selector - horizontal styled cards
+                if selected_file_path and file_configs:
+                    configs = file_configs[selected_file_path]
+
+                    st.markdown("##### Configuration")
+
+                    # Create config cards using columns
+                    num_configs = len(configs)
+                    if num_configs > 0:
+                        # Initialize selected config from session state
+                        if "selected_config_idx" not in st.session_state:
+                            st.session_state.selected_config_idx = 0
+
+                        # Ensure index is valid
+                        if st.session_state.selected_config_idx >= num_configs:
+                            st.session_state.selected_config_idx = 0
+
+                        # Create fixed-width columns: each card is 1 unit, fill rest with spacer
+                        # This ensures cards don't stretch too wide
+                        col_spec = [1] * num_configs  # card columns
+                        remaining_space = max(
+                            0, 4 - num_configs
+                        )  # spacer to fill remaining width
+                        if remaining_space > 0:
+                            col_spec.append(remaining_space)
+
+                        all_cols = st.columns(col_spec)
+                        config_cols = all_cols[:num_configs]  # only card columns
+
+                        for idx, config in enumerate(configs):
+                            with config_cols[idx]:
+                                # Format model name nicely
+                                model_name = config["model"]
+                                if "gpt-4o-mini" in model_name:
+                                    model_display = "GPT-4o Mini"
+                                elif "gpt-4o" in model_name:
+                                    model_display = "GPT-4o"
+                                elif "gpt-4" in model_name:
+                                    model_display = "GPT-4"
+                                elif "gemini" in model_name.lower():
+                                    model_display = "Gemini"
+                                else:
+                                    model_display = model_name
+
+                                # Check if this config is selected
+                                is_selected = (
+                                    idx == st.session_state.selected_config_idx
+                                )
+
+                                # Create clickable card
+                                clicked = card(
+                                    title=model_display,
+                                    text=f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · Top-K: {config['top_k']}",
+                                    key=f"config_card_{idx}",
+                                    styles={
+                                        "card": {
+                                            "width": "100%",
+                                            "height": "85px",
+                                            "border-radius": "10px",
+                                            "box-shadow": (
+                                                "0 2px 8px rgba(0,0,0,0.08)"
+                                                if not is_selected
+                                                else "0 4px 16px rgba(67,19,200,0.25)"
+                                            ),
+                                            "background-color": (
+                                                "#4313C8" if is_selected else "#FFFFFF"
+                                            ),
+                                            "border": (
+                                                "2px solid #4313C8"
+                                                if is_selected
+                                                else "1px solid #E5E7EB"
+                                            ),
+                                            "padding": "10px",
+                                            "margin": "0",
+                                        },
+                                        "title": {
+                                            "font-size": "15px",
+                                            "font-weight": "600",
+                                            "color": (
+                                                "white" if is_selected else "#1F2937"
+                                            ),
+                                            "font-family": "'Afacad', sans-serif",
+                                            "margin-bottom": "2px",
+                                        },
+                                        "text": {
+                                            "font-size": "11px",
+                                            "color": (
+                                                "rgba(255,255,255,0.85)"
+                                                if is_selected
+                                                else "#6B7280"
+                                            ),
+                                            "font-family": "'Afacad', sans-serif",
+                                        },
+                                    },
+                                )
+
+                                if clicked:
+                                    st.session_state.selected_config_idx = idx
+                                    st.rerun()
+
+                        # Get the selected config
+                        selected_config = {
+                            "label": "",
+                            "config": configs[st.session_state.selected_config_idx],
+                        }
+                    else:
+                        selected_config = None
+                else:
+                    selected_config = None
+
+                # 3. Display consolidated results
+                if selected_file_path and selected_config:
+                    display_consolidated_results(
+                        analyzer,
+                        selected_set,
+                        selected_file_path,
+                        selected_config["config"],
+                    )
+
+        # Add Climate+Tech footer at the bottom of sidebar
+        # Get current theme for logo selection and encode image as base64
+        try:
+            theme = st.context.theme if hasattr(st.context, "theme") else {}
+            is_dark = theme.get("base", "light") == "dark" if theme else False
+            logo_filename = (
+                "assets/climate-and-tech-logo-dark-mode.png"
+                if is_dark
+                else "assets/climateandtech-logo-new-light-mode.png"
+            )
+            logo_path = Path(__file__).parent / logo_filename
+
+            # Read and encode image as base64
+            if logo_path.exists():
+                with open(logo_path, "rb") as img_file:
+                    img_data = base64.b64encode(img_file.read()).decode()
+                    logo_src = f"data:image/png;base64,{img_data}"
+            else:
+                # Fallback if logo file doesn't exist
+                logo_src = ""
+        except Exception as e:
+            logger.warning(f"Could not load logo: {str(e)}")
+            logo_src = ""
+
+        # Add footer to sidebar
+        st.sidebar.markdown("---")
+        footer = f"""
         <div class="footer">
-            <img src="https://www.climateandtech.com/climateandtech.png" alt="Climate+Tech Logo">
+            {f'<img src="{logo_src}" alt="Climate+Tech Logo" style="height: 25px; max-width: 100%; width: auto; vertical-align: middle; margin-right: 8px; object-fit: contain;">' if logo_src else ''}
             <p>Climate+Tech Sustainability Report Analysis Tool</p>
             <p>For custom tool development contact us at <a href="https://www.climateandtech.com" target="_blank">www.climateandtech.com</a></p>
         </div>
         """
-        st.markdown(footer, unsafe_allow_html=True)
+        st.sidebar.markdown(footer, unsafe_allow_html=True)
 
     except Exception as e:
         st.error("Error during analysis:")

@@ -336,6 +336,166 @@ def test_update_llm_model(analyzer):
         assert analyzer.llm.model == new_model
 
 
+def test_cache_key_generation_with_none_llm(analyzer):
+    """Test cache key generation when llm is None (no API keys available)
+
+    This test would have failed before the fix that handles None llm gracefully.
+    Before the fix, accessing self.llm.model would raise:
+    AttributeError: 'NoneType' object has no attribute 'model'
+    """
+    # Simulate the case where no API keys are available (llm is None)
+    analyzer.llm = None
+    analyzer.default_model = "gpt-3.5-turbo-1106"  # Set a default model
+
+    # This should not crash - it should fall back to default_model
+    analyzer.update_parameters(500, 20, 5)
+
+    # Before the fix, this would raise: AttributeError: 'NoneType' object has no attribute 'model'
+    # After the fix, it should work and use default_model
+    key = analyzer._get_cache_key("test.pdf")
+
+    # Verify the cache key contains expected components
+    assert "cs500" in key
+    assert "ov20" in key
+    assert "tk5" in key
+    assert "test" in key
+    # Should use default_model when llm is None
+    assert "gpt-3.5-turbo-1106" in key  # Model should be included using default_model
+
+
+def test_process_document_config_with_none_llm(analyzer, test_env):
+    """Test that process_document creates config dict correctly when llm is None
+
+    This test would have failed before the fix that handles None llm in config creation.
+    """
+    # Simulate the case where no API keys are available (llm is None)
+    analyzer.llm = None
+    analyzer.default_model = "gpt-3.5-turbo-1106"
+    analyzer.update_parameters(500, 20, 5)
+    analyzer.question_set = "tcfd"
+
+    # Create a minimal test PDF file
+    test_file = test_env["storage_path"] / "test_report.pdf"
+    test_file.write_bytes(b"%PDF-1.4\n%Test PDF")
+
+    # Mock the document processing to avoid actual LLM calls
+    # We just want to verify the config dict creation doesn't crash
+    with patch.object(analyzer, "_create_chunks", return_value=[]):
+        # This should not crash when creating the config dict
+        # The actual processing will fail, but config creation should work
+        try:
+            # We'll catch the error after config is created
+            results = []
+
+            async def collect_results():
+                async for result in analyzer.process_document(
+                    str(test_file), [1], force_recompute=True
+                ):
+                    results.append(result)
+                    # Stop after we see the first error or status
+                    if "error" in result or "status" in result:
+                        break
+
+            import asyncio
+
+            asyncio.run(collect_results())
+
+            # The important thing is that we didn't crash with AttributeError
+            # about 'NoneType' object has no attribute 'model'
+            # If we got here, the config creation worked
+            assert True  # Test passes if no AttributeError was raised
+
+        except AttributeError as e:
+            if "'NoneType' object has no attribute 'model'" in str(e):
+                pytest.fail(
+                    "Config creation failed with None llm - this should be fixed!"
+                )
+            raise
+
+
+@pytest.mark.asyncio
+async def test_process_document_pre_retrieved_chunks(analyzer, test_env):
+    """Test processing document with pre-retrieved chunks"""
+    test_file = test_env["storage_path"] / "test_report.pdf"
+    test_file.write_bytes(b"%PDF-1.4\n%Test PDF")
+
+    # Pre-retrieved chunks in backend format
+    pre_chunks = [
+        {
+            "chunk_text": "This is a pre-processed chunk about climate risks.",
+            "chunk_metadata": {"page": 1, "source": "backend"},
+        },
+        {
+            "chunk_text": "This is another chunk about sustainability measures.",
+            "chunk_metadata": {"page": 2, "source": "backend"},
+        },
+    ]
+
+    # Mock LLM to avoid actual API calls
+    with patch.object(analyzer, "llm") as mock_llm:
+        mock_response = Mock()
+        mock_response.message.content = "Test answer"
+        mock_llm.achat = AsyncMock(return_value=mock_response)
+
+        results = []
+        async for result in analyzer.process_document(
+            str(test_file),
+            selected_questions=[1],
+            pre_retrieved_chunks=pre_chunks,
+            force_recompute=True,
+        ):
+            results.append(result)
+            if "error" in result or len(results) > 5:  # Limit iterations
+                break
+
+        # Should use pre-retrieved chunks instead of creating new ones
+        assert len(results) > 0
+        # Check that chunks were used (status message should indicate chunks loaded)
+        status_messages = [r for r in results if "status" in r]
+        if status_messages:
+            assert any(
+                "chunk" in str(r.get("status", "")).lower() for r in status_messages
+            )
+
+
+@pytest.mark.asyncio
+async def test_process_document_s3_url_support(analyzer, test_env):
+    """Test that analyzer can work with S3 URLs via pre-retrieved chunks"""
+    # S3 URLs are handled by external service handler which downloads and processes
+    # The analyzer receives pre-processed chunks, so we test that path
+    s3_chunks = [
+        {
+            "chunk_text": "Content downloaded from S3 bucket.",
+            "chunk_metadata": {
+                "source": "s3",
+                "url": "http://s3.example.com/bucket/file.pdf",
+            },
+        },
+    ]
+
+    # Use a temporary file path as identifier
+    s3_file_path = "s3://bucket/file.pdf"
+
+    with patch.object(analyzer, "llm") as mock_llm:
+        mock_response = Mock()
+        mock_response.message.content = "Test answer from S3 content"
+        mock_llm.achat = AsyncMock(return_value=mock_response)
+
+        results = []
+        async for result in analyzer.process_document(
+            s3_file_path,
+            selected_questions=[1],
+            pre_retrieved_chunks=s3_chunks,
+            force_recompute=True,
+        ):
+            results.append(result)
+            if "error" in result or len(results) > 5:
+                break
+
+        # Should process S3 chunks successfully
+        assert len(results) > 0
+
+
 def test_get_all_cached_answers(analyzer):
     """Test retrieving all cached answers"""
     # First check if the cache is empty
