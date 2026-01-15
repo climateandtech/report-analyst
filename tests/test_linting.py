@@ -51,7 +51,13 @@ def test_isort_imports():
     if result.returncode != 0:
         stderr = result.stderr
         # Check if errors are only in excluded paths
-        excluded_paths = ["venv2", "node_modules", "report_analyst_enterprise", ".git", "__pycache__"]
+        excluded_paths = [
+            "venv2",
+            "node_modules",
+            "report_analyst_enterprise",
+            ".git",
+            "__pycache__",
+        ]
         error_lines = stderr.split("\n")
         relevant_errors = [
             line
