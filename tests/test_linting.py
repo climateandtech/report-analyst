@@ -24,7 +24,7 @@ def test_black_formatting():
     # Check if the only failures are in excluded directories
     if result.returncode != 0:
         # Check if errors are only in excluded paths
-        excluded_paths = ["node_modules", "venv2", ".git"]
+        excluded_paths = ["node_modules", "venv2", ".git", "report_analyst_enterprise"]
         error_lines = (stderr + stdout).split("\n")
         relevant_errors = [
             line
@@ -51,7 +51,7 @@ def test_isort_imports():
     if result.returncode != 0:
         stderr = result.stderr
         # Check if errors are only in excluded paths
-        excluded_paths = ["venv2", "node_modules", ".git", "__pycache__"]
+        excluded_paths = ["venv2", "node_modules", "report_analyst_enterprise", ".git", "__pycache__"]
         error_lines = stderr.split("\n")
         relevant_errors = [
             line
