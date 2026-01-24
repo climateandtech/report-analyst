@@ -4206,7 +4206,7 @@ def main():
 
         # Benchmarking page
         elif nav_page == "Benchmarking":
-            st.header("🎯 Benchmarking")
+            st.header("Benchmarking")
             st.write(
                 "Evaluate retrieval and extraction systems against reference datasets"
             )
@@ -4230,7 +4230,7 @@ def main():
 
                 # Sub-tabs for benchmarking features
                 dataset_tab, eval_tab, results_tab, annotation_tab = st.tabs(
-                    ["📊 Datasets", "🎯 Evaluate", "📈 Results", "✍️ Annotate"]
+                    ["Datasets", "Evaluate", "Results", "Annotate"]
                 )
 
                 with dataset_tab:
