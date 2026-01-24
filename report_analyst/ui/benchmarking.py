@@ -28,7 +28,7 @@ class BenchmarkingUI:
 
     def render_dataset_management(self):
         """Render dataset management interface"""
-        st.subheader("📊 Dataset Management")
+        st.subheader("Dataset Management")
 
         # Dataset upload
         with st.expander("Upload New Dataset", expanded=False):
@@ -90,7 +90,7 @@ class BenchmarkingUI:
 
     def render_benchmarking_interface(self):
         """Render benchmarking interface"""
-        st.subheader("🎯 Run Benchmark Evaluation")
+        st.subheader("Run Benchmark Evaluation")
 
         datasets = self.benchmark_store.list_datasets()
         if not datasets:
@@ -128,7 +128,7 @@ class BenchmarkingUI:
 
     def render_results_dashboard(self):
         """Render evaluation results dashboard"""
-        st.subheader("📈 Evaluation Results")
+        st.subheader("Evaluation Results")
 
         evaluations = self.benchmark_store.list_evaluations()
         if not evaluations:
@@ -172,7 +172,7 @@ class BenchmarkingUI:
 
     def render_annotation_interface(self):
         """Render human annotation interface"""
-        st.subheader("✍️ Human Annotation")
+        st.subheader("Human Annotation")
 
         evaluations = self.benchmark_store.list_evaluations()
         if not evaluations:
@@ -207,7 +207,7 @@ class BenchmarkingUI:
             if warnings:
                 st.warning(f"Dataset loaded with {len(warnings)} warnings:")
                 for warning in warnings:
-                    st.write(f"⚠️ {warning}")
+                    st.write(f"Warning: {warning}")
             else:
                 st.success("Dataset validation passed!")
 
