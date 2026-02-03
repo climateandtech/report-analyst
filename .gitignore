@@ -76,3 +76,4 @@ plots/
 
 # local secrets
 .env.local
+ok.env.local
