@@ -73,3 +73,6 @@ VERCEL_MIGRATION_GUIDE.md
 plots/
 
 >>>>>>> 58a90b9b (Cleanup docs and data)
+
+# local secrets
+.env.local
