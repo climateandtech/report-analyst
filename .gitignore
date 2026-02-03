@@ -1,12 +1,8 @@
-<<<<<<< HEAD
-/data
-data/
-=======
 *.env
 env
->>>>>>> f95d946d (adding data for benchmarking)
 .env
 *.log
+.venv/
 venv/
 venv2/
 
@@ -15,6 +11,10 @@ __pycache__/
 /temp
 
 **/__pycache__/
+
+# Large data / caches
+report_analyst/core/benchmark/**/cache_embeddings/
+*.npy
 
 # Storage and cache directories
 /storage/
