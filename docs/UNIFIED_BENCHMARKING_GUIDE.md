@@ -224,8 +224,12 @@ The system detects format based on:
 
 Existing scripts continue to work:
 
-- `scripts/benchmark_climretrieve_one_model.py` - Still works
-- `scripts/benchmark_s4m.py` - Still works
+- `scripts/benchmark_climretrieve_one_model.py` - ClimRetrieve-specific (still works)
+- `scripts/benchmark_s4m.py` - S4M-specific (still works)
+- `report_analyst/core/benchmark/s4m_embed_and_compare_criteria.py` - S4M embedding and similarity calculation
+- `scripts/s4m_evaluate_embeddings_against_ground_truth.py` - S4M evaluation script
+- `scripts/plot_climretrieve_results.py` - ClimRetrieve results visualization
+- `scripts/run_climretrieve_benchmark_all_strategies.sh` - ClimRetrieve batch evaluation script
 - `app.core.benchmark.climretrieve_metrics.evaluate_climretrieve()` - Still works
 - `app.core.benchmark.s4m_metrics.evaluate_s4m_classification()` - Still works
 
@@ -269,9 +273,13 @@ metrics = evaluate_unified(
 ## Examples
 
 See:
-- `scripts/benchmark_unified.py` - Unified command-line script
+- `scripts/benchmark_unified.py` - Unified command-line script (works with both)
 - `scripts/benchmark_climretrieve_one_model.py` - ClimRetrieve-specific script
 - `scripts/benchmark_s4m.py` - S4M-specific script
+- `report_analyst/core/benchmark/s4m_embed_and_compare_criteria.py` - S4M embedding and similarity calculation
+- `scripts/s4m_evaluate_embeddings_against_ground_truth.py` - S4M evaluation script
+- `scripts/plot_climretrieve_results.py` - ClimRetrieve results visualization
+- `scripts/run_climretrieve_benchmark_all_strategies.sh` - ClimRetrieve batch evaluation script
 
 ## Summary
 

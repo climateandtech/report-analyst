@@ -3,12 +3,36 @@
 Script to benchmark S4M dataset with multiple model predictions.
 
 Usage:
+    # Single model with default grouping (by criteria and company)
+    python scripts/benchmark_s4m.py \
+        --data data/s4m/test_data_labelled_naive.xlsx \
+        --ground-truth-col "relevance" \
+        --model-col "model1" \
+        --k 1,3,5,10
+    
+    # Single model with custom grouping
+    python scripts/benchmark_s4m.py \
+        --data data/s4m/test_data_labelled_naive.xlsx \
+        --ground-truth-col "relevance" \
+        --model-col "model1" \
+        --group-by criteria company \
+        --k 1,3,5,10
+    
+    # Single model without grouping (global evaluation)
+    python scripts/benchmark_s4m.py \
+        --data data/s4m/test_data_labelled_naive.xlsx \
+        --ground-truth-col "relevance" \
+        --model-col "model1" \
+        --no-grouping \
+        --k 1,3,5,10
+    
+    # Multiple models comparison
     python scripts/benchmark_s4m.py \
         --data data/s4m/test_data_labelled_naive.xlsx \
         --ground-truth-col "relevance" \
         --model-cols "model1" "model2" "model3" \
         --k 1,3,5,10 \
-        --threshold 0.5
+        --threshold 1.0
 """
 
 import sys
@@ -19,7 +43,7 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.core.benchmark.s4m_metrics import evaluate_s4m_multiple_models, evaluate_s4m_classification
+from report_analyst.core.benchmark.s4m_metrics import evaluate_s4m_multiple_models, evaluate_s4m_classification
 
 
 def main():
@@ -31,6 +55,8 @@ def main():
     parser.add_argument("--k", default="1,3,5,10", help="Comma-separated K values")
     parser.add_argument("--threshold", type=float, default=1.0, help="Relevance threshold (default: 1.0, meaning labels >= 1 are relevant)")
     parser.add_argument("--sheet", help="Sheet name if Excel file (default: first sheet)")
+    parser.add_argument("--group-by", nargs="*", help="Columns to group by (e.g., 'criteria company'). Default: ['criteria', 'company']. Use '--group-by' with no arguments for global evaluation (no grouping)")
+    parser.add_argument("--no-grouping", action="store_true", help="Use global evaluation (no grouping). Equivalent to --group-by with no arguments")
     args = parser.parse_args()
     
     # Load data
@@ -68,6 +94,26 @@ def main():
         print("Error: No model columns specified or found")
         return 1
     
+    # Parse group_by argument
+    # If --no-grouping is set, use empty list (global evaluation)
+    # If --group-by is provided with values, use those values
+    # If --group-by is provided with no values (empty list), use empty list (global evaluation)
+    # If --group-by is not provided, use None (default: ['criteria', 'company'])
+    if args.no_grouping:
+        group_by = []  # Empty list = global evaluation
+        print("Using global evaluation (no grouping)")
+    elif args.group_by is not None:
+        if len(args.group_by) == 0:
+            group_by = []  # Empty list = global evaluation
+            print("Using global evaluation (no grouping)")
+        else:
+            group_by = args.group_by
+            print(f"Using grouping: {group_by}")
+    else:
+        group_by = None  # None = default grouping ['criteria', 'company']
+        print("Using default grouping: ['criteria', 'company']")
+    print()
+    
     # Evaluate
     if len(model_cols) == 1:
         # Single model evaluation
@@ -80,6 +126,7 @@ def main():
             model_pred_col=model_cols[0],
             relevance_threshold=args.threshold,
             k_values=k_values,
+            group_by=group_by,
         )
         
         print(f"Ground truth column: {args.ground_truth_col}")
@@ -113,6 +160,7 @@ def main():
             model_cols=model_cols,
             relevance_threshold=args.threshold,
             k_values=k_values,
+            group_by=group_by,
         )
         
         print(f"Ground truth column: {args.ground_truth_col}")

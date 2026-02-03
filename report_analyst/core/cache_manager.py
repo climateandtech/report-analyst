@@ -200,27 +200,59 @@ class CacheManager:
             # Retrieve similar nodes
             nodes = await retriever.aretrieve(query_bundle)
 
-            # Convert nodes to chunks format
+            # Convert nodes to chunks format and compute cosine similarity manually
             chunks = []
+            query_embedding_norm = np.linalg.norm(query_embedding)
+            
             for node in nodes:
-                # Ensure we have a valid similarity score
-                similarity_score = (
+                # Get similarity score from node (if available)
+                node_score = (
                     node.score
-                    if hasattr(node, "score")
-                    else node.get_score() if hasattr(node, "get_score") else 0.0
+                    if hasattr(node, "score") and node.score is not None
+                    else node.get_score() if hasattr(node, "get_score") else None
                 )
+                
+                # Compute cosine similarity manually to ensure accuracy
+                chunk_embedding = None
+                cosine_similarity = None
+                
+                if hasattr(node, "embedding") and node.embedding is not None:
+                    chunk_embedding = np.array(node.embedding, dtype=np.float32)
+                elif hasattr(node, "node") and hasattr(node.node, "embedding"):
+                    chunk_embedding = np.array(node.node.embedding, dtype=np.float32)
+                
+                if chunk_embedding is not None:
+                    # Manual cosine similarity calculation
+                    chunk_embedding_norm = np.linalg.norm(chunk_embedding)
+                    if chunk_embedding_norm > 0 and query_embedding_norm > 0:
+                        cosine_similarity = np.dot(query_embedding, chunk_embedding) / (
+                            query_embedding_norm * chunk_embedding_norm
+                        )
+                        # Use manually computed similarity if node score is missing or seems wrong
+                        if node_score is None:
+                            similarity_score = cosine_similarity
+                        else:
+                            # Use the higher of the two scores (node score might be normalized differently)
+                            similarity_score = max(float(node_score), float(cosine_similarity))
+                    else:
+                        similarity_score = node_score if node_score is not None else 0.0
+                else:
+                    # Fallback to node score if no embedding available
+                    similarity_score = node_score if node_score is not None else 0.0
+                    logger.warning(f"Node has no embedding, using node score: {similarity_score:.4f}")
 
                 chunk = {
-                    "id": node.metadata.get("id"),
-                    "text": node.text,
-                    "embedding": node.embedding,
-                    "metadata": node.metadata,
+                    "id": node.metadata.get("id") if hasattr(node, "metadata") else None,
+                    "text": node.text if hasattr(node, "text") else "",
+                    "embedding": chunk_embedding.tolist() if chunk_embedding is not None else None,
+                    "metadata": node.metadata if hasattr(node, "metadata") else {},
                     "score": similarity_score,  # Store as 'score' for consistency with vector store
                     "similarity_score": similarity_score,  # Also store as 'similarity_score' for backward compatibility
                 }
                 chunks.append(chunk)
+                computed_str = f"{cosine_similarity:.4f}" if cosine_similarity is not None else "N/A"
                 logger.debug(
-                    f"Found chunk with similarity score: {similarity_score:.4f}"
+                    f"Found chunk with similarity score: {similarity_score:.4f} (node_score: {node_score}, computed: {computed_str})"
                 )
 
             logger.info(f"Retrieved {len(chunks)} similar chunks for {file_path}")
@@ -582,10 +614,10 @@ class CacheManager:
                         continue
 
                 if chunk_data:
-                    # Insert all chunks in a single transaction
+                    # Insert all chunks in a single transaction (ignore duplicates)
                     cursor.executemany(
                         """
-                        INSERT INTO document_chunks (
+                        INSERT OR IGNORE INTO document_chunks (
                             file_path, chunk_text, chunk_size, chunk_overlap,
                             embedding, metadata, created_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -613,19 +645,32 @@ class CacheManager:
             logger.error(f"Error saving vectors: {str(e)}", exc_info=True)
             raise
 
-    def get_vectors(self, file_path: str) -> List[Dict[str, Any]]:
-        """Get vector embeddings for a document"""
+    def get_vectors(
+        self, 
+        file_path: str, 
+        chunk_size: Optional[int] = None,
+        chunk_overlap: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Get vector embeddings for a document, optionally filtered by chunk parameters"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 chunks = []
-                for row in conn.execute(
-                    """
-                    SELECT chunk_text, embedding, metadata
+                query = """
+                    SELECT chunk_text, embedding, metadata, chunk_size, chunk_overlap
                     FROM document_chunks
                     WHERE file_path = ?
-                """,
-                    (str(file_path),),
-                ):
+                """
+                params = [str(file_path)]
+                
+                if chunk_size is not None:
+                    query += " AND chunk_size = ?"
+                    params.append(chunk_size)
+                
+                if chunk_overlap is not None:
+                    query += " AND chunk_overlap = ?"
+                    params.append(chunk_overlap)
+                
+                for row in conn.execute(query, params):
                     metadata = json.loads(row[2]) if row[2] else {}
 
                     # Reconstruct embedding with proper shape
@@ -659,9 +704,11 @@ class CacheManager:
                             "text": row[0],
                             "embedding": embedding,
                             "metadata": clean_metadata,
+                            "chunk_size": row[3] if len(row) > 3 else None,
+                            "chunk_overlap": row[4] if len(row) > 4 else None,
                         }
                     )
-                logger.info(f"Retrieved {len(chunks)} vectors for {file_path}")
+                logger.info(f"Retrieved {len(chunks)} vectors for {file_path} (chunk_size={chunk_size}, chunk_overlap={chunk_overlap})")
                 return chunks
         except Exception as e:
             logger.error(f"Error retrieving vectors: {str(e)}", exc_info=True)

@@ -13,12 +13,12 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.core.benchmark.unified_metrics import (
+from report_analyst.core.benchmark.unified_metrics import (
     evaluate_unified,
     DatasetFormat,
     evaluate_multiple_models,
 )
-from app.core.benchmark.climretrieve_io import load_inputs
+from report_analyst.core.benchmark.climretrieve_io import load_inputs
 
 
 def main():

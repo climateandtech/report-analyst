@@ -273,6 +273,7 @@ class EvaluationEngine:
         reference_dataset: BenchmarkDataset,
         input_dataset: BenchmarkDataset,
         k_values: Optional[List[int]] = None,
+        use_exact_text_matching: bool = False,
     ) -> EvaluationMetrics:
         """
         Compare two flexible benchmark datasets (supports both IR and IE).
@@ -298,7 +299,7 @@ class EvaluationEngine:
             )
 
         if reference_dataset.dataset_type == DatasetType.INFORMATION_RETRIEVAL:
-            return self._compare_ir_datasets(reference_dataset, input_dataset, k_values)
+            return self._compare_ir_datasets(reference_dataset, input_dataset, k_values, use_exact_text_matching)
         elif reference_dataset.dataset_type == DatasetType.INFORMATION_EXTRACTION:
             return self._compare_ie_datasets(reference_dataset, input_dataset)
         else:
@@ -311,6 +312,7 @@ class EvaluationEngine:
         reference_dataset: BenchmarkDataset,
         input_dataset: BenchmarkDataset,
         k_values: Optional[List[int]] = None,
+        use_exact_text_matching: bool = False,
     ) -> EvaluationMetrics:
         """Compare two Information Retrieval datasets"""
         if k_values is None:
@@ -328,6 +330,8 @@ class EvaluationEngine:
             return EvaluationMetrics()
 
         logger.info(f"Found {len(common_queries)} common queries for IR comparison")
+        if use_exact_text_matching:
+            logger.info("Using exact text matching strategy")
 
         # Collect results per question
         question_results = []
@@ -338,17 +342,21 @@ class EvaluationEngine:
                 reference_results, key=lambda x: x.get_position() or 999
             )
 
-            # Build ground truth mapping: chunk_id -> relevance_score
-            ground_truth = {}
-            for i, ref_result in enumerate(reference_results):
-                chunk_id = ref_result.get_chunk_id()
-                if chunk_id:
-                    score = ref_result.get_score()
-                    # Use score if available, otherwise use inverse position
-                    relevance_score = (
-                        score if score is not None else max(0.0, 1.0 - (i * 0.1))
-                    )
-                    ground_truth[chunk_id] = relevance_score
+            if use_exact_text_matching:
+                # Build ground truth mapping using text matching
+                ground_truth = self._build_text_based_ground_truth(reference_results)
+            else:
+                # Build ground truth mapping: chunk_id -> relevance_score
+                ground_truth = {}
+                for i, ref_result in enumerate(reference_results):
+                    chunk_id = ref_result.get_chunk_id()
+                    if chunk_id:
+                        score = ref_result.get_score()
+                        # Use score if available, otherwise use inverse position
+                        relevance_score = (
+                            score if score is not None else max(0.0, 1.0 - (i * 0.1))
+                        )
+                        ground_truth[chunk_id] = relevance_score
 
             # Get input results (actual retrieval)
             input_results = input_dataset.get_results_by_query(query_id)
@@ -357,7 +365,24 @@ class EvaluationEngine:
             # Convert to format expected by _evaluate_single_question
             retrieved_chunks = []
             for result in input_results:
-                chunk_id = result.get_chunk_id()
+                if use_exact_text_matching:
+                    # Match by text content instead of chunk_id
+                    # Try to get chunk text from result data (check both chunk_text and paragraph columns)
+                    chunk_text = ""
+                    if hasattr(result, 'data') and isinstance(result.data, dict):
+                        chunk_text = result.data.get("chunk_text", result.data.get("paragraph", ""))
+                    elif hasattr(result, 'get_chunk_text'):
+                        chunk_text = result.get_chunk_text() or ""
+                    elif hasattr(result, 'chunk_text'):
+                        chunk_text = result.chunk_text or ""
+                    elif hasattr(result, 'paragraph'):
+                        chunk_text = result.paragraph or ""
+                    
+                    matched_id = self._find_exact_text_match(chunk_text, reference_results)
+                    chunk_id = matched_id if matched_id else result.get_chunk_id() or f"unknown_{result.get_position()}"
+                else:
+                    chunk_id = result.get_chunk_id()
+                
                 score = result.get_score() or 0.0
                 position = result.get_position() or 999
 
@@ -377,6 +402,63 @@ class EvaluationEngine:
 
         # Aggregate metrics
         return self._aggregate_metrics(question_results, k_values)
+    
+    def _normalize_text_for_matching(self, text: str) -> str:
+        """Normalize text for exact matching (same as climretrieve_runner)"""
+        import re
+        normalized = re.sub(r'\s+', ' ', str(text).strip())
+        return normalized.strip()
+    
+    def _find_exact_text_match(self, chunk_text: str, reference_results: List) -> Optional[str]:
+        """Find exact text match in ground truth paragraphs"""
+        if not chunk_text or not chunk_text.strip():
+            return None
+            
+        normalized_chunk = self._normalize_text_for_matching(chunk_text)
+        
+        # Try exact match first
+        for ref_result in reference_results:
+            # Try to get chunk text from reference result
+            ref_text = ""
+            if hasattr(ref_result, 'data') and isinstance(ref_result.data, dict):
+                ref_text = ref_result.data.get("chunk_text", ref_result.data.get("paragraph", ""))
+            elif hasattr(ref_result, 'get_chunk_text'):
+                ref_text = ref_result.get_chunk_text() or ""
+            elif hasattr(ref_result, 'chunk_text'):
+                ref_text = ref_result.chunk_text or ""
+            
+            if not ref_text:
+                continue
+                
+            normalized_ref = self._normalize_text_for_matching(ref_text)
+            
+            # Exact match
+            if normalized_chunk == normalized_ref:
+                return ref_result.get_chunk_id()
+            
+            # Substring match: chunk contains paragraph or paragraph contains chunk
+            if normalized_chunk in normalized_ref or normalized_ref in normalized_chunk:
+                # If significant overlap (at least 80% of shorter text), consider it a match
+                min_len = min(len(normalized_chunk), len(normalized_ref))
+                if min_len > 0:
+                    overlap = len(normalized_chunk) if normalized_chunk in normalized_ref else len(normalized_ref)
+                    if overlap / min_len >= 0.8:
+                        return ref_result.get_chunk_id()
+        
+        return None
+    
+    def _build_text_based_ground_truth(self, reference_results: List) -> Dict[str, float]:
+        """Build ground truth mapping using text-based matching"""
+        ground_truth = {}
+        for i, ref_result in enumerate(reference_results):
+            chunk_id = ref_result.get_chunk_id()
+            if chunk_id:
+                score = ref_result.get_score()
+                relevance_score = (
+                    score if score is not None else max(0.0, 1.0 - (i * 0.1))
+                )
+                ground_truth[chunk_id] = relevance_score
+        return ground_truth
 
     def _compare_ie_datasets(
         self, reference_dataset: BenchmarkDataset, input_dataset: BenchmarkDataset

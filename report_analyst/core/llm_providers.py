@@ -9,6 +9,7 @@ from llama_index.llms.gemini import Gemini
 
 # LlamaIndex LLM imports
 from llama_index.llms.openai import OpenAI
+from llama_index.llms.ollama import Ollama
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
     Factory function to get LLM implementations based on model name.
 
     Args:
-        model_name: Name of the model to use (e.g., "gpt-4o", "gemini-flash-2.0")
+        model_name: Name of the model to use (e.g., "gpt-4o", "gemini-flash-2.0", "ollama/llama3.2")
         cache_dir: Optional directory for LLM response caching
         **kwargs: Additional keyword arguments to pass to the LLM constructor
 
@@ -67,6 +68,35 @@ def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
 
         logger.info(f"Initializing Gemini model: {full_model_name}")
         return Gemini(model=full_model_name, api_key=api_key, **kwargs)
+
+    # Ollama models
+    elif model_name.startswith("ollama/") or model_name.startswith("ollama:"):
+        # Remove prefix if present
+        ollama_model = model_name.replace("ollama/", "").replace("ollama:", "")
+        
+        # Get Ollama base URL from environment (defaults to localhost)
+        ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        
+        logger.info(f"Initializing Ollama model: {ollama_model} at {ollama_base_url}")
+        
+        return Ollama(
+            model=ollama_model,
+            base_url=ollama_base_url,
+            request_timeout=120.0,  # Increase timeout for local models
+            **kwargs,
+        )
+    
+    # Also support direct model names that might be Ollama models (if USE_OLLAMA is set)
+    elif os.getenv("USE_OLLAMA", "false").lower() == "true":
+        ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        logger.info(f"Initializing Ollama model: {model_name} at {ollama_base_url}")
+        
+        return Ollama(
+            model=model_name,
+            base_url=ollama_base_url,
+            request_timeout=120.0,
+            **kwargs,
+        )
 
     else:
         logger.error(f"Unsupported model type: {model_name}")

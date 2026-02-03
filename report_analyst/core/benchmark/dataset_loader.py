@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import pandas as pd
 import yaml
 
 from ...models.benchmark import (
@@ -26,10 +27,22 @@ class DatasetLoader:
     """Loads and validates benchmark datasets"""
 
     def __init__(self):
-        self.supported_formats = [".yaml", ".yml", ".json"]
+        self.supported_formats = [".yaml", ".yml", ".json", ".csv"]
 
-    def load_dataset(self, file_path: str) -> BenchmarkDatasetContent:
-        """Load and validate a benchmark dataset from file"""
+    def load_dataset(self, file_path: str, dataset_id: Optional[str] = None, 
+                     dataset_name: Optional[str] = None, 
+                     dataset_description: Optional[str] = None,
+                     question_set: Optional[str] = None) -> BenchmarkDatasetContent:
+        """
+        Load and validate a benchmark dataset from file.
+        
+        Args:
+            file_path: Path to the dataset file
+            dataset_id: Optional dataset ID (required for CSV, optional for YAML/JSON)
+            dataset_name: Optional dataset name (required for CSV, optional for YAML/JSON)
+            dataset_description: Optional description (required for CSV, optional for YAML/JSON)
+            question_set: Optional question set identifier (required for CSV, optional for YAML/JSON)
+        """
         path = Path(file_path)
 
         if not path.exists():
@@ -40,7 +53,11 @@ class DatasetLoader:
                 f"Unsupported file format: {path.suffix}. Supported: {self.supported_formats}"
             )
 
-        # Load raw data
+        # Handle CSV files differently
+        if path.suffix.lower() == ".csv":
+            return self._load_csv_dataset(path, dataset_id, dataset_name, dataset_description, question_set)
+
+        # Load raw data for YAML/JSON
         raw_data = self._load_raw_data(path)
 
         # Validate and parse
@@ -201,3 +218,115 @@ class DatasetLoader:
 
         content_str = json.dumps(content, sort_keys=True)
         return hashlib.sha256(content_str.encode()).hexdigest()[:16]
+
+    def _load_csv_dataset(self, path: Path, dataset_id: Optional[str] = None,
+                          dataset_name: Optional[str] = None,
+                          dataset_description: Optional[str] = None,
+                          question_set: Optional[str] = None) -> BenchmarkDatasetContent:
+        """
+        Load a CSV dataset in ClimRetrieve format (report, question, paragraph, relevance).
+        
+        Expected CSV format:
+        - report: Report identifier
+        - question: Question text
+        - paragraph: Paragraph/chunk text
+        - relevance: Relevance score (0-3 for ClimRetrieve, or 0.0-1.0 normalized)
+        """
+        try:
+            df = pd.read_csv(path)
+            
+            # Validate required columns
+            required_cols = {"report", "question", "paragraph", "relevance"}
+            missing_cols = required_cols - set(df.columns)
+            if missing_cols:
+                raise DatasetValidationError(
+                    f"CSV file missing required columns: {missing_cols}. "
+                    f"Found columns: {list(df.columns)}"
+                )
+            
+            # Use provided metadata or generate defaults
+            if not dataset_id:
+                dataset_id = f"csv_dataset_{path.stem}"
+            if not dataset_name:
+                dataset_name = f"CSV Dataset: {path.stem}"
+            if not dataset_description:
+                dataset_description = f"Ground truth dataset loaded from CSV file: {path.name}"
+            if not question_set:
+                question_set = "custom"
+            
+            # Normalize relevance scores to 0.0-1.0 range
+            # ClimRetrieve uses 0-3, so we normalize: relevance / 3.0
+            # If already in 0-1 range, keep as is
+            df["relevance"] = pd.to_numeric(df["relevance"], errors="coerce").fillna(0)
+            max_relevance = df["relevance"].max()
+            if max_relevance > 1.0:
+                # Assume ClimRetrieve format (0-3), normalize to 0-1
+                df["relevance"] = df["relevance"] / max_relevance
+            
+            # Group by (report, question) to create questions
+            questions = []
+            question_counter = 0
+            
+            for (report, question_text), group_df in df.groupby(["report", "question"]):
+                question_counter += 1
+                question_id = f"q_{question_counter:04d}"
+                
+                # Create ground truth chunks from paragraphs
+                ground_truth_chunks = []
+                evidence_order = 1
+                
+                # Sort by relevance descending to assign evidence order
+                sorted_group = group_df.sort_values("relevance", ascending=False)
+                
+                for idx, row in sorted_group.iterrows():
+                    paragraph = str(row["paragraph"]).strip()
+                    relevance_score = float(row["relevance"])
+                    
+                    # Use paragraph text as chunk_id (or hash if too long)
+                    if len(paragraph) > 100:
+                        chunk_id = hashlib.md5(paragraph.encode()).hexdigest()[:16]
+                    else:
+                        chunk_id = paragraph[:100]
+                    
+                    # Consider relevant if score > 0
+                    is_evidence = relevance_score > 0.0
+                    
+                    ground_truth_chunks.append(
+                        GroundTruthChunk(
+                            chunk_id=chunk_id,
+                            relevance_score=relevance_score,
+                            is_evidence=is_evidence,
+                            evidence_order=evidence_order if is_evidence else None,
+                            annotation_notes=f"From CSV: report={report}, paragraph={paragraph[:50]}..."
+                        )
+                    )
+                    
+                    if is_evidence:
+                        evidence_order += 1
+                
+                questions.append(
+                    BenchmarkQuestion(
+                        question_id=question_id,
+                        question_text=str(question_text),
+                        ground_truth_chunks=ground_truth_chunks,
+                    )
+                )
+            
+            dataset = BenchmarkDatasetContent(
+                dataset_id=dataset_id,
+                name=dataset_name,
+                description=dataset_description,
+                version="1.0",
+                question_set=question_set,
+                created_at="",
+                questions=questions,
+            )
+            
+            logger.info(
+                f"Successfully loaded CSV dataset '{dataset.name}' with {len(dataset.questions)} questions "
+                f"from {len(df)} rows"
+            )
+            return dataset
+            
+        except Exception as e:
+            raise DatasetValidationError(f"Failed to load CSV dataset: {e}")

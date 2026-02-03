@@ -7,8 +7,17 @@ import re
 import shutil
 import sqlite3
 import sys
+import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+# Setup logging at the top of the file
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import pandas as pd
@@ -20,8 +29,11 @@ from langchain.chains.summarize import load_summarize_chain
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.ingestion import IngestionCache
 from llama_index.core.llms import ChatMessage, MessageRole
+from llama_index.core import Settings
+from llama_index.core.schema import Document
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.file import PyMuPDFReader
+from llama_index.core.embeddings import BaseEmbedding
 
 from .cache_manager import CacheManager
 from .llm_providers import get_llm
@@ -32,7 +44,8 @@ from .storage import LlamaVectorStore
 logger = logging.getLogger(__name__)
 
 # Load environment variables
-load_dotenv()
+load_dotenv()  # Loads .env by default
+load_dotenv("ok.env.local")  # Also load ok.env.local if it exists
 
 # Check for backend configuration first
 use_backend = os.getenv("USE_BACKEND", "false").lower() == "true"
@@ -122,6 +135,126 @@ def compute_params_hash(params: Dict) -> str:
     return hashlib.sha256(param_str.encode()).hexdigest()
 
 
+class OllamaEmbedding(BaseEmbedding):
+    """Custom Ollama embedding class for LlamaIndex compatibility."""
+    
+    def __init__(
+        self,
+        model_name: str = "nomic-embed-text",
+        base_url: str = "http://localhost:11434",
+        embed_batch_size: int = 100,
+        **kwargs
+    ):
+        """Initialize Ollama embedding model.
+        
+        Args:
+            model_name: Name of the Ollama embedding model (default: nomic-embed-text)
+            base_url: Base URL for Ollama API (default: http://localhost:11434)
+            embed_batch_size: Batch size for embedding requests
+        """
+        super().__init__(**kwargs)
+        # Use object.__setattr__ to bypass Pydantic validation for private attributes
+        # These are not Pydantic fields, so we store them as private attributes
+        object.__setattr__(self, '_model_name', model_name)
+        object.__setattr__(self, '_base_url', base_url.rstrip('/'))
+        object.__setattr__(self, '_embed_batch_size', embed_batch_size)
+        object.__setattr__(self, '_dimension', None)
+        
+    def _get_embedding(self, text: str) -> List[float]:
+        """Get embedding for a single text."""
+        if requests is None:
+            raise ImportError("requests library is required for Ollama embeddings")
+        
+        try:
+            response = requests.post(
+                f"{self._base_url}/api/embeddings",
+                json={
+                    "model": self._model_name,
+                    "prompt": text
+                },
+                timeout=60
+            )
+            response.raise_for_status()
+            result = response.json()
+            embedding = result.get("embedding", [])
+            
+            # Cache dimension on first call
+            if self._dimension is None:
+                object.__setattr__(self, '_dimension', len(embedding))
+            
+            return embedding
+        except Exception as e:
+            logger.error(f"Error getting Ollama embedding: {e}")
+            raise
+    
+    def _get_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """Get embeddings for a batch of texts."""
+        if requests is None:
+            raise ImportError("requests library is required for Ollama embeddings")
+        
+        embeddings = []
+        for i in range(0, len(texts), self._embed_batch_size):
+            batch = texts[i:i + self._embed_batch_size]
+            batch_embeddings = []
+            
+            for text in batch:
+                try:
+                    response = requests.post(
+                        f"{self._base_url}/api/embeddings",
+                        json={
+                            "model": self._model_name,
+                            "prompt": text
+                        },
+                        timeout=60
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    embedding = result.get("embedding", [])
+                    
+                    # Cache dimension on first call
+                    if self._dimension is None:
+                        object.__setattr__(self, '_dimension', len(embedding))
+                    
+                    batch_embeddings.append(embedding)
+                except Exception as e:
+                    logger.error(f"Error getting Ollama embedding for batch item: {e}")
+                    # Return zero vector on error
+                    dim = self._dimension or 768  # Default dimension for nomic-embed-text
+                    batch_embeddings.append([0.0] * dim)
+            
+            embeddings.extend(batch_embeddings)
+        
+        return embeddings
+    
+    def _get_query_embedding(self, query: str) -> List[float]:
+        """Get embedding for a query string."""
+        return self._get_embedding(query)
+    
+    def _get_text_embedding(self, text: str) -> List[float]:
+        """Get embedding for a text string."""
+        return self._get_embedding(text)
+    
+    async def _aget_query_embedding(self, query: str) -> List[float]:
+        """Get embedding for a query string (async)."""
+        # For now, just call the sync version
+        # In the future, could use async HTTP client for better performance
+        import asyncio
+        return await asyncio.to_thread(self._get_embedding, query)
+    
+    @property
+    def dimension(self) -> int:
+        """Return the dimension of embeddings."""
+        if self._dimension is None:
+            # Try to get dimension by making a test call
+            try:
+                test_embedding = self._get_embedding("test")
+                object.__setattr__(self, '_dimension', len(test_embedding))
+            except:
+                # Default dimension for nomic-embed-text
+                object.__setattr__(self, '_dimension', 768)
+        return self._dimension
+
+
 class DocumentAnalyzer:
     _instance = None
     _initialized = False
@@ -178,8 +311,25 @@ class DocumentAnalyzer:
                     cache_dir=str(self.llm_cache_path),
                 )
 
-                # Initialize embeddings if OpenAI API key is available
-                if openai_key and openai_key != "backend-handles-llm":
+                # Initialize embeddings - check for Ollama first, then OpenAI
+                embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", "").lower()
+                use_ollama = os.getenv("USE_OLLAMA_EMBEDDINGS", "false").lower() == "true"
+                
+                if use_ollama or embedding_model.startswith("ollama/") or embedding_model.startswith("nomic"):
+                    # Use Ollama embeddings
+                    ollama_model = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
+                    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+                    logger.info(f"Initializing Ollama embeddings with model: {ollama_model}")
+                    self.embeddings = OllamaEmbedding(
+                        model_name=ollama_model,
+                        base_url=ollama_base_url,
+                        embed_batch_size=100,
+                    )
+                    # Configure embeddings globally for LlamaIndex
+                    Settings.embed_model = self.embeddings
+                    logger.info(f"Ollama embeddings initialized successfully (dimension: {self.embeddings.dimension})")
+                elif openai_key and openai_key != "backend-handles-llm":
+                    # Use OpenAI embeddings
                     self.embeddings = OpenAIEmbedding(
                         api_key=openai_key,
                         api_base=os.getenv("OPENAI_API_BASE"),
@@ -188,12 +338,12 @@ class DocumentAnalyzer:
                         ),
                         embed_batch_size=100,
                     )
-
                     # Configure embeddings globally for LlamaIndex
                     Settings.embed_model = self.embeddings
+                    logger.info("OpenAI embeddings initialized successfully")
                 else:
                     logger.warning(
-                        "No OpenAI API key - embedding functionality will be limited"
+                        "No embedding provider configured - embedding functionality will be limited"
                     )
                     self.embeddings = None
 
@@ -236,9 +386,10 @@ class DocumentAnalyzer:
         self._initialized = True
 
     def _get_cache_key(self, file_path: str) -> str:
-        """Generate a unique cache key based on file and all analysis parameters.
+        """Generate a unique cache key based on file content hash and all analysis parameters.
 
         Handles both local file paths and URNs (backend resources).
+        Includes file content hash to detect when files are modified.
         Maintains backwards compatibility with existing local file cache keys.
         """
         try:
@@ -277,10 +428,30 @@ class DocumentAnalyzer:
             elif file_path.startswith("file://"):
                 # Handle file:// URIs - extract path
                 file_path_clean = file_path.replace("file://", "")
-                return f"{Path(file_path_clean).stem}_{params_str}"
+                file_path_obj = Path(file_path_clean)
+                # Include file content hash if file exists
+                if file_path_obj.exists() and file_path_obj.is_file():
+                    try:
+                        file_hash = hashlib.sha256(file_path_obj.read_bytes()).hexdigest()[:8]
+                        return f"{file_path_obj.stem}_{file_hash}_{params_str}"
+                    except Exception:
+                        # If hash fails, fall back to filename
+                        return f"{file_path_obj.stem}_{params_str}"
+                else:
+                    return f"{file_path_obj.stem}_{params_str}"
             else:
-                # Local file path (existing behavior - maintain backwards compatibility)
-                return f"{Path(file_path).stem}_{params_str}"
+                # Local file path - include file content hash
+                file_path_obj = Path(file_path)
+                if file_path_obj.exists() and file_path_obj.is_file():
+                    try:
+                        file_hash = hashlib.sha256(file_path_obj.read_bytes()).hexdigest()[:8]
+                        return f"{file_path_obj.stem}_{file_hash}_{params_str}"
+                    except Exception as hash_error:
+                        logger.warning(f"Failed to compute file hash: {hash_error}, using filename only")
+                        return f"{file_path_obj.stem}_{params_str}"
+                else:
+                    # File doesn't exist yet (e.g., just uploaded), use filename
+                    return f"{file_path_obj.stem}_{params_str}"
         except Exception as e:
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to generate cache key: {e}")
             # Fallback: try to extract identifier safely
@@ -894,9 +1065,37 @@ Output only the scores, one per line, in order:"""
             yield {"error": f"Error processing document: {str(e)}"}
 
     def _create_chunks(self, file_path: str) -> List[Dict[str, Any]]:
-        """Create document chunks with embeddings"""
+        """Create document chunks with embeddings, using cache if available"""
         try:
-            logger.info(f"Creating chunks for {file_path}")
+            chunk_size = self.chunk_params["chunk_size"]
+            chunk_overlap = self.chunk_params["chunk_overlap"]
+            
+            # First, check if we have cached embeddings with matching parameters
+            logger.info(f"Checking cache for chunks: {file_path} (chunk_size={chunk_size}, chunk_overlap={chunk_overlap})")
+            cached_chunks = self.cache_manager.get_vectors(
+                file_path, 
+                chunk_size=chunk_size, 
+                chunk_overlap=chunk_overlap
+            )
+            
+            if cached_chunks and len(cached_chunks) > 0:
+                logger.info(f"Found {len(cached_chunks)} cached chunks with embeddings - reusing them")
+                # Convert cached chunks to expected format
+                chunks_data = []
+                for cached in cached_chunks:
+                    chunk_dict = {
+                        "text": cached["text"],
+                        "metadata": cached.get("metadata", {}),
+                        "embedding": cached.get("embedding"),
+                        "similarity": 0.0,
+                        "computed_score": 0.0,
+                    }
+                    chunks_data.append(chunk_dict)
+                logger.info(f"Reused {len(chunks_data)} chunks from cache (saved embedding computation)")
+                return chunks_data
+            
+            # No cached chunks found, need to compute them
+            logger.info(f"No cached chunks found - computing new embeddings for {file_path}")
             reader = PyMuPDFReader()
             docs = reader.load(file_path=file_path)
             logger.info(f"Loaded {len(docs)} pages from document")
@@ -911,8 +1110,8 @@ Output only the scores, one per line, in order:"""
                             text=chunk,
                             metadata={
                                 **doc.metadata,
-                                "chunk_size": self.chunk_params["chunk_size"],
-                                "chunk_overlap": self.chunk_params["chunk_overlap"],
+                                "chunk_size": chunk_size,
+                                "chunk_overlap": chunk_overlap,
                             },
                         )
                         for chunk in nodes

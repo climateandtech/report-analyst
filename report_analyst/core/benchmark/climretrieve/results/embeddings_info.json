@@ -1,0 +1,5 @@
+{
+  "cache_database": "storage/cache/analysis.db",
+  "cache_exists": true,
+  "note": "Embeddings are stored in SQLite cache database. Use DocumentAnalyzer to retrieve them."
+}

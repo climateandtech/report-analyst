@@ -1,0 +1,31 @@
+# METADATA
+Ground Truth Column,relevance
+Group By,criteria
+Total Chunks Evaluated,1091
+Relevance Threshold,1.0
+Similarity Threshold,0.5
+Scoring Method,Embedding Similarity
+
+# METRICS
+K,Precision@K,Recall@K,F1@K,nDCG@K
+1,0.892308,0.309929,0.382077,0.861538
+3,0.758974,0.609213,0.526893,0.902635
+5,0.680000,0.749071,0.554642,0.921901
+10,0.495385,0.855367,0.475493,0.922650
+
+# ACCURACY
+Accuracy,0.178735
+
+# CONFUSION MATRIX
+## Binary Classification (Relevant vs Not Relevant)
+Metric,Count
+True Positives (TP),686
+True Negatives (TN),143
+False Positives (FP),45
+False Negatives (FN),217
+
+"## Multi-class Classification (0, 1, 2)"
+Ground Truth,Predicted 0,Predicted 1,Predicted 2
+GT_0,143,35,10
+GT_1,90,86,46
+GT_2,127,250,304

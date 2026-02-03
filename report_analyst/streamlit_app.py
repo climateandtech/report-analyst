@@ -21,7 +21,8 @@ from pandas.api.types import (
 )
 from streamlit_card import card
 
-# Add parent directory to path for backend integration
+# Add parent directory to path for backend integration AND core imports
+# This must happen FIRST before any report_analyst imports
 current_dir = Path(__file__).parent
 parent_dir = current_dir.parent
 if str(parent_dir) not in sys.path:
@@ -64,14 +65,21 @@ def log_analysis_step(message: str, level: str = "info"):
     log_func(f"[ANALYSIS] {message}")
 
 
-# Add the report-analyst directory to the Python path
-current_dir = Path(__file__).parent.parent
-if str(current_dir) not in sys.path:
-    sys.path.append(str(current_dir))
-logger.info(f"Added {current_dir} to Python path")
+# Import core modules - parent_dir is already in sys.path from above
+# This ensures report_analyst package can be imported regardless of where script is run from
+# Verify parent_dir is in path before importing
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
+logger.info(f"Python path parent directory: {parent_dir}")
 
-# Keep relative imports
-from report_analyst.core.analyzer import DocumentAnalyzer
+try:
+    from report_analyst.core.analyzer import DocumentAnalyzer
+except ImportError as e:
+    logger.error(f"Failed to import report_analyst.core.analyzer: {e}")
+    logger.error(f"Current sys.path: {sys.path[:5]}")
+    logger.error(f"Parent dir exists: {parent_dir.exists()}")
+    logger.error(f"report_analyst dir exists: {(parent_dir / 'report_analyst').exists()}")
+    raise
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
     create_combined_dataframe,
@@ -147,6 +155,31 @@ class ReportAnalyzer:
         self.cache_manager = (
             self.analyzer.cache_manager
         )  # Access the cache manager from the analyzer
+        
+        # Clean up old temp files on initialization
+        self._cleanup_old_temp_files()
+
+    def _cleanup_old_temp_files(self, max_age_hours: int = 24):
+        """Remove temp files older than max_age_hours to prevent disk space issues"""
+        try:
+            if not self.temp_dir.exists():
+                return
+            
+            cutoff_time = time.time() - (max_age_hours * 3600)
+            cleaned_count = 0
+            for file_path in self.temp_dir.glob("*"):
+                try:
+                    if file_path.is_file() and file_path.stat().st_mtime < cutoff_time:
+                        file_path.unlink()
+                        cleaned_count += 1
+                        logger.debug(f"Cleaned up old temp file: {file_path.name}")
+                except Exception as e:
+                    logger.warning(f"Error cleaning up temp file {file_path}: {e}")
+            
+            if cleaned_count > 0:
+                logger.info(f"Cleaned up {cleaned_count} old temp files (older than {max_age_hours} hours)")
+        except Exception as e:
+            logger.warning(f"Error during temp file cleanup: {e}")
 
     def load_question_set(self, question_set: str) -> Dict:
         """Load questions from the specified question set using centralized loader"""
@@ -205,9 +238,29 @@ class ReportAnalyzer:
             # Update analyzer with the current questions
             self.analyzer.questions = questions
 
-            # Convert selected question IDs to numbers for the analyzer
+            # Validate and convert selected question IDs to numbers for the analyzer
+            valid_questions = {}
+            invalid_questions = []
+            for q_id in selected_questions:
+                if q_id in questions:
+                    valid_questions[q_id] = questions[q_id]
+                else:
+                    invalid_questions.append(q_id)
+            
+            if invalid_questions:
+                log_analysis_step(
+                    f"Warning: Invalid question IDs found: {invalid_questions}. They will be skipped.",
+                    "warning"
+                )
+                logger.warning(f"Invalid question IDs: {invalid_questions}")
+            
+            if not valid_questions:
+                log_analysis_step("No valid questions selected", "error")
+                yield {"error": "No valid questions selected. Please select at least one valid question."}
+                return
+            
             selected_numbers = [
-                questions[q_id]["number"] for q_id in selected_questions
+                valid_questions[q_id]["number"] for q_id in valid_questions
             ]
 
             # Get the question set prefix from the first selected question
@@ -275,7 +328,7 @@ class ReportAnalyzer:
 
 
 def save_uploaded_file(uploaded_file) -> Optional[str]:
-    """Save uploaded file to temp directory"""
+    """Save uploaded file to temp directory with unique filename and PDF validation"""
     try:
         if uploaded_file is None:
             logger.warning("No file was uploaded")
@@ -285,24 +338,88 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
         if isinstance(uploaded_file, (str, Path)):
             return str(uploaded_file)
 
-        # Check if file was already saved in this session
-        file_key = f"saved_file_{uploaded_file.name}"
-        if file_key in st.session_state:
-            return st.session_state[file_key]
+        # Validate PDF before saving
+        try:
+            # Read file buffer to validate
+            file_buffer = uploaded_file.getbuffer()
+            
+            # Check if it's a PDF by reading first bytes
+            if len(file_buffer) < 4:
+                st.error("File is too small to be a valid PDF")
+                return None
+            
+            # PDF files start with %PDF
+            if not file_buffer[:4].startswith(b'%PDF'):
+                st.error("Uploaded file does not appear to be a valid PDF. Please upload a PDF file.")
+                return None
+            
+            # Try to validate with PyPDF2 if available
+            try:
+                from PyPDF2 import PdfReader
+                uploaded_file.seek(0)  # Reset file pointer
+                reader = PdfReader(uploaded_file)
+                if len(reader.pages) == 0:
+                    st.error("PDF appears to be empty or corrupted")
+                    return None
+                logger.info(f"PDF validated: {len(reader.pages)} pages")
+            except ImportError:
+                # PyPDF2 not available, skip deeper validation
+                logger.debug("PyPDF2 not available, skipping PDF validation")
+            except Exception as pdf_error:
+                logger.warning(f"PDF validation warning: {pdf_error}")
+                # Continue anyway, basic header check passed
+            
+            # Reset file pointer after validation
+            uploaded_file.seek(0)
+            
+        except Exception as validation_error:
+            logger.error(f"Error validating PDF: {str(validation_error)}")
+            st.error(f"Error validating PDF file: {str(validation_error)}")
+            return None
 
-        # Otherwise, handle it as an UploadedFile
-        file_path = Path("temp") / uploaded_file.name
+        # Generate unique filename using content hash and timestamp
+        import hashlib
+        file_buffer = uploaded_file.getbuffer()
+        file_hash = hashlib.md5(file_buffer).hexdigest()[:8]
+        timestamp = int(time.time())
+        file_extension = Path(uploaded_file.name).suffix
+        file_stem = Path(uploaded_file.name).stem
+        unique_filename = f"{timestamp}_{file_hash}_{file_stem}{file_extension}"
+        
+        # Check if file was already saved in this session (by content hash)
+        file_content_key = f"saved_file_hash_{file_hash}"
+        if file_content_key in st.session_state:
+            logger.info(f"File with same content already saved in this session: {st.session_state[file_content_key]}")
+            return st.session_state[file_content_key]
+
+        # Save with unique filename
+        file_path = Path("temp") / unique_filename
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        uploaded_file.seek(0)  # Reset file pointer before saving
         with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        logger.info(f"Successfully saved file: {file_path}")
+            f.write(file_buffer)
+        logger.info(f"Successfully saved file: {file_path} (original name: {uploaded_file.name})")
 
-        # Store the path in session state
+        # Store the path in session state (both by name and content hash)
+        file_key = f"saved_file_{uploaded_file.name}"
         st.session_state[file_key] = str(file_path)
+        st.session_state[file_content_key] = str(file_path)
+        
         # Reset file processing flag when a new file is saved
         st.session_state.file_processed = False
+        
+        # Clear previous results when a new file is uploaded
+        if "results" in st.session_state:
+            st.session_state.results = {"answers": {}}
+        if "last_file_path" in st.session_state:
+            if st.session_state.last_file_path != str(file_path):
+                logger.info(f"File changed from {st.session_state.last_file_path} to {file_path}, clearing results")
+        st.session_state.last_file_path = str(file_path)
+        
         return str(file_path)
     except Exception as e:
-        logger.error(f"Error saving file: {str(e)}")
+        logger.error(f"Error saving file: {str(e)}", exc_info=True)
         st.error(f"Error saving file: {str(e)}")
         return None
 
@@ -378,14 +495,37 @@ def display_download_buttons(
 
 
 def generate_file_key(file_path: str, st) -> str:
-    """Generate a cache file key from file path and settings"""
-    return (
-        f"{Path(file_path).name}_"
-        f"cs{st.session_state.new_chunk_size}_"
-        f"ov{st.session_state.new_overlap}_"
-        f"tk{st.session_state.new_top_k}_"
-        f"m{st.session_state.new_llm_model}"
-    )
+    """Generate a cache file key from file path, file content hash, and settings"""
+    import hashlib
+    
+    try:
+        # Include file content hash in cache key to detect file changes
+        file_path_obj = Path(file_path)
+        if file_path_obj.exists() and file_path_obj.is_file():
+            # Compute file content hash
+            file_hash = hashlib.sha256(file_path_obj.read_bytes()).hexdigest()[:8]
+            file_identifier = f"{file_path_obj.stem}_{file_hash}"
+        else:
+            # Fallback to filename if file doesn't exist (e.g., backend resources)
+            file_identifier = Path(file_path).stem
+        
+        return (
+            f"{file_identifier}_"
+            f"cs{st.session_state.new_chunk_size}_"
+            f"ov{st.session_state.new_overlap}_"
+            f"tk{st.session_state.new_top_k}_"
+            f"m{st.session_state.new_llm_model}"
+        )
+    except Exception as e:
+        logger.warning(f"Error generating file key with hash: {e}, falling back to filename")
+        # Fallback to original behavior
+        return (
+            f"{Path(file_path).name}_"
+            f"cs{st.session_state.new_chunk_size}_"
+            f"ov{st.session_state.new_overlap}_"
+            f"tk{st.session_state.new_top_k}_"
+            f"m{st.session_state.new_llm_model}"
+        )
 
 
 async def analyze_document_and_display(
@@ -409,15 +549,25 @@ async def analyze_document_and_display(
         # Use the helper function to generate file key
         file_key = generate_file_key(file_path, st)
 
-        # Initialize or clear results if question set changed
-        if (
-            "results" not in st.session_state
-            or "current_question_set" not in st.session_state
+        # Clear results if file changed or question set changed
+        file_changed = (
+            "last_analyzed_file_path" not in st.session_state
+            or st.session_state.last_analyzed_file_path != file_path
+        )
+        question_set_changed = (
+            "current_question_set" not in st.session_state
             or st.session_state.current_question_set != question_set
-        ):
+        )
+        
+        if file_changed or question_set_changed:
+            if file_changed:
+                logger.info(f"File changed from {st.session_state.get('last_analyzed_file_path', 'None')} to {file_path}, clearing results")
+            if question_set_changed:
+                logger.info(f"Question set changed to {question_set}, clearing results")
             st.session_state.results = {"answers": {}}
             st.session_state.current_question_set = question_set
             st.session_state.analyzed_files = set()
+            st.session_state.last_analyzed_file_path = file_path
 
         # Create status placeholder
         status_placeholder = st.empty()

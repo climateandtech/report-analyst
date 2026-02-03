@@ -6,8 +6,8 @@ import argparse
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.core.benchmark.climretrieve_io import load_inputs
-from app.core.benchmark.climretrieve_metrics import evaluate_climretrieve
+from report_analyst.core.benchmark.climretrieve_io import load_inputs
+from report_analyst.core.benchmark.climretrieve_metrics import evaluate_climretrieve
 
 
 def main() -> None:
