@@ -51,3 +51,9 @@ VERCEL_CHANGES_SUMMARY.md
 VERCEL_DEPLOYMENT_ASSESSMENT.md
 VERCEL_MIGRATION_GUIDE.md
 node_modules/
+
+# Build artifacts
+**/build/
+**/dist/
+**/public/*.es.js
+venv2/

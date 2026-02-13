@@ -12,3 +12,7 @@ psycopg2-binary>=2.9.0
 # For Heroku: heroku-postgresql may include pgvector
 # For Vercel: May need to enable pgvector separately
 
+# JSON Schema Components (see components/requirements.txt)
+# streamlit>=1.32.0
+# jsonschema>=4.0.0
+

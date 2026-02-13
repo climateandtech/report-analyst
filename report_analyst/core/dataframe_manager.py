@@ -62,11 +62,17 @@ def create_analysis_dataframes(
                     f"Processing question {question_id} with keys: {list(result.keys())}"
                 )
 
-                # Create analysis row
+                # Create analysis row - ensure score is a number
+                score = result.get("SCORE", 0)
+                try:
+                    score = float(score) if score is not None else 0
+                except (ValueError, TypeError):
+                    score = 0
+                
                 analysis_row = {
                     "Question ID": question_id,
                     "Analysis": result.get("ANSWER", ""),
-                    "Score": float(result.get("SCORE", 0)),
+                    "Score": score,
                     "Key Evidence": format_list_field(result.get("EVIDENCE", [])),
                     "Gaps": format_list_field(result.get("GAPS", [])),
                     "Sources": format_list_field(result.get("SOURCES", [])),
@@ -74,8 +80,9 @@ def create_analysis_dataframes(
                 analysis_rows.append(analysis_row)
                 logger.info(f"Added analysis row for question {question_id}")
 
-                # Process chunks - use exactly what's in the database
-                chunks = data.get("chunks", [])
+                # Process chunks - check both result and data for chunks
+                # Chunks can be in result (if added during analysis) or in data (if from database)
+                chunks = result.get("chunks", data.get("chunks", []))
                 logger.info(
                     f"Processing {len(chunks)} chunks for question {question_id}"
                 )

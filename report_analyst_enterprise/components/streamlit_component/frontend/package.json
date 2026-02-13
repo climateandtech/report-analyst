@@ -4,8 +4,10 @@
   "description": "Streamlit custom component for JSON Schema forms",
   "main": "src/index.tsx",
   "scripts": {
-    "start": "vite",
-    "build": "vite build && node -e \"const fs=require('fs'); const html=fs.readFileSync('build/index.html','utf8'); fs.writeFileSync('build/index.html', html.replace('src=\\\"/index.js\\\"','src=\\\"./index.js\\\"'));\""
+    "start": "vite --config vite.config.ts",
+    "dev:pdf-viewer": "vite --config vite.config.pdf-viewer.ts",
+    "build": "vite build --config vite.config.ts && node -e \"const fs=require('fs'); const html=fs.readFileSync('build/index.html','utf8'); fs.writeFileSync('build/index.html', html.replace('src=\\\"/index.js\\\"','src=\\\"./index.js\\\"'));\"",
+    "build:pdf-viewer": "vite build --config vite.config.pdf-viewer.ts && node -e \"const fs=require('fs'); const path=require('path'); const html=fs.readFileSync('build/index-pdf-viewer.html','utf8'); const fixedHtml=html.replace('src=\\\"/index-pdf-viewer.js\\\"','src=\\\"index-pdf-viewer.js\\\"'); fs.writeFileSync('build/index-pdf-viewer.html', fixedHtml); fs.mkdirSync('build/pdf-viewer', {recursive: true}); if(fs.existsSync('build/index-pdf-viewer.js')) fs.copyFileSync('build/index-pdf-viewer.js', 'build/pdf-viewer/index-pdf-viewer.js'); if(fs.existsSync('build/pdf-viewer.es.js')) { fs.copyFileSync('build/pdf-viewer.es.js', 'build/pdf-viewer/pdf-viewer.es.js'); } else { console.warn('Warning: build/pdf-viewer.es.js not found, PDF viewer web component may not load correctly'); } const pdfViewerHtml=html.replace('src=\\\"/index-pdf-viewer.js\\\"','src=\\\"index-pdf-viewer.js\\\"'); fs.writeFileSync('build/pdf-viewer/index.html', pdfViewerHtml);\""
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

@@ -9,16 +9,19 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: 'src/json-schema-form.js',
-      name: 'JsonSchemaForm',
-      fileName: (format) => `json-schema-form.${format}.js`,
+      entry: {
+        'json-schema-form': 'src/json-schema-form.js',
+        'pdf-viewer': 'src/pdf-viewer.js',
+      },
+      name: '[name]',
+      fileName: (format, entryName) => `${entryName}.${format}.js`,
       formats: ['es']
     },
     rollupOptions: {
       external: [], // Bundle everything for standalone use
       output: {
-        // Ensure single file output for web component
-        inlineDynamicImports: true,
+        // For multiple entry points, we can't use inlineDynamicImports
+        // Each entry will be a separate bundle
         globals: {}
       }
     }
