@@ -29,6 +29,8 @@ class CacheManager:
         # In-memory vector store for current document
         self.vector_store = None
         self.current_file_path = None
+        self.current_chunk_size = None
+        self.current_chunk_overlap = None
 
     def init_db(self):
         """Initialize the database schema"""
@@ -136,6 +138,11 @@ class CacheManager:
     def _load_vector_store(self, file_path: str, chunks: List[Dict]) -> None:
         """Load chunks into an in-memory vector store."""
         try:
+            # Clear the existing vector store if it exists
+            if self.vector_store is not None:
+                logger.debug("Clearing existing vector store before reload")
+                self.vector_store = None
+
             # Convert chunks to Documents
             documents = []
             for chunk in chunks:
@@ -152,6 +159,22 @@ class CacheManager:
                     )
                     documents.append(doc)
 
+            if not documents:
+                logger.warning(
+                    f"No documents with embeddings found to load into vector store. "
+                    f"Total chunks provided: {len(chunks)}"
+                )
+                # Clear vector store if no documents to load
+                self.vector_store = None
+                self.current_file_path = file_path
+                self.current_chunk_size = chunk_size
+                self.current_chunk_overlap = chunk_overlap
+                logger.warning(
+                    f"Vector store cleared - no chunks available for chunk_size={chunk_size}, "
+                    f"chunk_overlap={chunk_overlap}"
+                )
+                return
+
             # Create vector store index with pre-computed embeddings
             from llama_index.core.indices.vector_store.base import VectorStoreIndex
 
@@ -162,9 +185,14 @@ class CacheManager:
                 show_progress=True,  # Show progress during index creation
             )
             self.current_file_path = file_path
+            # Store chunk parameters to detect when they change
+            if chunks:
+                self.current_chunk_size = chunks[0].get("chunk_size")
+                self.current_chunk_overlap = chunks[0].get("chunk_overlap")
 
             logger.info(
-                f"Loaded {len(documents)} chunks into vector store for {file_path}"
+                f"Loaded {len(documents)} chunks into vector store for {file_path} "
+                f"(chunk_size={self.current_chunk_size}, chunk_overlap={self.current_chunk_overlap})"
             )
 
         except Exception as e:
@@ -182,9 +210,39 @@ class CacheManager:
         """Get chunks most similar to the query embedding using LlamaIndex vector store."""
         try:
             # Load chunks into vector store if needed
-            if self.current_file_path != file_path:
+            # Check if file path OR chunk parameters changed
+            needs_reload = (
+                self.current_file_path != file_path
+                or self.current_chunk_size != chunk_size
+                or self.current_chunk_overlap != chunk_overlap
+            )
+
+            if needs_reload:
+                logger.info(
+                    f"Reloading vector store: file_path changed={self.current_file_path != file_path}, "
+                    f"chunk_size changed={self.current_chunk_size != chunk_size}, "
+                    f"chunk_overlap changed={self.current_chunk_overlap != chunk_overlap}"
+                )
                 chunks = self.get_document_chunks(file_path, chunk_size, chunk_overlap)
+                logger.info(
+                    f"Retrieved {len(chunks)} chunks for chunk_size={chunk_size}, chunk_overlap={chunk_overlap}"
+                )
+                if not chunks:
+                    logger.warning(
+                        f"No chunks found in database for file_path={file_path}, "
+                        f"chunk_size={chunk_size}, chunk_overlap={chunk_overlap}. "
+                        f"Vector store will be empty. This may cause incorrect similarity search results."
+                    )
                 self._load_vector_store(file_path, chunks)
+
+            # Verify vector store is loaded
+            if self.vector_store is None:
+                logger.error(
+                    f"Vector store is None for file_path={file_path}, "
+                    f"chunk_size={chunk_size}, chunk_overlap={chunk_overlap}. "
+                    f"Cannot perform similarity search. Chunks may not exist in database."
+                )
+                return []
 
             # Get similar nodes using vector store
             retriever = self.vector_store.as_retriever(similarity_top_k=top_k)
@@ -210,6 +268,17 @@ class CacheManager:
                     else node.get_score() if hasattr(node, "get_score") else 0.0
                 )
 
+                node_chunk_size = node.metadata.get("chunk_size")
+                node_chunk_overlap = node.metadata.get("chunk_overlap")
+
+                # Verify chunk metadata matches requested parameters
+                if node_chunk_size != chunk_size or node_chunk_overlap != chunk_overlap:
+                    logger.warning(
+                        f"Chunk metadata mismatch! Requested chunk_size={chunk_size}, chunk_overlap={chunk_overlap}, "
+                        f"but chunk has chunk_size={node_chunk_size}, chunk_overlap={node_chunk_overlap}. "
+                        f"Chunk text preview: {node.text[:100]}..."
+                    )
+
                 chunk = {
                     "id": node.metadata.get("id"),
                     "text": node.text,
@@ -220,7 +289,9 @@ class CacheManager:
                 }
                 chunks.append(chunk)
                 logger.debug(
-                    f"Found chunk with similarity score: {similarity_score:.4f}"
+                    f"Found chunk (chunk_size={node_chunk_size}, chunk_overlap={node_chunk_overlap}) "
+                    f"with similarity score: {similarity_score:.4f}, "
+                    f"text preview: {node.text[:100]}..."
                 )
 
             logger.info(f"Retrieved {len(chunks)} similar chunks for {file_path}")

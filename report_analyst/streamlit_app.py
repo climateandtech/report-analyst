@@ -267,10 +267,16 @@ class ReportAnalyzer:
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ):
-        """Delegate to the analyzer's process_document method"""
+        """Delegate to the analyzer's process_document method, including backend chunks."""
         return self.analyzer.process_document(
-            file_path, selected_questions, use_llm_scoring, single_call, force_recompute
+            file_path=file_path,
+            selected_questions=selected_questions,
+            use_llm_scoring=use_llm_scoring,
+            single_call=single_call,
+            force_recompute=force_recompute,
+            pre_retrieved_chunks=pre_retrieved_chunks,
         )
 
 
@@ -1481,7 +1487,8 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         if cached_results and not st.session_state.get("force_recompute", False):
             logger.info(f"[CACHE] Cache HIT for config: {config}")
             progress_text.success("Found stored results!")
-            st.session_state.results = cached_results
+            # Store cached results in a consistent structure
+            st.session_state.results = {"answers": cached_results}
             logger.info(
                 f"[ANALYSIS] Writing results to session state for file: {file_path}"
             )
@@ -1570,7 +1577,8 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         logger.info(
             f"[ANALYSIS] Writing results to session state for file: {file_path}"
         )
-        st.session_state.results = final_results
+        # Store analysis results in a consistent structure
+        st.session_state.results = {"answers": final_results}
         logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
         progress_text.success("Analysis complete!")
 
@@ -1605,7 +1613,8 @@ def main():
             st.session_state.force_recompute = False  # Default recompute setting
 
         if "results" not in st.session_state:
-            st.session_state.results = {}  # Initialize empty results
+            # Initialize results with a consistent structure expected across the app
+            st.session_state.results = {"answers": {}}
 
         if "current_file" not in st.session_state:
             st.session_state.current_file = None  # Initialize current file
@@ -3246,25 +3255,57 @@ def main():
                         st.session_state.processing_steps_slider = "Answer"
 
                     # Use Streamlit's built-in pills widget
-                    # format_func must only return values that are in step_options
-                    # to avoid test framework errors with invalid values
+                    # Make format_func defensive to handle invalid values of any type
+                    # The format_func must return a value that exists in the options list
                     def safe_format_func(x):
-                        """Format function that only returns valid option values"""
-                        if x in step_options:
-                            return step_full_names.get(x, x)
-                        # If invalid value, return a valid default
-                        return step_full_names.get("Answer", "Answer")
+                        """Safely format step names, handling any input type gracefully.
+                        Always returns a value that exists in the formatted options list.
+                        """
+                        try:
+                            # Handle None or non-string types
+                            if x is None:
+                                return "Question Answering"
+                            if not isinstance(x, str):
+                                x = str(x)
+
+                            # If input is a valid option key, return its formatted name
+                            if x in step_full_names:
+                                return step_full_names[x]
+
+                            # If input is already a formatted name, return it as-is
+                            formatted_names = list(step_full_names.values())
+                            if x in formatted_names:
+                                return x
+
+                            # For any other invalid value, return default formatted name
+                            # This ensures the return value always exists in the options
+                            return "Question Answering"
+                        except Exception:
+                            # Ultimate fallback - return default formatted name
+                            return "Question Answering"
+
+                    # Ensure default value is always valid
+                    default_value = (
+                        st.session_state.processing_steps_slider
+                        if st.session_state.processing_steps_slider in step_options
+                        else "Answer"
+                    )
 
                     selected_step = st.pills(
                         "Select processing step",
                         options=step_options,
                         format_func=safe_format_func,
-                        default=st.session_state.processing_steps_slider,
+                        default=default_value,
                         key="processing_steps_slider",
                         help="Select which processing step to execute",
                         label_visibility="collapsed",
                         selection_mode="single",
                     )
+
+                    # Ensure selected_step is always valid (handle any widget state corruption)
+                    if selected_step not in step_options:
+                        selected_step = "Answer"
+                        st.session_state.processing_steps_slider = "Answer"
 
                 # Right column: Advanced Parameters
                 with col3:
@@ -3581,6 +3622,22 @@ def main():
                             "QID"
                         ].tolist()
 
+                        # Log question selection details for debugging
+                        total_questions = len(questions)
+                        selected_count = len(selected_questions)
+                        logger.info(
+                            f"[QUESTION SELECTION] Total questions available: {total_questions}"
+                        )
+                        logger.info(
+                            f"[QUESTION SELECTION] Number of questions selected: {selected_count}"
+                        )
+                        logger.info(
+                            f"[QUESTION SELECTION] Selected question IDs: {selected_questions}"
+                        )
+                        logger.info(
+                            f"[QUESTION SELECTION] Edited dataframe shape: {edited_df.shape}, Selected rows: {len(edited_df[edited_df['Select'] == True])}"
+                        )
+
                         # Update session state for individual question checkboxes (for backward compatibility)
                         for q_id in questions.keys():
                             is_selected = q_id in selected_questions
@@ -3643,64 +3700,34 @@ def main():
                                         )
                                     )
                                 else:
-                                    # For normal analysis, check cache first
-                                    cached_results = (
-                                        analyzer.analyzer.cache_manager.get_analysis(
-                                            file_path=analysis_file_path,
-                                            config=config,
-                                            question_ids=selected_questions,
-                                        )
+                                    # For normal analysis, use analyze_document_and_display
+                                    # which automatically handles both cached and uncached questions
+
+                                    # Ensure analyzer parameters are synced from UI settings
+                                    update_analyzer_parameters()
+
+                                    progress_text.info(
+                                        f"Analyzing {len(selected_questions)} questions..."
                                     )
 
-                                    if cached_results:
-                                        # Process cached results
-                                        for (
-                                            question_id,
-                                            result,
-                                        ) in cached_results.items():
-                                            st.session_state.results["answers"][
-                                                question_id
-                                            ] = result
-
-                                        # Generate file key for display
-                                        file_key = generate_file_key(
-                                            analysis_file_path, st
-                                        )
-
-                                        # Update display
-                                        analysis_df, chunks_df = (
-                                            create_analysis_dataframes(
-                                                st.session_state.results["answers"],
-                                                file_key,
+                                    try:
+                                        asyncio.run(
+                                            analyze_document_and_display(
+                                                analyzer,
+                                                file_path=analysis_file_path,  # Use URN for backend, file path for local
+                                                questions=questions,
+                                                selected_questions=selected_questions,
+                                                use_llm_scoring=st.session_state.new_llm_scoring,
+                                                single_call=st.session_state.new_batch_scoring,
+                                                force_recompute=False,  # Use cache when available
                                             )
                                         )
-                                        st.session_state.analysis_df = analysis_df
-                                        st.session_state.chunks_df = chunks_df
-                                        st.session_state.analysis_complete = True
-                                    else:
-                                        # Run analysis for uncached questions
-                                        progress_text.info(
-                                            f"Processing {len(selected_questions)} questions..."
-                                        )
 
-                                        try:
-                                            # Run analysis for uncached questions
-                                            asyncio.run(
-                                                analyze_document_and_display(
-                                                    analyzer,
-                                                    file_path=analysis_file_path,  # Use URN for backend, file path for local
-                                                    questions=questions,
-                                                    selected_questions=selected_questions,
-                                                    use_llm_scoring=st.session_state.new_llm_scoring,
-                                                    single_call=st.session_state.new_batch_scoring,
-                                                )
-                                            )
+                                        progress_text.success("Analysis complete!")
 
-                                            progress_text.success("Analysis complete!")
-
-                                        except Exception as e:
-                                            st.error(f"Error during analysis: {str(e)}")
-                                            st.exception(e)
+                                    except Exception as e:
+                                        st.error(f"Error during analysis: {str(e)}")
+                                        st.exception(e)
 
                                     # Get final results
                                     all_results = (
