@@ -1,5 +1,6 @@
 import json
 import logging
+import sqlite3
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -11,6 +12,7 @@ import streamlit as st
 
 from ..core.benchmark.dataset_loader import DatasetLoader, DatasetValidationError
 from ..core.benchmark.evaluation_engine import EvaluationEngine
+from ..core.benchmark.retrieval_results_loader import load_flexible_dataset_from_csv
 from ..core.storage.benchmark_store import BenchmarkStore
 from ..models.benchmark import BenchmarkEvaluation, HumanAnnotation, RetrievalConfig
 
@@ -29,21 +31,110 @@ class BenchmarkingUI:
     def render_dataset_management(self):
         """Render dataset management interface"""
         st.subheader("Dataset Management")
+        
+        # Initialize session state for uploaded datasets if not exists
+        if "uploaded_datasets" not in st.session_state:
+            st.session_state.uploaded_datasets = {}
 
-        # Dataset upload
-        with st.expander("Upload New Dataset", expanded=False):
-            uploaded_file = st.file_uploader(
-                "Choose a benchmark dataset file",
-                type=["yaml", "yml", "json"],
-                help="Upload a YAML or JSON file containing ground truth chunk relevance data",
+        # Dataset upload section with tabs for ground truth and benchmark
+        upload_tab1, upload_tab2 = st.tabs(["Upload Ground Truth Dataset", "Upload Benchmark Dataset"])
+
+        with upload_tab1:
+            st.write("Upload a ground truth/reference dataset file")
+            uploaded_ground_truth = st.file_uploader(
+                "Choose a ground truth dataset file",
+                type=["yaml", "yml", "json", "csv", "xlsx", "xls"],
+                help="Upload a YAML, JSON, CSV, or Excel file containing ground truth data",
+                key="ground_truth_uploader",
             )
 
-            if uploaded_file is not None:
-                self._handle_dataset_upload(uploaded_file)
+            # Track last processed file to avoid reprocessing on reruns
+            last_processed_key = "last_processed_ground_truth"
+            just_processed = False
+            if uploaded_ground_truth is not None:
+                # Check if this is a new file (different from last processed)
+                # Allow re-uploading even if there's a confirmed dataset (user can replace it)
+                if last_processed_key not in st.session_state or \
+                   st.session_state[last_processed_key] != uploaded_ground_truth.name:
+                    # Clean up old temporary datasets of the same type
+                    if "uploaded_datasets" in st.session_state:
+                        keys_to_remove = [k for k in st.session_state.uploaded_datasets.keys() 
+                                        if k.startswith("temp_ground_truth_")]
+                        for key in keys_to_remove:
+                            del st.session_state.uploaded_datasets[key]
+                    
+                    st.session_state[last_processed_key] = uploaded_ground_truth.name
+                    self._handle_dataset_upload(uploaded_ground_truth, dataset_type="ground_truth")
+                    just_processed = True
+                # If same file, don't reprocess (handles Streamlit reruns)
+            
+            # Check for unconfirmed temporary datasets only if we didn't just process a new upload
+            # (to avoid duplicate key errors - the upload handler already shows the confirmation UI)
+            if not just_processed:
+                temp_ground_truth_keys = [
+                    k for k in st.session_state.get("uploaded_datasets", {}).keys()
+                    if k.startswith("temp_ground_truth_")
+                ]
+                if temp_ground_truth_keys:
+                    # Show confirmation UI for the unconfirmed dataset
+                    temp_key = temp_ground_truth_keys[0]
+                    dataset = st.session_state.uploaded_datasets[temp_key]
+                    # Extract file name from temp_key (format: temp_ground_truth_filename.csv)
+                    file_name = temp_key.replace("temp_ground_truth_", "")
+                    self._render_confirmation_ui(dataset, temp_key, "ground_truth", file_name)
+
+        with upload_tab2:
+            st.write("Upload a benchmark/results dataset file")
+            uploaded_benchmark = st.file_uploader(
+                "Choose a benchmark dataset file",
+                type=["yaml", "yml", "json", "csv", "xlsx", "xls"],
+                help="Upload a YAML, JSON, CSV, or Excel file containing benchmark results",
+                key="benchmark_uploader",
+            )
+
+            # Track last processed file to avoid reprocessing on reruns
+            last_processed_key = "last_processed_benchmark"
+            just_processed = False
+            if uploaded_benchmark is not None:
+                # Check if this is a new file (different from last processed)
+                # Allow re-uploading even if there's a confirmed dataset (user can replace it)
+                if last_processed_key not in st.session_state or \
+                   st.session_state[last_processed_key] != uploaded_benchmark.name:
+                    # Clean up old temporary datasets of the same type
+                    if "uploaded_datasets" in st.session_state:
+                        keys_to_remove = [k for k in st.session_state.uploaded_datasets.keys() 
+                                        if k.startswith("temp_benchmark_")]
+                        for key in keys_to_remove:
+                            del st.session_state.uploaded_datasets[key]
+                    
+                    st.session_state[last_processed_key] = uploaded_benchmark.name
+                    self._handle_dataset_upload(uploaded_benchmark, dataset_type="benchmark")
+                    just_processed = True
+                # If same file, don't reprocess (handles Streamlit reruns)
+            
+            # Check for unconfirmed temporary datasets only if we didn't just process a new upload
+            # (to avoid duplicate key errors - the upload handler already shows the confirmation UI)
+            if not just_processed:
+                temp_benchmark_keys = [
+                    k for k in st.session_state.get("uploaded_datasets", {}).keys()
+                    if k.startswith("temp_benchmark_")
+                ]
+                if temp_benchmark_keys:
+                    # Show confirmation UI for the unconfirmed dataset
+                    temp_key = temp_benchmark_keys[0]
+                    dataset = st.session_state.uploaded_datasets[temp_key]
+                    # Extract file name from temp_key (format: temp_benchmark_filename.csv)
+                    file_name = temp_key.replace("temp_benchmark_", "")
+                    self._render_confirmation_ui(dataset, temp_key, "benchmark", file_name)
 
         # List existing datasets
         st.subheader("Existing Datasets")
-        datasets = self.benchmark_store.list_datasets()
+        try:
+            datasets = self.benchmark_store.list_datasets()
+        except sqlite3.OperationalError as e:
+            st.warning("Database not initialized. Please restart the application.")
+            logger.error(f"Database error: {e}")
+            datasets = []
 
         if not datasets:
             st.info("No datasets uploaded yet. Upload a dataset to get started.")
@@ -92,46 +183,134 @@ class BenchmarkingUI:
         """Render benchmarking interface"""
         st.subheader("Run Benchmark Evaluation")
 
-        datasets = self.benchmark_store.list_datasets()
-        if not datasets:
-            st.warning("No datasets available. Please upload a dataset first.")
+        # Get datasets from both database and session state (uploaded files)
+        db_datasets = []
+        try:
+            db_datasets = self.benchmark_store.list_datasets()
+        except sqlite3.OperationalError:
+            pass
+
+        uploaded_datasets = st.session_state.get("uploaded_datasets", {})
+        
+        # Check for unconfirmed datasets and show helpful message
+        temp_datasets = {k: v for k, v in uploaded_datasets.items() if k.startswith("temp_")}
+        if temp_datasets and not db_datasets and not any(not k.startswith("temp_") for k in uploaded_datasets.keys()):
+            st.warning(
+                "⚠️ You have uploaded datasets but haven't confirmed them yet. "
+                "Please go to the 'Datasets' tab and click 'Confirm and Use This Dataset' "
+                "for each uploaded dataset to make them available for evaluation."
+            )
+            return
+        
+        if not db_datasets and not uploaded_datasets:
+            st.warning("No datasets available. Please upload datasets first.")
             return
 
         # Configuration
         col1, col2 = st.columns(2)
 
         with col1:
-            selected_dataset = st.selectbox(
-                "Select Dataset:",
-                options=[d.dataset_id for d in datasets],
-                format_func=lambda x: next(
-                    d.name for d in datasets if d.dataset_id == x
-                ),
-            )
+            # Select reference/ground truth dataset
+            reference_options = {}
+            for d in db_datasets:
+                reference_options[f"DB: {d.name}"] = ("db", d.dataset_id)
+            
+            for key, dataset in uploaded_datasets.items():
+                # Only show confirmed datasets (not temporary ones)
+                if "ground_truth" in key and not key.startswith("temp_"):
+                    reference_options[f"Uploaded: {dataset.name}"] = ("uploaded", key)
+            
+            if reference_options:
+                selected_ref_label = st.selectbox(
+                    "Select Reference (Ground Truth) Dataset:",
+                    options=list(reference_options.keys()),
+                )
+                ref_source, ref_id = reference_options[selected_ref_label]
+            else:
+                st.error("No reference datasets available")
+                return
 
         with col2:
-            evaluation_name = st.text_input(
-                "Evaluation Name:",
-                value=f"eval_{selected_dataset}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}",
+            # Select benchmark dataset
+            benchmark_options = {}
+            for d in db_datasets:
+                benchmark_options[f"DB: {d.name}"] = ("db", d.dataset_id)
+            for key, dataset in uploaded_datasets.items():
+                # Only show confirmed datasets (not temporary ones)
+                if "benchmark" in key and not key.startswith("temp_"):
+                    benchmark_options[f"Uploaded: {dataset.name}"] = ("uploaded", key)
+            
+            if benchmark_options:
+                selected_bench_label = st.selectbox(
+                    "Select Benchmark (Results) Dataset:",
+                    options=list(benchmark_options.keys()),
+                )
+                bench_source, bench_id = benchmark_options[selected_bench_label]
+            else:
+                st.error("No benchmark datasets available")
+                return
+
+        # Evaluation name
+        evaluation_name = st.text_input(
+            "Evaluation Name:",
+            value=f"eval_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}",
+        )
+
+        # Top K configuration
+        st.subheader("Evaluation Configuration")
+        col1, col2 = st.columns(2)
+        with col1:
+            top_k = st.number_input(
+                "Top K",
+                min_value=1,
+                max_value=50,
+                value=10,
+                help="Number of top results to consider for evaluation",
+            )
+        with col2:
+            k_values_input = st.text_input(
+                "K values for metrics (comma-separated)",
+                value="1,3,5,10",
+                help="K values for Precision@K, Recall@K, etc. (e.g., 1,3,5,10)",
             )
 
-        # Retrieval configuration
-        st.subheader("Retrieval Configuration")
-        config = self._render_config_form()
+        # Parse K values
+        k_values = None
+        if k_values_input:
+            try:
+                k_values = [int(k.strip()) for k in k_values_input.split(",") if k.strip()]
+                if not k_values:
+                    k_values = None
+            except ValueError:
+                st.warning("Invalid K values format. Using default values.")
+                k_values = None
 
         # Run evaluation
         if st.button("Run Evaluation", type="primary"):
-            if selected_dataset and evaluation_name:
-                self._run_evaluation(selected_dataset, evaluation_name, config)
+            if evaluation_name:
+                self._run_csv_evaluation_from_datasets(
+                    ref_source, ref_id, bench_source, bench_id, k_values, evaluation_name
+                )
             else:
-                st.error("Please select a dataset and provide an evaluation name")
+                st.error("Please provide an evaluation name")
 
     def render_results_dashboard(self):
         """Render evaluation results dashboard"""
         st.subheader("Evaluation Results")
 
-        evaluations = self.benchmark_store.list_evaluations()
-        if not evaluations:
+        # Get evaluations from database
+        evaluations = []
+        try:
+            evaluations = self.benchmark_store.list_evaluations()
+        except sqlite3.OperationalError:
+            pass
+
+        # Get evaluations from session state (recent CSV evaluations)
+        session_evals = st.session_state.get("csv_evaluations", [])
+
+        all_evaluations = evaluations + session_evals
+
+        if not all_evaluations:
             st.info(
                 "No evaluations run yet. Run a benchmark evaluation to see results."
             )
@@ -140,35 +319,48 @@ class BenchmarkingUI:
         # Filter controls
         col1, col2 = st.columns(2)
         with col1:
-            datasets = list(set(e.dataset_id for e in evaluations))
-            selected_datasets = st.multiselect(
-                "Filter by Dataset:", datasets, default=datasets
-            )
+            datasets = list(set(e.dataset_id for e in all_evaluations if hasattr(e, 'dataset_id')))
+            if datasets:
+                selected_datasets = st.multiselect(
+                    "Filter by Dataset:", datasets, default=datasets
+                )
+            else:
+                selected_datasets = []
 
         with col2:
-            # Date range filter could be added here
+            # Show all evaluations by default
             pass
 
         # Filter evaluations
-        filtered_evals = [e for e in evaluations if e.dataset_id in selected_datasets]
+        if selected_datasets:
+            filtered_evals = [e for e in all_evaluations if hasattr(e, 'dataset_id') and e.dataset_id in selected_datasets]
+        else:
+            filtered_evals = all_evaluations
 
         if not filtered_evals:
             st.warning("No evaluations match the selected filters.")
             return
 
-        # Results table
+        # Results table - show all results
         self._render_results_table(filtered_evals)
 
         # Metrics visualization
         self._render_metrics_charts(filtered_evals)
 
         # Detailed evaluation view
-        if st.selectbox(
-            "Select evaluation for details:",
-            options=[f"{e.evaluation_name} ({e.dataset_id})" for e in filtered_evals],
-        ):
-            selected_eval = filtered_evals[0]  # Simplified for demo
-            self._render_evaluation_details(selected_eval)
+        if filtered_evals:
+            eval_options = [
+                f"{e.evaluation_name} ({getattr(e, 'dataset_id', 'N/A')})" 
+                for e in filtered_evals
+            ]
+            selected_eval_name = st.selectbox(
+                "Select evaluation for details:",
+                options=eval_options,
+            )
+            if selected_eval_name:
+                selected_idx = eval_options.index(selected_eval_name)
+                selected_eval = filtered_evals[selected_idx]
+                self._render_evaluation_details(selected_eval)
 
     def render_annotation_interface(self):
         """Render human annotation interface"""
@@ -188,49 +380,257 @@ class BenchmarkingUI:
         if selected_eval:
             self._render_annotation_form(selected_eval)
 
-    def _handle_dataset_upload(self, uploaded_file):
-        """Handle dataset file upload"""
+    def _run_csv_evaluation_from_datasets(
+        self, ref_source, ref_id, bench_source, bench_id, k_values, evaluation_name
+    ):
+        """Run evaluation using selected datasets from database or uploaded files"""
         try:
+            with st.spinner("Loading datasets and calculating metrics..."):
+                # Load reference dataset
+                if ref_source == "db":
+                    # Load from database (would need to convert from BenchmarkDatasetContent)
+                    st.error("Database dataset evaluation not yet implemented. Please use uploaded CSV/Excel files.")
+                    return
+                else:
+                    # Load from session state
+                    reference_dataset = st.session_state.uploaded_datasets.get(ref_id)
+                    if not reference_dataset:
+                        st.error(f"Reference dataset {ref_id} not found.")
+                        return
+
+                # Load benchmark dataset
+                if bench_source == "db":
+                    st.error("Database dataset evaluation not yet implemented. Please use uploaded CSV/Excel files.")
+                    return
+                else:
+                    # Load from session state
+                    benchmark_dataset = st.session_state.uploaded_datasets.get(bench_id)
+                    if not benchmark_dataset:
+                        st.error(f"Benchmark dataset {bench_id} not found.")
+                        return
+
+                # Run evaluation
+                metrics = self.evaluation_engine.compare_flexible_datasets(
+                    reference_dataset, benchmark_dataset, k_values=k_values
+                )
+
+            # Display results
+            st.success("Evaluation completed successfully!")
+            st.subheader("Results")
+
+            # Display metrics table
+            self._render_csv_metrics_table(metrics, k_values)
+
+            # Display charts
+            self._render_csv_metrics_charts(metrics, k_values)
+
+            # Store evaluation in session state for results tab
+            if "csv_evaluations" not in st.session_state:
+                st.session_state.csv_evaluations = []
+            
+            from ..models.benchmark import BenchmarkEvaluation, RetrievalConfig
+            eval_obj = type('Evaluation', (), {
+                'evaluation_name': evaluation_name,
+                'dataset_id': f"{ref_id}_{bench_id}",
+                'evaluation_metrics': metrics,
+                'retrieval_config': RetrievalConfig(top_k=k_values[0] if k_values else 10),
+                'created_at': pd.Timestamp.now(),
+            })()
+            st.session_state.csv_evaluations.append(eval_obj)
+
+        except ValueError as e:
+            st.error(f"Error loading datasets: {str(e)}")
+            logger.exception("Dataset loading error")
+        except Exception as e:
+            st.error(f"Error during evaluation: {str(e)}")
+            logger.exception("Evaluation error")
+
+    def _render_confirmation_ui(self, dataset, temp_key: str, dataset_type: str, file_name: str):
+        """Render confirmation UI for an unconfirmed dataset"""
+        st.info(f"📋 **{dataset.name}** ({len(dataset.results)} rows) - Pending confirmation")
+        
+        # Show basic info
+        st.write(f"**Dataset Name:** {dataset.name}")
+        st.write(f"**Number of rows:** {len(dataset.results)}")
+        
+        # Confirm save - this will replace any existing dataset of the same type
+        col1, col2 = st.columns(2)
+        with col1:
+            button_key = f"confirm_{dataset_type}_{file_name}"
+            if st.button("Confirm and Use This Dataset", key=button_key, type="primary"):
+                dataset_key = f"{dataset_type}_current"
+                
+                # Remove old dataset of the same type if it exists
+                if dataset_key in st.session_state.uploaded_datasets:
+                    old_dataset = st.session_state.uploaded_datasets[dataset_key]
+                    st.info(f"Replacing previous {dataset_type} dataset: {old_dataset.name}")
+                
+                # Save the new dataset
+                st.session_state.uploaded_datasets[dataset_key] = dataset
+                
+                # Remove temporary key
+                if temp_key in st.session_state.uploaded_datasets:
+                    del st.session_state.uploaded_datasets[temp_key]
+                
+                st.success(f"Dataset '{dataset.name}' confirmed and ready for evaluation!")
+                st.rerun()
+        
+        with col2:
+            if st.button("Cancel", key=f"cancel_{dataset_type}_{file_name}"):
+                # Remove temporary dataset
+                if temp_key in st.session_state.uploaded_datasets:
+                    del st.session_state.uploaded_datasets[temp_key]
+                st.info("Upload cancelled. Dataset not saved.")
+                st.rerun()
+        
+        # Show detailed preview
+        st.divider()
+        st.write("**Dataset Details:**")
+        st.write(f"**Dataset ID:** {dataset.dataset_id}")
+        st.write(f"**Dataset Type:** {dataset.dataset_type.value}")
+        
+        # Show sample data
+        if dataset.results:
+            st.write("**Sample data (first 5 rows):**")
+            sample_data = []
+            for i, result in enumerate(dataset.results[:5]):
+                row_data = result.data.copy()
+                sample_data.append(row_data)
+            if sample_data:
+                st.dataframe(pd.DataFrame(sample_data), use_container_width=True)
+
+    def _handle_dataset_upload(self, uploaded_file, dataset_type: str = "ground_truth"):
+        """Handle dataset file upload - supports YAML, JSON, CSV, and Excel files"""
+        tmp_path = None
+        try:
+            # Determine file extension
+            file_ext = uploaded_file.name.split('.')[-1].lower()
+            
             # Save uploaded file temporarily
             with tempfile.NamedTemporaryFile(
-                delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}"
+                delete=False, suffix=f".{file_ext}"
             ) as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
                 tmp_path = tmp_file.name
 
-            # Load and validate dataset
+            # Load dataset based on file type
             with st.spinner("Loading and validating dataset..."):
-                dataset = self.dataset_loader.load_dataset(tmp_path)
-                warnings = self.dataset_loader.validate_dataset_consistency(dataset)
+                if file_ext in ["csv", "xlsx", "xls"]:
+                    # For Excel files, convert to CSV-like format first
+                    if file_ext in ["xlsx", "xls"]:
+                        # Read Excel file and convert to CSV string
+                        df = pd.read_excel(tmp_path)
+                        csv_string = df.to_csv(index=False)
+                        dataset = load_flexible_dataset_from_csv(
+                            csv_content=csv_string,
+                            dataset_name=f"{dataset_type}_{uploaded_file.name}",
+                        )
+                    else:
+                        # Use flexible CSV loader
+                        dataset = load_flexible_dataset_from_csv(
+                            csv_path=tmp_path,
+                            dataset_name=f"{dataset_type}_{uploaded_file.name}",
+                        )
+                    st.success(f"Dataset loaded successfully from {file_ext.upper()} file!")
+                    
+                    # Store dataset temporarily in session state for preview
+                    # Use a temporary key that will be replaced on confirmation
+                    temp_key = f"temp_{dataset_type}_{uploaded_file.name}"
+                    if "uploaded_datasets" not in st.session_state:
+                        st.session_state.uploaded_datasets = {}
+                    
+                    st.session_state.uploaded_datasets[temp_key] = dataset
+                    
+                    # Show basic info and confirmation buttons immediately after upload
+                    st.write(f"**Dataset Name:** {dataset.name}")
+                    st.write(f"**Number of rows:** {len(dataset.results)}")
+                    
+                    # Confirm save - this will replace any existing dataset of the same type
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        button_key = f"confirm_{dataset_type}_{uploaded_file.name}"
+                        if st.button("Confirm and Use This Dataset", key=button_key, type="primary"):
+                            # Use a consistent key based on dataset_type (not dataset_id which changes)
+                            # This ensures new uploads replace old ones of the same type
+                            dataset_key = f"{dataset_type}_current"
+                            
+                            # Remove old dataset of the same type if it exists
+                            if dataset_key in st.session_state.uploaded_datasets:
+                                old_dataset = st.session_state.uploaded_datasets[dataset_key]
+                                st.info(f"Replacing previous {dataset_type} dataset: {old_dataset.name}")
+                            
+                            # Save the new dataset
+                            st.session_state.uploaded_datasets[dataset_key] = dataset
+                            
+                            # Remove temporary key
+                            if temp_key in st.session_state.uploaded_datasets:
+                                del st.session_state.uploaded_datasets[temp_key]
+                            
+                            st.success(f"Dataset '{dataset.name}' confirmed and ready for evaluation!")
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("Cancel", key=f"cancel_{dataset_type}_{uploaded_file.name}"):
+                            # Remove temporary dataset
+                            if temp_key in st.session_state.uploaded_datasets:
+                                del st.session_state.uploaded_datasets[temp_key]
+                            st.info("Upload cancelled. Dataset not saved.")
+                            st.rerun()
+                    
+                    # Show detailed preview below the buttons
+                    st.divider()
+                    st.write("**Dataset Details:**")
+                    st.write(f"**Dataset ID:** {dataset.dataset_id}")
+                    st.write(f"**Dataset Type:** {dataset.dataset_type.value}")
+                    
+                    # Show sample data
+                    if dataset.results:
+                        st.write("**Sample data (first 5 rows):**")
+                        sample_data = []
+                        for i, result in enumerate(dataset.results[:5]):
+                            row_data = result.data.copy()
+                            sample_data.append(row_data)
+                        if sample_data:
+                            st.dataframe(pd.DataFrame(sample_data), use_container_width=True)
+                    
+                else:
+                    # Use traditional YAML/JSON loader
+                    dataset = self.dataset_loader.load_dataset(tmp_path)
+                    warnings = self.dataset_loader.validate_dataset_consistency(dataset)
 
-            # Show validation results
-            if warnings:
-                st.warning(f"Dataset loaded with {len(warnings)} warnings:")
-                for warning in warnings:
-                    st.write(f"Warning: {warning}")
-            else:
-                st.success("Dataset validation passed!")
+                    # Show validation results
+                    if warnings:
+                        st.warning(f"Dataset loaded with {len(warnings)} warnings:")
+                        for warning in warnings:
+                            st.write(f"Warning: {warning}")
+                    else:
+                        st.success("Dataset validation passed!")
 
-            # Show dataset preview
-            st.write(f"**Dataset:** {dataset.name}")
-            st.write(f"**Description:** {dataset.description}")
-            st.write(f"**Questions:** {len(dataset.questions)}")
+                    # Show dataset preview
+                    st.write(f"**Dataset:** {dataset.name}")
+                    st.write(f"**Description:** {dataset.description}")
+                    st.write(f"**Questions:** {len(dataset.questions)}")
 
-            # Confirm save
-            if st.button("Save Dataset"):
-                self.benchmark_store.save_dataset(dataset, uploaded_file.name)
-                st.success(f"Dataset '{dataset.name}' saved successfully!")
-                st.rerun()
+                    # Confirm save
+                    if st.button("Save Dataset", key=f"save_{dataset_type}"):
+                        self.benchmark_store.save_dataset(dataset, uploaded_file.name)
+                        st.success(f"Dataset '{dataset.name}' saved successfully!")
+                        st.rerun()
 
-        except (DatasetValidationError, Exception) as e:
+        except (DatasetValidationError, ValueError) as e:
             st.error(f"Failed to load dataset: {str(e)}")
+            logger.exception("Dataset loading error")
+        except Exception as e:
+            st.error(f"Unexpected error: {str(e)}")
+            logger.exception("Unexpected error during dataset upload")
 
         finally:
             # Clean up temp file
-            try:
-                Path(tmp_path).unlink()
-            except:
-                pass
+            if tmp_path:
+                try:
+                    Path(tmp_path).unlink()
+                except:
+                    pass
 
     def _render_config_form(self) -> RetrievalConfig:
         """Render retrieval configuration form"""
@@ -305,15 +705,22 @@ class BenchmarkingUI:
             f"Evaluation '{evaluation_name}' completed and saved with ID {eval_id}"
         )
 
-    def _render_results_table(self, evaluations: List[BenchmarkEvaluation]):
+    def _render_results_table(self, evaluations):
         """Render evaluation results table"""
         results_data = []
         for eval in evaluations:
-            metrics = eval.evaluation_metrics
+            metrics = getattr(eval, 'evaluation_metrics', None)
+            if not metrics:
+                continue
+                
+            eval_name = getattr(eval, 'evaluation_name', 'Unknown')
+            dataset_id = getattr(eval, 'dataset_id', 'N/A')
+            created_at = getattr(eval, 'created_at', None)
+            
             results_data.append(
                 {
-                    "Evaluation": eval.evaluation_name,
-                    "Dataset": eval.dataset_id,
+                    "Evaluation": eval_name,
+                    "Dataset": dataset_id,
                     "MAP": f"{metrics.mean_average_precision:.3f}",
                     "MRR": f"{metrics.mean_reciprocal_rank:.3f}",
                     "P@5": f"{metrics.precision_at_k.get(5, 0):.3f}",
@@ -321,37 +728,46 @@ class BenchmarkingUI:
                     "F1@5": f"{metrics.f1_at_k.get(5, 0):.3f}",
                     "NDCG@5": f"{metrics.ndcg_at_k.get(5, 0):.3f}",
                     "Date": (
-                        eval.created_at.strftime("%Y-%m-%d")
-                        if eval.created_at
-                        else "Unknown"
+                        created_at.strftime("%Y-%m-%d")
+                        if created_at and hasattr(created_at, 'strftime')
+                        else (str(created_at) if created_at else "Unknown")
                     ),
                 }
             )
 
-        df = pd.DataFrame(results_data)
-        st.dataframe(df, use_container_width=True)
+        if results_data:
+            df = pd.DataFrame(results_data)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("No evaluation results to display.")
 
-    def _render_metrics_charts(self, evaluations: List[BenchmarkEvaluation]):
+    def _render_metrics_charts(self, evaluations):
         """Render metrics visualization charts"""
-        if len(evaluations) < 2:
+        if len(evaluations) < 1:
             return
 
         # Prepare data for plotting
         chart_data = []
         for eval in evaluations:
-            metrics = eval.evaluation_metrics
-            for k in [1, 3, 5]:
-                if k in metrics.precision_at_k:
-                    chart_data.append(
-                        {
-                            "Evaluation": eval.evaluation_name,
-                            "K": k,
-                            "Precision": metrics.precision_at_k[k],
-                            "Recall": metrics.recall_at_k[k],
-                            "F1": metrics.f1_at_k[k],
-                            "NDCG": metrics.ndcg_at_k[k],
-                        }
-                    )
+            metrics = getattr(eval, 'evaluation_metrics', None)
+            if not metrics:
+                continue
+                
+            eval_name = getattr(eval, 'evaluation_name', 'Unknown')
+            
+            # Get all available K values
+            k_values = sorted(metrics.precision_at_k.keys())
+            for k in k_values:
+                chart_data.append(
+                    {
+                        "Evaluation": eval_name,
+                        "K": k,
+                        "Precision": metrics.precision_at_k.get(k, 0.0),
+                        "Recall": metrics.recall_at_k.get(k, 0.0),
+                        "F1": metrics.f1_at_k.get(k, 0.0),
+                        "NDCG": metrics.ndcg_at_k.get(k, 0.0),
+                    }
+                )
 
         if not chart_data:
             return
@@ -368,14 +784,16 @@ class BenchmarkingUI:
                 y="Precision",
                 color="Evaluation",
                 title="Precision@K Comparison",
+                markers=True,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="results_precision_chart")
 
         with col2:
             fig = px.line(
-                df, x="K", y="Recall", color="Evaluation", title="Recall@K Comparison"
+                df, x="K", y="Recall", color="Evaluation", title="Recall@K Comparison",
+                markers=True,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="results_recall_chart")
 
     def _show_dataset_details(self, dataset_id: str):
         """Show detailed dataset information"""
@@ -402,20 +820,30 @@ class BenchmarkingUI:
             else:
                 st.error("Failed to delete dataset")
 
-    def _render_evaluation_details(self, evaluation: BenchmarkEvaluation):
+    def _render_evaluation_details(self, evaluation):
         """Render detailed evaluation information"""
-        st.subheader(f"Evaluation: {evaluation.evaluation_name}")
+        eval_name = getattr(evaluation, 'evaluation_name', 'Unknown')
+        st.subheader(f"Evaluation: {eval_name}")
 
-        # Configuration
-        config = evaluation.retrieval_config
-        st.write("**Configuration:**")
-        config_dict = config.model_dump()
-        st.json(config_dict)
+        # Configuration (if available)
+        if hasattr(evaluation, 'retrieval_config') and evaluation.retrieval_config:
+            config = evaluation.retrieval_config
+            st.write("**Configuration:**")
+            if hasattr(config, 'model_dump'):
+                config_dict = config.model_dump()
+            else:
+                config_dict = dict(config) if isinstance(config, dict) else {}
+            st.json(config_dict)
 
-        # Metrics
-        st.write("**Metrics:**")
-        metrics_dict = evaluation.evaluation_metrics.model_dump()
-        st.json(metrics_dict)
+        # Metrics - show only JSON format in details, tables and charts are already shown above
+        if hasattr(evaluation, 'evaluation_metrics') and evaluation.evaluation_metrics:
+            metrics = evaluation.evaluation_metrics
+            st.write("**Metrics (JSON):**")
+            if hasattr(metrics, 'model_dump'):
+                metrics_dict = metrics.model_dump()
+            else:
+                metrics_dict = dict(metrics) if isinstance(metrics, dict) else {}
+            st.json(metrics_dict)
 
     def _render_annotation_form(self, evaluation: BenchmarkEvaluation):
         """Render annotation form for an evaluation"""
@@ -431,3 +859,110 @@ class BenchmarkingUI:
 
         if st.button("Save Annotations"):
             st.success("Annotations saved! (This is a placeholder)")
+
+
+    def _render_csv_metrics_table(self, metrics, k_values: Optional[List[int]]):
+        """Render metrics table for CSV evaluation results"""
+        st.subheader("Metrics Summary")
+
+        if k_values is None or not k_values:
+            k_values = sorted(metrics.precision_at_k.keys())
+
+        # Prepare table data
+        table_data = {
+            "Metric": ["MAP", "MRR"],
+            "Value": [
+                f"{metrics.mean_average_precision:.4f}",
+                f"{metrics.mean_reciprocal_rank:.4f}",
+            ],
+        }
+
+        # Add metrics at K
+        for k in sorted(k_values):
+            table_data[f"K={k}"] = [
+                f"{metrics.precision_at_k.get(k, 0.0):.4f}",
+                f"{metrics.recall_at_k.get(k, 0.0):.4f}",
+            ]
+
+        df_summary = pd.DataFrame(table_data)
+
+        # Create detailed metrics table
+        detailed_data = []
+        for k in sorted(k_values):
+            detailed_data.append(
+                {
+                    "K": k,
+                    "Precision@K": f"{metrics.precision_at_k.get(k, 0.0):.4f}",
+                    "Recall@K": f"{metrics.recall_at_k.get(k, 0.0):.4f}",
+                    "F1@K": f"{metrics.f1_at_k.get(k, 0.0):.4f}",
+                    "NDCG@K": f"{metrics.ndcg_at_k.get(k, 0.0):.4f}",
+                }
+            )
+
+        df_detailed = pd.DataFrame(detailed_data)
+
+        # Display tables
+        st.write("**Overall Metrics:**")
+        st.dataframe(df_summary, use_container_width=True, hide_index=True)
+
+        st.write("**Metrics at K:**")
+        st.dataframe(df_detailed, use_container_width=True, hide_index=True)
+
+    def _render_csv_metrics_charts(self, metrics, k_values: Optional[List[int]], chart_key_prefix: str = "csv"):
+        """Render Plotly charts for CSV evaluation results"""
+        st.subheader("Visualization")
+
+        if k_values is None or not k_values:
+            k_values = sorted(metrics.precision_at_k.keys())
+
+        if not k_values:
+            st.warning("No K values available for plotting.")
+            return
+
+        # Prepare data for plotting
+        chart_data = []
+        for k in sorted(k_values):
+            chart_data.append(
+                {
+                    "K": k,
+                    "Precision": metrics.precision_at_k.get(k, 0.0),
+                    "Recall": metrics.recall_at_k.get(k, 0.0),
+                    "F1": metrics.f1_at_k.get(k, 0.0),
+                    "NDCG": metrics.ndcg_at_k.get(k, 0.0),
+                }
+            )
+
+        df_chart = pd.DataFrame(chart_data)
+
+        # Create charts side by side
+        col1, col2 = st.columns(2)
+
+        with col1:
+            fig_precision = px.line(
+                df_chart,
+                x="K",
+                y="Precision",
+                title="Precision@K",
+                markers=True,
+            )
+            fig_precision.update_layout(
+                xaxis_title="K",
+                yaxis_title="Precision",
+                yaxis_range=[0, 1.1],
+            )
+            st.plotly_chart(fig_precision, use_container_width=True, key=f"{chart_key_prefix}_precision_{id(metrics)}")
+
+        with col2:
+            fig_recall = px.line(
+                df_chart,
+                x="K",
+                y="Recall",
+                title="Recall@K",
+                markers=True,
+            )
+            fig_recall.update_layout(
+                xaxis_title="K",
+                yaxis_title="Recall",
+                yaxis_range=[0, 1.1],
+            )
+            st.plotly_chart(fig_recall, use_container_width=True, key=f"{chart_key_prefix}_recall_{id(metrics)}")
