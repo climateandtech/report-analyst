@@ -489,6 +489,7 @@ class CacheManager:
                     "tcfd": "tcfd",
                     "s4m": "s4m",
                     "lucia": "lucia",
+                    "climretrieve": "climretr",  # Map climretrieve to climretr shortcut
                 }
                 db_question_set = question_set_mapping.get(
                     config["question_set"], config["question_set"]

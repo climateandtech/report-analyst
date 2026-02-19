@@ -58,12 +58,6 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 
-def log_analysis_step(message: str, level: str = "info"):
-    """Helper function to log analysis steps with consistent formatting"""
-    log_func = getattr(logger, level)
-    log_func(f"[ANALYSIS] {message}")
-
-
 # Add the report-analyst directory to the Python path
 current_dir = Path(__file__).parent.parent
 if str(current_dir) not in sys.path:
@@ -198,17 +192,50 @@ class ReportAnalyzer:
             pre_retrieved_chunks: Optional pre-retrieved chunks (e.g., from backend)
         """
         try:
-            log_analysis_step(f"Starting analysis of document: {file_path}")
-            log_analysis_step(f"Selected questions: {selected_questions}")
-            log_analysis_step(f"LLM scoring enabled: {use_llm_scoring}")
+            logger.info(f"[ANALYSIS] Starting analysis of document: {file_path}")
+            logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
+            logger.info(f"[ANALYSIS] LLM scoring enabled: {use_llm_scoring}")
 
             # Update analyzer with the current questions
             self.analyzer.questions = questions
 
             # Convert selected question IDs to numbers for the analyzer
-            selected_numbers = [
-                questions[q_id]["number"] for q_id in selected_questions
-            ]
+            selected_numbers = []
+            for q_id in selected_questions:
+                try:
+                    # Try to get number from question data
+                    if "number" in questions[q_id]:
+                        selected_numbers.append(questions[q_id]["number"])
+                    else:
+                        # Extract number from question ID (e.g., "climretr_4" -> 4, "climretr_17_ir" -> 17)
+                        parts = q_id.split("_")
+                        if len(parts) > 1:
+                            try:
+                                num = int(parts[1])
+                                selected_numbers.append(num)
+                                # #region agent log
+                                with open('/home/yauheni/Documents/my_main/.cursor/debug.log', 'a') as f:
+                                    f.write(json.dumps({"id":"log_extracted_num","timestamp":int(__import__('time').time()*1000),"location":"streamlit_app.py:227","message":"Extracted number from ID","data":{"q_id":q_id,"extracted_num":num},"runId":"run1","hypothesisId":"A"}) + "\n")
+                                # #endregion
+                            except ValueError:
+                                # #region agent log
+                                with open('/home/yauheni/Documents/my_main/.cursor/debug.log', 'a') as f:
+                                    f.write(json.dumps({"id":"log_extract_failed","timestamp":int(__import__('time').time()*1000),"location":"streamlit_app.py:232","message":"Failed to extract number","data":{"q_id":q_id,"parts":parts},"runId":"run1","hypothesisId":"C"}) + "\n")
+                                # #endregion
+                                pass
+                except KeyError as e:
+                    # #region agent log
+                    with open('/home/yauheni/Documents/my_main/.cursor/debug.log', 'a') as f:
+                        f.write(json.dumps({"id":"log_keyerror","timestamp":int(__import__('time').time()*1000),"location":"streamlit_app.py:237","message":"KeyError accessing question","data":{"q_id":q_id,"error":str(e)},"runId":"run1","hypothesisId":"A"}) + "\n")
+                    # #endregion
+                    # Extract number from question ID as fallback
+                    parts = q_id.split("_")
+                    if len(parts) > 1:
+                        try:
+                            num = int(parts[1])
+                            selected_numbers.append(num)
+                        except ValueError:
+                            pass
 
             # Get the question set prefix from the first selected question
             question_set = (
@@ -257,7 +284,7 @@ class ReportAnalyzer:
                     yield result
 
         except Exception as e:
-            log_analysis_step(f"Critical error during analysis: {str(e)}", "error")
+            logger.error(f"[ANALYSIS] Critical error during analysis: {str(e)}")
             yield {"error": f"Error analyzing document: {str(e)}"}
 
     def process_document(
@@ -428,7 +455,7 @@ async def analyze_document_and_display(
         # Create status placeholder
         status_placeholder = st.empty()
 
-        log_analysis_step(f"Starting analysis with question set: {question_set}")
+        logger.info(f"[ANALYSIS] Starting analysis with question set: {question_set}")
 
         # Get current configuration
         config = {
@@ -449,8 +476,8 @@ async def analyze_document_and_display(
         )
 
         if cached_answers:
-            log_analysis_step(
-                f"Found {len(cached_answers)} cached answers for {file_key}"
+            logger.info(
+                f"[ANALYSIS] Found {len(cached_answers)} cached answers for {file_key}"
             )
             # Show cache info
             st.info(f"📁 Loading results from stored: {file_key}")
@@ -480,8 +507,8 @@ async def analyze_document_and_display(
         ]
 
         if questions_to_process:
-            log_analysis_step(
-                f"Processing {len(questions_to_process)} uncached questions..."
+            logger.info(
+                f"[ANALYSIS] Processing {len(questions_to_process)} uncached questions..."
             )
 
             # Update analyzer with question set
@@ -501,11 +528,11 @@ async def analyze_document_and_display(
                 pre_retrieved_chunks=pre_retrieved_chunks,
             ):
                 # Add debug logging to see what results we're getting
-                log_analysis_step(f"Received result: {str(result)[:200]}...")
+                logger.info(f"[ANALYSIS] Received result: {str(result)[:200]}...")
 
                 if "error" in result:
-                    log_analysis_step(
-                        f"Error received from analyzer: {result['error']}", "error"
+                    logger.error(
+                        f"[ANALYSIS] Error received from analyzer: {result['error']}"
                     )
                     st.error(f"Analysis error: {result['error']}")
                     continue
@@ -516,8 +543,8 @@ async def analyze_document_and_display(
 
                 question_id = result.get("question_id")
                 if question_id is None:
-                    log_analysis_step(
-                        f"No question_id in result: {str(result)[:200]}...", "warning"
+                    logger.warning(
+                        f"[ANALYSIS] No question_id in result: {str(result)[:200]}..."
                     )
                     continue
 
@@ -541,7 +568,7 @@ async def analyze_document_and_display(
                 # Add a success message for each processed question
                 st.success(f"✓ Processed question {question_id}")
         else:
-            log_analysis_step("All selected questions have cached answers")
+            logger.info("[ANALYSIS] All selected questions have cached answers")
             # Show success message for cached results
             st.success(
                 f"✓ All {len(selected_questions_list)} selected questions loaded from stored"
@@ -557,8 +584,8 @@ async def analyze_document_and_display(
         st.session_state.analysis_complete = True
 
     except Exception as e:
-        log_analysis_step(f"Critical error during analysis: {str(e)}", "error")
-        log_analysis_step(traceback.format_exc(), "error")
+        logger.error(f"[ANALYSIS] Critical error during analysis: {str(e)}")
+        logger.error(traceback.format_exc())
         st.error(f"Error during analysis: {str(e)}")
 
 

@@ -103,12 +103,6 @@ if not os.getenv("OPENAI_ORGANIZATION"):
     logger.warning("OPENAI_ORGANIZATION environment variable is not set")
 
 
-def log_analysis_step(message: str, level: str = "info"):
-    """Helper function to log analysis steps with consistent formatting"""
-    log_func = getattr(logger, level)
-    log_func(f"[ANALYSIS] {message}")
-
-
 def compute_file_hash(file_path: str) -> str:
     """Compute SHA-256 hash of a file"""
     sha256_hash = hashlib.sha256()
@@ -147,17 +141,12 @@ class DocumentAnalyzer:
         self.cache_path.mkdir(parents=True, exist_ok=True)
         self.llm_cache_path.mkdir(parents=True, exist_ok=True)
 
-        log_analysis_step(f"Storage path: {self.storage_path.resolve()}", "debug")
-        log_analysis_step(f"Cache path: {self.cache_path.resolve()}", "debug")
-        log_analysis_step(f"LLM cache path: {self.llm_cache_path.resolve()}", "debug")
-
         # Set default question set
         self.question_set = "tcfd"
         self.questions = self._load_questions()
 
         # Use model from environment variables as default
         self.default_model = default_model
-        log_analysis_step(f"Using default model from env: {self.default_model}")
 
         # Check if we should use backend for all LLM functionality
         self.use_backend_llm = use_backend and (
@@ -165,10 +154,6 @@ class DocumentAnalyzer:
         )
 
         if self.use_backend_llm:
-            log_analysis_step(
-                "Skipping local LLM initialization - using backend for all LLM functionality",
-                "info",
-            )
             # Set minimal placeholders for compatibility
             self.llm = None
             self.embeddings = None
@@ -200,9 +185,7 @@ class DocumentAnalyzer:
                     self.embeddings = None
 
             except Exception as e:
-                log_analysis_step(
-                    f"Error initializing local LLM clients: {str(e)}", "error"
-                )
+                logger.error(f"Error initializing local LLM clients: {str(e)}")
                 if not self.use_backend_llm:
                     raise
                 else:
@@ -386,8 +369,6 @@ class DocumentAnalyzer:
         if not self.use_cache:
             Settings.ingestion_cache = None
 
-        log_analysis_step(f"Computing relevance score for chunk: {chunk_text[:100]}...")
-
         try:
             response = await self.llm.achat(
                 prompt=f"""As a senior equity analyst with expertise in climate science evaluating a company's sustainability report, you are tasked with evaluating text fragments for their usefulness in answering specific TCFD questions.
@@ -434,11 +415,11 @@ Output only the numeric score (0.0-1.0):"""
 
             score = float(response.message.content.strip())
             score = max(0.0, min(1.0, score))
-            log_analysis_step(f"Computed relevance score: {score:.4f}")
+            logger.debug(f"[ANALYSIS] Computed relevance score: {score:.4f}")
             return score
 
         except Exception as e:
-            log_analysis_step(f"Error scoring chunk relevance: {str(e)}", "error")
+            logger.error(f"[ANALYSIS] Error scoring chunk relevance: {str(e)}")
             return 0.0
 
     async def score_chunk_relevance_batch(
@@ -516,7 +497,7 @@ Output only the scores, one per line, in order:"""
                         )
                     return scores
                 except Exception as e:
-                    log_analysis_step(f"Error parsing batch scores: {str(e)}", "error")
+                    logger.error(f"[ANALYSIS] Error parsing batch scores: {str(e)}")
                     return [0.0] * len(chunks)
 
             else:
@@ -525,11 +506,13 @@ Output only the scores, one per line, in order:"""
                 for i, chunk in enumerate(chunks):
                     score = await self.score_chunk_relevance(question, chunk["text"])
                     scores.append(score)
-                    log_analysis_step(f"Scored chunk {i+1}/{len(chunks)}: {score:.2f}")
+                    logger.debug(
+                        f"[ANALYSIS] Scored chunk {i+1}/{len(chunks)}: {score:.2f}"
+                    )
                 return scores
 
         except Exception as e:
-            log_analysis_step(f"Error in batch scoring: {str(e)}", "error")
+            logger.error(f"[ANALYSIS] Error in batch scoring: {str(e)}")
             return [0.0] * len(chunks)
 
     def _load_cached_answers(self, file_path: str) -> Dict:
@@ -714,7 +697,24 @@ Output only the scores, one per line, in order:"""
                         yield {"error": f"Question {question_number} not found"}
                         continue
 
-                    question_id = f"{self.question_set}_{question_number}"
+                    # Use the same prefix extraction logic as get_question_by_number
+                    question_set_mapping = {
+                        "everest": "ev",
+                        "tcfd": "tcfd",
+                        "s4m": "s4m",
+                        "lucia": "lucia",
+                        "climretrieve": "climretr",
+                    }
+                    question_prefix = question_set_mapping.get(
+                        self.question_set, self.question_set
+                    )
+                    # If still not found in mapping, try to extract prefix from actual question IDs
+                    if question_prefix == self.question_set and self.questions:
+                        first_qid = next(iter(self.questions.keys()), "")
+                        if first_qid and "_" in first_qid:
+                            question_prefix = first_qid.split("_")[0]
+                    
+                    question_id = f"{question_prefix}_{question_number}"
                     logger.info(f"[ANALYSIS] Question ID: {question_id}")
 
                     yield {
@@ -1219,30 +1219,21 @@ Output only the scores, one per line, in order:"""
             / f"{self.question_set}_questions.yaml",  # current working directory
         ]
 
-        log_analysis_step(f"Looking for {self.question_set}_questions.yaml in:")
-        for path in possible_paths:
-            log_analysis_step(f"- {path.resolve()}")
-
         yaml_file = None
         for path in possible_paths:
             if path.exists():
                 yaml_file = path
-                log_analysis_step(f"✓ Found questions file at: {path.resolve()}")
                 break
 
         if not yaml_file:
-            log_analysis_step(
-                f"Could not find questions file for {self.question_set} in any of: {[str(p) for p in possible_paths]}",
-                "error",
+            logger.error(
+                f"Could not find questions file for {self.question_set} in any of: {[str(p) for p in possible_paths]}"
             )
             return {}
 
         try:
             with open(yaml_file, "r") as f:
                 config = yaml.safe_load(f)
-                log_analysis_step(
-                    f"Loaded YAML content: {str(config)[:200]}..."
-                )  # Show first 200 chars
 
                 questions = {}
                 # Convert the questions list into a structured format
@@ -1253,17 +1244,13 @@ Output only the scores, one per line, in order:"""
                             "text": q.get("text", ""),
                             "guidelines": q.get("guidelines", ""),
                         }
-                        log_analysis_step(
-                            f"Added question {q_id}: {questions[q_id]['text'][:50]}..."
-                        )
 
-                log_analysis_step(
-                    f"✓ Loaded {len(questions)} questions for {self.question_set}"
+                logger.info(
+                    f"Loaded {len(questions)} questions for {self.question_set}: {list(questions.keys())}"
                 )
-                log_analysis_step(f"Available question IDs: {list(questions.keys())}")
                 return questions
         except Exception as e:
-            log_analysis_step(f"Error loading questions: {str(e)}", "error")
+            logger.error(f"Error loading questions: {str(e)}")
             logger.exception("Full error:")  # This will log the full traceback
             return {}
 
@@ -1276,20 +1263,34 @@ Output only the scores, one per line, in order:"""
                 "tcfd": "tcfd",
                 "s4m": "s4m",
                 "lucia": "lucia",
+                "climretrieve": "climretr",  # Map climretrieve to climretr shortcut
             }
 
             # Get the correct prefix for the question set
             question_prefix = question_set_mapping.get(
                 self.question_set, self.question_set
             )
+            
+            # If still not found in mapping, try to extract prefix from actual question IDs
+            if question_prefix == self.question_set and self.questions:
+                # Extract prefix from first question ID (e.g., "climretr_1" -> "climretr")
+                first_qid = next(iter(self.questions.keys()), "")
+                if first_qid and "_" in first_qid:
+                    extracted_prefix = first_qid.split("_")[0]
+                    logger.info(
+                        f"[ANALYSIS] Extracted prefix '{extracted_prefix}' from question IDs "
+                        f"(question_set='{self.question_set}')"
+                    )
+                    question_prefix = extracted_prefix
+            
             question_key = f"{question_prefix}_{number}"
-
             logger.debug(f"Looking for question {number} with key: {question_key}")
             logger.debug(f"Available question keys: {list(self.questions.keys())}")
 
-            return self.questions.get(question_key)
+            result = self.questions.get(question_key)
+            return result
         except Exception as e:
-            log_analysis_step(f"Error getting question {number}: {str(e)}", "error")
+            logger.error(f"Error getting question {number}: {str(e)}")
             logger.exception("Full error:")
             return None
 
@@ -1314,7 +1315,7 @@ Output only the scores, one per line, in order:"""
 
     def update_llm_model(self, model_name: str):
         """Update the LLM model."""
-        log_analysis_step(f"Updating LLM model to: {model_name}")
+        logger.info(f"Updating LLM model to: {model_name}")
 
         # Initialize LLM with caching using the provider factory
         self.llm = get_llm(
