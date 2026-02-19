@@ -2,6 +2,8 @@
 
 **Version 0.8.0-rc (Release Candidate)**
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/climateandtech/report-analyst) [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io)
+
 Open Sustainability Analyst is the analyst-facing application of the **Open Sustainability Analysis** project by **Climate+Tech**.  
 It helps sustainability and ESG professionals analyze complex sustainability reports with modern AI, while keeping methods transparent and research-based.
 

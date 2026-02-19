@@ -1,0 +1,8 @@
+#!/bin/sh
+# Strip Co-authored-by trailers - we don't want them in our commits.
+COMMIT_MSG_FILE=$1
+if [ -f "$COMMIT_MSG_FILE" ]; then
+  grep -v '^Co-authored-by:' "$COMMIT_MSG_FILE" > "${COMMIT_MSG_FILE}.tmp"
+  mv "${COMMIT_MSG_FILE}.tmp" "$COMMIT_MSG_FILE"
+fi
+exit 0

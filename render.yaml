@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: report-analyst
+    runtime: python
+    plan: free
+
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run report_analyst/streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
+
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_API_MODEL
+        value: gpt-4o-mini
+      - key: GOOGLE_API_KEY
+        sync: false
