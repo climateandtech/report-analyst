@@ -2,7 +2,9 @@
 
 **Version 0.8.0-rc (Release Candidate)**
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/climateandtech/report-analyst) [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/climateandtech/report-analyst) [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://www.heroku.com/deploy?template=https://github.com/climateandtech/report-analyst) [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/climateandtech/report-analyst) [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io)
+
+Vercel: FastAPI may be deployable; Streamlit is not (see [VERCEL_DEPLOYMENT_ASSESSMENT.md](VERCEL_DEPLOYMENT_ASSESSMENT.md)).
 
 Open Sustainability Analyst is the analyst-facing application of the **Open Sustainability Analysis** project by **Climate+Tech**.  
 It helps sustainability and ESG professionals analyze complex sustainability reports with modern AI, while keeping methods transparent and research-based.
