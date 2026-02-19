@@ -1,7 +1,12 @@
 {
   "name": "Open Sustainability Analyst",
-  "description": "Analyze sustainability reports with AI. Streamlit app for ESG/TCFD analysis.",
+  "description": "Analyze sustainability reports with AI. Core report_analyst app for ESG/TCFD analysis.",
   "repository": "https://github.com/climateandtech/report-analyst",
+  "stack": "heroku-24",
+  "buildpacks": [
+    { "url": "heroku-community/apt" },
+    { "url": "heroku/python" }
+  ],
   "success_url": "/",
   "env": {
     "OPENAI_API_KEY": {
