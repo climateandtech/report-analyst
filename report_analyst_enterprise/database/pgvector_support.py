@@ -29,7 +29,7 @@ def check_pgvector_available(connection) -> bool:
                 SELECT EXISTS(
                     SELECT 1 FROM pg_extension WHERE extname = 'vector'
                 )
-            """
+                """
             )
         )
         available = result.fetchone()[0]
