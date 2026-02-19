@@ -130,6 +130,18 @@ For more advanced deployment patterns (NATS workers, search backend, etc.), see:
 
 ---
 
+## For Contributors
+
+After cloning, enable the project's git hooks (strips Co-authored-by from commits):
+
+```bash
+git config core.hooksPath .githooks
+```
+
+See `.githooks/README.md` for details.
+
+---
+
 ## Licensing Notes
 
 - **`report_analyst/`** is open-core under the **Reciprocal Public License (RPL)**
