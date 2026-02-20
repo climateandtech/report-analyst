@@ -109,6 +109,37 @@ pip install -r report_analyst_jobs/requirements.txt
 
 ---
 
+## 5. Docker
+
+Two images are available: **core** (RPL, Streamlit only) and **enterprise** (core + Postgres/pgvector support).
+
+**Build:**
+
+```bash
+# Core image (Streamlit app only)
+docker build -t report-analyst:core .
+
+# Enterprise image (adds report_analyst_enterprise, Alembic)
+docker build -f Dockerfile.enterprise -t report-analyst:enterprise .
+```
+
+On **Apple Silicon (ARM)** use `--platform linux/amd64` so `sqlite-vss` installs (no Linux ARM wheel):  
+`docker build --platform linux/amd64 -t report-analyst:core .`
+
+**Run:**
+
+```bash
+# Core – pass API keys at runtime
+docker run -p 8080:8080 -e OPENAI_API_KEY=your_key -e GOOGLE_API_KEY=your_key report-analyst:core
+
+# Enterprise – add DATABASE_URL (and optionally USE_ALEMBIC_MIGRATIONS, USE_POSTGRES_FILE_STORAGE)
+docker run -p 8080:8080 -e OPENAI_API_KEY=your_key -e DATABASE_URL=postgresql://... report-analyst:enterprise
+```
+
+App is at `http://localhost:8080`.
+
+---
+
 ## Usage Summary
 
 ### Streamlit App (Core)
