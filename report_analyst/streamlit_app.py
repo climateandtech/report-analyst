@@ -2883,6 +2883,7 @@ def main():
             # OpenRouter Connect (when USE_OPENROUTER_OAUTH and no key)
             if use_openrouter and not os.getenv("OPENAI_API_KEY"):
                 st.subheader("AI Access")
+                # Use OPENROUTER_CALLBACK_URL or Render's automatic RENDER_EXTERNAL_URL
                 callback_url = (
                     os.getenv("OPENROUTER_CALLBACK_URL")
                     or os.getenv("RENDER_EXTERNAL_URL", "")

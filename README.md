@@ -106,8 +106,9 @@ For more detailed setup options (API, search backend, jobs), see `INSTALL.md`.
 When deploying to Render with `USE_OPENROUTER_OAUTH=true`, users get AI access without API keys or credit card:
 
 1. Deploy to Render (see `render.yaml`).
-2. Set `OPENROUTER_CALLBACK_URL` to your app URL.
-3. Users open Settings → **Connect OpenRouter** → authorize → done (50 free requests/day).
+2. Users open Settings → **Connect OpenRouter** → authorize → done (50 free requests/day).
+
+(Render sets `RENDER_EXTERNAL_URL` automatically for the OAuth callback.)
 
 ---
 
