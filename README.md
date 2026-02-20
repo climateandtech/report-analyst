@@ -2,9 +2,6 @@
 
 **Version 0.8.0-rc (Release Candidate)**
 
-**Deploy (core `report_analyst/`, RPL):** [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io) [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/climateandtech/report-analyst) [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://www.heroku.com/deploy?template=https://github.com/climateandtech/report-analyst)  
-**Deploy (API and other modules):** [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/climateandtech/report-analyst) — `report_analyst_api/` may be deployable; core app is not (see [VERCEL_DEPLOYMENT_ASSESSMENT.md](VERCEL_DEPLOYMENT_ASSESSMENT.md)).
-
 Open Sustainability Analyst is the analyst-facing application of the **Open Sustainability Analysis** project by **Climate+Tech**.  
 It helps sustainability and ESG professionals analyze complex sustainability reports with modern AI, while keeping methods transparent and research-based.
 
@@ -27,6 +24,19 @@ You stay in control of:
 - Which reports are analyzed.
 - Which questions/frameworks are used.
 - Which models and parameters are applied.
+
+---
+
+## Deploy
+
+You can install and run the app with one click on the platforms below; on **Streamlit Cloud** and **Render** no credit card is required. Follow each platform’s dialogs and enter the secrets (API keys) explained in **Quick Start** below.
+
+| Platform | Deploys | |
+|----------|---------|---|
+| **Streamlit Cloud** | Core `report_analyst/` (RPL) | [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io) |
+| **Render** | Core `report_analyst/` (RPL) | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/climateandtech/report-analyst) |
+| **Heroku** | Core `report_analyst/` (RPL) | [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://www.heroku.com/deploy?template=https://github.com/climateandtech/report-analyst) |
+| **Vercel** | `report_analyst_api/` only; core app not supported | [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/climateandtech/report-analyst) |
 
 ---
 
