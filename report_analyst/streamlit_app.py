@@ -77,6 +77,11 @@ from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
     create_combined_dataframe,
 )
+from report_analyst.core.openrouter_oauth import (
+    exchange_code_for_key,
+    get_and_clear_oauth_state,
+    get_auth_url,
+)
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
 
@@ -89,14 +94,24 @@ question_loader = get_question_loader()
 
 # Define model lists based on available API keys
 OPENAI_MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"]
+# OpenRouter model IDs (provider/model format)
+OPENROUTER_MODELS = [
+    "openai/gpt-4o-mini",
+    "openai/gpt-4o",
+    "anthropic/claude-3-haiku",
+    "anthropic/claude-3-sonnet",
+]
 
 GEMINI_MODELS = ["gemini-1.5-flash", "gemini-1.5-pro"]
 
 # Only include models with available API keys
 LLM_MODELS = OPENAI_MODELS.copy()
 
-# Check for Google API key and add Gemini models if available
-if os.getenv("GOOGLE_API_KEY"):
+# OpenRouter OAuth mode: use OpenRouter models when enabled
+if os.getenv("USE_OPENROUTER_OAUTH", "false").lower() == "true":
+    LLM_MODELS = OPENROUTER_MODELS.copy()
+    logger.info("OpenRouter OAuth mode - using OpenRouter model list")
+elif os.getenv("GOOGLE_API_KEY"):
     logger.info("Google API key found - adding Gemini models to available options")
     LLM_MODELS.extend(GEMINI_MODELS)
 else:
@@ -1298,6 +1313,7 @@ def update_analyzer_parameters():
     llm_model = st.session_state.new_llm_model
 
     # Validate selected model availability
+    use_openrouter = os.getenv("USE_OPENROUTER_OAUTH", "false").lower() == "true"
     if llm_model.startswith("gemini-") and not os.getenv("GOOGLE_API_KEY"):
         # If somehow a Gemini model was selected but no API key exists
         logger.error(f"Attempt to use Gemini model '{llm_model}' without API key")
@@ -1305,9 +1321,11 @@ def update_analyzer_parameters():
         # Reset to default OpenAI model
         llm_model = OPENAI_MODELS[0]
         st.session_state.new_llm_model = llm_model
-    elif llm_model.startswith("gpt-") and not os.getenv("OPENAI_API_KEY"):
-        logger.error(f"Attempt to use OpenAI model '{llm_model}' without API key")
-        st.error(f"OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly.")
+    elif (llm_model.startswith("gpt-") or llm_model.startswith("openai/") or use_openrouter) and not os.getenv("OPENAI_API_KEY"):
+        logger.error(f"Attempt to use model '{llm_model}' without API key")
+        st.error(
+            "Connect OpenRouter in Settings to get AI access, or set OPENAI_API_KEY."
+        )
 
     # Update the analyzer with the new parameters
     try:
@@ -1497,6 +1515,39 @@ def main():
         APIKeyManager.sync_api_keys_to_env(st.session_state)
 
         st.set_page_config(page_title="Report Analyst", layout="wide")
+
+        # OpenRouter OAuth: handle callback and sync key to env
+        use_openrouter = os.getenv("USE_OPENROUTER_OAUTH", "false").lower() == "true"
+        if use_openrouter:
+            os.environ.setdefault("OPENAI_API_BASE", "https://openrouter.ai/api/v1")
+            # Handle OAuth callback (code + state in URL)
+            query_params = st.query_params
+            code = query_params.get("code")
+            state = query_params.get("state")
+            if code and state:
+                try:
+                    oauth_state = get_and_clear_oauth_state(state)
+                    if oauth_state:
+                        api_key = exchange_code_for_key(
+                            code=code,
+                            code_verifier=oauth_state["code_verifier"],
+                            code_challenge_method=oauth_state.get(
+                                "code_challenge_method", "S256"
+                            ),
+                        )
+                        st.session_state["openrouter_api_key"] = api_key
+                        os.environ["OPENAI_API_KEY"] = api_key
+                        # Clear URL params
+                        st.query_params.clear()
+                        st.success("Connected to OpenRouter! AI access is ready.")
+                        st.rerun()
+                    else:
+                        st.error("Invalid or expired OAuth state. Please try again.")
+                except Exception as e:
+                    logger.exception("OpenRouter OAuth exchange failed")
+                    st.error(f"Failed to connect: {e}")
+            elif "openrouter_api_key" in st.session_state:
+                os.environ["OPENAI_API_KEY"] = st.session_state["openrouter_api_key"]
 
         # Inject Material Icons link tag at the top
         st.markdown(
@@ -2734,6 +2785,25 @@ def main():
                 st.session_state.analyzer = ReportAnalyzer()
             analyzer = st.session_state.analyzer  # Use the stored analyzer
 
+            # OpenRouter: refresh LLM when key became available after OAuth
+            if use_openrouter and os.getenv("OPENAI_API_KEY"):
+                if analyzer.analyzer.llm is None:
+                    default_model = os.getenv(
+                        "OPENAI_API_MODEL", "openai/gpt-4o-mini"
+                    )
+                    analyzer.analyzer.update_llm_model(default_model)
+                    # Also init embeddings for OpenRouter
+                    from llama_index.core import Settings
+                    from llama_index.embeddings.openai import OpenAIEmbedding
+
+                    analyzer.analyzer.embeddings = OpenAIEmbedding(
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        api_base="https://openrouter.ai/api/v1",
+                        model_name="text-embedding-ada-002",
+                        embed_batch_size=100,
+                    )
+                    Settings.embed_model = analyzer.analyzer.embeddings
+
         except Exception as e:
             st.error(f"Error initializing analyzer: {str(e)}")
             st.exception(e)
@@ -2807,10 +2877,37 @@ def main():
             nav_options = ["Upload Report", "Report Analyst", "All Results", "Settings"]
             nav_page = st.sidebar.radio("", nav_options, key="nav_page", label_visibility="collapsed")
 
-        # Show page-specific content based on navigation
-        if nav_page == "Settings":
-            st.title("Settings")
-            st.caption("Configure application settings and integrations")
+        # Settings section in sidebar (consolidates all integration settings)
+        st.sidebar.markdown("---")
+        with st.sidebar.expander("Settings", expanded=False):
+            # OpenRouter Connect (when USE_OPENROUTER_OAUTH and no key)
+            if use_openrouter and not os.getenv("OPENAI_API_KEY"):
+                st.subheader("AI Access")
+                callback_url = (
+                    os.getenv("OPENROUTER_CALLBACK_URL")
+                    or os.getenv("RENDER_EXTERNAL_URL", "")
+                ).rstrip("/")
+                if callback_url:
+                    auth_url, _state = get_auth_url(callback_url)
+                    st.link_button(
+                        "Connect OpenRouter",
+                        auth_url,
+                        type="primary",
+                        help="One-click AI access, no credit card. Free: 50 req/day.",
+                    )
+                    st.caption(
+                        "One-click AI access, no credit card. Free tier: 50 requests/day."
+                    )
+                else:
+                    st.warning(
+                        "Set OPENROUTER_CALLBACK_URL to your app URL to enable "
+                        "Connect OpenRouter. (On Render, RENDER_EXTERNAL_URL is set automatically.)"
+                    )
+                st.divider()
+            # Show Enterprise Mode status at the top
+            use_s3_upload = st.session_state.get("use_s3_upload", False)
+            if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
+                st.caption("Enterprise mode")
 
             # Open Source Modules Section
             st.header("Open Source Modules")
@@ -3127,6 +3224,13 @@ def main():
             else:
                 st.info("PostgreSQL file storage requires a PostgreSQL database. Currently using SQLite.")
                 st.caption("Files are stored in local temp directory")
+
+        # OpenRouter: show connect banner when no key
+        if use_openrouter and not os.getenv("OPENAI_API_KEY"):
+            st.info(
+                "**Get AI access** – Open Settings in the sidebar and click "
+                '"Connect OpenRouter" for one-click access (no credit card, 50 free requests/day).'
+            )
 
         # Show page-specific content based on navigation
         if nav_page == "Report Analyst":

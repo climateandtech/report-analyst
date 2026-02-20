@@ -65,7 +65,7 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-3. **Set your API keys (for LLMs)**
+3. **Set your API keys (for LLMs)** – or use OpenRouter one-click on Render
 
 Copy the example environment file and add your API keys:
 
@@ -100,6 +100,14 @@ In the web UI you can:
   - Gaps and uncertainties
 
 For more detailed setup options (API, search backend, jobs), see `INSTALL.md`.
+
+### One-click AI access (Render + OpenRouter)
+
+When deploying to Render with `USE_OPENROUTER_OAUTH=true`, users get AI access without API keys or credit card:
+
+1. Deploy to Render (see `render.yaml`).
+2. Set `OPENROUTER_CALLBACK_URL` to your app URL.
+3. Users open Settings → **Connect OpenRouter** → authorize → done (50 free requests/day).
 
 ---
 
