@@ -5,8 +5,9 @@ services:
     plan: free
 
     buildCommand: pip install -r requirements.txt
-    preDeployCommand: python -m alembic upgrade head || echo "Migrations skipped (no Postgres or not enabled)"
-    startCommand: streamlit run report_analyst/streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
+    startCommand: |
+      python -m alembic upgrade head || true
+      exec streamlit run report_analyst/streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
 
     envVars:
       - key: DATABASE_URL
