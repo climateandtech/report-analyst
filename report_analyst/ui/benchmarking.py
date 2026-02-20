@@ -12,7 +12,14 @@ import streamlit as st
 
 from ..core.benchmark.dataset_loader import DatasetLoader, DatasetValidationError
 from ..core.benchmark.evaluation_engine import EvaluationEngine
-from ..core.benchmark.retrieval_results_loader import load_flexible_dataset_from_csv
+from ..core.benchmark.error_analysis import (
+    build_error_analysis_dataframe,
+    build_error_analysis_dataframe_from_flexible,
+)
+from ..core.benchmark.retrieval_results_loader import (
+    load_flexible_dataset_from_csv,
+    load_retrieval_results_from_csv,
+)
 from ..core.storage.benchmark_store import BenchmarkStore
 from ..models.benchmark import BenchmarkEvaluation, HumanAnnotation, RetrievalConfig
 
@@ -347,6 +354,9 @@ class BenchmarkingUI:
         # Metrics visualization
         self._render_metrics_charts(filtered_evals)
 
+        # Error analysis export for the latest CSV evaluation (session-based)
+        self._render_error_analysis_export()
+
         # Detailed evaluation view
         if filtered_evals:
             eval_options = [
@@ -361,6 +371,135 @@ class BenchmarkingUI:
                 selected_idx = eval_options.index(selected_eval_name)
                 selected_eval = filtered_evals[selected_idx]
                 self._render_evaluation_details(selected_eval)
+
+    def _render_error_analysis_export(self):
+        """Render download button for error-analysis CSV based on current CSV evaluation context."""
+        # Use the most recent CSV evaluation from session state
+        session_evals = st.session_state.get("csv_evaluations", [])
+        if not session_evals:
+            return
+
+        latest_eval = session_evals[-1]
+        retrieval_config = getattr(latest_eval, "retrieval_config", None)
+        if not retrieval_config:
+            return
+
+        top_k = getattr(retrieval_config, "top_k", None)
+        if not top_k:
+            return
+
+        st.subheader("Error analysis export")
+        st.caption(
+            "Download a CSV with, for each retrieved chunk, the report, question, expert relevant part, "
+            "retrieved chunk text, its position in top-K, expert relevance label, and whether it is really relevant "
+            "(expert label > 0)."
+        )
+
+        if st.button("Build error-analysis CSV"):
+            try:
+                # Get current ground-truth and benchmark datasets used for the last CSV evaluation
+                # Prefer explicit keys stored on the evaluation object
+                ref_id = getattr(latest_eval, "ref_key", None)
+                bench_id = getattr(latest_eval, "bench_key", None)
+
+                dataset_id = getattr(latest_eval, "dataset_id", "")
+                # Fallback to parsing dataset_id for legacy evaluations
+                if (ref_id is None or bench_id is None) and dataset_id:
+                    if "|||" in dataset_id:
+                        ref_id, bench_id = dataset_id.split("|||", 1)
+                    elif "_" in dataset_id:
+                        ref_id, bench_id = dataset_id.split("_", 1)
+
+                if not ref_id or not bench_id:
+                    st.error("Cannot determine datasets for error analysis from evaluation metadata.")
+                    return
+
+                uploaded_datasets = st.session_state.get("uploaded_datasets", {})
+                ground_truth_ds = uploaded_datasets.get(ref_id)
+                benchmark_ds = uploaded_datasets.get(bench_id)
+
+                # #region agent log
+                log_path = Path("/home/yauheni/Documents/my_main/.cursor/debug.log")
+                try:
+                    with open(log_path, "a") as f:
+                        f.write(
+                            json.dumps(
+                                {
+                                    "id": "log_error_analysis_dataset_resolution",
+                                    "timestamp": int(__import__("time").time() * 1000),
+                                    "location": "ui/benchmarking.py:_render_error_analysis_export",
+                                    "message": "Dataset resolution for error analysis",
+                                    "runId": "pre-fix",
+                                    "hypothesisId": "A",
+                                    "data": {
+                                        "dataset_id": dataset_id,
+                                        "ref_id": ref_id,
+                                        "bench_id": bench_id,
+                                        "uploaded_keys": list(uploaded_datasets.keys()),
+                                        "has_ground_truth": bool(ground_truth_ds),
+                                        "has_benchmark": bool(benchmark_ds),
+                                    },
+                                }
+                            )
+                            + "\n"
+                        )
+                except Exception:
+                    pass
+                # #endregion
+
+                if not ground_truth_ds or not benchmark_ds:
+                    st.error(
+                        "Could not locate the ground truth and benchmark datasets used for this evaluation."
+                    )
+                    return
+
+                # Both datasets are flexible BenchmarkDataset objects
+                # Use the flexible dataset version of the error analysis builder
+                # #region agent log
+                log_path = Path("/home/yauheni/Documents/my_main/.cursor/debug.log")
+                try:
+                    with open(log_path, "a") as f:
+                        f.write(
+                            json.dumps(
+                                {
+                                    "id": "log_error_analysis_top_k_value",
+                                    "timestamp": int(__import__("time").time() * 1000),
+                                    "location": "ui/benchmarking.py:_render_error_analysis_export",
+                                    "message": "Top-K value for error analysis",
+                                    "runId": "pre-fix",
+                                    "hypothesisId": "H",
+                                    "data": {
+                                        "top_k": top_k,
+                                        "retrieval_config_top_k": getattr(retrieval_config, "top_k", None),
+                                    },
+                                }
+                            )
+                            + "\n"
+                        )
+                except Exception:
+                    pass
+                # #endregion
+                
+                df_error = build_error_analysis_dataframe_from_flexible(
+                    ground_truth_dataset=ground_truth_ds,
+                    benchmark_dataset=benchmark_ds,
+                    top_k=top_k,
+                )
+
+                if df_error.empty:
+                    st.warning("No rows generated for error analysis.")
+                    return
+
+                csv_bytes = df_error.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "Download error-analysis CSV",
+                    data=csv_bytes,
+                    file_name="benchmark_error_analysis.csv",
+                    mime="text/csv",
+                    key="download_error_analysis_csv",
+                )
+            except Exception as e:
+                st.error(f"Failed to build error-analysis CSV: {str(e)}")
 
     def render_annotation_interface(self):
         """Render human annotation interface"""
@@ -429,12 +568,17 @@ class BenchmarkingUI:
                 st.session_state.csv_evaluations = []
             
             from ..models.benchmark import BenchmarkEvaluation, RetrievalConfig
+            # Use the maximum k value for error analysis export (to show all top-K chunks)
+            max_k = max(k_values) if k_values else 10
             eval_obj = type('Evaluation', (), {
                 'evaluation_name': evaluation_name,
-                'dataset_id': f"{ref_id}_{bench_id}",
+                'dataset_id': f"{ref_id}|||{bench_id}",
                 'evaluation_metrics': metrics,
-                'retrieval_config': RetrievalConfig(top_k=k_values[0] if k_values else 10),
+                'retrieval_config': RetrievalConfig(top_k=max_k),
                 'created_at': pd.Timestamp.now(),
+                # Explicit references to the dataset keys used for this evaluation
+                'ref_key': ref_id,
+                'bench_key': bench_id,
             })()
             st.session_state.csv_evaluations.append(eval_obj)
 

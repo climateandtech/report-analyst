@@ -1,7 +1,5 @@
-import json
 import logging
 from collections import defaultdict
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -77,8 +75,20 @@ class EvaluationEngine:
         retrieved_chunks: List[Dict],
         ground_truth: Dict[str, float],
         k_values: List[int],
+        relevant_text_sim_scores: Optional[List[float]] = None,
+        relevance_threshold: float = 0.95,
     ) -> Dict:
-        """Evaluate a single question's retrieval results"""
+        """Evaluate a single question's retrieval results
+        
+        Args:
+            retrieved_chunks: List of retrieved chunks with metadata
+            ground_truth: Dict mapping chunk_id to relevance score (for total count and NDCG ideal)
+            k_values: List of K values to compute metrics for
+            relevant_text_sim_scores: Optional list of relevant_text_sim scores from benchmark dataset.
+                                     If provided, used for binary relevance (relevant if > threshold).
+                                     Must match order of retrieved_chunks after deduplication.
+            relevance_threshold: Threshold for relevant_text_sim to consider a chunk relevant (default: 0.95)
+        """
 
         # Extract relevant part IDs in retrieval order
         # Note: "id" field contains relevant_part_id (for matching to ground truth)
@@ -94,53 +104,43 @@ class EvaluationEngine:
         # count the relevant part once to prevent recall > 1.0
         seen = set()
         retrieved_ids = []
-        for relevant_part_id in retrieved_ids_raw:
+        deduplicated_indices = []  # Track which original indices were kept
+        for i, relevant_part_id in enumerate(retrieved_ids_raw):
             if relevant_part_id not in seen:
                 retrieved_ids.append(relevant_part_id)
                 seen.add(relevant_part_id)
-
-        # #region agent log
-        log_path = Path("/home/yauheni/Documents/my_main/.cursor/debug.log")
-        try:
-            with open(log_path, "a") as f:
-                f.write(
-                    json.dumps(
-                        {
-                            "location": "evaluation_engine.py:_evaluate_single_question:82",
-                            "message": "Retrieved relevant part IDs analysis (after deduplication)",
-                            "data": {
-                                "total_retrieved_paragraphs": len(retrieved_chunks),
-                                "total_relevant_parts_before": len(retrieved_ids_raw),
-                                "total_relevant_parts_after": len(retrieved_ids),
-                                "unique_relevant_parts": len(set(retrieved_ids)),
-                                "has_duplicates_before": len(retrieved_ids_raw)
-                                != len(set(retrieved_ids_raw)),
-                                "has_duplicates_after": len(retrieved_ids)
-                                != len(set(retrieved_ids)),
-                                "retrieved_relevant_part_ids_sample": retrieved_ids[:10],
-                                "ground_truth_keys_count": len(ground_truth),
-                                "ground_truth_keys_sample": list(ground_truth.keys())[
-                                    :5
-                                ],
-                            },
-                            "timestamp": int(__import__("time").time() * 1000),
-                            "runId": "new-alignment",
-                            "hypothesisId": "A",
-                        }
-                    )
-                    + "\n"
-                )
-        except Exception:
-            pass
-        # #endregion
+                deduplicated_indices.append(i)
 
         # Get relevance scores for retrieved chunks (after deduplication)
+        # For NDCG, we still use ground truth scores if available
         retrieved_relevance = [
             ground_truth.get(chunk_id, 0.0) for chunk_id in retrieved_ids
         ]
 
-        # Binary relevance (relevant if score > 0)
-        binary_relevance = [1 if score > 0 else 0 for score in retrieved_relevance]
+        # Binary relevance: Use relevant_text_sim threshold if provided, otherwise fall back to ground truth matching
+        if relevant_text_sim_scores is not None:
+            # Use relevant_text_sim threshold: chunk is relevant if relevant_text_sim > threshold (default 0.95)
+            # Map to deduplicated indices
+            binary_relevance = []
+            for idx in deduplicated_indices:
+                if idx < len(relevant_text_sim_scores):
+                    sim_score = relevant_text_sim_scores[idx]
+                    # Convert to float if needed
+                    if isinstance(sim_score, str):
+                        try:
+                            sim_score = float(sim_score)
+                        except (ValueError, TypeError):
+                            sim_score = 0.0
+                    else:
+                        sim_score = float(sim_score) if sim_score else 0.0
+                    is_relevant = 1 if sim_score > relevance_threshold else 0
+                    binary_relevance.append(is_relevant)
+                else:
+                    # Missing score, default to not relevant
+                    binary_relevance.append(0)
+        else:
+            # Fallback: use ground truth matching (old behavior)
+            binary_relevance = [1 if score > 0 else 0 for score in retrieved_relevance]
 
         # Total relevant chunks in ground truth
         total_relevant = sum(1 for score in ground_truth.values() if score > 0)
@@ -171,46 +171,6 @@ class EvaluationEngine:
             result["recall_at_k"][k] = recall_k
             result["f1_at_k"][k] = f1_k
             result["ndcg_at_k"][k] = ndcg_k
-
-            # #region agent log
-            log_path = Path("/home/yauheni/Documents/my_main/.cursor/debug.log")
-            try:
-                with open(log_path, "a") as f:
-                    f.write(
-                        json.dumps(
-                            {
-                                "location": "evaluation_engine.py:_evaluate_single_question:162",
-                                "message": f"Metrics at K={k} (using relevant_part_id matching)",
-                                "data": {
-                                    "k": k,
-                                    "precision": precision_k,
-                                    "recall": recall_k,
-                                    "f1": f1_k,
-                                    "ndcg": ndcg_k,
-                                    "relevant_at_k": sum(binary_relevance[:k]),
-                                    "total_relevant": total_relevant,
-                                    "retrieved_at_k": min(k, len(retrieved_ids)),
-                                    "total_retrieved": len(retrieved_ids),
-                                    "k_greater_than_retrieved": k > len(retrieved_ids),
-                                    "has_metrics_gt_1": any(
-                                        [
-                                            precision_k > 1,
-                                            recall_k > 1,
-                                            f1_k > 1,
-                                            ndcg_k > 1,
-                                        ]
-                                    ),
-                                },
-                                "timestamp": int(__import__("time").time() * 1000),
-                                "runId": "recall-debug",
-                                "hypothesisId": "A",
-                            }
-                        )
-                        + "\n"
-                    )
-            except Exception:
-                pass
-            # #endregion
 
         # Compute MRR and MAP
         result["reciprocal_rank"] = self._reciprocal_rank(binary_relevance)
@@ -264,36 +224,6 @@ class EvaluationEngine:
             else:
                 idcg += ideal_scores[i] / np.log2(i + 1)
 
-        # #region agent log
-        log_path = Path("/home/yauheni/Documents/my_main/.cursor/debug.log")
-        try:
-            with open(log_path, "a") as f:
-                f.write(
-                    json.dumps(
-                        {
-                            "location": "evaluation_engine.py:_ndcg_at_k:179",
-                            "message": "NDCG calculation details (using relevant_part_id matching)",
-                            "data": {
-                                "k": k,
-                                "dcg": dcg,
-                                "idcg": idcg,
-                                "ndcg": dcg / idcg if idcg > 0 else 0.0,
-                                "retrieved_relevance_sample": retrieved_relevance[:k],
-                                "ideal_scores_sample": ideal_scores[:k],
-                                "ground_truth_unique_count": len(ground_truth),
-                                "ndcg_gt_1": (dcg / idcg if idcg > 0 else 0.0) > 1.0,
-                            },
-                            "timestamp": int(__import__("time").time() * 1000),
-                            "runId": "post-fix",
-                            "hypothesisId": "C",
-                        }
-                    )
-                    + "\n"
-                )
-        except Exception:
-            pass
-        # #endregion
-
         if idcg == 0:
             return 0.0
 
@@ -338,39 +268,6 @@ class EvaluationEngine:
             recalls = [r["recall_at_k"].get(k, 0.0) for r in question_results]
             f1s = [r["f1_at_k"].get(k, 0.0) for r in question_results]
             ndcgs = [r["ndcg_at_k"].get(k, 0.0) for r in question_results]
-
-            # #region agent log
-            log_path = Path("/home/yauheni/Documents/my_main/.cursor/debug.log")
-            try:
-                with open(log_path, "a") as f:
-                    f.write(
-                        json.dumps(
-                            {
-                                "location": "evaluation_engine.py:_aggregate_metrics:331",
-                                "message": f"Aggregating metrics at K={k}",
-                                "data": {
-                                    "k": k,
-                                    "num_questions": len(question_results),
-                                    "precisions_count": len(precisions),
-                                    "recalls_count": len(recalls),
-                                    "precisions_with_value": sum(1 for p in precisions if p > 0),
-                                    "recalls_with_value": sum(1 for r in recalls if r > 0),
-                                    "precisions_sample": precisions[:5],
-                                    "recalls_sample": recalls[:5],
-                                    "mean_precision": np.mean(precisions),
-                                    "mean_recall": np.mean(recalls),
-                                    "recall_is_decreasing": False,  # Will check in analysis
-                                },
-                                "timestamp": int(__import__("time").time() * 1000),
-                                "runId": "recall-debug",
-                                "hypothesisId": "B",
-                            }
-                        )
-                        + "\n"
-                    )
-            except Exception:
-                pass
-            # #endregion
 
             metrics.precision_at_k[k] = np.mean(precisions)
             metrics.recall_at_k[k] = np.mean(recalls)
@@ -494,12 +391,9 @@ class EvaluationEngine:
 
             # Build ground truth mapping: chunk_id -> relevance_score
             ground_truth = {}
-            duplicate_chunk_ids = []
             for i, ref_result in enumerate(reference_results):
                 chunk_id = ref_result.get_chunk_id()
                 if chunk_id:
-                    if chunk_id in ground_truth:
-                        duplicate_chunk_ids.append(chunk_id)
                     score = ref_result.get_score()
                     # Use score if available, otherwise use inverse position
                     relevance_score = (
@@ -507,45 +401,37 @@ class EvaluationEngine:
                     )
                     ground_truth[chunk_id] = relevance_score
 
-            # #region agent log
-            log_path = Path("/home/yauheni/Documents/my_main/.cursor/debug.log")
-            try:
-                with open(log_path, "a") as f:
-                    f.write(
-                        json.dumps(
-                            {
-                                "location": "evaluation_engine.py:_compare_ir_datasets:351",
-                                "message": "Ground truth mapping analysis",
-                                "data": {
-                                    "query_id": query_id,
-                                    "reference_results_count": len(reference_results),
-                                    "ground_truth_unique_chunks": len(ground_truth),
-                                    "has_duplicate_chunk_ids": len(duplicate_chunk_ids)
-                                    > 0,
-                                    "duplicate_chunk_ids": duplicate_chunk_ids[:5],
-                                    "ground_truth_scores_sample": dict(
-                                        list(ground_truth.items())[:5]
-                                    ),
-                                },
-                                "timestamp": int(__import__("time").time() * 1000),
-                                "runId": "new-alignment",
-                                "hypothesisId": "D",
-                            }
-                        )
-                        + "\n"
-                    )
-            except Exception:
-                pass
-            # #endregion
+            # Skip this query if there's no ground truth (can't evaluate without ground truth)
+            if not ground_truth:
+                logger.debug(
+                    f"Skipping query with no ground truth: query_id='{query_id}'"
+                )
+                continue
 
             # Get input results (actual retrieval)
             input_results = input_dataset.get_results_by_query(query_id)
-            input_results = sorted(input_results, key=lambda x: x.get_position() or 999)
+            
+            # Helper function to get similarity score for ranking (same logic as error analysis)
+            def get_similarity_score_for_ranking(result):
+                data = result.data if hasattr(result, 'data') else {}
+                # Use relevant_text_sim as priority for ranking (similarity between retrieved chunk and relevant part)
+                # Note: sim_text_relevance is NOT used here - it's an expert-annotated label, not a ranking score
+                sim_score = (
+                    data.get("relevant_text_sim")
+                    or result.get_score()
+                    or data.get("score")
+                    or data.get("relevance_score")
+                    or 0.0
+                )
+                return float(sim_score) if sim_score else 0.0
+            
+            # Sort by similarity score (descending) - this matches the error analysis logic
+            input_results = sorted(input_results, key=get_similarity_score_for_ranking, reverse=True)
 
             # Convert to format expected by _evaluate_single_question
             # Use relevant_part_id for matching to ground truth (if available), otherwise fallback to chunk_id
             retrieved_chunks = []
-            retrieved_chunk_ids_list = []
+            relevant_text_sim_scores = []  # Extract relevant_text_sim from benchmark dataset
             for result in input_results:
                 chunk_id = result.get_chunk_id()  # Unique paragraph identifier
                 relevant_part_id = result.get(
@@ -553,8 +439,32 @@ class EvaluationEngine:
                 )  # For matching to ground truth
                 # Fallback: if no relevant_part_id, use chunk_id (backward compatibility)
                 match_id = relevant_part_id if relevant_part_id else chunk_id
-                score = result.get_score() or 0.0
+                # Use relevant_text_sim as the score (same priority as ranking)
+                data = result.data if hasattr(result, 'data') else {}
+                score = (
+                    data.get("relevant_text_sim")
+                    or result.get_score()
+                    or data.get("score")
+                    or data.get("relevance_score")
+                    or 0.0
+                )
+                score = float(score) if score else 0.0
                 position = result.get_position() or 999
+
+                # Extract relevant_text_sim for relevance determination (chunk is relevant if relevant_text_sim > 0.95)
+                relevant_text_sim = (
+                    data.get("relevant_text_sim")
+                    or 0.0
+                )
+                # Convert to numeric if it's a string
+                if isinstance(relevant_text_sim, str):
+                    try:
+                        relevant_text_sim = float(relevant_text_sim)
+                    except (ValueError, TypeError):
+                        relevant_text_sim = 0.0
+                else:
+                    relevant_text_sim = float(relevant_text_sim) if relevant_text_sim else 0.0
+                relevant_text_sim_scores.append(relevant_text_sim)
 
                 chunk_dict = {
                     "id": match_id
@@ -567,51 +477,10 @@ class EvaluationEngine:
                     "position": position,
                 }
                 retrieved_chunks.append(chunk_dict)
-                retrieved_chunk_ids_list.append(match_id or f"unknown_{position}")
-
-            # #region agent log
-            log_path = Path("/home/yauheni/Documents/my_main/.cursor/debug.log")
-            try:
-                with open(log_path, "a") as f:
-                    f.write(
-                        json.dumps(
-                            {
-                                "location": "evaluation_engine.py:_compare_ir_datasets:370",
-                                "message": "Retrieved chunks analysis",
-                                "data": {
-                                    "query_id": query_id,
-                                    "input_results_count": len(input_results),
-                                    "retrieved_chunks_count": len(retrieved_chunks),
-                                    "retrieved_chunk_ids_unique": len(
-                                        set(retrieved_chunk_ids_list)
-                                    ),
-                                    "retrieved_chunk_ids_total": len(
-                                        retrieved_chunk_ids_list
-                                    ),
-                                    "has_duplicate_retrieved_ids": len(
-                                        set(retrieved_chunk_ids_list)
-                                    )
-                                    < len(retrieved_chunk_ids_list),
-                                    "duplicate_ids_sample": [
-                                        x
-                                        for x in set(retrieved_chunk_ids_list)
-                                        if retrieved_chunk_ids_list.count(x) > 1
-                                    ][:5],
-                                },
-                                "timestamp": int(__import__("time").time() * 1000),
-                                "runId": "new-alignment",
-                                "hypothesisId": "E",
-                            }
-                        )
-                        + "\n"
-                    )
-            except Exception:
-                pass
-            # #endregion
 
             # Evaluate this question
             result = self._evaluate_single_question(
-                retrieved_chunks, ground_truth, k_values
+                retrieved_chunks, ground_truth, k_values, relevant_text_sim_scores, relevance_threshold=0.95
             )
             question_results.append(result)
 
@@ -748,25 +617,77 @@ class EvaluationEngine:
                 )
                 ground_truth[chunk_id] = relevance_score
 
+            # Skip this query if there's no ground truth (can't evaluate without ground truth)
+            if not ground_truth:
+                logger.debug(
+                    f"Skipping query with no ground truth: query_id='{query_id}'"
+                )
+                continue
+
             # Get input results (actual retrieval)
             input_results = input_dataset.get_results_by_query(query_id)
-            # Sort by position
-            input_results = sorted(input_results, key=lambda x: x.position)
+            
+            # Helper function to get similarity score for ranking
+            def get_similarity_score_for_ranking_legacy(result):
+                # For legacy RetrievalResultRow, check if it has data attribute
+                if hasattr(result, 'metadata') and result.metadata:
+                    data = result.metadata
+                    # Use relevant_text_sim as priority for ranking
+                    sim_score = (
+                        data.get("relevant_text_sim")
+                        or result.score
+                        or data.get("score")
+                        or data.get("relevance_score")
+                        or 0.0
+                    )
+                    return float(sim_score) if sim_score else 0.0
+                # Fallback to score if no metadata
+                return float(result.score) if result.score else 0.0
+            
+            # Sort by similarity score (descending) - prioritize relevant_text_sim
+            input_results = sorted(input_results, key=get_similarity_score_for_ranking_legacy, reverse=True)
 
             # Convert to format expected by _evaluate_single_question
             retrieved_chunks = []
+            relevant_text_sim_scores = []  # Extract relevant_text_sim from benchmark dataset
             for result in input_results:
+                # Use relevant_text_sim as the score if available
+                score = result.score or 0.0
+                relevant_text_sim = 0.0
+                if hasattr(result, 'metadata') and result.metadata:
+                    data = result.metadata
+                    score = (
+                        data.get("relevant_text_sim")
+                        or result.score
+                        or data.get("score")
+                        or data.get("relevance_score")
+                        or 0.0
+                    )
+                    # Extract relevant_text_sim for relevance determination (chunk is relevant if relevant_text_sim > 0.95)
+                    relevant_text_sim = data.get("relevant_text_sim") or 0.0
+                score = float(score) if score else 0.0
+                
+                # Convert to numeric if it's a string
+                if isinstance(relevant_text_sim, str):
+                    try:
+                        relevant_text_sim = float(relevant_text_sim)
+                    except (ValueError, TypeError):
+                        relevant_text_sim = 0.0
+                else:
+                    relevant_text_sim = float(relevant_text_sim) if relevant_text_sim else 0.0
+                relevant_text_sim_scores.append(relevant_text_sim)
+                
                 chunk_dict = {
                     "id": result.chunk_id,
                     "chunk_id": result.chunk_id,
-                    "score": result.score,
+                    "score": score,
                     "position": result.position,
                 }
                 retrieved_chunks.append(chunk_dict)
 
             # Evaluate this question
             result = self._evaluate_single_question(
-                retrieved_chunks, ground_truth, k_values
+                retrieved_chunks, ground_truth, k_values, relevant_text_sim_scores, relevance_threshold=0.95
             )
             question_results.append(result)
 

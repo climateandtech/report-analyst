@@ -213,21 +213,9 @@ class ReportAnalyzer:
                             try:
                                 num = int(parts[1])
                                 selected_numbers.append(num)
-                                # #region agent log
-                                with open('/home/yauheni/Documents/my_main/.cursor/debug.log', 'a') as f:
-                                    f.write(json.dumps({"id":"log_extracted_num","timestamp":int(__import__('time').time()*1000),"location":"streamlit_app.py:227","message":"Extracted number from ID","data":{"q_id":q_id,"extracted_num":num},"runId":"run1","hypothesisId":"A"}) + "\n")
-                                # #endregion
                             except ValueError:
-                                # #region agent log
-                                with open('/home/yauheni/Documents/my_main/.cursor/debug.log', 'a') as f:
-                                    f.write(json.dumps({"id":"log_extract_failed","timestamp":int(__import__('time').time()*1000),"location":"streamlit_app.py:232","message":"Failed to extract number","data":{"q_id":q_id,"parts":parts},"runId":"run1","hypothesisId":"C"}) + "\n")
-                                # #endregion
                                 pass
                 except KeyError as e:
-                    # #region agent log
-                    with open('/home/yauheni/Documents/my_main/.cursor/debug.log', 'a') as f:
-                        f.write(json.dumps({"id":"log_keyerror","timestamp":int(__import__('time').time()*1000),"location":"streamlit_app.py:237","message":"KeyError accessing question","data":{"q_id":q_id,"error":str(e)},"runId":"run1","hypothesisId":"A"}) + "\n")
-                    # #endregion
                     # Extract number from question ID as fallback
                     parts = q_id.split("_")
                     if len(parts) > 1:

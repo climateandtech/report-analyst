@@ -92,10 +92,12 @@ def transform_ground_truth(
 
     Output columns:
     - query_id: Generated from (document, question)
-    - chunk_id: Generated from context/relevant text hash
+    - chunk_id: Generated from relevant text hash (preferred) or context text hash (fallback)
     - position: Position/rank (1-indexed, per query)
-    - score: Relevance label (2, 1, 0)
-    - context: Original context text (preserved)
+    - score: Relevance label converted to numeric (2, 1, 0)
+    - relevance_label: Original relevance label column (preserved)
+    - context: Original context text (preserved, if used for chunk_id)
+    - relevant: Original relevant text (preserved, if used for chunk_id)
     - document: Original document name (preserved)
     - question: Original question text (preserved)
 
@@ -136,6 +138,7 @@ def transform_ground_truth(
     label_col = (
         df_cols_lower.get(relevance_label_col.lower())
         or df_cols_lower.get("relevance_label")
+        or df_cols_lower.get("source relevance score")  # Check for "Source Relevance Score"
         or df_cols_lower.get("relevance")
         or df_cols_lower.get("label")
     )
@@ -158,15 +161,21 @@ def transform_ground_truth(
             f"Could not find relevance label column. Will default to score=1.0. Available: {list(df.columns)}"
         )
 
-    # Use context or relevant as the text source for chunk_id
-    text_col = ctx_col or rel_col
+    # Use relevant column first (preferred), then context as fallback for chunk_id
+    # This ensures chunk_id matches the actual relevant part text, not the context with surrounding sentences
+    text_col = rel_col or ctx_col
+    if text_col == rel_col:
+        logger.info("Using 'relevant' column for chunk_id generation (preferred for matching with benchmark relevant_text)")
+    elif text_col == ctx_col:
+        logger.info("Using 'context' column for chunk_id generation (fallback, 'relevant' column not found)")
 
     # Generate query_id
     df["query_id"] = df.apply(
         lambda row: generate_query_id(row[doc_col], row[q_col]), axis=1
     )
 
-    # Generate chunk_id from context/relevant text
+    # Generate chunk_id from relevant text (or context if relevant not available)
+    # This should match the relevant_text used in benchmark dataset for relevant_part_id
     df["chunk_id"] = df[text_col].apply(lambda x: generate_chunk_id(x))
 
     # Generate position (1-indexed, per query)
@@ -174,6 +183,7 @@ def transform_ground_truth(
 
     # Map relevance label to score
     if label_col:
+        logger.info(f"Using column '{label_col}' for score generation")
         # Convert label to numeric, handling various formats
         def parse_label(val):
             if pd.isna(val):
@@ -195,23 +205,50 @@ def transform_ground_truth(
                     return 1.0  # Default
 
         df["score"] = df[label_col].apply(parse_label)
+        # Log score distribution for verification
+        score_counts = df["score"].value_counts().sort_index()
+        logger.info(f"Score distribution: {dict(score_counts)}")
+        logger.info(f"Score range: {df['score'].min()} to {df['score'].max()}")
     else:
+        logger.warning("No relevance label column found, defaulting all scores to 1.0")
         df["score"] = 1.0  # Default score
 
     # Select output columns
     output_cols = ["query_id", "chunk_id", "position", "score"]
     # Preserve original columns for reference
-    preserve_cols = [doc_col, q_col, text_col]
+    preserve_cols = [doc_col, q_col]
+    # Preserve the text column used for chunk_id (relevant or context)
+    if text_col:
+        preserve_cols.append(text_col)
+    # Also preserve the other text column if it exists (for reference)
+    if rel_col and rel_col != text_col and rel_col in df.columns:
+        preserve_cols.append(rel_col)
+    if ctx_col and ctx_col != text_col and ctx_col in df.columns:
+        preserve_cols.append(ctx_col)
     if page_num_col:
         preserve_cols.append(page_num_col)
+    # Preserve relevance_label column if it exists (user requested this)
+    if label_col and label_col in df.columns:
+        preserve_cols.append(label_col)
     # Rename preserved columns to standard names
     rename_map = {
         doc_col: "document",
         q_col: "question",
-        text_col: "context",
     }
+    # Rename the text column used for chunk_id
+    if text_col == rel_col:
+        rename_map[text_col] = "relevant"
+    elif text_col == ctx_col:
+        rename_map[text_col] = "context"
+    # Rename the other text column if preserved
+    if rel_col and rel_col != text_col and rel_col in preserve_cols:
+        rename_map[rel_col] = "relevant"
+    if ctx_col and ctx_col != text_col and ctx_col in preserve_cols:
+        rename_map[ctx_col] = "context"
     if page_num_col:
         rename_map[page_num_col] = "page_number"
+    if label_col and label_col in df.columns:
+        rename_map[label_col] = "relevance_label"
 
     df_output = df[output_cols + preserve_cols].copy()
     df_output = df_output.rename(columns=rename_map)
@@ -258,6 +295,7 @@ def transform_benchmark_results(
     - chunk_id: Generated from relevant_text (if available) or paragraph text
     - position: Position/rank (1-indexed, per query) or from number column
     - score: Optional relevance score (from relevance_score or label)
+    - relevance_label: Original relevance label column (preserved if exists)
     - paragraph: Original paragraph text (preserved)
     - report: Original report name (preserved)
     - question: Original question text (preserved)
@@ -415,6 +453,9 @@ def transform_benchmark_results(
     preserve_cols = [report_col_actual, q_col, para_col]
     if rel_text_col and rel_text_col in df.columns:
         preserve_cols.append(rel_text_col)
+    # Preserve relevance_label column if it exists (for consistency with ground truth)
+    if label_col_actual and label_col_actual in df.columns:
+        preserve_cols.append(label_col_actual)
     # Add similarity score columns if they exist
     if relevant_text_sim_col and relevant_text_sim_col in df.columns:
         preserve_cols.append(relevant_text_sim_col)
@@ -429,6 +470,8 @@ def transform_benchmark_results(
     }
     if rel_text_col and rel_text_col in df.columns:
         rename_map[rel_text_col] = "relevant_text"
+    if label_col_actual and label_col_actual in df.columns:
+        rename_map[label_col_actual] = "relevance_label"
     if relevant_text_sim_col and relevant_text_sim_col in df.columns:
         rename_map[relevant_text_sim_col] = "relevant_text_sim"
     if sim_text_relevance_col and sim_text_relevance_col in df.columns:
