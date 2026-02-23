@@ -17,7 +17,7 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["report_analyst"]
+include = ["report_analyst", "report_analyst.*"]
 
 [tool.isort]
 profile = "black"
