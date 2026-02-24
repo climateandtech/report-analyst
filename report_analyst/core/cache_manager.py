@@ -783,10 +783,7 @@ class CacheManager:
                     )
                 )
                 rows = result_obj.fetchall()
-                return [
-                    {"file_path": row[0], "question_set": row[1]}
-                    for row in rows
-                ]
+                return [{"file_path": row[0], "question_set": row[1]} for row in rows]
         except Exception as e:
             logger.error(f"Error listing analysis keys: {e}", exc_info=True)
             return []

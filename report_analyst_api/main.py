@@ -6,7 +6,9 @@ FastAPI application for document analysis.
 
 # Load .env first so OPENBLAS_NUM_THREADS=1 (and other vars) are set before any NumPy/OpenBLAS import
 import os
+
 from dotenv import load_dotenv
+
 load_dotenv()
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
@@ -185,6 +187,7 @@ async def get_models():
 def _get_temp_dir() -> str:
     """Report temp dir for uploads and report_path (same as service.get_report_temp_dir)."""
     from report_analyst.core.service import get_report_temp_dir
+
     return str(get_report_temp_dir())
 
 

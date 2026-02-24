@@ -7,10 +7,11 @@ lazy (on first use) and OPENBLAS_NUM_THREADS is set before importing NumPy
 to avoid SIGSEGV on macOS/ARM.
 """
 
+import json
 import logging
 import os
-import json
 from typing import Any, Dict, List, Optional
+
 from sqlalchemy import text
 
 from report_analyst.core.question_loader import get_question_loader
@@ -24,10 +25,7 @@ def get_question_sets_for_api() -> List[Dict[str, Any]]:
     """Return question sets in API shape: list of {id, name, description}. Same source as Streamlit."""
     loader = get_question_loader()
     question_sets = loader.get_question_sets()
-    return [
-        {"id": qset.id, "name": qset.name, "description": qset.description}
-        for qset in question_sets.values()
-    ]
+    return [{"id": qset.id, "name": qset.name, "description": qset.description} for qset in question_sets.values()]
 
 
 def get_questions_for_api(question_set_id: str) -> Dict[str, Any]:
@@ -39,6 +37,7 @@ def get_questions_for_api(question_set_id: str) -> Dict[str, Any]:
 def get_report_temp_dir():
     """Return the directory used for local report PDFs (async uploads and report_path). Same as API _resolve_analyze_path."""
     from pathlib import Path
+
     path = os.environ.get("REPORT_ANALYST_TEMP")
     if path:
         return Path(os.path.realpath(path))
@@ -50,7 +49,6 @@ def get_report_temp_dir():
 def get_reports_for_api(question_set_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """Return list of reports (local + any configured backends). Same source as Streamlit via ReportDataClient."""
     try:
-        from pathlib import Path
         from report_analyst.core.report_data_client import ReportDataClient
 
         temp_dir = get_report_temp_dir()
@@ -188,5 +186,6 @@ def get_document_analyzer():
         if "OPENBLAS_NUM_THREADS" not in os.environ:
             os.environ["OPENBLAS_NUM_THREADS"] = "1"
         from report_analyst.core.analyzer import DocumentAnalyzer
+
         _analyzer = DocumentAnalyzer()
     return _analyzer

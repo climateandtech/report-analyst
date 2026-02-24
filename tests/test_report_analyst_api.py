@@ -104,9 +104,7 @@ def test_reports_can_filter_by_question_set_param():
         pytest.skip("No question_set_id found in consolidated rows.")
 
     expected_ids = {
-        str(row.get("report_id") or "")
-        for row in consolidated
-        if str(row.get("question_set_id") or "") == question_set_id
+        str(row.get("report_id") or "") for row in consolidated if str(row.get("question_set_id") or "") == question_set_id
     }
     if not expected_ids:
         pytest.skip(f"No consolidated report_ids for question_set_id={question_set_id}.")

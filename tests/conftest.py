@@ -7,10 +7,12 @@ Provides test environment configuration and common fixtures.
 # Load .env first so OPENBLAS_NUM_THREADS=1 is set before any NumPy/OpenBLAS import (avoids SIGSEGV on macOS ARM)
 import os
 from pathlib import Path
+
 _conftest_dir = Path(__file__).resolve().parent
 _env = _conftest_dir.parent / ".env"
 if _env.exists():
     from dotenv import load_dotenv
+
     load_dotenv(_env)
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
