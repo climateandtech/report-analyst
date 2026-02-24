@@ -23,6 +23,7 @@ report_analyst/temp/*
 
 # Coverage and test artifacts
 .coverage
+coverage.xml
 .pytest_cache/
 
 # Temporary files and diffs
