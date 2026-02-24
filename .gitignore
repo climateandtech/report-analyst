@@ -55,3 +55,8 @@ THEME_SWITCHING.md
 VERCEL_CHANGES_SUMMARY.md
 VERCEL_DEPLOYMENT_ASSESSMENT.md
 VERCEL_MIGRATION_GUIDE.md
+
+# Frontend generated artifacts
+report_analyst_enterprise/components/web/node_modules/
+report_analyst_enterprise/components/web/dist/
+report_analyst_enterprise/components/streamlit_component/frontend/build/
