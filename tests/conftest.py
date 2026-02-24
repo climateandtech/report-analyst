@@ -4,18 +4,22 @@ Shared pytest fixtures for all tests.
 Provides test environment configuration and common fixtures.
 """
 
-import json
+# Load .env first so OPENBLAS_NUM_THREADS=1 is set before any NumPy/OpenBLAS import (avoids SIGSEGV on macOS ARM)
 import os
-import tempfile
 from pathlib import Path
+_conftest_dir = Path(__file__).resolve().parent
+_env = _conftest_dir.parent / ".env"
+if _env.exists():
+    from dotenv import load_dotenv
+    load_dotenv(_env)
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
+import json
+import tempfile
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 import yaml
-from dotenv import load_dotenv
-
-# Load environment variables from .env file before any other imports
-load_dotenv()
 
 from report_analyst_jobs.event_router import IGNORE_ACTION, EventRouter
 

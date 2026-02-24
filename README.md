@@ -356,6 +356,8 @@ export QUESTIONSETS_PATH=report_analyst/questionsets
 pytest tests/ -v --cov=report_analyst --cov-report=term-missing
 ```
 
+**macOS ARM (Apple Silicon):** If you see a crash in `libopenblas` / `gemm_thread_n` (SIGSEGV), set `OPENBLAS_NUM_THREADS=1` before running. The API and test conftest set this by default; for other entry points use `export OPENBLAS_NUM_THREADS=1` in your shell or add it to `.env`.
+
 For detailed deployment patterns (Docker, Kubernetes, NATS workers, etc.), see:
 - `INSTALL.md` – Installation and configuration options
 - `report_analyst_jobs/README.md` – Job processing and worker patterns

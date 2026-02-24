@@ -42,8 +42,8 @@ class AnalysisConfiguration(BaseModel):
     force_recompute: bool = Field(False, description="Force recomputation of cached results")
 
 
-class AnalysisRequest(BaseModel):
-    """Request model for analysis"""
+class AnalysisJobRequest(BaseModel):
+    """Request model for job-based analysis (document_id + selected_questions). Reserved for future use."""
 
     document_id: str = Field(..., description="ID of the uploaded document")
     question_set_id: str = Field(..., description="ID of the question set to use")
@@ -114,7 +114,7 @@ class QuestionSet(BaseModel):
     id: str = Field(..., description="Question set identifier")
     name: str = Field(..., description="Question set name")
     description: str = Field(..., description="Question set description")
-    questions: Dict[str, Question] = Field(..., description="Questions in the set")
+    questions: Optional[Dict[str, Question]] = Field(None, description="Questions in the set")
 
 
 class QuestionSetResponse(BaseModel):
@@ -150,11 +150,12 @@ class HealthResponse(BaseModel):
     """Health check response model"""
 
     status: str = Field(..., description="Health status")
-    core_package: bool = Field(..., description="Core package availability")
-    question_loader: bool = Field(..., description="Question loader status")
-    analyzer: bool = Field(..., description="Analyzer status")
-    available_integrations: Dict[str, bool] = Field(..., description="Integration status")
-    document_sources: List[str] = Field(..., description="Available document sources")
+    version: Optional[str] = Field(None, description="API version")
+    core_package: Optional[bool] = Field(None, description="Core package availability")
+    question_loader: Optional[bool] = Field(None, description="Question loader status")
+    analyzer: Optional[bool] = Field(None, description="Analyzer status")
+    available_integrations: Optional[Dict[str, bool]] = Field(None, description="Integration status")
+    document_sources: Optional[List[str]] = Field(None, description="Available document sources")
 
 
 class AnalysisRequest(BaseModel):

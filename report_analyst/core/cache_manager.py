@@ -769,6 +769,28 @@ class CacheManager:
         except Exception as e:
             logger.error(f"Error clearing cache: {str(e)}", exc_info=True)
 
+    def list_analysis_keys(self) -> List[Dict[str, str]]:
+        """List distinct (file_path, question_set) pairs that have stored analysis. Used for UI dropdowns driven by stored data."""
+        try:
+            with self.db_manager.get_connection() as conn:
+                result_obj = conn.execute(
+                    text(
+                        """
+                        SELECT DISTINCT file_path, question_set
+                        FROM analysis_cache
+                        ORDER BY question_set, file_path
+                        """
+                    )
+                )
+                rows = result_obj.fetchall()
+                return [
+                    {"file_path": row[0], "question_set": row[1]}
+                    for row in rows
+                ]
+        except Exception as e:
+            logger.error(f"Error listing analysis keys: {e}", exc_info=True)
+            return []
+
     def check_cache_status(self, file_path: str = None):
         """Debug method to check cache contents"""
         try:
