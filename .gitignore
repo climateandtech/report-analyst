@@ -1,5 +1,5 @@
-/data
-data/
+#/data
+#data/
 .env
 *.log
 venv/

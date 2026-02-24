@@ -19,6 +19,9 @@ dependencies = [
 where = ["."]
 include = ["report_analyst", "report_analyst.*"]
 
+[tool.setuptools.package-data]
+"report_analyst" = ["data/*.csv"]
+
 [tool.isort]
 profile = "black"
 line_length = 88
@@ -40,7 +43,8 @@ exclude = '''
   | htmlcov
   | \.eggs
   | \.mypy_cache
-  | \.tox
+  | \.toximport report_analyst
+print(dir(report_analyst))
   | dist
   | build
   | \.idea
