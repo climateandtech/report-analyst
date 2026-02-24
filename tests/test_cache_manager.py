@@ -37,12 +37,10 @@ def test_init_db(temp_db):
     """Test database initialization"""
     # Check if tables exist
     with sqlite3.connect(temp_db.db_path) as conn:
-        cursor = conn.execute(
-            """
+        cursor = conn.execute("""
             SELECT name FROM sqlite_master 
             WHERE type='table' AND (name='analysis_cache' OR name='document_chunks')
-        """
-        )
+        """)
         tables = [row[0] for row in cursor.fetchall()]
 
     assert "analysis_cache" in tables

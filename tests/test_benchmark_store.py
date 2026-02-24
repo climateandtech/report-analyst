@@ -32,8 +32,7 @@ class TestBenchmarkStore:
         store = BenchmarkStore(db_path)
         with sqlite3.connect(db_path) as conn:
             # Create the benchmark tables (simplified version for testing)
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE benchmark_datasets (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     dataset_id TEXT UNIQUE,
@@ -45,11 +44,9 @@ class TestBenchmarkStore:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
+            """)
 
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE ground_truth_chunks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     dataset_id TEXT,
@@ -62,11 +59,9 @@ class TestBenchmarkStore:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(dataset_id) REFERENCES benchmark_datasets(dataset_id)
                 )
-            """
-            )
+            """)
 
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE benchmark_evaluations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     dataset_id TEXT,
@@ -77,11 +72,9 @@ class TestBenchmarkStore:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(dataset_id) REFERENCES benchmark_datasets(dataset_id)
                 )
-            """
-            )
+            """)
 
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE human_annotations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     evaluation_id INTEGER,
@@ -95,8 +88,7 @@ class TestBenchmarkStore:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(evaluation_id) REFERENCES benchmark_evaluations(id)
                 )
-            """
-            )
+            """)
 
             conn.commit()
 
