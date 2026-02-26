@@ -33,6 +33,22 @@ from .storage import LlamaVectorStore
 # Setup logging at the top of the file
 logger = logging.getLogger(__name__)
 
+
+def log_analysis_step(step: str, details: Dict[str, Any]) -> None:
+    """
+    Lightweight helper used in tests to log analysis steps in a structured way.
+
+    Args:
+        step: Name of the analysis step (e.g. 'chunking', 'retrieval', 'llm_call').
+        details: Arbitrary metadata about the step; must be JSON-serializable.
+    """
+    try:
+        logger.info("ANALYSIS_STEP %s %s", step, json.dumps(details, default=str))
+    except Exception:
+        # Fall back to a simple log if details cannot be serialized
+        logger.info("ANALYSIS_STEP %s %r", step, details)
+
+
 # Load environment variables
 load_dotenv()
 
@@ -713,7 +729,7 @@ Output only the scores, one per line, in order:"""
                         first_qid = next(iter(self.questions.keys()), "")
                         if first_qid and "_" in first_qid:
                             question_prefix = first_qid.split("_")[0]
-                    
+
                     question_id = f"{question_prefix}_{question_number}"
                     logger.info(f"[ANALYSIS] Question ID: {question_id}")
 
@@ -1270,7 +1286,7 @@ Output only the scores, one per line, in order:"""
             question_prefix = question_set_mapping.get(
                 self.question_set, self.question_set
             )
-            
+
             # If still not found in mapping, try to extract prefix from actual question IDs
             if question_prefix == self.question_set and self.questions:
                 # Extract prefix from first question ID (e.g., "climretr_1" -> "climretr")
@@ -1282,7 +1298,7 @@ Output only the scores, one per line, in order:"""
                         f"(question_set='{self.question_set}')"
                     )
                     question_prefix = extracted_prefix
-            
+
             question_key = f"{question_prefix}_{number}"
             logger.debug(f"Looking for question {number} with key: {question_key}")
             logger.debug(f"Available question keys: {list(self.questions.keys())}")

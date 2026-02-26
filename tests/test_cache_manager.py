@@ -358,7 +358,7 @@ async def test_vector_store_reloads_on_chunk_size_change(temp_db):
 
     # Use consistent embedding dimension for all chunks and query
     embedding_dim = 384  # Common embedding dimension (e.g., sentence-transformers)
-    
+
     # Create test chunks with chunk_size=500
     chunks_500 = [
         {
@@ -433,7 +433,11 @@ async def test_vector_store_reloads_on_chunk_size_change(temp_db):
         {
             "text": "This is a test chunk with different overlap. " * 20,
             "embedding": np.random.rand(embedding_dim).astype(np.float32),
-            "metadata": {"page": 1, "chunk_size": 1000, "chunk_overlap": 50},  # Different overlap
+            "metadata": {
+                "page": 1,
+                "chunk_size": 1000,
+                "chunk_overlap": 50,
+            },  # Different overlap
         },
     ]
 

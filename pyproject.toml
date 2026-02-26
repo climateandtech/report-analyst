@@ -20,7 +20,7 @@ where = ["."]
 include = ["report_analyst", "report_analyst.*"]
 
 [tool.setuptools.package-data]
-"report_analyst" = ["data/*.csv"]
+"report_analyst" = ["data/*.csv", "config/datasets/*.yaml"]
 
 [tool.isort]
 profile = "black"

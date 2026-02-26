@@ -2,8 +2,8 @@ import argparse
 import csv
 from pathlib import Path
 
-from llama_index.readers.file import PyMuPDFReader
 from llama_index.core.node_parser import SentenceSplitter
+from llama_index.readers.file import PyMuPDFReader
 
 
 def extract_chunks(pdf_path: str, chunk_size: int, chunk_overlap: int) -> list[str]:

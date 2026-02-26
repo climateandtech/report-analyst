@@ -9,6 +9,3 @@ For example:
 
     python -m scripts.evaluate_benchmark_from_csv --help
 """
-
-
-
