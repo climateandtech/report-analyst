@@ -187,23 +187,19 @@ tcfd_1,chunk_001,1,0.95"""
         try:
             # Create table and insert data
             conn = sqlite3.connect(db_path)
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE benchmark_results (
                     query_id TEXT,
                     chunk_id TEXT,
                     position INTEGER,
                     score REAL
                 )
-            """
-            )
-            conn.execute(
-                """
+            """)
+            conn.execute("""
                 INSERT INTO benchmark_results VALUES
                 ('tcfd_1', 'chunk_001', 1, 0.95),
                 ('tcfd_1', 'chunk_015', 2, 0.89)
-            """
-            )
+            """)
             conn.commit()
             conn.close()
 
@@ -224,23 +220,19 @@ tcfd_1,chunk_001,1,0.95"""
 
         try:
             conn = sqlite3.connect(db_path)
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE benchmark_results (
                     query_id TEXT,
                     chunk_id TEXT,
                     position INTEGER,
                     score REAL
                 )
-            """
-            )
-            conn.execute(
-                """
+            """)
+            conn.execute("""
                 INSERT INTO benchmark_results VALUES
                 ('tcfd_1', 'chunk_001', 1, 0.95),
                 ('tcfd_2', 'chunk_023', 1, 0.93)
-            """
-            )
+            """)
             conn.commit()
             conn.close()
 

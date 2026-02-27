@@ -23,6 +23,7 @@ report_analyst/temp/*
 
 # Coverage and test artifacts
 .coverage
+coverage.xml
 .pytest_cache/
 
 # Temporary files and diffs
@@ -57,3 +58,8 @@ VERCEL_DEPLOYMENT_ASSESSMENT.md
 VERCEL_MIGRATION_GUIDE.md
 .env
 reports/
+
+# Frontend generated artifacts
+report_analyst_enterprise/components/web/node_modules/
+report_analyst_enterprise/components/web/dist/
+report_analyst_enterprise/components/streamlit_component/frontend/build/

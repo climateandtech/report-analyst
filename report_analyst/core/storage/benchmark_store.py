@@ -204,11 +204,9 @@ class BenchmarkStore:
         """List all available benchmark datasets"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT * FROM benchmark_datasets ORDER BY created_at DESC
-            """
-            )
+            """)
 
             datasets = []
             for row in cursor.fetchall():
@@ -336,12 +334,10 @@ class BenchmarkStore:
                     (dataset_id,),
                 )
             else:
-                cursor = conn.execute(
-                    """
+                cursor = conn.execute("""
                     SELECT * FROM benchmark_evaluations 
                     ORDER BY created_at DESC
-                """
-                )
+                """)
 
             evaluations = []
             for row in cursor.fetchall():
