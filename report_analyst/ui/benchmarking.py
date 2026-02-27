@@ -697,6 +697,24 @@ class BenchmarkingUI:
                         df_raw = pd.read_csv(tmp_path)
                         csv_kwargs = {"csv_path": tmp_path}
 
+                    # If this file has already been aligned and registered for this
+                    # dataset_type, avoid re-showing the schema warning on rerun.
+                    aligned_flag_key = (
+                        f"aligned_{dataset_type}_{uploaded_file.name}"
+                    )
+                    dataset_key = f"{dataset_type}_current"
+                    if (
+                        st.session_state.get(aligned_flag_key)
+                        and "uploaded_datasets" in st.session_state
+                        and dataset_key in st.session_state.uploaded_datasets
+                    ):
+                        aligned_dataset = st.session_state.uploaded_datasets[dataset_key]
+                        st.success(
+                            f"Using previously aligned dataset '{aligned_dataset.name}' "
+                            f"({len(aligned_dataset.results)} rows) for evaluation."
+                        )
+                        return
+
                     # ------------------------------------------------------------------
                     # Step 2: Try to load as a flexible benchmark dataset
                     # If this fails (missing key columns, etc.), offer alignment.
@@ -857,6 +875,14 @@ class BenchmarkingUI:
 
                                 if temp_key in st.session_state.uploaded_datasets:
                                     del st.session_state.uploaded_datasets[temp_key]
+
+                                # Remember that this particular uploaded file has
+                                # already been aligned so we do not re-show the
+                                # schema warning on subsequent reruns.
+                                aligned_flag_key = (
+                                    f"aligned_{dataset_type}_{uploaded_file.name}"
+                                )
+                                st.session_state[aligned_flag_key] = True
 
                                 st.success(
                                     "Dataset was aligned to the expected structure and "
