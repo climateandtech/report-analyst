@@ -699,16 +699,16 @@ class BenchmarkingUI:
 
                     # If this file has already been aligned and registered for this
                     # dataset_type, avoid re-showing the schema warning on rerun.
-                    aligned_flag_key = (
-                        f"aligned_{dataset_type}_{uploaded_file.name}"
-                    )
+                    aligned_flag_key = f"aligned_{dataset_type}_{uploaded_file.name}"
                     dataset_key = f"{dataset_type}_current"
                     if (
                         st.session_state.get(aligned_flag_key)
                         and "uploaded_datasets" in st.session_state
                         and dataset_key in st.session_state.uploaded_datasets
                     ):
-                        aligned_dataset = st.session_state.uploaded_datasets[dataset_key]
+                        aligned_dataset = st.session_state.uploaded_datasets[
+                            dataset_key
+                        ]
                         st.success(
                             f"Using previously aligned dataset '{aligned_dataset.name}' "
                             f"({len(aligned_dataset.results)} rows) for evaluation."
