@@ -161,17 +161,26 @@ class CacheManager:
 
             if not documents:
                 logger.warning(
-                    f"No documents with embeddings found to load into vector store. "
+                    "No documents with embeddings found to load into vector store. "
                     f"Total chunks provided: {len(chunks)}"
                 )
                 # Clear vector store if no documents to load
                 self.vector_store = None
                 self.current_file_path = file_path
-                self.current_chunk_size = chunk_size
-                self.current_chunk_overlap = chunk_overlap
+
+                # Derive chunk parameters from the first chunk if available
+                if chunks:
+                    self.current_chunk_size = chunks[0].get("chunk_size")
+                    self.current_chunk_overlap = chunks[0].get("chunk_overlap")
+                else:
+                    self.current_chunk_size = None
+                    self.current_chunk_overlap = None
+
                 logger.warning(
-                    f"Vector store cleared - no chunks available for chunk_size={chunk_size}, "
-                    f"chunk_overlap={chunk_overlap}"
+                    "Vector store cleared - no chunks available for "
+                    "chunk_size=%s, chunk_overlap=%s",
+                    self.current_chunk_size,
+                    self.current_chunk_overlap,
                 )
                 return
 
