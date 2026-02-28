@@ -23,15 +23,11 @@ def check_pgvector_available(connection) -> bool:
     try:
         from sqlalchemy import text
 
-        result = connection.execute(
-            text(
-                """
+        result = connection.execute(text("""
                 SELECT EXISTS(
                     SELECT 1 FROM pg_extension WHERE extname = 'vector'
                 )
-                """
-            )
-        )
+                """))
         available = result.fetchone()[0]
         if available:
             logger.info("pgvector extension is available")

@@ -16,7 +16,7 @@ backoff==2.2.1
 bcrypt==4.2.1
 beautifulsoup4==4.13.3
 boto3==1.40.9
-black==24.2.0
+black==24.8.0
 blinker==1.9.0
 build==1.2.2.post1
 cachetools==5.5.1
