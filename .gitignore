@@ -1,5 +1,4 @@
-#/data
-#data/
+report_analyst/data
 .env
 *.log
 venv/
