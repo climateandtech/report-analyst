@@ -286,13 +286,15 @@ def display_backend_analysis_results(result: AnalysisResult):
 
     # Display backend analysis benefits
     st.subheader("Backend Analysis Benefits")
-    st.info("""
+    st.info(
+        """
     **Persistent Storage**: Results stored in backend database
     **Multi-User Access**: Available to all authorized users  
     **Centralized Processing**: All computation done in backend
     **Scalable**: Backend handles multiple concurrent analyses
     **Consistent**: Same analysis logic across all clients
-    """)
+    """
+    )
 
     if st.button("Refresh Results"):
         st.rerun()

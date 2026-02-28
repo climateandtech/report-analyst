@@ -37,7 +37,8 @@ class CacheManager:
         conn = sqlite3.connect(self.db_path)
         try:
             # Create optimized table for document chunks
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS document_chunks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_path TEXT,
@@ -49,7 +50,8 @@ class CacheManager:
                 created_at TIMESTAMP,
                 UNIQUE(file_path, chunk_text, chunk_size, chunk_overlap)
             )
-            """)
+            """
+            )
 
             # Create indices for better performance
             conn.execute(
@@ -60,7 +62,8 @@ class CacheManager:
             )
 
             # Store questions separately
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS questions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 question_id TEXT,
@@ -69,10 +72,12 @@ class CacheManager:
                 guidelines TEXT,
                 UNIQUE(question_id, question_set)
             )
-            """)
+            """
+            )
 
             # Create analysis cache table
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS analysis_cache (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_path TEXT,
@@ -86,10 +91,12 @@ class CacheManager:
                 created_at TIMESTAMP,
                 UNIQUE(file_path, question_id, chunk_size, chunk_overlap, top_k, model, question_set)
             )
-            """)
+            """
+            )
 
             # Store analysis configurations and results
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS question_analysis (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_path TEXT,
@@ -102,10 +109,12 @@ class CacheManager:
                 FOREIGN KEY(question_id) REFERENCES questions(id),
                 UNIQUE(file_path, question_id, model, top_k, version)
             )
-            """)
+            """
+            )
 
             # Store chunk-question relationships with all scores and ordering
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS chunk_relevance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 question_analysis_id INTEGER,
@@ -120,7 +129,8 @@ class CacheManager:
                 FOREIGN KEY(document_chunk_id) REFERENCES document_chunks(id),
                 UNIQUE(question_analysis_id, document_chunk_id)
             )
-            """)
+            """
+            )
 
         finally:
             conn.close()
@@ -547,7 +557,9 @@ class CacheManager:
                         AND ac.question_set = ?
                         AND ac.question_id IN ({})
                         ORDER BY ac.question_id, cr.chunk_order
-                    """.format(",".join("?" * len(results)))
+                    """.format(
+                        ",".join("?" * len(results))
+                    )
 
                     chunk_params = [
                         str(file_path),
@@ -773,10 +785,12 @@ class CacheManager:
                     )
                 else:
                     logger.info("Checking all cache entries")
-                    cursor = conn.execute("""
+                    cursor = conn.execute(
+                        """
                         SELECT DISTINCT file_path, chunk_size, chunk_overlap, top_k, model, question_set
                         FROM analysis_cache
-                    """)
+                    """
+                    )
 
                 rows = cursor.fetchall()
                 logger.info(f"Found {len(rows)} distinct configurations:")

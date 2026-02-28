@@ -43,11 +43,13 @@ exclude = '''
   | htmlcov
   | \.eggs
   | \.mypy_cache
-  | \.toximport report_analyst
-print(dir(report_analyst))
+  | \.tox
   | dist
   | build
   | \.idea
   | \.vscode
 )/
 '''
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
