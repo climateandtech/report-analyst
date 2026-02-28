@@ -113,7 +113,9 @@ def test_db_engine():
 
     # Set up schema once at the start of the test session
     with engine.connect() as conn:
-        conn.execute(text("""
+        conn.execute(
+            text(
+                """
             CREATE TABLE IF NOT EXISTS stored_files (
                 id VARCHAR(36) PRIMARY KEY,
                 filename VARCHAR(255) NOT NULL,
@@ -122,7 +124,9 @@ def test_db_engine():
                 file_size VARCHAR(20),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """))
+        """
+            )
+        )
         conn.commit()
 
     yield engine

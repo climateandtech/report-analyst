@@ -102,10 +102,12 @@ class PostgreSQLFileStorage:
 
             with self.db_manager.get_connection() as conn:
                 # Use parameterized query for safety
-                query = text("""
+                query = text(
+                    """
                     INSERT INTO stored_files (id, filename, file_data, content_type, file_size, created_at)
                     VALUES (:id, :filename, :file_data, :content_type, :file_size, :created_at)
-                """)
+                """
+                )
                 conn.execute(
                     query,
                     {
@@ -160,10 +162,12 @@ class PostgreSQLFileStorage:
         """
         try:
             with self.db_manager.get_connection() as conn:
-                query = text("""
+                query = text(
+                    """
                     SELECT filename, content_type, file_size, created_at
                     FROM stored_files WHERE id = :file_id
-                """)
+                """
+                )
                 result = conn.execute(query, {"file_id": file_id})
                 row = result.fetchone()
 
