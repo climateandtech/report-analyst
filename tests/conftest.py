@@ -3,6 +3,7 @@ Shared pytest fixtures for event router tests
 """
 
 import json
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock
@@ -10,7 +11,25 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 import yaml
 
-from report_analyst_jobs.event_router import IGNORE_ACTION, EventRouter
+# Add project root and parent directory to Python path
+# This allows tests to import report_analyst and report_analyst_jobs
+project_root = Path(__file__).parent.parent
+parent_dir = project_root.parent
+
+for path in [str(project_root), str(parent_dir)]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
+# Make report_analyst_jobs import optional
+try:
+    from report_analyst_jobs.event_router import IGNORE_ACTION, EventRouter
+
+    REPORT_ANALYST_JOBS_AVAILABLE = True
+except ImportError:
+    REPORT_ANALYST_JOBS_AVAILABLE = False
+    # Create dummy objects to avoid NameError
+    IGNORE_ACTION = None
+    EventRouter = None
 
 
 @pytest.fixture
@@ -65,6 +84,9 @@ def mock_nats_connection():
 @pytest.fixture
 def event_router_with_mocks(event_router_yaml_file, mock_nats_connection):
     """Event router with mocked NATS connection"""
+    if not REPORT_ANALYST_JOBS_AVAILABLE:
+        pytest.skip("report_analyst_jobs not available - skipping event router tests")
+
     mock_nc, mock_js = mock_nats_connection
 
     router = EventRouter.from_yaml(yaml_path=event_router_yaml_file)

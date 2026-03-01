@@ -1,7 +1,8 @@
-/data
+report_analyst/data
 .env
 *.log
 venv/
+venv2/
 
 .gradio
 __pycache__/
@@ -21,6 +22,7 @@ report_analyst/temp/*
 
 # Coverage and test artifacts
 .coverage
+coverage.xml
 .pytest_cache/
 
 # Temporary files and diffs
@@ -39,6 +41,9 @@ inputlucia
 # macOS system files
 .DS_Store
 
+# Development notes and assessments (keep local, don't commit)
+.devnotes/
+
 # Deployment guides and assessments (keep local, don't commit)
 CLOUDFLARE_ASSESSMENT.md
 CLOUDFLARE_QUICK_SUMMARY.md
@@ -50,3 +55,10 @@ THEME_SWITCHING.md
 VERCEL_CHANGES_SUMMARY.md
 VERCEL_DEPLOYMENT_ASSESSMENT.md
 VERCEL_MIGRATION_GUIDE.md
+.env
+reports/
+
+# Frontend generated artifacts
+report_analyst_enterprise/components/web/node_modules/
+report_analyst_enterprise/components/web/dist/
+report_analyst_enterprise/components/streamlit_component/frontend/build/

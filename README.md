@@ -72,11 +72,76 @@ python3 -m streamlit run report_analyst/streamlit_app.py
 
 In the web UI you can:
 - Upload a PDF sustainability report.
-- Select a question set (e.g. TCFD, Lucia, Everest).
+- Select a question set (e.g. TCFD, Lucia, Everest, ClimRetrieve).
 - Run the analysis and view:
   - Answers
   - Evidence and sources
   - Gaps and uncertainties
+- Use the **Benchmarking** page to evaluate retrieval or extraction results against reference datasets (upload CSVs, align formats, run metrics, view results).
+
+## Running Benchmarks
+
+The project includes support for benchmarking retrieval and extraction systems against reference datasets. You can run benchmarks **from the Streamlit app** or via **command-line scripts**.
+
+### Benchmarking in the Streamlit App
+
+In the web UI, open the **Benchmarking** page from the sidebar. It provides four tabs:
+
+| Tab | Functionality |
+|-----|----------------|
+| **Datasets** | Upload ground truth and benchmark datasets (CSV, Excel, YAML, JSON). List and manage stored datasets. **Dataset Alignment:** CSV/Excel use the alignment section and configurable mappers (`report_analyst/config/datasets/`). YAML/JSON that don’t match the app schema (e.g. ClimRetrieve Report-Level) are **aligned automatically** when possible (list-of-records with document, question, paragraph/relevance). Expected structures for CSV, Excel, YAML, and JSON: see [Expected file formats](EXPECTED_FILE_FORMATS.md). |
+| **Evaluate** | Select a reference (ground truth) and a benchmark dataset, set K values and evaluation name, and run the evaluation. Metrics are computed with the same engine as the CLI (Precision@K, Recall@K, F1@K, NDCG@K, MAP, MRR). |
+| **Results** | View and compare past evaluations, filter by dataset or date, and inspect metrics and charts. |
+| **Annotate** | Attach human annotations to evaluation results for later analysis. |
+
+This makes it easy to compare retrieval or extraction outputs against expert-annotated data without leaving the app.
+
+### ClimRetrieve Benchmark (CLI)
+
+Run the ClimRetrieve benchmark to evaluate your retrieval system against expert-annotated datasets:
+
+```bash
+# Activate virtual environment
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Run the benchmark (downloads datasets automatically)
+python scripts/test_climretrieve_benchmark.py
+```
+
+This will:
+1. Download ClimRetrieve datasets from GitHub to `data/climretrieve/`
+2. Transform datasets to the required format
+3. Compare reference (ground truth) vs input (your results) datasets
+4. Display evaluation metrics (MAP, MRR, Precision@K, Recall@K, F1@K, NDCG@K)
+
+**Options:**
+- `--skip-download`: Use existing downloaded datasets
+- `--reference-path PATH`: Specify custom reference dataset path
+- `--input-path PATH`: Specify custom input dataset path
+- `--k-values 1 5 10 20`: Custom K values for metrics
+
+**Requirements:**
+- `openpyxl` for Excel file support (install with `pip install openpyxl`)
+- Internet connection for initial download
+
+### Generic CSV Evaluation
+
+For **any** pair of ground-truth and results CSVs (not only ClimRetrieve), use the flexible loader and evaluation engine:
+
+- **Script:** `scripts/evaluate_benchmark_from_csv.py` — load two CSVs, run evaluation, print metrics and optionally write JSON.
+- **Loader:** `load_flexible_dataset_from_csv` auto-detects IR vs IE datasets and accepts common column names (`query_id`/`question_id`, `chunk_id`, `position`/`rank`, `score`, etc.).
+- **Engine:** `EvaluationEngine.compare_flexible_datasets` computes Precision@K, Recall@K, F1@K, NDCG@K, MAP, MRR.
+
+Example:
+
+```bash
+python -m scripts.evaluate_benchmark_from_csv \
+  --reference path/to/ground_truth.csv \
+  --input path/to/benchmark_results.csv \
+  --k-values 1 3 5 10
+```
+
+For expected CSV formats (IR vs IE), script options, and ClimRetrieve-specific details, see `scripts/README_CLIMRETRIEVE.md`. For using the same workflow in **Google Colab** (install from Git, load CSVs from URLs, run evaluation and error analysis), see `COLAB.md`.
 
 For more detailed setup options (API, search backend, jobs), see `INSTALL.md`.
 
@@ -105,7 +170,7 @@ Open Sustainability Analyst is used by various organizations and research instit
 
 | Feature | Description |
 |---------|-------------|
-| Preset Question Sets | Use research-validated frameworks (TCFD, Lucia, Everest, Denali, Kilimanjaro) |
+| Preset Question Sets | Use research-validated frameworks (TCFD, Lucia, Everest, ClimRetrieve, Denali, Kilimanjaro) |
 | Custom Question Selection | Choose specific questions from any framework |
 | Framework Comparison | Analyze the same document with different frameworks side-by-side |
 | Framework Extensibility | Add your own question sets via YAML files |
@@ -148,6 +213,16 @@ Open Sustainability Analyst is used by various organizations and research instit
 | REST API | Optional FastAPI integration for other systems |
 | Backend Integration | Optional enterprise S3+NATS upload and processing |
 
+### Benchmarking
+
+| Feature | Description |
+|---------|-------------|
+| Streamlit Benchmarking UI | Upload ground truth and benchmark CSVs, align datasets (e.g. ClimRetrieve), run evaluations, view results and charts, attach human annotations |
+| Flexible CSV Loader | Auto-detect IR vs IE datasets; accept common column names (query_id, chunk_id, position, score, etc.) |
+| Evaluation Metrics | Precision@K, Recall@K, F1@K, NDCG@K, MAP, MRR via `EvaluationEngine` |
+| Dataset Alignment | **CSV/Excel:** map raw files via YAML configs (e.g. `config/datasets/climretrieve.yaml`). **YAML/JSON:** when the file does not match the app schema, alignment is attempted automatically (list-of-records with document, question, chunk, score). |
+| Colab Support | Run evaluation and error analysis from Google Colab; see `COLAB.md` |
+
 ### Advanced Features
 
 | Feature | Description |
@@ -168,6 +243,8 @@ Current core question sets (in `report_analyst/questionsets/`):
   Comprehensive sustainability labeling and gap analysis framework (35+ questions).
 - **TCFD** – `tcfd_questions.yaml`  
   Climate-related financial disclosure questions aligned with TCFD.
+- **ClimRetrieve** – `climretrieve_questions.yaml`  
+  Climate-focused questions aligned with the [ClimRetrieve](https://arxiv.org/abs/2406.09818) benchmark (adaptation, scenarios, targets, risks, etc.). Use this set when evaluating retrieval or analysis against ClimRetrieve datasets.
 - **Denali** – `denali_questions.yaml`  
   Deeper sustainability analysis for specific focus areas.
 - **Kilimanjaro** – `kilimanjaro_questions.yaml`  
@@ -226,7 +303,10 @@ This repository is intentionally modular. The separation also reflects **differe
 report-analyst/
 ├── report_analyst/                  # Core open-source analysis engine (RPL)
 │   ├── core/                        # Chunking, analysis, caching, workflows
+│   │   └── benchmark/               # Evaluation engine, CSV loader, error analysis, dataset mapper
+│   ├── config/datasets/             # YAML configs for dataset alignment (e.g. climretrieve.yaml)
 │   ├── questionsets/                # Question set YAML files (frameworks)
+│   ├── ui/benchmarking.py           # Streamlit benchmarking UI (datasets, evaluate, results, annotate)
 │   ├── streamlit_app.py             # Main Streamlit application
 │   └── streamlit_app_backend.py     # Legacy / backend-focused UI
 ├── report_analyst_api/              # FastAPI REST API (Climate+Tech Open License for Good)
@@ -358,6 +438,8 @@ pytest tests/ -v --cov=report_analyst --cov-report=term-missing
 
 For detailed deployment patterns (Docker, Kubernetes, NATS workers, etc.), see:
 - `INSTALL.md` – Installation and configuration options
+- `COLAB.md` – Using benchmarking and evaluation in Google Colab
+- `scripts/README_CLIMRETRIEVE.md` – ClimRetrieve benchmark and generic CSV evaluation
 - `report_analyst_jobs/README.md` – Job processing and worker patterns
 - `docs/CI.md` – Continuous integration and testing
 

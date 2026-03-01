@@ -58,12 +58,6 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 
-def log_analysis_step(message: str, level: str = "info"):
-    """Helper function to log analysis steps with consistent formatting"""
-    log_func = getattr(logger, level)
-    log_func(f"[ANALYSIS] {message}")
-
-
 # Add the report-analyst directory to the Python path
 current_dir = Path(__file__).parent.parent
 if str(current_dir) not in sys.path:
@@ -198,17 +192,38 @@ class ReportAnalyzer:
             pre_retrieved_chunks: Optional pre-retrieved chunks (e.g., from backend)
         """
         try:
-            log_analysis_step(f"Starting analysis of document: {file_path}")
-            log_analysis_step(f"Selected questions: {selected_questions}")
-            log_analysis_step(f"LLM scoring enabled: {use_llm_scoring}")
+            logger.info(f"[ANALYSIS] Starting analysis of document: {file_path}")
+            logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
+            logger.info(f"[ANALYSIS] LLM scoring enabled: {use_llm_scoring}")
 
             # Update analyzer with the current questions
             self.analyzer.questions = questions
 
             # Convert selected question IDs to numbers for the analyzer
-            selected_numbers = [
-                questions[q_id]["number"] for q_id in selected_questions
-            ]
+            selected_numbers = []
+            for q_id in selected_questions:
+                try:
+                    # Try to get number from question data
+                    if "number" in questions[q_id]:
+                        selected_numbers.append(questions[q_id]["number"])
+                    else:
+                        # Extract number from question ID (e.g., "climretr_4" -> 4, "climretr_17_ir" -> 17)
+                        parts = q_id.split("_")
+                        if len(parts) > 1:
+                            try:
+                                num = int(parts[1])
+                                selected_numbers.append(num)
+                            except ValueError:
+                                pass
+                except KeyError as e:
+                    # Extract number from question ID as fallback
+                    parts = q_id.split("_")
+                    if len(parts) > 1:
+                        try:
+                            num = int(parts[1])
+                            selected_numbers.append(num)
+                        except ValueError:
+                            pass
 
             # Get the question set prefix from the first selected question
             question_set = (
@@ -257,7 +272,7 @@ class ReportAnalyzer:
                     yield result
 
         except Exception as e:
-            log_analysis_step(f"Critical error during analysis: {str(e)}", "error")
+            logger.error(f"[ANALYSIS] Critical error during analysis: {str(e)}")
             yield {"error": f"Error analyzing document: {str(e)}"}
 
     def process_document(
@@ -267,10 +282,16 @@ class ReportAnalyzer:
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ):
-        """Delegate to the analyzer's process_document method"""
+        """Delegate to the analyzer's process_document method, including backend chunks."""
         return self.analyzer.process_document(
-            file_path, selected_questions, use_llm_scoring, single_call, force_recompute
+            file_path=file_path,
+            selected_questions=selected_questions,
+            use_llm_scoring=use_llm_scoring,
+            single_call=single_call,
+            force_recompute=force_recompute,
+            pre_retrieved_chunks=pre_retrieved_chunks,
         )
 
 
@@ -422,7 +443,7 @@ async def analyze_document_and_display(
         # Create status placeholder
         status_placeholder = st.empty()
 
-        log_analysis_step(f"Starting analysis with question set: {question_set}")
+        logger.info(f"[ANALYSIS] Starting analysis with question set: {question_set}")
 
         # Get current configuration
         config = {
@@ -443,8 +464,8 @@ async def analyze_document_and_display(
         )
 
         if cached_answers:
-            log_analysis_step(
-                f"Found {len(cached_answers)} cached answers for {file_key}"
+            logger.info(
+                f"[ANALYSIS] Found {len(cached_answers)} cached answers for {file_key}"
             )
             # Show cache info
             st.info(f"📁 Loading results from stored: {file_key}")
@@ -474,8 +495,8 @@ async def analyze_document_and_display(
         ]
 
         if questions_to_process:
-            log_analysis_step(
-                f"Processing {len(questions_to_process)} uncached questions..."
+            logger.info(
+                f"[ANALYSIS] Processing {len(questions_to_process)} uncached questions..."
             )
 
             # Update analyzer with question set
@@ -495,11 +516,11 @@ async def analyze_document_and_display(
                 pre_retrieved_chunks=pre_retrieved_chunks,
             ):
                 # Add debug logging to see what results we're getting
-                log_analysis_step(f"Received result: {str(result)[:200]}...")
+                logger.info(f"[ANALYSIS] Received result: {str(result)[:200]}...")
 
                 if "error" in result:
-                    log_analysis_step(
-                        f"Error received from analyzer: {result['error']}", "error"
+                    logger.error(
+                        f"[ANALYSIS] Error received from analyzer: {result['error']}"
                     )
                     st.error(f"Analysis error: {result['error']}")
                     continue
@@ -510,8 +531,8 @@ async def analyze_document_and_display(
 
                 question_id = result.get("question_id")
                 if question_id is None:
-                    log_analysis_step(
-                        f"No question_id in result: {str(result)[:200]}...", "warning"
+                    logger.warning(
+                        f"[ANALYSIS] No question_id in result: {str(result)[:200]}..."
                     )
                     continue
 
@@ -535,7 +556,7 @@ async def analyze_document_and_display(
                 # Add a success message for each processed question
                 st.success(f"✓ Processed question {question_id}")
         else:
-            log_analysis_step("All selected questions have cached answers")
+            logger.info("[ANALYSIS] All selected questions have cached answers")
             # Show success message for cached results
             st.success(
                 f"✓ All {len(selected_questions_list)} selected questions loaded from stored"
@@ -551,8 +572,8 @@ async def analyze_document_and_display(
         st.session_state.analysis_complete = True
 
     except Exception as e:
-        log_analysis_step(f"Critical error during analysis: {str(e)}", "error")
-        log_analysis_step(traceback.format_exc(), "error")
+        logger.error(f"[ANALYSIS] Critical error during analysis: {str(e)}")
+        logger.error(traceback.format_exc())
         st.error(f"Error during analysis: {str(e)}")
 
 
@@ -1481,7 +1502,8 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         if cached_results and not st.session_state.get("force_recompute", False):
             logger.info(f"[CACHE] Cache HIT for config: {config}")
             progress_text.success("Found stored results!")
-            st.session_state.results = cached_results
+            # Store cached results in a consistent structure
+            st.session_state.results = {"answers": cached_results}
             logger.info(
                 f"[ANALYSIS] Writing results to session state for file: {file_path}"
             )
@@ -1570,7 +1592,8 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         logger.info(
             f"[ANALYSIS] Writing results to session state for file: {file_path}"
         )
-        st.session_state.results = final_results
+        # Store analysis results in a consistent structure
+        st.session_state.results = {"answers": final_results}
         logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
         progress_text.success("Analysis complete!")
 
@@ -1605,7 +1628,8 @@ def main():
             st.session_state.force_recompute = False  # Default recompute setting
 
         if "results" not in st.session_state:
-            st.session_state.results = {}  # Initialize empty results
+            # Initialize results with a consistent structure expected across the app
+            st.session_state.results = {"answers": {}}
 
         if "current_file" not in st.session_state:
             st.session_state.current_file = None  # Initialize current file
@@ -1623,6 +1647,14 @@ def main():
             st.session_state.use_s3_upload = (
                 os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
             )
+
+        # Initialize processing_steps_slider to prevent invalid values from test framework
+        valid_steps = ["Chunk", "Embed", "Map", "Answer"]
+        if (
+            "processing_steps_slider" not in st.session_state
+            or st.session_state.get("processing_steps_slider") not in valid_steps
+        ):
+            st.session_state.processing_steps_slider = "Answer"
 
         st.set_page_config(page_title="Report Analyst", layout="wide")
 
@@ -2886,8 +2918,13 @@ def main():
             with st.sidebar:
                 nav_page = option_menu(
                     menu_title=None,
-                    options=["Upload Report", "Report Analyst", "All Results"],
-                    icons=["house", "file-text", "bar-chart"],
+                    options=[
+                        "Upload Report",
+                        "Report Analyst",
+                        "All Results",
+                        "Benchmarking",
+                    ],
+                    icons=["house", "file-text", "bar-chart", "target"],
                     menu_icon=None,
                     default_index=0,
                     orientation="vertical",
@@ -2917,7 +2954,12 @@ def main():
                 )
         except ImportError:
             # Fallback to regular radio if package not installed
-            nav_options = ["Upload Report", "Report Analyst", "All Results"]
+            nav_options = [
+                "Upload Report",
+                "Report Analyst",
+                "All Results",
+                "Benchmarking",
+            ]
             nav_page = st.sidebar.radio(
                 "", nav_options, key="nav_page", label_visibility="collapsed"
             )
@@ -3220,25 +3262,65 @@ def main():
                         "Answer": "Question Answering",
                     }
 
-                    # Initialize selected step in session state if not exists
-                    if "processing_steps_slider" not in st.session_state:
+                    # Initialize selected step in session state if not exists or invalid
+                    if (
+                        "processing_steps_slider" not in st.session_state
+                        or st.session_state.processing_steps_slider not in step_options
+                    ):
                         st.session_state.processing_steps_slider = "Answer"
 
                     # Use Streamlit's built-in pills widget
+                    # Make format_func defensive to handle invalid values of any type
+                    # The format_func must return a value that exists in the options list
+                    def safe_format_func(x):
+                        """Safely format step names, handling any input type gracefully.
+                        Always returns a value that exists in the formatted options list.
+                        """
+                        try:
+                            # Handle None or non-string types
+                            if x is None:
+                                return "Question Answering"
+                            if not isinstance(x, str):
+                                x = str(x)
+
+                            # If input is a valid option key, return its formatted name
+                            if x in step_full_names:
+                                return step_full_names[x]
+
+                            # If input is already a formatted name, return it as-is
+                            formatted_names = list(step_full_names.values())
+                            if x in formatted_names:
+                                return x
+
+                            # For any other invalid value, return default formatted name
+                            # This ensures the return value always exists in the options
+                            return "Question Answering"
+                        except Exception:
+                            # Ultimate fallback - return default formatted name
+                            return "Question Answering"
+
+                    # Ensure default value is always valid
+                    default_value = (
+                        st.session_state.processing_steps_slider
+                        if st.session_state.processing_steps_slider in step_options
+                        else "Answer"
+                    )
+
                     selected_step = st.pills(
                         "Select processing step",
                         options=step_options,
-                        format_func=lambda x: step_full_names[x],
-                        default=(
-                            st.session_state.processing_steps_slider
-                            if st.session_state.processing_steps_slider in step_options
-                            else "Answer"
-                        ),
+                        format_func=safe_format_func,
+                        default=default_value,
                         key="processing_steps_slider",
                         help="Select which processing step to execute",
                         label_visibility="collapsed",
                         selection_mode="single",
                     )
+
+                    # Ensure selected_step is always valid (handle any widget state corruption)
+                    if selected_step not in step_options:
+                        selected_step = "Answer"
+                        st.session_state.processing_steps_slider = "Answer"
 
                 # Right column: Advanced Parameters
                 with col3:
@@ -3555,6 +3637,22 @@ def main():
                             "QID"
                         ].tolist()
 
+                        # Log question selection details for debugging
+                        total_questions = len(questions)
+                        selected_count = len(selected_questions)
+                        logger.info(
+                            f"[QUESTION SELECTION] Total questions available: {total_questions}"
+                        )
+                        logger.info(
+                            f"[QUESTION SELECTION] Number of questions selected: {selected_count}"
+                        )
+                        logger.info(
+                            f"[QUESTION SELECTION] Selected question IDs: {selected_questions}"
+                        )
+                        logger.info(
+                            f"[QUESTION SELECTION] Edited dataframe shape: {edited_df.shape}, Selected rows: {len(edited_df[edited_df['Select'] == True])}"
+                        )
+
                         # Update session state for individual question checkboxes (for backward compatibility)
                         for q_id in questions.keys():
                             is_selected = q_id in selected_questions
@@ -3617,64 +3715,34 @@ def main():
                                         )
                                     )
                                 else:
-                                    # For normal analysis, check cache first
-                                    cached_results = (
-                                        analyzer.analyzer.cache_manager.get_analysis(
-                                            file_path=analysis_file_path,
-                                            config=config,
-                                            question_ids=selected_questions,
-                                        )
+                                    # For normal analysis, use analyze_document_and_display
+                                    # which automatically handles both cached and uncached questions
+
+                                    # Ensure analyzer parameters are synced from UI settings
+                                    update_analyzer_parameters()
+
+                                    progress_text.info(
+                                        f"Analyzing {len(selected_questions)} questions..."
                                     )
 
-                                    if cached_results:
-                                        # Process cached results
-                                        for (
-                                            question_id,
-                                            result,
-                                        ) in cached_results.items():
-                                            st.session_state.results["answers"][
-                                                question_id
-                                            ] = result
-
-                                        # Generate file key for display
-                                        file_key = generate_file_key(
-                                            analysis_file_path, st
-                                        )
-
-                                        # Update display
-                                        analysis_df, chunks_df = (
-                                            create_analysis_dataframes(
-                                                st.session_state.results["answers"],
-                                                file_key,
+                                    try:
+                                        asyncio.run(
+                                            analyze_document_and_display(
+                                                analyzer,
+                                                file_path=analysis_file_path,  # Use URN for backend, file path for local
+                                                questions=questions,
+                                                selected_questions=selected_questions,
+                                                use_llm_scoring=st.session_state.new_llm_scoring,
+                                                single_call=st.session_state.new_batch_scoring,
+                                                force_recompute=False,  # Use cache when available
                                             )
                                         )
-                                        st.session_state.analysis_df = analysis_df
-                                        st.session_state.chunks_df = chunks_df
-                                        st.session_state.analysis_complete = True
-                                    else:
-                                        # Run analysis for uncached questions
-                                        progress_text.info(
-                                            f"Processing {len(selected_questions)} questions..."
-                                        )
 
-                                        try:
-                                            # Run analysis for uncached questions
-                                            asyncio.run(
-                                                analyze_document_and_display(
-                                                    analyzer,
-                                                    file_path=analysis_file_path,  # Use URN for backend, file path for local
-                                                    questions=questions,
-                                                    selected_questions=selected_questions,
-                                                    use_llm_scoring=st.session_state.new_llm_scoring,
-                                                    single_call=st.session_state.new_batch_scoring,
-                                                )
-                                            )
+                                        progress_text.success("Analysis complete!")
 
-                                            progress_text.success("Analysis complete!")
-
-                                        except Exception as e:
-                                            st.error(f"Error during analysis: {str(e)}")
-                                            st.exception(e)
+                                    except Exception as e:
+                                        st.error(f"Error during analysis: {str(e)}")
+                                        st.exception(e)
 
                                     # Get final results
                                     all_results = (
@@ -4177,6 +4245,54 @@ def main():
                         selected_file_path,
                         selected_config["config"],
                     )
+
+        # Benchmarking page
+        elif nav_page == "Benchmarking":
+            st.header("Benchmarking")
+            st.write(
+                "Evaluate retrieval and extraction systems against reference datasets"
+            )
+
+            try:
+                from report_analyst.ui.benchmarking import BenchmarkingUI
+
+                # Initialize analyzer if not already in session state
+                if "analyzer" not in st.session_state:
+                    # Create a minimal analyzer for cache_manager access
+                    from report_analyst.core.analyzer import DocumentAnalyzer
+                    from report_analyst.core.cache_manager import CacheManager
+
+                    cache_manager = CacheManager()
+                    analyzer = DocumentAnalyzer(cache_manager=cache_manager)
+                    st.session_state.analyzer = analyzer
+                else:
+                    analyzer = st.session_state.analyzer
+
+                benchmark_ui = BenchmarkingUI(analyzer.cache_manager)
+
+                # Sub-tabs for benchmarking features
+                dataset_tab, eval_tab, results_tab, annotation_tab = st.tabs(
+                    ["Datasets", "Evaluate", "Results", "Annotate"]
+                )
+
+                with dataset_tab:
+                    benchmark_ui.render_dataset_management()
+
+                with eval_tab:
+                    benchmark_ui.render_benchmarking_interface()
+
+                with results_tab:
+                    benchmark_ui.render_results_dashboard()
+
+                with annotation_tab:
+                    benchmark_ui.render_annotation_interface()
+
+            except ImportError as e:
+                st.error(f"Benchmarking functionality not available: {e}")
+                st.exception(e)
+            except Exception as e:
+                st.error(f"Error loading benchmarking interface: {e}")
+                st.exception(e)
 
         # Add Climate+Tech footer at the bottom of sidebar
         # Get current theme for logo selection and encode image as base64

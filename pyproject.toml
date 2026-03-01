@@ -1,7 +1,55 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "report-analyst"
+version = "0.8.0rc"
+description = "Open Sustainability Analyst - benchmark evaluation, error analysis, and dataset loading for retrieval evaluation"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "pandas",
+    "numpy",
+    "pydantic",
+    "pyyaml",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["report_analyst", "report_analyst.*"]
+
+[tool.setuptools.package-data]
+"report_analyst" = ["data/*.csv", "config/datasets/*.yaml"]
+
 [tool.isort]
 profile = "black"
 line_length = 88
+skip = ["venv", "venv2", "node_modules", "report_analyst_enterprise", ".git", "__pycache__", "htmlcov", "*.egg-info"]
 
 [tool.black]
 line-length = 88
 target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | venv
+  | venv2
+  | node_modules
+  | report_analyst_enterprise
+  | __pycache__
+  | \.pytest_cache
+  | htmlcov
+  | \.eggs
+  | \.mypy_cache
+  | \.tox
+  | dist
+  | build
+  | \.idea
+  | \.vscode
+)/
+'''
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
