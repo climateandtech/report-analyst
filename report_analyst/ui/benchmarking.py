@@ -43,6 +43,27 @@ class BenchmarkingUI:
         """Render dataset management interface"""
         st.subheader("Dataset Management")
 
+        # Expected file formats (expandable)
+        with st.expander("Expected file formats (CSV, Excel, YAML, JSON)"):
+            st.markdown(
+                "**CSV / Excel (ground truth or benchmark)** — For evaluation, the app expects "
+                "columns such as: `query_id` (or `question_id`), `chunk_id`, `position` (or `rank`), "
+                "`score` (or `relevance_score`). Ground truth alignment expects: `document`, `question`, "
+                "`context` or `relevant`, `relevance_label`. Benchmark alignment expects: `report`, "
+                "`question`, `paragraph`, and optionally `relevant_text`, `relevant_text_sim`. "
+                "Column names are case-insensitive; common variants are accepted. If your file does not "
+                "match, use **Dataset Alignment** (CSV/Excel only) to convert it."
+            )
+            st.markdown(
+                "**YAML / JSON** — Benchmark content schema: top-level `dataset_id`, `name`, "
+                "`description`, `version`, `question_set`, and `questions` (array of `question_id`, "
+                "`question_text`, `ground_truth_chunks` with `chunk_id`, `relevance_score`, `is_evidence`). "
+                "Alignment is not available for YAML/JSON; use CSV/Excel for alignment."
+            )
+            st.caption(
+                "Full details: see EXPECTED_FILE_FORMATS.md in the project root."
+            )
+
         # Initialize session state for uploaded datasets if not exists
         if "uploaded_datasets" not in st.session_state:
             st.session_state.uploaded_datasets = {}
@@ -81,6 +102,36 @@ class BenchmarkingUI:
                 self._handle_dataset_upload(
                     uploaded_benchmark, dataset_type="benchmark"
                 )
+
+        # Offer download of aligned datasets (when user previously aligned and used one)
+        aligned_gt = st.session_state.get("aligned_csv_current_ground_truth")
+        aligned_bm = st.session_state.get("aligned_csv_current_benchmark")
+        if aligned_gt or aligned_bm:
+            st.subheader("Download aligned datasets")
+            st.caption(
+                "You have aligned dataset(s) in use. Download the aligned CSV version below."
+            )
+            dl_col1, dl_col2 = st.columns(2)
+            if aligned_gt:
+                with dl_col1:
+                    _name, _bytes = aligned_gt
+                    st.download_button(
+                        label="Download aligned ground truth CSV",
+                        data=_bytes,
+                        file_name="ground_truth_aligned.csv",
+                        mime="text/csv",
+                        key="download_aligned_gt_current",
+                    )
+            if aligned_bm:
+                with dl_col2:
+                    _name, _bytes = aligned_bm
+                    st.download_button(
+                        label="Download aligned benchmark CSV",
+                        data=_bytes,
+                        file_name="benchmark_aligned.csv",
+                        mime="text/csv",
+                        key="download_aligned_bm_current",
+                    )
 
         # List existing datasets
         st.subheader("Existing Datasets")
@@ -138,6 +189,10 @@ class BenchmarkingUI:
         # Optional: On-the-fly alignment tools using DatasetMapper
         # ------------------------------------------------------------------
         st.subheader("Dataset Alignment (Experimental)")
+        st.caption(
+            "⚠️ Alignment works only for CSV or Excel files. YAML/JSON datasets are "
+            "loaded as-is and cannot be aligned with this tool."
+        )
 
         available_ids = list_available_dataset_ids()
         if not available_ids:
@@ -166,17 +221,21 @@ class BenchmarkingUI:
 
         with align_tab_gt:
             st.write(
-                "Upload a **raw ground truth** CSV and convert it to the aligned format "
-                "used by the evaluation engine."
+                "Upload a **raw ground truth** CSV or Excel file and convert it to the "
+                "aligned format used by the evaluation engine."
             )
             raw_gt_file = st.file_uploader(
-                "Ground truth CSV",
-                type=["csv"],
+                "Ground truth file (CSV or Excel)",
+                type=["csv", "xlsx", "xls"],
                 key="align_ground_truth_csv",
             )
             if raw_gt_file is not None:
                 try:
-                    df_raw = pd.read_csv(raw_gt_file)
+                    ext = raw_gt_file.name.split(".")[-1].lower()
+                    if ext in ["xlsx", "xls"]:
+                        df_raw = pd.read_excel(raw_gt_file)
+                    else:
+                        df_raw = pd.read_csv(raw_gt_file)
                     df_aligned = mapper.align_ground_truth(df_raw)
                     st.success(
                         f"Aligned ground truth dataset "
@@ -199,17 +258,21 @@ class BenchmarkingUI:
 
         with align_tab_bm:
             st.write(
-                "Upload a **raw benchmark results** CSV and convert it to the aligned "
-                "format used by the evaluation engine."
+                "Upload a **raw benchmark results** CSV or Excel file and convert it to "
+                "the aligned format used by the evaluation engine."
             )
             raw_bm_file = st.file_uploader(
-                "Benchmark results CSV",
-                type=["csv"],
+                "Benchmark results file (CSV or Excel)",
+                type=["csv", "xlsx", "xls"],
                 key="align_benchmark_csv",
             )
             if raw_bm_file is not None:
                 try:
-                    df_raw = pd.read_csv(raw_bm_file)
+                    ext = raw_bm_file.name.split(".")[-1].lower()
+                    if ext in ["xlsx", "xls"]:
+                        df_raw = pd.read_excel(raw_bm_file)
+                    else:
+                        df_raw = pd.read_csv(raw_bm_file)
                     df_aligned = mapper.align_benchmark(df_raw)
                     st.success(
                         f"Aligned benchmark results "
@@ -775,6 +838,11 @@ class BenchmarkingUI:
                                 if temp_key in st.session_state.uploaded_datasets:
                                     del st.session_state.uploaded_datasets[temp_key]
 
+                                # Clear any previously stored aligned CSV for this type
+                                st.session_state.pop(
+                                    f"aligned_csv_current_{dataset_type}", None
+                                )
+
                                 st.success(
                                     f"Dataset '{dataset.name}' confirmed and ready for evaluation!"
                                 )
@@ -817,6 +885,9 @@ class BenchmarkingUI:
                             "This file does not match the expected benchmark CSV schema "
                             "used by the evaluation engine."
                         )
+                        st.caption(
+                            "Alignment is available for CSV and Excel files only."
+                        )
                         if load_error is not None:
                             st.caption(f"Details: {load_error}")
 
@@ -839,56 +910,102 @@ class BenchmarkingUI:
                                 key=f"align_cfg_{dataset_type}_{uploaded_file.name}",
                             )
 
-                            if st.button(
-                                "Align dataset and use for evaluation",
-                                key=f"align_and_use_{dataset_type}_{uploaded_file.name}",
-                            ):
-                                mapper = DatasetMapperFactory.get_mapper(
-                                    selected_mapping_id
-                                )
-                                if dataset_type == "ground_truth":
-                                    df_aligned = mapper.align_ground_truth(df_raw)
-                                else:
-                                    df_aligned = mapper.align_benchmark(df_raw)
-
-                                csv_aligned = df_aligned.to_csv(index=False)
-                                aligned_dataset = load_flexible_dataset_from_csv(
-                                    csv_content=csv_aligned,
-                                    dataset_name=(
-                                        f"{dataset_type}_aligned_{uploaded_file.name}"
+                            # If we just aligned for download, show the download button
+                            download_key = (
+                                f"aligned_csv_download_{dataset_type}_{uploaded_file.name}"
+                            )
+                            if st.session_state.get(download_key) is not None:
+                                csv_bytes = st.session_state[download_key]
+                                st.success("Aligned file is ready. Download it below.")
+                                st.download_button(
+                                    label="Download aligned CSV",
+                                    data=csv_bytes,
+                                    file_name=(
+                                        "ground_truth_aligned.csv"
+                                        if dataset_type == "ground_truth"
+                                        else "benchmark_aligned.csv"
                                     ),
+                                    mime="text/csv",
+                                    key=f"dl_aligned_{dataset_type}_{uploaded_file.name}",
+                                )
+                                st.caption(
+                                    "You can also 'Align and use for evaluation' to use "
+                                    "this dataset for evaluation."
                                 )
 
-                                temp_key = (
-                                    f"temp_{dataset_type}_aligned_{uploaded_file.name}"
-                                )
-                                if "uploaded_datasets" not in st.session_state:
-                                    st.session_state.uploaded_datasets = {}
-                                st.session_state.uploaded_datasets[temp_key] = (
-                                    aligned_dataset
-                                )
+                            col_align_use, col_align_dl = st.columns(2)
+                            with col_align_use:
+                                if st.button(
+                                    "Align dataset and use for evaluation",
+                                    key=f"align_and_use_{dataset_type}_{uploaded_file.name}",
+                                ):
+                                    mapper = DatasetMapperFactory.get_mapper(
+                                        selected_mapping_id
+                                    )
+                                    if dataset_type == "ground_truth":
+                                        df_aligned = mapper.align_ground_truth(df_raw)
+                                    else:
+                                        df_aligned = mapper.align_benchmark(df_raw)
 
-                                dataset_key = f"{dataset_type}_current"
-                                st.session_state.uploaded_datasets[dataset_key] = (
-                                    aligned_dataset
-                                )
+                                    csv_aligned = df_aligned.to_csv(index=False)
+                                    csv_bytes = csv_aligned.encode("utf-8")
+                                    aligned_dataset = load_flexible_dataset_from_csv(
+                                        csv_content=csv_aligned,
+                                        dataset_name=(
+                                            f"{dataset_type}_aligned_{uploaded_file.name}"
+                                        ),
+                                    )
 
-                                if temp_key in st.session_state.uploaded_datasets:
-                                    del st.session_state.uploaded_datasets[temp_key]
+                                    temp_key = (
+                                        f"temp_{dataset_type}_aligned_{uploaded_file.name}"
+                                    )
+                                    if "uploaded_datasets" not in st.session_state:
+                                        st.session_state.uploaded_datasets = {}
+                                    st.session_state.uploaded_datasets[temp_key] = (
+                                        aligned_dataset
+                                    )
 
-                                # Remember that this particular uploaded file has
-                                # already been aligned so we do not re-show the
-                                # schema warning on subsequent reruns.
-                                aligned_flag_key = (
-                                    f"aligned_{dataset_type}_{uploaded_file.name}"
-                                )
-                                st.session_state[aligned_flag_key] = True
+                                    dataset_key = f"{dataset_type}_current"
+                                    st.session_state.uploaded_datasets[dataset_key] = (
+                                        aligned_dataset
+                                    )
 
-                                st.success(
-                                    "Dataset was aligned to the expected structure and "
-                                    "is now ready for evaluation."
-                                )
-                                st.rerun()
+                                    if temp_key in st.session_state.uploaded_datasets:
+                                        del st.session_state.uploaded_datasets[temp_key]
+
+                                    aligned_flag_key = (
+                                        f"aligned_{dataset_type}_{uploaded_file.name}"
+                                    )
+                                    st.session_state[aligned_flag_key] = True
+
+                                    # Store aligned CSV so user can download it later
+                                    st.session_state[
+                                        f"aligned_csv_current_{dataset_type}"
+                                    ] = (uploaded_file.name, csv_bytes)
+
+                                    st.success(
+                                        "Dataset was aligned to the expected structure and "
+                                        "is now ready for evaluation."
+                                    )
+                                    st.rerun()
+
+                            with col_align_dl:
+                                if st.button(
+                                    "Align and download CSV",
+                                    key=f"align_and_download_{dataset_type}_{uploaded_file.name}",
+                                ):
+                                    mapper = DatasetMapperFactory.get_mapper(
+                                        selected_mapping_id
+                                    )
+                                    if dataset_type == "ground_truth":
+                                        df_aligned = mapper.align_ground_truth(df_raw)
+                                    else:
+                                        df_aligned = mapper.align_benchmark(df_raw)
+                                    csv_bytes = df_aligned.to_csv(
+                                        index=False
+                                    ).encode("utf-8")
+                                    st.session_state[download_key] = csv_bytes
+                                    st.rerun()
 
                 else:
                     # Use traditional YAML/JSON loader
