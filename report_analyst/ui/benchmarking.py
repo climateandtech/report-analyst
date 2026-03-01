@@ -911,9 +911,7 @@ class BenchmarkingUI:
                             )
 
                             # If we just aligned for download, show the download button
-                            download_key = (
-                                f"aligned_csv_download_{dataset_type}_{uploaded_file.name}"
-                            )
+                            download_key = f"aligned_csv_download_{dataset_type}_{uploaded_file.name}"
                             if st.session_state.get(download_key) is not None:
                                 csv_bytes = st.session_state[download_key]
                                 st.success("Aligned file is ready. Download it below.")
@@ -956,9 +954,7 @@ class BenchmarkingUI:
                                         ),
                                     )
 
-                                    temp_key = (
-                                        f"temp_{dataset_type}_aligned_{uploaded_file.name}"
-                                    )
+                                    temp_key = f"temp_{dataset_type}_aligned_{uploaded_file.name}"
                                     if "uploaded_datasets" not in st.session_state:
                                         st.session_state.uploaded_datasets = {}
                                     st.session_state.uploaded_datasets[temp_key] = (
@@ -1001,9 +997,9 @@ class BenchmarkingUI:
                                         df_aligned = mapper.align_ground_truth(df_raw)
                                     else:
                                         df_aligned = mapper.align_benchmark(df_raw)
-                                    csv_bytes = df_aligned.to_csv(
-                                        index=False
-                                    ).encode("utf-8")
+                                    csv_bytes = df_aligned.to_csv(index=False).encode(
+                                        "utf-8"
+                                    )
                                     st.session_state[download_key] = csv_bytes
                                     st.rerun()
 
