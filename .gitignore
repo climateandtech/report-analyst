@@ -1,5 +1,4 @@
-/data
-data/
+report_analyst/data
 .env
 *.log
 venv/
@@ -56,6 +55,8 @@ THEME_SWITCHING.md
 VERCEL_CHANGES_SUMMARY.md
 VERCEL_DEPLOYMENT_ASSESSMENT.md
 VERCEL_MIGRATION_GUIDE.md
+.env
+reports/
 
 # Frontend generated artifacts
 report_analyst_enterprise/components/web/node_modules/

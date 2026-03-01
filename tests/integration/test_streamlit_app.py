@@ -65,7 +65,8 @@ def test_env():
     # Create test database
     db_path = cache_path / "analysis.db"
     conn = sqlite3.connect(db_path)
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS analysis_cache (
             file_path TEXT,
             question_id TEXT,
@@ -78,7 +79,8 @@ def test_env():
             created_at TEXT,
             PRIMARY KEY (file_path, question_id, chunk_size, chunk_overlap, top_k, model, question_set)
         )
-    """)
+    """
+    )
     conn.close()
 
     # Create test question set

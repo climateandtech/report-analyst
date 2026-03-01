@@ -75,21 +75,83 @@ class EvaluationEngine:
         retrieved_chunks: List[Dict],
         ground_truth: Dict[str, float],
         k_values: List[int],
+        relevant_text_sim_scores: Optional[List[float]] = None,
+        relevance_threshold: float = 0.95,
     ) -> Dict:
-        """Evaluate a single question's retrieval results"""
+        """Evaluate a single question's retrieval results
 
-        # Extract chunk IDs in retrieval order
-        retrieved_ids = [
+        Args:
+            retrieved_chunks: List of retrieved chunks with metadata
+            ground_truth: Dict mapping chunk_id to relevance score (for total count and NDCG ideal)
+            k_values: List of K values to compute metrics for
+            relevant_text_sim_scores: Optional list of relevant_text_sim scores from benchmark dataset.
+                                     If provided, used for binary relevance (relevant if > threshold).
+                                     Must match order of retrieved_chunks after deduplication.
+            relevance_threshold: Threshold for relevant_text_sim to consider a chunk relevant (default: 0.95)
+        """
+
+        # Extract relevant part IDs in retrieval order
+        # Note: "id" field contains relevant_part_id (for matching to ground truth)
+        # chunk_id is the unique paragraph identifier (for reference)
+        # Multiple retrieved paragraphs can legitimately match the same relevant part
+        retrieved_ids_raw = [
             chunk.get("id", chunk.get("chunk_id", "")) for chunk in retrieved_chunks
         ]
 
-        # Get relevance scores for retrieved chunks
+        # Deduplicate relevant parts while preserving order (keep first occurrence)
+        # This ensures each unique relevant part is counted only once in recall/NDCG
+        # Multiple retrieved paragraphs matching the same relevant part is valid, but we only
+        # count the relevant part once to prevent recall > 1.0
+        seen = set()
+        retrieved_ids = []
+        deduplicated_indices = []  # Track which original indices were kept
+        for i, relevant_part_id in enumerate(retrieved_ids_raw):
+            if relevant_part_id not in seen:
+                retrieved_ids.append(relevant_part_id)
+                seen.add(relevant_part_id)
+                deduplicated_indices.append(i)
+
+        # Get relevance scores for retrieved chunks (after deduplication)
+        # For NDCG, we still use ground truth scores if available
         retrieved_relevance = [
             ground_truth.get(chunk_id, 0.0) for chunk_id in retrieved_ids
         ]
 
-        # Binary relevance (relevant if score > 0)
-        binary_relevance = [1 if score > 0 else 0 for score in retrieved_relevance]
+        # Decide whether we have usable relevant_text_sim scores
+        use_sim_scores = bool(
+            relevant_text_sim_scores
+            and any(
+                (s is not None and float(str(s) or 0) != 0.0)
+                for s in relevant_text_sim_scores
+            )
+        )
+
+        binary_relevance: List[int] = []
+
+        if use_sim_scores:
+            # Use relevant_text_sim threshold: chunk is relevant if relevant_text_sim > threshold (default 0.95)
+            # Map to deduplicated indices
+            for idx in deduplicated_indices:
+                if idx < len(relevant_text_sim_scores):
+                    sim_score = relevant_text_sim_scores[idx]
+                    # Convert to float if needed
+                    if isinstance(sim_score, str):
+                        try:
+                            sim_score = float(sim_score)
+                        except (ValueError, TypeError):
+                            sim_score = 0.0
+                    else:
+                        sim_score = float(sim_score) if sim_score else 0.0
+                    is_relevant = 1 if sim_score > relevance_threshold else 0
+                    binary_relevance.append(is_relevant)
+                else:
+                    # Missing score, default to not relevant
+                    binary_relevance.append(0)
+        else:
+            # Fallback: use ground truth matching (old behavior):
+            # treat a retrieved chunk as relevant if its chunk_id appears in the ground truth.
+            for chunk_id in retrieved_ids:
+                binary_relevance.append(1 if ground_truth.get(chunk_id, 0.0) > 0 else 0)
 
         # Total relevant chunks in ground truth
         total_relevant = sum(1 for score in ground_truth.values() if score > 0)
@@ -108,18 +170,18 @@ class EvaluationEngine:
         }
 
         # Compute metrics at different K values
+        # NOTE: Metrics should be calculated for ALL k values, even if k > len(retrieved_ids)
+        # When k > len(retrieved_ids), recall@k equals the maximum recall (all relevant items found)
+        # and precision@k is calculated with k as denominator (correctly lower when fewer items retrieved)
         for k in k_values:
-            if k <= len(retrieved_ids):
-                result["precision_at_k"][k] = self._precision_at_k(binary_relevance, k)
-                result["recall_at_k"][k] = self._recall_at_k(
-                    binary_relevance, total_relevant, k
-                )
-                result["f1_at_k"][k] = self._f1_at_k(
-                    result["precision_at_k"][k], result["recall_at_k"][k]
-                )
-                result["ndcg_at_k"][k] = self._ndcg_at_k(
-                    retrieved_relevance, ground_truth, k
-                )
+            precision_k = self._precision_at_k(binary_relevance, k)
+            recall_k = self._recall_at_k(binary_relevance, total_relevant, k)
+            f1_k = self._f1_at_k(precision_k, recall_k)
+            ndcg_k = self._ndcg_at_k(retrieved_relevance, ground_truth, k)
+            result["precision_at_k"][k] = precision_k
+            result["recall_at_k"][k] = recall_k
+            result["f1_at_k"][k] = f1_k
+            result["ndcg_at_k"][k] = ndcg_k
 
         # Compute MRR and MAP
         result["reciprocal_rank"] = self._reciprocal_rank(binary_relevance)
@@ -350,20 +412,81 @@ class EvaluationEngine:
                     )
                     ground_truth[chunk_id] = relevance_score
 
+            # Skip this query if there's no ground truth (can't evaluate without ground truth)
+            if not ground_truth:
+                logger.debug(
+                    f"Skipping query with no ground truth: query_id='{query_id}'"
+                )
+                continue
+
             # Get input results (actual retrieval)
             input_results = input_dataset.get_results_by_query(query_id)
-            input_results = sorted(input_results, key=lambda x: x.get_position() or 999)
+
+            # Helper function to get similarity score for ranking (same logic as error analysis)
+            def get_similarity_score_for_ranking(result):
+                data = result.data if hasattr(result, "data") else {}
+                # Use relevant_text_sim as priority for ranking (similarity between retrieved chunk and relevant part)
+                # Note: sim_text_relevance is NOT used here - it's an expert-annotated label, not a ranking score
+                sim_score = (
+                    data.get("relevant_text_sim")
+                    or result.get_score()
+                    or data.get("score")
+                    or data.get("relevance_score")
+                    or 0.0
+                )
+                return float(sim_score) if sim_score else 0.0
+
+            # Sort by similarity score (descending) - this matches the error analysis logic
+            input_results = sorted(
+                input_results, key=get_similarity_score_for_ranking, reverse=True
+            )
 
             # Convert to format expected by _evaluate_single_question
+            # Use relevant_part_id for matching to ground truth (if available), otherwise fallback to chunk_id
             retrieved_chunks = []
+            relevant_text_sim_scores = (
+                []
+            )  # Extract relevant_text_sim from benchmark dataset
             for result in input_results:
-                chunk_id = result.get_chunk_id()
-                score = result.get_score() or 0.0
+                chunk_id = result.get_chunk_id()  # Unique paragraph identifier
+                relevant_part_id = result.get(
+                    "relevant_part_id"
+                )  # For matching to ground truth
+                # Fallback: if no relevant_part_id, use chunk_id (backward compatibility)
+                match_id = relevant_part_id if relevant_part_id else chunk_id
+                # Use relevant_text_sim as the score (same priority as ranking)
+                data = result.data if hasattr(result, "data") else {}
+                score = (
+                    data.get("relevant_text_sim")
+                    or result.get_score()
+                    or data.get("score")
+                    or data.get("relevance_score")
+                    or 0.0
+                )
+                score = float(score) if score else 0.0
                 position = result.get_position() or 999
 
+                # Extract relevant_text_sim for relevance determination (chunk is relevant if relevant_text_sim > 0.95)
+                relevant_text_sim = data.get("relevant_text_sim") or 0.0
+                # Convert to numeric if it's a string
+                if isinstance(relevant_text_sim, str):
+                    try:
+                        relevant_text_sim = float(relevant_text_sim)
+                    except (ValueError, TypeError):
+                        relevant_text_sim = 0.0
+                else:
+                    relevant_text_sim = (
+                        float(relevant_text_sim) if relevant_text_sim else 0.0
+                    )
+                relevant_text_sim_scores.append(relevant_text_sim)
+
                 chunk_dict = {
-                    "id": chunk_id or f"unknown_{position}",
-                    "chunk_id": chunk_id or f"unknown_{position}",
+                    "id": match_id
+                    or f"unknown_{position}",  # Use relevant_part_id for matching
+                    "chunk_id": chunk_id
+                    or f"unknown_{position}",  # Keep original chunk_id for reference
+                    "relevant_part_id": match_id
+                    or f"unknown_{position}",  # Store for logging
                     "score": score,
                     "position": position,
                 }
@@ -371,7 +494,11 @@ class EvaluationEngine:
 
             # Evaluate this question
             result = self._evaluate_single_question(
-                retrieved_chunks, ground_truth, k_values
+                retrieved_chunks,
+                ground_truth,
+                k_values,
+                relevant_text_sim_scores,
+                relevance_threshold=0.95,
             )
             question_results.append(result)
 
@@ -508,25 +635,87 @@ class EvaluationEngine:
                 )
                 ground_truth[chunk_id] = relevance_score
 
+            # Skip this query if there's no ground truth (can't evaluate without ground truth)
+            if not ground_truth:
+                logger.debug(
+                    f"Skipping query with no ground truth: query_id='{query_id}'"
+                )
+                continue
+
             # Get input results (actual retrieval)
             input_results = input_dataset.get_results_by_query(query_id)
-            # Sort by position
-            input_results = sorted(input_results, key=lambda x: x.position)
+
+            # Helper function to get similarity score for ranking
+            def get_similarity_score_for_ranking_legacy(result):
+                # For legacy RetrievalResultRow, check if it has data attribute
+                if hasattr(result, "metadata") and result.metadata:
+                    data = result.metadata
+                    # Use relevant_text_sim as priority for ranking
+                    sim_score = (
+                        data.get("relevant_text_sim")
+                        or result.score
+                        or data.get("score")
+                        or data.get("relevance_score")
+                        or 0.0
+                    )
+                    return float(sim_score) if sim_score else 0.0
+                # Fallback to score if no metadata
+                return float(result.score) if result.score else 0.0
+
+            # Sort by similarity score (descending) - prioritize relevant_text_sim
+            input_results = sorted(
+                input_results, key=get_similarity_score_for_ranking_legacy, reverse=True
+            )
 
             # Convert to format expected by _evaluate_single_question
             retrieved_chunks = []
+            relevant_text_sim_scores = (
+                []
+            )  # Extract relevant_text_sim from benchmark dataset
             for result in input_results:
+                # Use relevant_text_sim as the score if available
+                score = result.score or 0.0
+                relevant_text_sim = 0.0
+                if hasattr(result, "metadata") and result.metadata:
+                    data = result.metadata
+                    score = (
+                        data.get("relevant_text_sim")
+                        or result.score
+                        or data.get("score")
+                        or data.get("relevance_score")
+                        or 0.0
+                    )
+                    # Extract relevant_text_sim for relevance determination (chunk is relevant if relevant_text_sim > 0.95)
+                    relevant_text_sim = data.get("relevant_text_sim") or 0.0
+                score = float(score) if score else 0.0
+
+                # Convert to numeric if it's a string
+                if isinstance(relevant_text_sim, str):
+                    try:
+                        relevant_text_sim = float(relevant_text_sim)
+                    except (ValueError, TypeError):
+                        relevant_text_sim = 0.0
+                else:
+                    relevant_text_sim = (
+                        float(relevant_text_sim) if relevant_text_sim else 0.0
+                    )
+                relevant_text_sim_scores.append(relevant_text_sim)
+
                 chunk_dict = {
                     "id": result.chunk_id,
                     "chunk_id": result.chunk_id,
-                    "score": result.score,
+                    "score": score,
                     "position": result.position,
                 }
                 retrieved_chunks.append(chunk_dict)
 
             # Evaluate this question
             result = self._evaluate_single_question(
-                retrieved_chunks, ground_truth, k_values
+                retrieved_chunks,
+                ground_truth,
+                k_values,
+                relevant_text_sim_scores,
+                relevance_threshold=0.95,
             )
             question_results.append(result)
 

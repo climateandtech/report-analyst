@@ -22,6 +22,96 @@ class BenchmarkStore:
 
     def __init__(self, db_path: str):
         self.db_path = db_path
+        self.init_db()
+
+    def init_db(self):
+        """Initialize the database schema for benchmarking tables"""
+        with sqlite3.connect(self.db_path) as conn:
+            # Create benchmark_datasets table
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS benchmark_datasets (
+                    dataset_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    version TEXT,
+                    question_set TEXT,
+                    file_path TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+
+            # Create ground_truth_chunks table
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ground_truth_chunks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    dataset_id TEXT NOT NULL,
+                    question_id TEXT NOT NULL,
+                    chunk_id TEXT NOT NULL,
+                    relevance_score REAL DEFAULT 0.0,
+                    is_evidence INTEGER DEFAULT 0,
+                    evidence_order INTEGER,
+                    annotation_notes TEXT,
+                    FOREIGN KEY (dataset_id) REFERENCES benchmark_datasets(dataset_id),
+                    UNIQUE(dataset_id, question_id, chunk_id)
+                )
+            """
+            )
+
+            # Create benchmark_evaluations table
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS benchmark_evaluations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    dataset_id TEXT NOT NULL,
+                    evaluation_name TEXT NOT NULL,
+                    config_hash TEXT,
+                    retrieval_config TEXT,
+                    evaluation_metrics TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (dataset_id) REFERENCES benchmark_datasets(dataset_id)
+                )
+            """
+            )
+
+            # Create human_annotations table
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS human_annotations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    evaluation_id INTEGER NOT NULL,
+                    question_id TEXT NOT NULL,
+                    chunk_id TEXT NOT NULL,
+                    human_relevance_score REAL,
+                    human_is_evidence INTEGER,
+                    human_evidence_order INTEGER,
+                    annotation_notes TEXT,
+                    annotator_id TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (evaluation_id) REFERENCES benchmark_evaluations(id)
+                )
+            """
+            )
+
+            # Create indices for better performance
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ground_truth_dataset ON ground_truth_chunks(dataset_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ground_truth_question ON ground_truth_chunks(question_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_evaluations_dataset ON benchmark_evaluations(dataset_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_annotations_evaluation ON human_annotations(evaluation_id)"
+            )
+
+            conn.commit()
+            logger.info("Benchmark database schema initialized")
 
     def save_dataset(self, dataset: BenchmarkDatasetContent, file_path: str) -> int:
         """Save a benchmark dataset to the database"""
@@ -114,9 +204,11 @@ class BenchmarkStore:
         """List all available benchmark datasets"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT * FROM benchmark_datasets ORDER BY created_at DESC
-            """)
+            """
+            )
 
             datasets = []
             for row in cursor.fetchall():
@@ -244,10 +336,12 @@ class BenchmarkStore:
                     (dataset_id,),
                 )
             else:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT * FROM benchmark_evaluations 
                     ORDER BY created_at DESC
-                """)
+                """
+                )
 
             evaluations = []
             for row in cursor.fetchall():

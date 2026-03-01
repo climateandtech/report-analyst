@@ -184,7 +184,15 @@ class TestQuestionSetLoader:
         question_sets = loader.get_question_sets()
 
         # Should have at least the main question sets
-        expected_sets = ["everest", "tcfd", "denali", "kilimanjaro"]
+        # "custom" is a UI-only option and not a real question set ID
+        expected_sets = [
+            "everest",
+            "tcfd",
+            "denali",
+            "kilimanjaro",
+            "lucia",
+            "climretrieve",
+        ]
         for expected_set in expected_sets:
             assert (
                 expected_set in question_sets
@@ -335,9 +343,18 @@ class TestQuestionSetLoader:
             ]  # Only custom when core functionality unavailable
 
         # Should have all question sets plus custom
-        expected_sets = {"everest", "tcfd", "denali", "kilimanjaro", "lucia", "custom"}
+        expected_sets = {
+            "everest",
+            "tcfd",
+            "denali",
+            "kilimanjaro",
+            "lucia",
+            "climretrieve",
+            "custom",
+        }
         assert set(question_set_options) == expected_sets
-        assert len(question_set_options) == 6
+        # 6 real sets + "custom" UI option
+        assert len(question_set_options) == 7
         assert "custom" in question_set_options
         assert "everest" in question_set_options
         assert "tcfd" in question_set_options
@@ -385,10 +402,17 @@ class TestQuestionSetLoader:
         assert options1 == options2 == options3
 
         # Should contain expected question sets
-        expected_sets = ["everest", "tcfd", "denali", "kilimanjaro", "lucia"]
+        expected_sets = [
+            "everest",
+            "tcfd",
+            "denali",
+            "kilimanjaro",
+            "lucia",
+            "climretrieve",
+        ]
         for expected_set in expected_sets:
             assert (
                 expected_set in options1
             ), f"Expected question set '{expected_set}' not found in options"
 
-        assert len(options1) == 5
+        assert len(options1) == 6

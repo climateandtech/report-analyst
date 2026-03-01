@@ -29,13 +29,16 @@ class CacheManager:
         # In-memory vector store for current document
         self.vector_store = None
         self.current_file_path = None
+        self.current_chunk_size = None
+        self.current_chunk_overlap = None
 
     def init_db(self):
         """Initialize the database schema"""
         conn = sqlite3.connect(self.db_path)
         try:
             # Create optimized table for document chunks
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS document_chunks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_path TEXT,
@@ -47,7 +50,8 @@ class CacheManager:
                 created_at TIMESTAMP,
                 UNIQUE(file_path, chunk_text, chunk_size, chunk_overlap)
             )
-            """)
+            """
+            )
 
             # Create indices for better performance
             conn.execute(
@@ -58,7 +62,8 @@ class CacheManager:
             )
 
             # Store questions separately
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS questions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 question_id TEXT,
@@ -67,10 +72,12 @@ class CacheManager:
                 guidelines TEXT,
                 UNIQUE(question_id, question_set)
             )
-            """)
+            """
+            )
 
             # Create analysis cache table
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS analysis_cache (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_path TEXT,
@@ -84,10 +91,12 @@ class CacheManager:
                 created_at TIMESTAMP,
                 UNIQUE(file_path, question_id, chunk_size, chunk_overlap, top_k, model, question_set)
             )
-            """)
+            """
+            )
 
             # Store analysis configurations and results
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS question_analysis (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_path TEXT,
@@ -100,10 +109,12 @@ class CacheManager:
                 FOREIGN KEY(question_id) REFERENCES questions(id),
                 UNIQUE(file_path, question_id, model, top_k, version)
             )
-            """)
+            """
+            )
 
             # Store chunk-question relationships with all scores and ordering
-            conn.execute("""
+            conn.execute(
+                """
             CREATE TABLE IF NOT EXISTS chunk_relevance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 question_analysis_id INTEGER,
@@ -118,7 +129,8 @@ class CacheManager:
                 FOREIGN KEY(document_chunk_id) REFERENCES document_chunks(id),
                 UNIQUE(question_analysis_id, document_chunk_id)
             )
-            """)
+            """
+            )
 
         finally:
             conn.close()
@@ -126,6 +138,11 @@ class CacheManager:
     def _load_vector_store(self, file_path: str, chunks: List[Dict]) -> None:
         """Load chunks into an in-memory vector store."""
         try:
+            # Clear the existing vector store if it exists
+            if self.vector_store is not None:
+                logger.debug("Clearing existing vector store before reload")
+                self.vector_store = None
+
             # Convert chunks to Documents
             documents = []
             for chunk in chunks:
@@ -142,6 +159,31 @@ class CacheManager:
                     )
                     documents.append(doc)
 
+            if not documents:
+                logger.warning(
+                    "No documents with embeddings found to load into vector store. "
+                    f"Total chunks provided: {len(chunks)}"
+                )
+                # Clear vector store if no documents to load
+                self.vector_store = None
+                self.current_file_path = file_path
+
+                # Derive chunk parameters from the first chunk if available
+                if chunks:
+                    self.current_chunk_size = chunks[0].get("chunk_size")
+                    self.current_chunk_overlap = chunks[0].get("chunk_overlap")
+                else:
+                    self.current_chunk_size = None
+                    self.current_chunk_overlap = None
+
+                logger.warning(
+                    "Vector store cleared - no chunks available for "
+                    "chunk_size=%s, chunk_overlap=%s",
+                    self.current_chunk_size,
+                    self.current_chunk_overlap,
+                )
+                return
+
             # Create vector store index with pre-computed embeddings
             from llama_index.core.indices.vector_store.base import VectorStoreIndex
 
@@ -152,9 +194,14 @@ class CacheManager:
                 show_progress=True,  # Show progress during index creation
             )
             self.current_file_path = file_path
+            # Store chunk parameters to detect when they change
+            if chunks:
+                self.current_chunk_size = chunks[0].get("chunk_size")
+                self.current_chunk_overlap = chunks[0].get("chunk_overlap")
 
             logger.info(
-                f"Loaded {len(documents)} chunks into vector store for {file_path}"
+                f"Loaded {len(documents)} chunks into vector store for {file_path} "
+                f"(chunk_size={self.current_chunk_size}, chunk_overlap={self.current_chunk_overlap})"
             )
 
         except Exception as e:
@@ -172,9 +219,39 @@ class CacheManager:
         """Get chunks most similar to the query embedding using LlamaIndex vector store."""
         try:
             # Load chunks into vector store if needed
-            if self.current_file_path != file_path:
+            # Check if file path OR chunk parameters changed
+            needs_reload = (
+                self.current_file_path != file_path
+                or self.current_chunk_size != chunk_size
+                or self.current_chunk_overlap != chunk_overlap
+            )
+
+            if needs_reload:
+                logger.info(
+                    f"Reloading vector store: file_path changed={self.current_file_path != file_path}, "
+                    f"chunk_size changed={self.current_chunk_size != chunk_size}, "
+                    f"chunk_overlap changed={self.current_chunk_overlap != chunk_overlap}"
+                )
                 chunks = self.get_document_chunks(file_path, chunk_size, chunk_overlap)
+                logger.info(
+                    f"Retrieved {len(chunks)} chunks for chunk_size={chunk_size}, chunk_overlap={chunk_overlap}"
+                )
+                if not chunks:
+                    logger.warning(
+                        f"No chunks found in database for file_path={file_path}, "
+                        f"chunk_size={chunk_size}, chunk_overlap={chunk_overlap}. "
+                        f"Vector store will be empty. This may cause incorrect similarity search results."
+                    )
                 self._load_vector_store(file_path, chunks)
+
+            # Verify vector store is loaded
+            if self.vector_store is None:
+                logger.error(
+                    f"Vector store is None for file_path={file_path}, "
+                    f"chunk_size={chunk_size}, chunk_overlap={chunk_overlap}. "
+                    f"Cannot perform similarity search. Chunks may not exist in database."
+                )
+                return []
 
             # Get similar nodes using vector store
             retriever = self.vector_store.as_retriever(similarity_top_k=top_k)
@@ -200,6 +277,17 @@ class CacheManager:
                     else node.get_score() if hasattr(node, "get_score") else 0.0
                 )
 
+                node_chunk_size = node.metadata.get("chunk_size")
+                node_chunk_overlap = node.metadata.get("chunk_overlap")
+
+                # Verify chunk metadata matches requested parameters
+                if node_chunk_size != chunk_size or node_chunk_overlap != chunk_overlap:
+                    logger.warning(
+                        f"Chunk metadata mismatch! Requested chunk_size={chunk_size}, chunk_overlap={chunk_overlap}, "
+                        f"but chunk has chunk_size={node_chunk_size}, chunk_overlap={node_chunk_overlap}. "
+                        f"Chunk text preview: {node.text[:100]}..."
+                    )
+
                 chunk = {
                     "id": node.metadata.get("id"),
                     "text": node.text,
@@ -210,7 +298,9 @@ class CacheManager:
                 }
                 chunks.append(chunk)
                 logger.debug(
-                    f"Found chunk with similarity score: {similarity_score:.4f}"
+                    f"Found chunk (chunk_size={node_chunk_size}, chunk_overlap={node_chunk_overlap}) "
+                    f"with similarity score: {similarity_score:.4f}, "
+                    f"text preview: {node.text[:100]}..."
                 )
 
             logger.info(f"Retrieved {len(chunks)} similar chunks for {file_path}")
@@ -408,6 +498,7 @@ class CacheManager:
                     "tcfd": "tcfd",
                     "s4m": "s4m",
                     "lucia": "lucia",
+                    "climretrieve": "climretr",  # Map climretrieve to climretr shortcut
                 }
                 db_question_set = question_set_mapping.get(
                     config["question_set"], config["question_set"]
@@ -466,7 +557,9 @@ class CacheManager:
                         AND ac.question_set = ?
                         AND ac.question_id IN ({})
                         ORDER BY ac.question_id, cr.chunk_order
-                    """.format(",".join("?" * len(results)))
+                    """.format(
+                        ",".join("?" * len(results))
+                    )
 
                     chunk_params = [
                         str(file_path),
@@ -692,10 +785,12 @@ class CacheManager:
                     )
                 else:
                     logger.info("Checking all cache entries")
-                    cursor = conn.execute("""
+                    cursor = conn.execute(
+                        """
                         SELECT DISTINCT file_path, chunk_size, chunk_overlap, top_k, model, question_set
                         FROM analysis_cache
-                    """)
+                    """
+                    )
 
                 rows = cursor.fetchall()
                 logger.info(f"Found {len(rows)} distinct configurations:")

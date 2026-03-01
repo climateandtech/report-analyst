@@ -24,81 +24,25 @@ class TestBenchmarkStore:
 
     @pytest.fixture
     def temp_db(self):
-        """Create a temporary database for testing"""
+        """Create a temporary database for testing.
+
+        The BenchmarkStore class is responsible for initializing the schema,
+        so the fixture only needs to create a temporary file and let
+        BenchmarkStore.init_db() handle table creation.
+        """
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_db:
             db_path = tmp_db.name
 
-        # Initialize database schema
-        store = BenchmarkStore(db_path)
-        with sqlite3.connect(db_path) as conn:
-            # Create the benchmark tables (simplified version for testing)
-            conn.execute("""
-                CREATE TABLE benchmark_datasets (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    dataset_id TEXT UNIQUE,
-                    name TEXT,
-                    description TEXT,
-                    version TEXT,
-                    question_set TEXT,
-                    file_path TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+        # Initialize database schema via BenchmarkStore
+        BenchmarkStore(db_path)
 
-            conn.execute("""
-                CREATE TABLE ground_truth_chunks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    dataset_id TEXT,
-                    question_id TEXT,
-                    chunk_id TEXT,
-                    relevance_score REAL,
-                    is_evidence BOOLEAN,
-                    evidence_order INTEGER,
-                    annotation_notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(dataset_id) REFERENCES benchmark_datasets(dataset_id)
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE benchmark_evaluations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    dataset_id TEXT,
-                    evaluation_name TEXT,
-                    config_hash TEXT,
-                    retrieval_config TEXT,
-                    evaluation_metrics TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(dataset_id) REFERENCES benchmark_datasets(dataset_id)
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE human_annotations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    evaluation_id INTEGER,
-                    question_id TEXT,
-                    chunk_id TEXT,
-                    human_relevance_score REAL,
-                    human_is_evidence BOOLEAN,
-                    human_evidence_order INTEGER,
-                    annotation_notes TEXT,
-                    annotator_id TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(evaluation_id) REFERENCES benchmark_evaluations(id)
-                )
-            """)
-
-            conn.commit()
-
-        yield db_path
-
-        # Cleanup
         try:
-            Path(db_path).unlink()
-        except:
-            pass
+            yield db_path
+        finally:
+            try:
+                Path(db_path).unlink()
+            except OSError:
+                pass
 
     @pytest.fixture
     def store(self, temp_db):

@@ -1,0 +1,793 @@
+name: ClimRetrieve
+shortcut: climretr
+description: Comprehensive sustainability labeling framework for evaluating climate transformation initiatives and carbon
+  footprint reporting
+questions:
+- id: climretr_1
+  text: Does the company provide definitions for climate change adaptation?
+  guidelines: ''
+- id: climretr_2
+  text: Has the company identified any synergies between its climate change adaptation goals and other business goals?
+  guidelines: ''
+- id: climretr_3
+  text: Does the company report the climate change scenarios used to test the resilience of its business strategy?
+  guidelines: ''
+- id: climretr_4
+  text: Does the company seek to adjust its business model to better provide climate change adaptation products and services?
+  guidelines: ''
+- id: climretr_5
+  text: Does the company have any engagements with industry peers in relation to climate change?
+  guidelines: ''
+- id: climretr_6
+  text: Does the company have a specific process in place to identify risks arising from climate change?
+  guidelines: ''
+- id: climretr_7
+  text: Does the company report the methodology used to identify the dependencies and impact of its business activities on
+    the environment?
+  guidelines: ''
+- id: climretr_8
+  text: Does the company refer to any third party scenarios when identifying climate-related risks or opportunities (e.g.
+    IPCC trajectories, NGFS scenarios, etc.)?
+  guidelines: ''
+- id: climretr_9
+  text: Does the company encourage downstream partners to carry out climate-related risk assessments?
+  guidelines: ''
+- id: climretr_10
+  text: Does the company report how adjustments to its business operations will allow it to adapt to climate change?
+  guidelines: ''
+- id: climretr_11
+  text: Do the environmental/sustainability targets set by the company reference external climate change adaptation goals/targets?
+  guidelines: ''
+- id: climretr_12
+  text: Do the environmental/sustainability targets set by the company align with external climate change adaptation goals/targets?
+  guidelines: ''
+- id: climretr_13
+  text: Does the company report short-term actions taken or planned to reduce its waste generation?
+  guidelines: ''
+- id: climretr_14
+  text: Does the company report a plan to engage with downstream partners on water consumption or water pollution?
+  guidelines: ''
+- id: climretr_15
+  text: Does the company identify any impacts of its business activities on the environment?
+  guidelines: ''
+- id: climretr_16
+  text: Does the company have a strategy on waste management?
+  guidelines: ''
+- id: climretr_17_ir
+  text: We search for details on how a company's efforts to adapt to climate change are integrated with and support its broader
+    business objectives. This includes examining how initiatives aimed at increasing climate resilience also contribute to
+    the company's long-term sustainability, competitive advantage, stakeholder engagement, and overall economic, social, and
+    environmental impact. Information of interest encompasses strategies that align climate action with enhancing client success,
+    community strengthening, and opportunity advancement. We look for evidence of how environmental, social, and governance
+    (ESG) goals, particularly those related to climate action, are woven into the fabric of the company's mission, operational
+    practices, and corporate culture. This also involves understanding how these efforts are communicated and reported, reflecting
+    a commitment to transparency and stakeholder engagement. Additionally, we seek insights into how the company's climate
+    change adaptation measures are perceived as adding value to its brand, customer satisfaction, and investor appeal, thereby
+    driving business growth and shareholder returns.
+  guidelines: ''
+- id: climretr_18_ir
+  text: We search for details on the specific climate change scenarios a company uses to evaluate the resilience of its business
+    strategy. This includes identifying the types of scenarios (e.g., IEA Net Zero Emissions Scenario, high emission scenarios)
+    and the time frames considered (e.g., 2030, 2050). Information on how these scenarios help the company to identify, assess,
+    and prioritize climate-related risks and opportunities is crucial. This encompasses both physical risks, such as increased
+    temperatures and sea levels affecting operations, and transition risks, including policy changes or shifts in market preferences.
+    Additionally, we look for how these analyses are integrated into the company’s risk management processes, such as through
+    an Enterprise Risk Register, and how they inform strategic planning and decision-making. Details on mitigation strategies
+    and opportunities identified through this process, including financial impacts and actions taken to adapt or capitalize
+    on climate-related trends, are also relevant. This approach ensures a comprehensive understanding of how prepared a company
+    is to navigate the challenges and opportunities presented by climate change across various industries.
+  guidelines: ''
+- id: climretr_19_ir
+  text: We search for details on how a company is innovating and transforming its operations, products, or services to address
+    the challenges posed by climate change. This includes investments in sustainability initiatives, such as funds dedicated
+    to environmental projects or the adoption of renewable energy sources, which demonstrate a commitment to reducing carbon
+    footprints and enhancing energy efficiency. Information on the development or implementation of technologies that minimize
+    energy loss, improve resource use efficiency, or contribute to the sustainability of operations is also pertinent. Additionally,
+    we look for evidence of strategic planning, such as the adoption of sustainability guides or frameworks that prioritize
+    eco-friendly practices in new projects or renovations. The establishment of programs that encourage sustainable practices
+    within specific departments or units, like laboratories, indicates a holistic approach to embedding climate resilience
+    across the company's operations. Overall, we seek to understand how a company is pivoting towards sustainability to mitigate
+    the impacts of climate change and ensure long-term resilience.
+  guidelines: ''
+- id: climretr_20_ir
+  text: We search for details on how a company collaborates with other entities within its industry to address climate change.
+    This includes partnerships with stakeholders such as suppliers, non-profit organizations, industry groups, governments,
+    and customers aimed at promoting sustainability and achieving net-zero emissions. Information on joint initiatives with
+    other corporations, participation in industry-wide commitments to reduce greenhouse gas emissions, and engagement in collective
+    actions to tackle environmental challenges, like deforestation and responsible sourcing, is pertinent. Additionally, membership
+    in industry-specific sustainability organizations or initiatives that work towards creating a more sustainable sector,
+    whether it's in cocoa, coffee, tea, or any other, demonstrates a company's commitment to collaborative efforts in combating
+    climate change. The involvement in partnerships that focus on innovation for scalable solutions and the integration of
+    sustainable practices across the supply chain are also key indicators of a company's engagement with industry peers in
+    relation to climate change adaptation and resilience.
+  guidelines: ''
+- id: climretr_21_ir
+  text: We search for details on how a company identifies and addresses risks related to climate change, focusing on both
+    the transition to a low-carbon economy and the physical impacts of climate change. This involves looking into whether
+    the company has integrated Environmental, Social, and Governance (ESG) considerations into its risk management strategies,
+    thereby reducing its environmental footprint, enhancing diversity, and creating long-term value. We also seek information
+    on specific tools or programs the company uses to assess climate-related risks, such as providing or utilizing localized
+    climate data to inform investment decisions and improve community resilience. Additionally, we look for evidence of the
+    company's commitment to making infrastructure more resilient against climate change, which could include investments in
+    sustainable technologies or practices. This inquiry spans across all industries, aiming to understand how companies are
+    preparing for and adapting to the challenges posed by climate change in a holistic manner.
+  guidelines: ''
+- id: climretr_22_ir
+  text: We search for details on how a company identifies and evaluates the ways in which its operations depend on and impact
+    the environment. This involves understanding the methodologies or frameworks the company uses to assess its environmental
+    footprint, including both direct and indirect effects on ecosystems, biodiversity, and climate. Information of interest
+    includes the company's approach to sourcing materials sustainably, efforts to conserve natural resources, and initiatives
+    aimed at enhancing ecological resilience. For instance, a company might detail its strategies for engaging with suppliers
+    on sustainable sourcing practices or describe projects it supports that contribute to the restoration and protection of
+    critical habitats. Additionally, we look for evidence of how these environmental considerations are integrated into the
+    company's business model, such as investing a portion of profits into conservation and climate adaptation projects. This
+    information helps gauge the company's commitment to mitigating its environmental impact and adapting to climate change,
+    showcasing a proactive approach to sustainability and resilience.
+  guidelines: ''
+- id: climretr_23_ir
+  text: We search for details on whether a company incorporates external, authoritative climate projections and scenarios
+    into their strategic planning and risk management processes. This involves looking for references to established climate
+    models and pathways, such as those provided by the Intergovernmental Panel on Climate Change (IPCC) or the Network for
+    Greening the Financial System (NGFS), which offer a range of future climate conditions based on varying levels of greenhouse
+    gas emissions. Specifically, we're interested in how these scenarios are used to evaluate potential financial, operational,
+    and strategic impacts under different climate futures, including both risks and opportunities. This could involve assessing
+    the implications of transition risks as economies shift towards lower carbon pathways, or the physical risks posed by
+    changes in climate patterns and extreme weather events. Information that indicates a company is applying these scenarios
+    to understand direct impacts on their business operations, investment strategies, or risk management practices is particularly
+    relevant.
+  guidelines: ''
+- id: climretr_24_ir
+  text: We search for details on how a company motivates and supports its downstream partners, including suppliers and distributors,
+    in identifying and managing climate-related risks. This involves looking into whether the company has established frameworks
+    or initiatives that encourage these partners to evaluate their vulnerability to climate change and to adopt measures that
+    enhance their resilience. Specifically, we're interested in information about supplier engagement strategies, educational
+    programs aimed at increasing climate risk awareness, and the provision of tools or infrastructure that facilitate the
+    assessment and reporting of climate impacts. This could encompass efforts to reduce Scope 3 emissions through sustainable
+    practices across the supply chain, such as promoting energy transition, advocating for deforestation-free agricultural
+    practices, and encouraging the production and distribution of energy-efficient products and sustainable packaging. The
+    goal is to understand how the company collaborates with its network to mitigate climate risks and contribute to a more
+    sustainable and resilient future.
+  guidelines: ''
+- id: climretr_25_ir
+  text: We search for details on how a company plans and implements strategies to modify its operations in response to the
+    changing climate. This includes identifying and mitigating risks posed by climate change to their business model, such
+    as water scarcity, increased frequency of extreme weather events, and the transition to a low-carbon economy. Information
+    on sustainable resource management, like water conservation and efficient use, and efforts to reduce carbon footprint
+    through innovative solutions are pertinent. Additionally, strategies to ensure the sustainability of supply chains, such
+    as sourcing materials from low-deforestation risk areas and enhancing sustainable packaging practices, are relevant. The
+    adaptation measures should also cover infrastructure resilience, including designing facilities to withstand extreme weather
+    and implementing effective crisis management for continuity in essential services. Overall, we look for comprehensive
+    approaches that a company takes to adapt its operations, safeguard assets, and ensure business continuity in the face
+    of climate change challenges, applicable across various industries.
+  guidelines: ''
+- id: climretr_26_ir
+  text: We search for details on how a company's environmental or sustainability goals align with broader, external climate
+    change adaptation and resilience frameworks or targets. This includes commitments to international agreements like the
+    Paris Climate Agreement, participation in industry-specific alliances such as the Net-Zero Banking Alliance, and adherence
+    to pathways aimed at limiting global warming, such as the 1.5°C pathway. Information of interest encompasses the setting
+    of specific, measurable targets for reducing emissions across various sectors of operation, strategies for transitioning
+    to net-zero emissions by a certain year, and policies against financing projects that contradict global climate goals.
+    Additionally, we look for evidence of risk assessments conducted in light of climate change scenarios, such as those provided
+    by the Intergovernmental Panel on Climate Change, and how these assessments inform operational decisions. This inquiry
+    aims to gauge the depth of a company's commitment to climate change adaptation and resilience, beyond mere compliance,
+    towards a proactive and strategic alignment with global efforts to mitigate climate change impacts.
+  guidelines: ''
+- id: climretr_27_ir
+  text: We search for details on how a company's environmental or sustainability goals are designed to support broader efforts
+    to adapt to and mitigate the impacts of climate change. This involves examining whether these goals are in harmony with
+    recognized external standards, initiatives, or guidelines that are widely accepted as effective in addressing climate
+    change challenges. Specifically, we look for information indicating the company's commitment to reducing greenhouse gas
+    emissions across all scopes, including direct operations and the wider value chain. This includes assessing whether the
+    company has set science-based targets, adheres to international standards for achieving net-zero emissions, and engages
+    in practices that contribute to the restoration and protection of natural ecosystems. Additionally, we evaluate the company's
+    efforts in supplier engagement to ensure that its entire supply chain is moving towards sustainability. The alignment
+    with external goals and targets, such as those set by the Science Based Targets initiative, ISO guidelines, or recommendations
+    from research and environmental organizations, is crucial. This alignment demonstrates a company's proactive stance in
+    contributing to global efforts to combat climate change and its commitment to sustainability.
+  guidelines: ''
+- id: climretr_28_ir
+  text: We search for details on the specific measures a company is taking or planning to implement to minimize waste production
+    in the short term. This encompasses initiatives to enhance the sustainability of products through design innovations,
+    efforts to increase the recyclability and reuse of materials, and strategies to reduce food and plastic waste. Information
+    on partnerships with suppliers, customers, and technology firms to promote circular economy practices is also pertinent.
+    Additionally, we look for data on the tangible outcomes of these actions, such as the quantity of waste diverted from
+    landfills, reductions in the use of virgin plastics, and increases in the use of recycled materials. The company's commitment
+    to global sustainability goals, such as zero hunger and responsible consumption, through specific targets like achieving
+    zero food waste to landfill, is another critical aspect. Lastly, educational and community engagement initiatives aimed
+    at reducing waste generation across the value chain are of interest.
+  guidelines: ''
+- id: climretr_29_ir
+  text: We search for details on how a company's operations and processes contribute to environmental degradation or climate
+    change, focusing on both direct and indirect impacts. This includes quantifiable metrics such as greenhouse gas (GHG)
+    emissions, which are critical for understanding a company's carbon footprint and its efforts towards reduction. Additionally,
+    we look into the company's practices that might have broader environmental consequences, such as waste generation, water
+    usage, and pollution. The information sought also encompasses the company's acknowledgment of the negative repercussions
+    of its business model on the environment, such as the impact of product returns or the lifecycle environmental cost of
+    its services and products. This analysis helps in assessing the company's awareness and management of its environmental
+    impact, which is crucial for adaptation and resilience strategies in the face of climate change. This approach is applicable
+    across all industries, as every sector has unique environmental challenges and opportunities for improvement.
+  guidelines: ''
+- id: climretr_30_ir
+  text: We search for details on how a company approaches the reduction and management of waste within its operations and
+    supply chain, aiming to enhance its resilience and adaptability to environmental challenges. This includes strategies
+    for minimizing the use of single-use plastics and diverting waste from landfills, which are critical for reducing environmental
+    impact and promoting sustainability. Information of interest encompasses specific targets and timelines for eliminating
+    single-use plastics and achieving zero waste to landfill, reflecting a commitment to significant environmental goals.
+    Additionally, we look for evidence of investments in innovative solutions and technologies that facilitate waste reduction,
+    as well as initiatives to improve operational and fleet efficiency by reducing waste generation. The development of roadmaps
+    or action plans that detail steps towards these goals, including efforts to engage with suppliers and partners in reducing
+    packaging and increasing the use of recycled materials, is also pertinent. These strategies demonstrate a company's proactive
+    approach to waste management, contributing to its overall sustainability and resilience in the face of climate change.
+  guidelines: ''
+- id: climretr_31_simple_ir
+  text: |-
+    We search for details on how the company conceptualizes and defines climate change adaptation within its operations and strategic planning. This involves understanding the company's recognition of climate change impacts and its strategies to adjust and respond to these changes to minimize harm or exploit beneficial opportunities. Specifically, we look for:
+
+    1. The company's definition of climate change adaptation in the context of its business operations.
+    2. Examples of how the company identifies vulnerabilities and risks associated with climate change.
+    3. Descriptions of strategies or measures the company has implemented or plans to implement to adapt to changing climate conditions.
+    4. Any frameworks or standards the company uses to guide its adaptation efforts.
+    5. How the company measures or evaluates the effectiveness of its adaptation strategies.
+    6. Information on stakeholder engagement in developing adaptation strategies.
+
+    This information helps assess the company's resilience and preparedness in the face of climate change, indicating its long-term sustainability and risk management approach.
+  guidelines: ''
+- id: climretr_32_simple_ir
+  text: |-
+    We search for details on how the company's efforts to adapt to climate change align with and potentially enhance its broader business objectives. This involves understanding the concept of synergies, which refers to situations where combined actions produce a greater outcome than the sum of their individual effects. Specifically, in the context of climate change adaptation and resilience, this means looking for ways in which the company's strategies to mitigate climate risks also contribute to its financial health, operational efficiency, market position, or sustainability targets in other areas such as water use, waste reduction, and social responsibility.
+
+    Examples of information we are looking for include:
+    - Initiatives that reduce carbon footprint and lower operational costs.
+    - Investments in renewable energy that secure long-term energy supply and open up new business opportunities.
+    - Projects that enhance ecosystem resilience, which also serve as community engagement or corporate social responsibility efforts.
+    - Adaptation measures that improve infrastructure resilience, potentially reducing insurance costs and increasing investor confidence.
+  guidelines: ''
+- id: climretr_33_simple_ir
+  text: |-
+    We search for details on the specific climate change scenarios that a company has considered to evaluate how resilient its business strategy is to various potential future climates. This involves understanding the meaning behind climate change scenarios, which are projections based on different assumptions about future greenhouse gas emissions, technological advancements, and policy changes. These scenarios help in assessing the vulnerability and adaptability of a company's operations, supply chains, and market demand under different future conditions.
+
+    Examples of information we look for include:
+    - The types of climate change scenarios considered (e.g., RCP 2.6, RCP 8.5, SSPs).
+    - How these scenarios impact the company's critical operations and strategic planning.
+    - Adaptation measures the company plans to implement in response to these scenarios.
+    - Any resilience-building strategies to mitigate potential negative impacts.
+    - The process of integrating scenario analysis into business strategy and risk management practices.
+    - Evidence of scenario planning in long-term business sustainability goals.
+  guidelines: ''
+- id: climretr_34_simple_ir
+  text: |-
+    We search for details on whether the company is actively modifying its business strategy to offer products and services that help in adapting to climate change. This involves understanding the concept of climate change adaptation, which refers to actions taken to manage the impacts of climate change by reducing vulnerability and increasing resilience. Resilience here means the ability of a system, community, or economy to withstand and recover from the effects of climate change.
+
+    Examples of information we look for include:
+
+    1. Development of new products or services designed to mitigate the impacts of climate change, such as drought-resistant crops or flood defense systems.
+    2. Changes in the company's operations or supply chain to reduce risks associated with climate change, such as relocating facilities away from flood-prone areas.
+    3. Investments in research and development focused on climate change resilience solutions.
+    4. Partnerships with governments or NGOs to support community-based adaptation initiatives.
+    5. Training programs for employees and local communities on climate change adaptation strategies.
+  guidelines: ''
+- id: climretr_35_simple_ir
+  text: |-
+    We search for details on the company's involvement with other organizations within its industry to collectively address climate change. This includes any partnerships, collaborations, or joint initiatives aimed at reducing greenhouse gas emissions, enhancing sustainability practices, or developing adaptive strategies to mitigate climate change impacts. Specifically, we look for:
+
+    1. Membership in industry-wide sustainability consortia or alliances focused on climate change.
+    2. Participation in roundtable discussions or forums with industry peers to share best practices and challenges related to climate adaptation and resilience.
+    3. Joint research projects or innovation labs with other companies to develop new technologies or methods for reducing carbon footprints.
+    4. Co-authored position papers or policy advocacy efforts aimed at promoting climate-friendly regulations and standards within the industry.
+    5. Collaborative supply chain initiatives to ensure environmental sustainability and resilience against climate-related disruptions.
+
+    These examples illustrate the company's commitment to not only addressing climate change individually but also contributing to sector-wide efforts for a more sustainable and resilient future.
+  guidelines: ''
+- id: climretr_36_simple_ir
+  text: |-
+    We search for details on the company's methodologies and strategies for recognizing potential threats linked to climate change. This involves understanding how the company anticipates, evaluates, and plans to manage risks related to extreme weather events, rising sea levels, changing agricultural patterns, and regulatory shifts aimed at reducing carbon emissions. Specifically, we look for:
+
+    1. **Risk Identification Processes**: How the company systematically identifies climate-related risks, including both direct impacts on operations and indirect impacts through supply chains or market changes.
+    2. **Assessment Methods**: The criteria or tools used to evaluate the severity and likelihood of identified risks.
+    3. **Adaptation Strategies**: Plans or actions the company has in place to adapt to identified risks, ensuring business continuity and resilience.
+    4. **Stakeholder Engagement**: How the company involves stakeholders in its risk identification process, including local communities, suppliers, and customers.
+    5. **Monitoring and Reviewing**: The process for regularly updating risk assessments and adaptation strategies in response to new climate data or events.
+  guidelines: ''
+- id: climretr_37_simple_ir
+  text: |-
+    We search for details on the specific approaches and techniques a company employs to understand how its operations rely on and affect the natural environment. This involves looking into whether the company has a systematic process for evaluating its environmental footprint, including both direct impacts (such as emissions and waste) and indirect impacts (such as resource consumption and effects on biodiversity). Additionally, we're interested in how the company identifies its vulnerability to environmental changes, which could affect its supply chains, operational viability, and overall sustainability. Examples of information we seek include:
+
+    - Descriptions of environmental risk assessments and their methodologies.
+    - Details on the use of environmental impact assessments (EIAs) or life cycle assessments (LCAs).
+    - Information on tools or frameworks used to gauge dependency on ecosystem services.
+    - Evidence of stakeholder engagement in identifying environmental impacts and dependencies.
+    - Any mention of collaboration with environmental scientists or sustainability experts to refine their impact assessment process.
+  guidelines: ''
+- id: climretr_38_simple_ir
+  text: |-
+    We search for details on whether the company utilizes external, authoritative climate projections or models to inform their understanding of climate-related risks and opportunities. This involves looking for references to scenarios developed by recognized bodies such as the Intergovernmental Panel on Climate Change (IPCC) or the Network for Greening the Financial System (NGFS). These scenarios provide various future outlooks based on different levels of greenhouse gas emissions and policy responses, helping organizations to plan for a range of possible climate futures. Specifically, we're interested in:
+
+    1. Mention of any specific IPCC trajectories, such as Representative Concentration Pathways (RCPs) or Shared Socioeconomic Pathways (SSPs), that the company has considered in their risk assessments or strategy development.
+    2. Reference to NGFS scenarios, which are designed to help financial institutions understand and manage the risks climate change poses to the economy.
+    3. How these external scenarios have been integrated into the company's climate risk management or opportunity identification processes.
+    4. Any other third-party climate scenarios or models referenced in the company's sustainability reporting.
+
+    This information helps assess the company's thoroughness in considering a broad range of potential climate futures in their adaptation and resilience planning.
+  guidelines: ''
+- id: climretr_39_simple_ir
+  text: |-
+    We search for details on whether the company actively promotes and supports climate-related risk assessments among its downstream partners, such as suppliers, distributors, and retailers. This involves understanding if the company extends its climate change adaptation and resilience strategies beyond its immediate operations to include the entire supply chain. Specifically, we look for:
+
+    1. **Partnership Initiatives:** Evidence of programs or initiatives aimed at helping downstream partners assess their vulnerability to climate change impacts.
+    2. **Guidance and Resources:** Information on whether the company provides tools, resources, or expertise to assist partners in conducting their risk assessments.
+    3. **Collaborative Assessments:** Instances where the company has worked together with partners to identify and evaluate climate risks.
+    4. **Policy and Requirements:** Details on any policies requiring downstream partners to conduct climate risk assessments as a condition of doing business.
+    5. **Support for Implementation:** Examples of how the company supports partners in implementing adaptation and resilience measures based on the outcomes of their risk assessments.
+
+    This inquiry aims to gauge the company's commitment to fostering a resilient value chain that can withstand climate change impacts.
+  guidelines: ''
+- id: climretr_40_simple_ir
+  text: |-
+    We search for details on how a company plans to modify its business practices to remain resilient and competitive in the face of climate change. This involves understanding the company's awareness and response to the risks and opportunities presented by climate change. Specifically, we look for:
+
+    1. **Risk Assessment**: Information on how the company identifies and evaluates climate-related risks to its operations, supply chain, and market demand.
+    2. **Adaptation Strategies**: Details on specific strategies the company is implementing to adapt to climate change, such as investing in renewable energy, improving water efficiency, or sourcing materials more sustainably.
+    3. **Operational Changes**: Examples of operational adjustments, like altering production processes, relocating facilities prone to climate impacts, or adopting new technologies to reduce carbon footprint.
+    4. **Financial Planning**: Insight into how climate change is factored into the company's financial planning and investment decisions, ensuring long-term sustainability and resilience.
+    5. **Stakeholder Engagement**: Information on how the company communicates and collaborates with stakeholders (employees, customers, investors, local communities) on climate change adaptation efforts.
+
+    These details help assess the company's preparedness for the impacts of climate change, ensuring it can sustain operations and thrive in a changing environment.
+  guidelines: ''
+- id: climretr_41_simple_ir
+  text: We search for details on whether the company's environmental or sustainability objectives align with broader, externally
+    established climate change adaptation goals or targets. This involves understanding if the company has integrated international,
+    national, or sector-specific benchmarks and targets into their sustainability strategy, particularly those aimed at enhancing
+    resilience to climate change and promoting adaptation measures. Examples of such external goals include commitments under
+    the Paris Agreement, the United Nations Sustainable Development Goals (SDGs), especially SDG 13 (Climate Action), or industry-specific
+    resilience standards. Information sought includes mentions of specific external frameworks or targets the company commits
+    to, how these commitments are reflected in their operational or strategic plans, and any evidence of progress towards
+    these externally referenced goals. This analysis helps assess the company's commitment to contributing to global efforts
+    in combating climate change and enhancing adaptive capacities within their operations and broader community or ecosystem
+    they impact.
+  guidelines: ''
+- id: climretr_42_simple_ir
+  text: |-
+    We search for details on how the company's environmental or sustainability objectives match up with broader, externally established climate change adaptation goals or targets. This involves understanding the company's commitments to reducing its environmental impact, enhancing resilience against climate change effects, and contributing to global efforts like the Paris Agreement or the Sustainable Development Goals (SDGs). Specifically, we look for:
+
+    1. The company's specific environmental targets, such as reducing greenhouse gas emissions, increasing renewable energy usage, or improving water efficiency.
+    2. How these targets compare with international, national, or industry-specific adaptation goals, such as those outlined in the Paris Agreement or by the Intergovernmental Panel on Climate Change (IPCC).
+    3. Evidence of strategic planning or investment in adaptation measures, like infrastructure improvements to withstand extreme weather events or shifts in operational practices to conserve biodiversity.
+    4. Partnerships or collaborations with external bodies to enhance climate resilience.
+    5. Reporting mechanisms and progress tracking towards these adaptation and resilience goals.
+
+    This analysis helps gauge the company's commitment to and alignment with global efforts to combat climate change through adaptation and resilience strategies.
+  guidelines: ''
+- id: climretr_43_simple_ir
+  text: |-
+    We search for details on the specific measures a company has implemented or intends to implement in the near future to minimize its waste production. This inquiry delves into the realm of adaptation and resilience by examining how a company adjusts its operations to mitigate environmental impact, thereby contributing to a more sustainable and resilient ecosystem. Adaptation refers to the adjustments in processes, practices, or structures to counteract potential damage or take advantage of opportunities arising from environmental changes. Resilience is the capacity to recover quickly from difficulties; in this context, it's about the company's ability to sustain operations amidst environmental challenges by reducing waste generation.
+
+    Examples of information sought include:
+    - Initiatives to improve resource efficiency or recycling programs aimed at reducing operational waste.
+    - Investment in technology or processes that minimize waste production.
+    - Partnerships with waste management firms to ensure responsible waste disposal.
+    - Employee training programs on sustainability practices to reduce waste.
+    - Short-term goals or targets set for waste reduction and progress reports on these objectives.
+  guidelines: ''
+- id: climretr_44_simple_ir
+  text: |-
+    We search for details on how the company plans to collaborate with its downstream partners, such as suppliers, distributors, and customers, to address and manage water consumption and water pollution issues. This involves understanding the company's strategies for reducing water usage and minimizing water pollution across its value chain. Specifically, we look for:
+
+    1. **Partnership Initiatives**: Any programs or projects the company has initiated with its downstream partners to reduce water consumption or mitigate water pollution.
+    2. **Guidance and Support**: Information on whether the company provides technical support, resources, or guidelines to help partners implement water-saving practices or pollution control measures.
+    3. **Monitoring and Reporting**: Details on how the company and its partners monitor water usage and pollution levels, including any shared reporting mechanisms or platforms.
+    4. **Goals and Targets**: Specific targets or objectives set by the company in collaboration with its partners to reduce water consumption and pollution over a defined period.
+    5. **Success Stories**: Examples of successful water conservation or pollution reduction initiatives undertaken with downstream partners.
+
+    This information is crucial for assessing the company's commitment to sustainability, particularly in managing water resources responsibly and building resilience against water-related challenges in its supply chain.
+  guidelines: ''
+- id: climretr_45_simple_ir
+  text: |-
+    We search for details on how the company's operations influence the environment, focusing on both direct and indirect impacts. This involves understanding the company's carbon footprint, waste generation, water usage, and effects on biodiversity. In the context of adaptation and resilience, we're particularly interested in how these environmental impacts might affect the company's ability to adapt to climate change and maintain resilience against environmental stressors. For example, we look for information on:
+
+    - Emissions of greenhouse gases and efforts to reduce them.
+    - Strategies for managing water resources sustainably and adapting to water scarcity.
+    - Measures to reduce waste and promote recycling, contributing to a circular economy.
+    - Initiatives to protect and restore biodiversity, ensuring ecosystem services that support climate adaptation.
+    - Assessments of how environmental degradation could affect the company's operations and supply chain, and plans to mitigate these risks.
+
+    This information helps gauge the company's commitment to minimizing its environmental footprint and enhancing its resilience to climate change.
+  guidelines: ''
+- id: climretr_46_simple_ir
+  text: |-
+    We search for details on the company's approach to handling, reducing, and repurposing waste as part of its operations and product lifecycle. This involves understanding the company's policies, practices, and goals related to waste management, which is crucial for assessing its adaptation and resilience to climate change. Effective waste management strategies can significantly reduce environmental impact, contribute to the circular economy, and enhance the company's sustainability profile.
+
+    Examples of information sought include:
+
+    1. **Waste Reduction Initiatives:** Efforts to minimize waste production at the source.
+    2. **Recycling Programs:** Systems in place for recycling materials used in operations and products.
+    3. **Waste Repurposing:** Strategies for reusing waste materials in new or existing products.
+    4. **Partnerships:** Collaborations with external organizations for waste management and recycling.
+    5. **Compliance and Reporting:** Adherence to local and international waste management regulations and transparent reporting of waste generation and handling statistics.
+    6. **Innovation in Waste Management:** Adoption of new technologies or methods for waste treatment and reduction.
+    7. **Employee and Community Engagement:** Programs to engage employees and the community in waste reduction and recycling efforts.
+
+    These details help evaluate the company's commitment to sustainability and its capability to adapt to environmental challenges through responsible waste management.
+  guidelines: ''
+- id: climretr_47_ir_three
+  text: We search for details on how a company conceptualizes and integrates the notions of climate change adaptation into
+    their operations and strategic planning. This involves looking for explicit definitions or descriptions provided by the
+    company that explain what they understand by climate change adaptation and resilience. This could include their participation
+    in initiatives or alliances that focus on innovative solutions for adapting to climate change impacts and enhancing resilience,
+    such as developing new technologies or practices in digital finance that contribute to these goals. Additionally, we seek
+    information on how these concepts are applied within the company's sustainability strategies, including any specific projects,
+    partnerships, or commitments made to address climate adaptation and resilience. The aim is to assess the company's awareness
+    and proactive approach towards mitigating the adverse effects of climate change through adaptation and resilience-building
+    measures, which are crucial for sustainable business practices across all industries.
+  guidelines: ''
+- id: climretr_48_ir_three
+  text: We search for details on how a company integrates its climate change adaptation strategies with its broader business
+    objectives, ensuring these efforts are not siloed but rather contribute to the company's overall success. This includes
+    understanding the governance structures in place, such as committees or councils, that oversee the alignment of sustainability
+    goals with business operations and strategic planning. We look for evidence of how environmental, social, and governance
+    (ESG) considerations are embedded into company policies, including remuneration and risk management frameworks, to incentivize
+    and prioritize sustainability efforts among senior leadership and across the organization. Information on how the company
+    engages with stakeholders to prioritize and assess the impact of its ESG goals is crucial, as is the linkage of sustainability
+    achievements to compensation structures, demonstrating a commitment to these goals at the highest levels. Additionally,
+    we examine how the company aligns its sustainability initiatives with global standards or goals, such as the United Nations
+    Sustainable Development Goals, to ensure its efforts contribute to broader societal and environmental objectives.
+  guidelines: ''
+- id: climretr_49_ir_three
+  text: We search for details on how a company identifies, assesses, and prepares for the various impacts of climate change
+    on its operations, supply chain, and overall business strategy. This includes understanding the specific climate-related
+    scenarios a company considers, such as transitional and physical risks over short, medium, and long-term horizons. Information
+    on the company's hedging strategies against rising operational costs due to factors like soaring energy prices, as well
+    as their approach to managing these risks through budgeting and market strategies, is pertinent. Additionally, we look
+    for evidence of comprehensive climate risk assessments and scenario analyses that guide the company in understanding potential
+    climate risks and opportunities. This encompasses the integration of climate-related risks into the company's overall
+    risk management framework, the establishment of emissions-reduction targets, and engagement in initiatives aimed at enhancing
+    climate adaptation and resilience. The goal is to gauge the company's proactive measures in ensuring its sustainability
+    and resilience in the face of climate change challenges.
+  guidelines: ''
+- id: climretr_50_ir_three
+  text: We search for details on how a company is innovating or transforming its operations, products, or services to address
+    the challenges posed by climate change. This includes the development or integration of technologies that reduce carbon
+    emissions, such as fuel-efficient transportation or renewable energy sources. We're interested in partnerships that aim
+    to lower greenhouse gas emissions or initiatives to enhance sustainability in the supply chain, from reducing reliance
+    on fossil fuels to promoting the use of recycled materials. Efforts to engage with and support communities in adapting
+    to climate change, through educational programs or by funding research into sustainable practices, are also relevant.
+    Additionally, strategies to conserve natural resources, like water, and actions to improve environmental and social governance
+    (ESG) criteria within the company and its suppliers signal a commitment to climate change adaptation. Investments in sustainability,
+    whether through capital allocation to low-carbon projects or sustainability-linked financial instruments, illustrate the
+    company's dedication to adjusting its business model for climate resilience.
+  guidelines: ''
+- id: climretr_51_ir_three
+  text: We search for details on how a company collaborates with others in its industry to address climate change. This includes
+    sharing best practices, participating in industry associations, and engaging in collective action initiatives. We're interested
+    in whether the company contributes to or benefits from shared knowledge on sustainability, engages in dialogues with stakeholders
+    about climate-related issues, and takes part in policy advocacy aligned with climate goals. Information on partnerships
+    aimed at decarbonizing supply chains, developing sustainable technologies, and setting industry-wide emissions targets
+    is also relevant. Additionally, we look for evidence of the company working with suppliers and other partners on training
+    programs to meet climate action goals. The focus is on understanding how the company's collaborative efforts contribute
+    to broader industry adaptation and resilience to climate change, regardless of the specific sector it operates in.
+  guidelines: ''
+- id: climretr_52_ir_three
+  text: We search for details on how a company proactively identifies, assesses, and manages risks related to climate change.
+    This includes the establishment of dedicated teams or offices focusing on environmental affairs and climate risks, and
+    the integration of climate risk considerations into the company's overall risk management framework. Information on the
+    role of the Board or specific committees in overseeing climate risk management is pertinent, as well as descriptions of
+    any frameworks, strategies, or policies developed to address climate risks. Examples of interest also encompass how climate
+    risks are integrated into investment processes, governance structures, and operational risk frameworks. Additionally,
+    we look for evidence of scenario analysis, risk identification, and the management practices employed to mitigate adverse
+    impacts from climate-related events. The company's approach to assessing and managing both the physical and transitional
+    risks of climate change, including the use of models, stress tests, and the impact on credit ratings and financials, is
+    also relevant.
+  guidelines: ''
+- id: climretr_53_ir_three
+  text: We search for details on the specific approaches and frameworks a company employs to understand and evaluate the environmental
+    dependencies and impacts of its business operations. This includes how they assess the ecological footprint of their activities,
+    such as the sourcing of raw materials, the operation of facilities, and the delivery of services. Information sought encompasses
+    initiatives to connect with and support ecosystems and communities through conservation efforts, the allocation of financial
+    resources to enhance climate resilience and biodiversity, and the adoption of innovative practices like biomimicry to
+    design solutions that contribute positively to the environment. Additionally, we look for evidence of how these methodologies
+    contribute to the development of sustainable practices, such as the creation of marine protected areas, coral reef restoration,
+    or the enhancement of ecosystems around business infrastructures. The goal is to understand not just the impact of the
+    company's activities but also how they are actively working towards mitigating negative effects and enhancing environmental
+    resilience.
+  guidelines: ''
+- id: climretr_54_ir_three
+  text: We search for details on how a company incorporates external climate-related projections and models into their risk
+    management and opportunity identification processes. This involves looking for references to authoritative sources like
+    the Intergovernmental Panel on Climate Change (IPCC) assessments, which provide global warming projections and recommendations
+    for emissions reductions, or the Network for Greening the Financial System (NGFS) scenarios, which offer insights into
+    the financial risks and opportunities from climate change. Information of interest includes the company's acknowledgment
+    of global warming impacts as outlined by the IPCC, commitments to international initiatives like the Science-based Targets
+    initiative or the UNFCCC Race to Zero, alignment with reporting frameworks that consider climate-related financial disclosures
+    (e.g., TCFD, SASB), and specific strategies to reduce greenhouse gas emissions in line with global climate goals. These
+    details demonstrate how a company is planning for and adapting to the future climate scenario, enhancing its resilience
+    against climate-related risks while seizing new opportunities.
+  guidelines: ''
+- id: climretr_55_ir_three
+  text: We search for details on how a company actively involves its downstream partners, such as suppliers and distributors,
+    in assessing and mitigating climate-related risks. This involves looking for evidence of strategies and initiatives aimed
+    at promoting transparency, engagement, and support for these partners to address their environmental impact and sustainability
+    practices. Specifically, we're interested in whether the company encourages its partners to conduct their own climate
+    risk assessments, adopt sustainable sourcing practices, and report on their progress in reducing greenhouse gas (GHG)
+    emissions. Additionally, we seek information on any programs or projects aimed at decarbonization that include supplier
+    participation, as well as efforts to educate, incentivize, and support suppliers in enhancing their resilience against
+    climate change. The company's commitment to partnering with suppliers who prioritize high ethical and sustainability standards,
+    and its efforts to achieve carbon neutrality through collaborative initiatives with its supply chain, are also of interest.
+  guidelines: ''
+- id: climretr_56_ir_three
+  text: We search for details on how a company plans to modify its operations to withstand and thrive amidst the changing
+    climate. This encompasses strategies for reducing carbon footprints, such as adopting renewable energy sources, enhancing
+    operational efficiencies, and investing in advanced, less polluting technologies. Information on the deployment of new,
+    more efficient product lines or services that contribute to lower CO2 emissions is crucial. We also look for evidence
+    of innovative practices, like the development and testing of sustainable technologies or materials, and efforts to minimize
+    waste and resource use across the company's lifecycle. Additionally, details on setting and pursuing ambitious environmental
+    targets, such as net-zero emissions, reductions in greenhouse gases, energy, water, and waste, are vital. The company's
+    approach to managing physical risks from climate change, including strategies for business resilience and recovery, alongside
+    commitments to circular economy practices, are also of interest. These actions demonstrate a company's adaptability to
+    climate change, showcasing its resilience and commitment to sustainability.
+  guidelines: ''
+- id: climretr_57_ir_three
+  text: We search for details on how a company's environmental or sustainability goals are aligned with or reference external
+    climate change adaptation and resilience frameworks, initiatives, or standards. This includes looking for commitments
+    to internationally recognized targets such as those set by the Science Based Targets initiative (SBTi) for greenhouse
+    gas (GHG) reduction, alignment with the goals of the Paris Agreement, participation in renewable energy initiatives like
+    RE100, and adherence to guidelines or standards such as the ISO Net Zero Guidelines or the Task Force on Climate-related
+    Financial Disclosures (TCFD) methodology. Information indicating the company's efforts to engage with their supply chain
+    on climate issues, investment in nature-based solutions, and setting specific, science-based emissions reduction targets
+    for the near and long term are also relevant. Additionally, we look for how these targets and strategies contribute to
+    broader sustainability goals, such as responsible consumption and production, life below water, and life on land, demonstrating
+    a holistic approach to environmental responsibility and climate resilience across all operations.
+  guidelines: ''
+- id: climretr_58_ir_three
+  text: We search for details on how a company's environmental or sustainability goals are designed to meet or exceed established
+    external climate change adaptation and resilience benchmarks, such as those set by the Paris Agreement, the Net-Zero Banking
+    Alliance (NZBA), or the Science Based Targets initiative (SBTi). This includes examining commitments to reduce greenhouse
+    gas (GHG) emissions in alignment with a 1.5°C pathway, efforts to transition to net-zero emissions by a specific year,
+    and strategies for enhancing climate change resilience. Information on sector-specific targets, especially in carbon-intensive
+    industries, and the adoption of renewable energy sources to power operations are also pertinent. Additionally, we look
+    for evidence of engagement with external validation initiatives like SBTi or the Climate Group’s RE100 initiative, which
+    lend credibility to a company's targets. The exclusion of financing for projects that contradict net-zero ambitions, such
+    as new coal mines or oil and gas fields, and the setting of science-based targets for emissions reduction across the company's
+    operations and value chain are also critical details.
+  guidelines: ''
+- id: climretr_59_ir_three
+  text: We search for details on the specific measures a company is undertaking or planning to implement in the near future
+    to minimize waste production. This encompasses strategies to enhance material efficiency, such as optimizing the use of
+    resources in operations, products, and packaging, and prioritizing the sourcing of sustainable materials. Information
+    on the adoption of circular economy principles, aiming to extend the lifecycle of products through reuse, repair, and
+    recycling, is also pertinent. Initiatives to phase out single-use plastics and to improve waste management practices,
+    including the achievement of waste reduction targets and certifications, are relevant. Additionally, efforts to improve
+    the accuracy of waste data and the expansion of waste disclosure are of interest. These actions demonstrate a company's
+    commitment to reducing its environmental footprint and contributing to sustainability goals, which are crucial for all
+    industries aiming to enhance their climate change adaptation and resilience.
+  guidelines: ''
+- id: climretr_60_ir_three
+  text: We search for details on how a company plans to collaborate with its downstream partners to address water consumption
+    and pollution issues. This involves understanding the strategies and initiatives a company has in place to not only reduce
+    its own water footprint but also to influence and work together with its partners, suppliers, and customers to promote
+    sustainable water use and pollution control. This could include efforts to replenish water sources, innovate new water-saving
+    technologies, and engage in policy advocacy for water conservation. Additionally, we look for information on how companies
+    integrate water sustainability into their investment or procurement guidelines, emphasizing the importance of biodiversity,
+    conservation, and waste management. The goal is to assess the company's commitment to fostering a holistic and collaborative
+    approach to water sustainability that extends beyond its immediate operations to encompass its entire value chain, thereby
+    enhancing climate change adaptation and resilience.
+  guidelines: ''
+- id: climretr_61_ir_three
+  text: We search for details on how a company's operations and activities influence the environment, focusing on both direct
+    and indirect impacts. This includes emissions of greenhouse gases (GHGs) from company operations and the broader value
+    chain, such as emissions from purchased goods and services, business travel, and waste generated. Information on the company's
+    land use, including the extent of land owned, operated, or influenced, and efforts to protect or restore ecosystems, is
+    also pertinent. Additionally, we look for data on the company's energy consumption, including electricity and other forms
+    of energy, to understand its carbon footprint. Strategies or initiatives aimed at mitigating environmental impacts, such
+    as developing biodiversity strategies, collaborating on low-emission transportation solutions, or addressing impacts through
+    the supply chain and client engagement, are also of interest. This comprehensive view helps assess the company's adaptation
+    and resilience strategies in the face of climate change challenges.
+  guidelines: ''
+- id: climretr_62_ir_three
+  text: We search for details on a company's comprehensive approach towards managing and minimizing waste as part of its sustainability
+    and resilience strategy. This includes initiatives to achieve zero waste through circular economy practices, such as designing
+    products and packaging to reduce material use, enhancing recyclability, and extending the lifecycle of products through
+    reuse and repair. Information on specific targets and timelines, like achieving a certain percentage of waste diversion
+    from landfills by a set year, or the elimination of single-use plastics within the company's operations, is crucial. Additionally,
+    strategies for increasing the use of recycled materials in products and packaging, and efforts to design out waste from
+    the beginning, are of interest. The company's commitment to reducing its environmental impact through waste management,
+    including in areas like paper use and sustainable diets, and how these efforts are integrated across its operations, products,
+    and supply chain, are also pertinent details.
+  guidelines: ''
+- id: climretr_63_ir_all
+  text: We search for details on how a company conceptualizes and integrates the notions of climate change adaptation into
+    their operations and strategic planning. This involves looking for explicit definitions or descriptions provided by the
+    company that explain what climate change adaptation means to them and how it is relevant to their business model. Specifically,
+    we are interested in identifying any initiatives, partnerships, or projects the company is involved in that aim to enhance
+    resilience and adaptability to climate-related challenges. For instance, involvement in alliances or collaborations that
+    focus on innovative solutions for climate adaptation and resilience, such as developing digital finance tools to support
+    adaptation efforts, would be pertinent. This information helps assess the company's commitment to and understanding of
+    the importance of adapting to changing climate conditions, which is crucial across all industries for mitigating risks
+    and leveraging opportunities related to climate change.
+  guidelines: ''
+- id: climretr_64_ir_all
+  text: We search for details on how a company integrates its climate change adaptation strategies with its broader business
+    objectives, ensuring these efforts are not siloed but rather contribute to the company's overall success. This includes
+    examining the governance structures in place, such as committees or councils, that oversee the alignment of sustainability
+    goals with business demands. We look into how environmental, social, and governance (ESG) goals are incorporated into
+    company policies, including remuneration policies, to incentivize sustainable practices among senior leadership and across
+    the organization. Information on how these sustainability goals are tied to the company's strategic direction, and the
+    processes for creating and evaluating these goals, is crucial. This involves stakeholder engagement to prioritize ESG
+    issues and assess risks and opportunities at various levels of the organization. Additionally, we consider how companies
+    link compensation to sustainability achievements and their commitment to broader global initiatives, such as the United
+    Nations Sustainable Development Goals, to gauge their external engagement and impact.
+  guidelines: ''
+- id: climretr_65_ir_all
+  text: We search for details on how companies assess and prepare for the potential impacts of climate change on their business
+    operations and strategy. This includes identifying whether they conduct climate risk assessments and scenario analyses,
+    and if so, what specific scenarios they consider (e.g., transitional and physical risks over short, medium, and long terms).
+    We look for information on how these assessments are integrated into their overall risk management practices, such as
+    through the application of risk management models or the establishment of emissions-reduction targets based on scientific
+    data. Additionally, we seek evidence of proactive engagement in initiatives or alliances aimed at enhancing climate adaptation
+    and resilience, and whether companies are setting clear, science-based targets to mitigate greenhouse gas emissions across
+    their operations and value chain. The goal is to understand the depth of a company's commitment to adapting its business
+    strategy to the evolving climate landscape, ensuring long-term resilience and sustainability.
+  guidelines: ''
+- id: climretr_66_ir_all
+  text: We search for details on how companies are actively modifying their business strategies to incorporate climate change
+    adaptation products and services. This includes the development and deployment of innovative technologies or processes
+    that reduce environmental impact, such as the introduction of more fuel-efficient aircraft or the use of sustainable aviation
+    fuel to lower carbon emissions. It also involves initiatives aimed at enhancing ecosystem resilience and biodiversity,
+    alongside efforts to reduce water usage and improve water quality in response to climate change challenges. Furthermore,
+    we look for evidence of companies engaging with their supply chains to promote decarbonization and the use of renewable
+    energy sources, as well as investments in low-carbon and circular economy projects. The establishment of partnerships
+    or institutions focused on climate resilience and adaptation strategies, and the allocation of financial resources towards
+    sustainability-linked projects or bonds, are also pertinent details indicating a company's commitment to adjusting its
+    business model for climate change adaptation.
+  guidelines: ''
+- id: climretr_67_ir_all
+  text: We search for details on how a company collaborates with others in its industry to address climate change. This includes
+    sharing best practices, participating in industry associations, and engaging in collective action initiatives. Information
+    on partnerships with peers, suppliers, and other stakeholders that aim to reduce emissions, develop sustainable technologies,
+    or influence policy is relevant. Examples of such collaborations could involve joint development of guidelines for emissions
+    reporting, advocacy for regulatory changes, participation in industry-wide sustainability training, and projects that
+    span the entire value chain to decarbonize specific sectors. Additionally, details on how the company aligns its climate
+    change positions with industry associations and ensures these are in agreement with global climate goals, such as the
+    Paris Agreement, are pertinent. The involvement in initiatives that support innovation in renewable energy, emissions
+    reduction, and sustainable practices across the industry, demonstrating a commitment to collective progress towards climate
+    resilience and adaptation, is also of interest.
+  guidelines: ''
+- id: climretr_68_ir_all
+  text: We search for details on how a company proactively identifies, assesses, and manages risks related to climate change.
+    This includes the establishment of specialized teams or offices focused on environmental affairs and climate risk, and
+    the integration of climate risk considerations into the company's broader risk management frameworks and governance structures.
+    Information on the development and implementation of policies, standards, and frameworks specifically designed to address
+    climate risks is crucial. Additionally, we look for evidence of scenario analysis and stress testing to understand potential
+    impacts of climate change on the company's operations, including both transition risks, such as regulatory changes and
+    shifts in market preferences, and physical risks, such as extreme weather events. The role of executive oversight, such
+    as board committees responsible for climate risk oversight, and the incorporation of climate risk into investment processes
+    and operational risk frameworks, are also key indicators of a company's commitment to identifying and managing climate-related
+    risks.
+  guidelines: ''
+- id: climretr_69_ir_all
+  text: We search for details on the specific processes and methodologies a company employs to understand and evaluate how
+    its operations and business activities interact with and impact the environment. This includes identifying both how the
+    company depends on natural resources and ecosystems, and how its actions might affect these environmental elements. For
+    instance, we look for information on initiatives that connect business practices with environmental conservation efforts,
+    such as platforms that aid in sustainable sourcing or projects aimed at enhancing ecosystem health around business sites.
+    Additionally, we seek examples of how a company contributes to climate resilience and conservation, through financial
+    or operational support for projects like Marine Protected Areas or coral reef restoration. The use of innovative approaches,
+    like biomimicry, to minimize negative impacts on the environment and to promote regeneration and sustainability in business
+    expansions or operations is also pertinent. These details collectively help in understanding a company's commitment and
+    approach to environmental sustainability and resilience.
+  guidelines: ''
+- id: climretr_70_ir_all
+  text: We search for details on how a company incorporates external climate projections and models into their risk management
+    and opportunity identification processes. This involves looking for references to authoritative sources like the Intergovernmental
+    Panel on Climate Change (IPCC) assessments, which provide global warming projections and recommendations for emissions
+    reductions, or the Network for Greening the Financial System (NGFS) scenarios, which offer insights into how financial
+    systems can evolve in response to climate change. Information that indicates a company is aligning its strategies with
+    these or similar third-party climate scenarios—such as setting net-zero targets in line with global efforts to limit warming,
+    adopting governance and reporting standards that consider climate-related financial disclosures, or designing emissions
+    reduction strategies based on specific global warming potential scenarios—demonstrates their engagement with established
+    climate science and policy frameworks. This approach helps in assessing the company's preparedness for and resilience
+    to climate-related challenges and opportunities.
+  guidelines: ''
+- id: climretr_71_ir_all
+  text: We search for details on how a company actively involves its downstream partners, such as suppliers and distributors,
+    in identifying, assessing, and mitigating climate-related risks. This involves looking for evidence of the company's efforts
+    to promote transparency in environmental progress, support for sustainability initiatives within the supply chain, and
+    encouragement of sustainable sourcing practices. Specifically, we're interested in whether the company asks its partners
+    to conduct climate risk assessments, report greenhouse gas (GHG) emissions, and adopt decarbonization strategies. Additionally,
+    we seek information on any educational or financial support provided to partners to enhance their resilience against climate
+    change impacts. This could include partnerships with suppliers committed to high ethical and environmental standards,
+    initiatives to build transparent supply chains, and efforts to reduce environmental impacts collaboratively. The goal
+    is to understand how the company extends its climate change adaptation and resilience strategies beyond its immediate
+    operations to its broader network of partners, contributing to industry-wide sustainability practices.
+  guidelines: ''
+- id: climretr_72_ir_all
+  text: We search for details on how a company plans to modify its operations to withstand and thrive amidst the changing
+    climate. This includes strategies for reducing greenhouse gas emissions, such as adopting renewable energy sources, enhancing
+    operational efficiency, and investing in advanced technologies that lower carbon footprints. Information on the deployment
+    of new, more efficient product designs or materials that contribute to emissions reduction is pertinent. Additionally,
+    we look for evidence of efforts to minimize resource use, including water and energy, and strategies for waste reduction,
+    such as circular practices that extend product lifecycles and reduce landfill waste. Details on setting and achieving
+    ambitious sustainability targets, like net-zero emissions and significant reductions in water use and solid waste, are
+    crucial. Furthermore, we examine how companies assess and mitigate the physical risks of climate change to their operations,
+    including the integration of climate scenarios into risk management frameworks and the development of business resilience
+    strategies.
+  guidelines: ''
+- id: climretr_73_ir_all
+  text: We search for details on how a company's environmental or sustainability targets are not just internally motivated
+    but are also aligned with or reference external climate change adaptation goals or targets. This includes looking for
+    evidence of commitments to internationally recognized frameworks or initiatives, such as the Science Based Targets initiative
+    (SBTi), which aligns corporate goals with the need to limit global warming to 1.5° C in accordance with the Paris Agreement.
+    Information indicating participation in renewable energy movements like the RE100 initiative, or adherence to guidelines
+    and standards set by global organizations, such as the ISO Net Zero Guidelines, is also pertinent. Additionally, we look
+    for mentions of engaging with suppliers to drive responsible climate choices, aligning carbon footprint reduction efforts
+    across all scopes of emissions (1, 2, & 3), and setting both near-term and long-term greenhouse gas (GHG) reduction targets.
+    Evidence of strategies that include investing in nature-based solutions or the management and restoration of natural resources
+    to combat climate change is also relevant. This comprehensive approach demonstrates a company's broader commitment to
+    global climate change adaptation and resilience efforts.
+  guidelines: ''
+- id: climretr_74_ir_all
+  text: We search for details on how a company's environmental or sustainability targets are designed to align with broader
+    external climate change adaptation and resilience goals, such as those outlined by the Paris Agreement, the Net-Zero Banking
+    Alliance (NZBA), or the Science Based Targets initiative (SBTi). This includes examining commitments to reduce greenhouse
+    gas (GHG) emissions, strategies for transitioning to net-zero operations, and efforts to enhance climate change resilience
+    across their operations and supply chains. Information on specific sector-level targets, especially in carbon-intensive
+    industries, and the adoption of renewable energy sources to power operations are also pertinent. Additionally, we look
+    for evidence of the company's engagement with external climate initiatives and frameworks, such as the NZBA or SBTi, and
+    how these commitments are operationalized within their business strategy. The company's approach to managing physical
+    and transitional risks associated with climate change, including the financing of projects aligned with a low-carbon future,
+    is also relevant.
+  guidelines: ''
+- id: climretr_75_ir_all
+  text: We search for details on the specific measures a company is undertaking or planning to implement in the near future
+    to minimize waste production. This includes initiatives to adopt circular economy principles, such as enhancing the longevity
+    of products through design improvements that facilitate reuse, repair, and recycling. Information on efforts to reduce
+    the use of materials by sourcing them responsibly, increasing the incorporation of recycled content, and eliminating hazardous
+    substances is pertinent. Additionally, strategies to cut down on operational and technology waste, including the reduction
+    of single-use plastics and the achievement of waste reduction targets, are of interest. The company's commitment to achieving
+    certifications that validate their waste reduction efforts, alongside the development of new recycling strategies and
+    policies aimed at zero waste, are also relevant details. These actions demonstrate the company's short-term commitment
+    to reducing its environmental impact through waste generation reduction, reflecting its adaptation and resilience strategies
+    in the face of climate change challenges.
+  guidelines: ''
+- id: climretr_76_ir_all
+  text: We search for details on how a company plans to collaborate with its downstream partners to address water consumption
+    and pollution issues. This involves understanding the strategies and initiatives a company has in place to not only reduce
+    its own water footprint but also to influence and work together with its partners, suppliers, and customers to promote
+    sustainable water use and pollution control. This includes efforts to replenish water sources, innovate in water-saving
+    technologies, and engage in policy advocacy for water conservation. Additionally, we look for information on how companies
+    integrate water sustainability into their investment guidelines, emphasizing the importance of biodiversity, conservation,
+    and waste management. The goal is to assess the company's commitment to fostering a holistic and collaborative approach
+    to water sustainability that extends beyond its immediate operations to encompass its entire value chain, thereby enhancing
+    resilience and adaptation to water-related challenges in the context of climate change.
+  guidelines: ''
+- id: climretr_77_ir_all
+  text: We search for details on how a company's operations and activities influence the environment, focusing on both direct
+    and indirect impacts. This includes emissions of greenhouse gases (GHGs) from company operations, energy consumption metrics,
+    and the effects on land use, such as the extent of land protected versus used for business purposes. It also encompasses
+    the company's approach to managing its ecological footprint, including strategies for biodiversity and nature conservation.
+    Additionally, we look at how the company addresses emissions through its value chain, including purchased goods and services,
+    and efforts to collaborate on or develop low-emission solutions. Information on the company's total GHG emissions, both
+    direct and indirect, as well as specific figures on electricity consumption, provides insight into its environmental impact.
+    This analysis helps in understanding the company's commitment to climate change adaptation and resilience, by assessing
+    its actions to mitigate environmental impacts and enhance sustainability.
+  guidelines: ''
+- id: climretr_78_ir_all
+  text: We search for details on a company's comprehensive approach towards managing waste, aiming for sustainability and
+    resilience against climate change. This includes strategies for achieving zero waste through circular economy practices,
+    such as reducing the use of materials, sourcing responsibly, and enhancing the recyclability and reuse of products and
+    packaging. Information on specific targets, like diversion rates for operational and construction waste, elimination of
+    single-use plastics, and the recyclability of products, is crucial. Additionally, the company's efforts in extending the
+    lifecycle of its products through repair and reuse initiatives, as well as its commitment to reducing waste in its operations,
+    data centers, and through its product lifecycle, are of interest. The focus is also on how these strategies are integrated
+    across the company's value chain, from design and material selection to end-of-life management, to mitigate environmental
+    impacts and promote sustainability across all operations.
+  guidelines: ''
+analysis_guidelines: |-
+  - Responses must be precise and grounded in report extracts
+  - Acknowledge uncertainty rather than making assumptions
+  - Consider potential greenwashing and cheap talk
+  - Scrutinize quantifiable data vs vague statements
+  - Maintain a critical analytical tone
+  - Acknowledge information represents company's perspective
+  - Evaluate completeness and quality of disclosures
+  - Use original company wording where possible
+  - Format responses consistently with bullet points where specified
+  - Clearly state when no relevant information is found
