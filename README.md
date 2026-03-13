@@ -33,10 +33,18 @@ You can install and run the app with one click on the platforms below; on **Stre
 
 | Platform | Deploys | |
 |----------|---------|---|
-| **Streamlit Cloud** | Core `report_analyst/` (RPL) | [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io) |
+| **Streamlit Cloud** | Core `report_analyst/` (RPL) | [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy) |
 | **Render** | Core `report_analyst/` (RPL) | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/climateandtech/report-analyst) |
 | **Heroku** | Core `report_analyst/` (RPL) | [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://www.heroku.com/deploy?template=https://github.com/climateandtech/report-analyst) |
 | **Vercel** | `report_analyst_api/` only; core app not supported | [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/climateandtech/report-analyst) |
+
+### Deploy on Streamlit Cloud
+
+1. Click the **Open in Streamlit** badge above (or go to [share.streamlit.io](https://share.streamlit.io)).
+2. Click **Create app**.
+3. Select **Yup, I have an app**, then paste this URL:  
+   `https://github.com/climateandtech/report-analyst/blob/main/report_analyst/streamlit_app.py`
+4. In **Advanced settings**, add your secrets (e.g. `OPENAI_API_KEY`, `GOOGLE_API_KEY`) as in **Quick Start** below.
 
 ---
 
@@ -368,6 +376,8 @@ pip install pytest pytest-cov pytest-asyncio
 export QUESTIONSETS_PATH=report_analyst/questionsets
 pytest tests/ -v --cov=report_analyst --cov-report=term-missing
 ```
+
+**macOS ARM (Apple Silicon):** If you see a crash in `libopenblas` / `gemm_thread_n` (SIGSEGV), set `OPENBLAS_NUM_THREADS=1` before running. The API and test conftest set this by default; for other entry points use `export OPENBLAS_NUM_THREADS=1` in your shell or add it to `.env`.
 
 For detailed deployment patterns (Docker, Kubernetes, NATS workers, etc.), see:
 - `INSTALL.md` – Installation and configuration options
