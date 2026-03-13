@@ -45,18 +45,13 @@ def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             logger.error(
-                f"Cannot initialize OpenRouter model '{model_name}' - "
-                "OPENAI_API_KEY not set (connect via OpenRouter OAuth)"
+                f"Cannot initialize OpenRouter model '{model_name}' - " "OPENAI_API_KEY not set (connect via OpenRouter OAuth)"
             )
-            raise ValueError(
-                "Connect OpenRouter to get AI access. No API key available."
-            )
+            raise ValueError("Connect OpenRouter to get AI access. No API key available.")
         api_base = os.getenv("OPENAI_API_BASE", OPENROUTER_API_BASE)
         # OpenRouter model IDs: openai/gpt-4o-mini, anthropic/claude-3-haiku, etc.
         if not model_name.startswith(("openai/", "anthropic/", "google/", "meta/")):
-            openrouter_model = (
-                f"openai/{model_name}" if "gpt" in model_name else model_name
-            )
+            openrouter_model = f"openai/{model_name}" if "gpt" in model_name else model_name
         else:
             openrouter_model = model_name
         return OpenAI(

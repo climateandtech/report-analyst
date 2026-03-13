@@ -9,7 +9,6 @@ import base64
 import hashlib
 import json
 import logging
-import os
 import secrets
 from pathlib import Path
 from typing import Optional, Tuple
@@ -93,11 +92,6 @@ def get_auth_url(callback_url: str) -> Tuple[str, str]:
     state = secrets.token_urlsafe(16)
     code_verifier, code_challenge = generate_pkce()
     store_oauth_state(state, code_verifier)
-    params = {
-        "callback_url": callback_url,
-        "code_challenge": code_challenge,
-        "code_challenge_method": "S256",
-    }
     url = f"{OPENROUTER_AUTH_URL}?callback_url={callback_url}&code_challenge={code_challenge}&code_challenge_method=S256"
     return url, state
 

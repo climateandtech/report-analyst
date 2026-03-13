@@ -1321,11 +1321,11 @@ def update_analyzer_parameters():
         # Reset to default OpenAI model
         llm_model = OPENAI_MODELS[0]
         st.session_state.new_llm_model = llm_model
-    elif (llm_model.startswith("gpt-") or llm_model.startswith("openai/") or use_openrouter) and not os.getenv("OPENAI_API_KEY"):
+    elif (llm_model.startswith("gpt-") or llm_model.startswith("openai/") or use_openrouter) and not os.getenv(
+        "OPENAI_API_KEY"
+    ):
         logger.error(f"Attempt to use model '{llm_model}' without API key")
-        st.error(
-            "Connect OpenRouter in Settings to get AI access, or set OPENAI_API_KEY."
-        )
+        st.error("Connect OpenRouter in Settings to get AI access, or set OPENAI_API_KEY.")
 
     # Update the analyzer with the new parameters
     try:
@@ -1531,9 +1531,7 @@ def main():
                         api_key = exchange_code_for_key(
                             code=code,
                             code_verifier=oauth_state["code_verifier"],
-                            code_challenge_method=oauth_state.get(
-                                "code_challenge_method", "S256"
-                            ),
+                            code_challenge_method=oauth_state.get("code_challenge_method", "S256"),
                         )
                         st.session_state["openrouter_api_key"] = api_key
                         os.environ["OPENAI_API_KEY"] = api_key
@@ -2788,9 +2786,7 @@ def main():
             # OpenRouter: refresh LLM when key became available after OAuth
             if use_openrouter and os.getenv("OPENAI_API_KEY"):
                 if analyzer.analyzer.llm is None:
-                    default_model = os.getenv(
-                        "OPENAI_API_MODEL", "openai/gpt-4o-mini"
-                    )
+                    default_model = os.getenv("OPENAI_API_MODEL", "openai/gpt-4o-mini")
                     analyzer.analyzer.update_llm_model(default_model)
                     # Also init embeddings for OpenRouter
                     from llama_index.core import Settings
@@ -2884,10 +2880,7 @@ def main():
             if use_openrouter and not os.getenv("OPENAI_API_KEY"):
                 st.subheader("AI Access")
                 # Use OPENROUTER_CALLBACK_URL or Render's automatic RENDER_EXTERNAL_URL
-                callback_url = (
-                    os.getenv("OPENROUTER_CALLBACK_URL")
-                    or os.getenv("RENDER_EXTERNAL_URL", "")
-                ).rstrip("/")
+                callback_url = (os.getenv("OPENROUTER_CALLBACK_URL") or os.getenv("RENDER_EXTERNAL_URL", "")).rstrip("/")
                 if callback_url:
                     auth_url, _state = get_auth_url(callback_url)
                     st.link_button(
@@ -2896,9 +2889,7 @@ def main():
                         type="primary",
                         help="One-click AI access, no credit card. Free: 50 req/day.",
                     )
-                    st.caption(
-                        "One-click AI access, no credit card. Free tier: 50 requests/day."
-                    )
+                    st.caption("One-click AI access, no credit card. Free tier: 50 requests/day.")
                 else:
                     st.warning(
                         "Set OPENROUTER_CALLBACK_URL to your app URL to enable "
