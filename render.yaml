@@ -18,10 +18,17 @@ services:
         value: "true"
       - key: USE_POSTGRES_FILE_STORAGE
         value: "true"
+      # OpenRouter OAuth: one-click AI access, no credit card
+      - key: USE_OPENROUTER_OAUTH
+        value: "true"
+      - key: OPENAI_API_BASE
+        value: "https://openrouter.ai/api/v1"
+      - key: OPENAI_API_MODEL
+        value: openai/gpt-4o-mini
+      # RENDER_EXTERNAL_URL is set automatically by Render for the callback
+      # Optional: override with your own keys for non-OAuth usage
       - key: OPENAI_API_KEY
         sync: false
-      - key: OPENAI_API_MODEL
-        value: gpt-4o-mini
       - key: GOOGLE_API_KEY
         sync: false
 

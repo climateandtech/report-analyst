@@ -61,29 +61,39 @@ if use_backend and (use_centralized_llm or use_full_backend_analysis):
     if not gemini_key:
         gemini_key = "backend-handles-llm"
 else:
-    # Only check for API keys if not using backend LLM
-    # Check if we need to force the default model based on available keys
-    if default_model.startswith("gemini-") and not gemini_key:
-        logger.warning(f"Default model is {default_model} but no GOOGLE_API_KEY is available")
-        if openai_key:
-            default_model = "gpt-3.5-turbo-1106"
-            logger.info(f"Switching default model to {default_model}")
-        else:
-            logger.error("No valid API keys available for any models")
-            raise ValueError("No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY")
-    elif default_model.startswith("gpt-") and not openai_key:
-        logger.warning(f"Default model is {default_model} but no OPENAI_API_KEY is available")
-        if gemini_key:
-            default_model = "gemini-pro"
-            logger.info(f"Switching default model to {default_model}")
-        else:
-            logger.error("No valid API keys available for any models")
-            raise ValueError("No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY")
+    # OpenRouter OAuth mode: allow startup without keys (user connects via OAuth)
+    use_openrouter_oauth = os.getenv("USE_OPENROUTER_OAUTH", "false").lower() == "true"
+    if use_openrouter_oauth and not openai_key and not gemini_key:
+        logger.info("OpenRouter OAuth mode - app will start without keys, user connects via OAuth")
+        default_model = os.getenv("OPENAI_API_MODEL", "openai/gpt-4o-mini")
+        openai_key = None  # Will be set at runtime after OAuth
+        gemini_key = None
+    else:
+        # Only check for API keys if not using OpenRouter OAuth
+        if default_model.startswith("gemini-") and not gemini_key:
+            logger.warning(f"Default model is {default_model} but no GOOGLE_API_KEY is available")
+            if openai_key:
+                default_model = "gpt-3.5-turbo-1106"
+                logger.info(f"Switching default model to {default_model}")
+            else:
+                logger.error("No valid API keys available for any models")
+                raise ValueError("No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY")
+        elif default_model.startswith("gpt-") and not openai_key:
+            logger.warning(f"Default model is {default_model} but no OPENAI_API_KEY is available")
+            if gemini_key:
+                default_model = "gemini-pro"
+                logger.info(f"Switching default model to {default_model}")
+            else:
+                logger.error("No valid API keys available for any models")
+                raise ValueError("No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY")
 
-    # Ensure we have at least one API key for the selected model type
-    if not openai_key and not gemini_key:
-        logger.error("No API keys found - set either OPENAI_API_KEY or GOOGLE_API_KEY")
-        raise ValueError("Set either OPENAI_API_KEY or GOOGLE_API_KEY environment variable")
+        # Ensure we have at least one API key for the selected model type
+        if not openai_key and not gemini_key:
+            logger.error("No API keys found - set either OPENAI_API_KEY or GOOGLE_API_KEY")
+            raise ValueError("Set either OPENAI_API_KEY or GOOGLE_API_KEY environment variable")
+
+# Track OpenRouter OAuth mode for deferred LLM init
+use_openrouter_oauth = os.getenv("USE_OPENROUTER_OAUTH", "false").lower() == "true"
 
 if not os.getenv("OPENAI_ORGANIZATION"):
     logger.warning("OPENAI_ORGANIZATION environment variable is not set")
@@ -154,6 +164,13 @@ class DocumentAnalyzer:
                 "info",
             )
             # Set minimal placeholders for compatibility
+            self.llm = None
+            self.embeddings = None
+        elif use_openrouter_oauth and not openai_key and not gemini_key:
+            log_analysis_step(
+                "OpenRouter OAuth mode - deferring LLM init until user connects",
+                "info",
+            )
             self.llm = None
             self.embeddings = None
         else:
