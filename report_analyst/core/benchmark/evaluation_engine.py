@@ -400,17 +400,25 @@ class EvaluationEngine:
                 reference_results, key=lambda x: x.get_position() or 999
             )
 
-            # Build ground truth mapping: chunk_id -> relevance_score
+            # Build ground truth mapping: ID used for matching -> relevance_score
+            # IMPORTANT: Use the same identifier that will be used for retrieved_ids
+            # in _evaluate_single_question. That function uses the "id" field from
+            # retrieved_chunks, which we construct from relevant_part_id when
+            # available (fallback to chunk_id). To keep NDCG consistent with
+            # binary relevance/recall, we therefore key ground_truth by
+            # relevant_part_id if it exists, otherwise by chunk_id.
             ground_truth = {}
             for i, ref_result in enumerate(reference_results):
                 chunk_id = ref_result.get_chunk_id()
-                if chunk_id:
+                data = ref_result.data if hasattr(ref_result, "data") else {}
+                match_id = data.get("relevant_part_id") or chunk_id
+                if match_id:
                     score = ref_result.get_score()
                     # Use score if available, otherwise use inverse position
                     relevance_score = (
                         score if score is not None else max(0.0, 1.0 - (i * 0.1))
                     )
-                    ground_truth[chunk_id] = relevance_score
+                    ground_truth[match_id] = relevance_score
 
             # Skip this query if there's no ground truth (can't evaluate without ground truth)
             if not ground_truth:

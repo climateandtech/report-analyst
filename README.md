@@ -79,6 +79,43 @@ In the web UI you can:
   - Gaps and uncertainties
 - Use the **Benchmarking** page to evaluate retrieval or extraction results against reference datasets (upload CSVs, align formats, run metrics, view results).
 
+## Running With Docker
+
+If you prefer to run the app in Docker instead of installing Python locally:
+
+1. **Build the image**
+
+```bash
+docker build -t report-analyst .
+```
+
+2. **Run the Streamlit app**
+
+Make sure you have a `.env` file (for example by copying `.env.example`), then:
+
+```bash
+docker run --rm -p 8501:8501 --env-file .env report-analyst
+```
+
+Open `http://localhost:8501` in your browser.
+
+3. **(Optional) Use Docker Compose**
+
+```bash
+docker compose up app
+```
+
+You can also run CLI tools inside the same image, for example:
+
+```bash
+docker run --rm --env-file .env report-analyst python scripts/test_climretrieve_benchmark.py --help
+# Or with Compose:
+docker compose run --rm cli python scripts/test_climretrieve_benchmark.py --help
+```
+
+The Dockerfile is configured to use Python 3.12 and installs system dependencies
+required by the PDF and benchmarking stack (`libpoppler-cpp-dev`, `pkg-config`, etc.).
+
 ## Running Benchmarks
 
 The project includes support for benchmarking retrieval and extraction systems against reference datasets. You can run benchmarks **from the Streamlit app** or via **command-line scripts**.
@@ -89,12 +126,17 @@ In the web UI, open the **Benchmarking** page from the sidebar. It provides four
 
 | Tab | Functionality |
 |-----|----------------|
-| **Datasets** | Upload ground truth and benchmark datasets (CSV, Excel, YAML, JSON). List and manage stored datasets. **Dataset Alignment:** CSV/Excel use the alignment section and configurable mappers (`report_analyst/config/datasets/`). YAML/JSON that don’t match the app schema (e.g. ClimRetrieve Report-Level) are **aligned automatically** when possible (list-of-records with document, question, paragraph/relevance). Expected structures for CSV, Excel, YAML, and JSON: see [Expected file formats](EXPECTED_FILE_FORMATS.md). |
+| **Datasets** | Upload ground truth and benchmark datasets (CSV, Excel, YAML, JSON). List and manage stored datasets. **Dataset Alignment (presets):** CSV/Excel can be aligned via configurable mappers (`report_analyst/config/datasets/`, e.g. ClimRetrieve). YAML/JSON that don’t match the app schema (e.g. ClimRetrieve Report-Level) are **aligned automatically** when possible (list-of-records with document, question, paragraph/relevance). **Flexible alignment (wizard):** for custom CSV/Excel files with expert labels and model predictions, use the **Flexible Dataset Alignment (Wizard)** section to interactively map query/criteria, chunk text, relevant parts, and label/prediction columns into a unified schema. Expected structures for CSV, Excel, YAML, and JSON: see [Expected file formats](EXPECTED_FILE_FORMATS.md). |
 | **Evaluate** | Select a reference (ground truth) and a benchmark dataset, set K values and evaluation name, and run the evaluation. Metrics are computed with the same engine as the CLI (Precision@K, Recall@K, F1@K, NDCG@K, MAP, MRR). |
-| **Results** | View and compare past evaluations, filter by dataset or date, and inspect metrics and charts. |
+| **Results** | View and compare past evaluations, filter by dataset or date, and inspect metrics and charts. When a benchmark dataset also contains `relevance` / `usefulness` labels and corresponding `*_score_*` columns, this tab additionally shows a **Classification calibration (relevance/usefulness)** panel with calibration metrics (ECE, Brier scores, ROC AUC, F1) and a 3-class classification report for a selected model. |
 | **Annotate** | Attach human annotations to evaluation results for later analysis. |
 
-This makes it easy to compare retrieval or extraction outputs against expert-annotated data without leaving the app.
+To use the classification calibration view, prepare a benchmark dataset that includes:
+
+- Label columns: `relevance` and/or `usefulness` (ordinal labels 0–2).  
+- Model score columns: `relevance_score_<model>` / `usefulness_score_<model>` (continuous scores from your model or a notebook, for example as in `report_analyst/core/benchmark/02_classification_calibration.py`).
+
+Upload this dataset as a **Benchmark Dataset**. In the **Results** tab, pick the dataset, choose the label type and one or more score columns, then run the calibration analysis to inspect reliability and per-class performance.
 
 ### ClimRetrieve Benchmark (CLI)
 
@@ -217,10 +259,10 @@ Open Sustainability Analyst is used by various organizations and research instit
 
 | Feature | Description |
 |---------|-------------|
-| Streamlit Benchmarking UI | Upload ground truth and benchmark CSVs, align datasets (e.g. ClimRetrieve), run evaluations, view results and charts, attach human annotations |
+| Streamlit Benchmarking UI | Upload ground truth and benchmark CSV/Excel/YAML/JSON, align datasets (e.g. ClimRetrieve), run evaluations, view results and charts, attach human annotations |
 | Flexible CSV Loader | Auto-detect IR vs IE datasets; accept common column names (query_id, chunk_id, position, score, etc.) |
-| Evaluation Metrics | Precision@K, Recall@K, F1@K, NDCG@K, MAP, MRR via `EvaluationEngine` |
-| Dataset Alignment | **CSV/Excel:** map raw files via YAML configs (e.g. `config/datasets/climretrieve.yaml`). **YAML/JSON:** when the file does not match the app schema, alignment is attempted automatically (list-of-records with document, question, chunk, score). |
+| Evaluation Metrics | Precision@K, Recall@K, F1@K, NDCG@K, MAP, MRR via `EvaluationEngine`; calibration and classification metrics (ECE, Brier, ROC AUC, F1, 3-class report) via `classification_calibration` |
+| Dataset Alignment | **Preset mappers:** CSV/Excel can be mapped via YAML configs (e.g. `config/datasets/climretrieve.yaml`). **Flexible wizard:** CSV/Excel can be aligned through a guided wizard that defines `query_id`, `chunk_id`, optional relevant-part IDs, and ground-truth/prediction columns so that both ranking and classification metrics can be computed from the same aligned data. **YAML/JSON:** when the file does not match the app schema, alignment is attempted automatically (list-of-records with document, question, chunk, score). |
 | Colab Support | Run evaluation and error analysis from Google Colab; see `COLAB.md` |
 
 ### Advanced Features
