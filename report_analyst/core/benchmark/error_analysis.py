@@ -485,15 +485,23 @@ def build_error_analysis_dataframe_from_flexible(
                 gt_entry = gt_chunks.get(retrieved_chunk_id, {})
                 expert_score = float(gt_entry.get("score", 0.0))
                 relevant_part_text = gt_entry.get("text", "")
-                report_name = gt_entry.get("report") or data.get("document") or data.get(
-                    "report"
-                ) or data.get("report_name") or ""
+                report_name = (
+                    gt_entry.get("report")
+                    or data.get("document")
+                    or data.get("report")
+                    or data.get("report_name")
+                    or ""
+                )
                 question_text = gt_entry.get("question") or data.get("question") or ""
 
                 # Model score: keep same priority as main path
-                model_score = data.get("relevant_text_sim") or r.get_score() or data.get(
-                    "score"
-                ) or data.get("relevance_score") or 0.0
+                model_score = (
+                    data.get("relevant_text_sim")
+                    or r.get_score()
+                    or data.get("score")
+                    or data.get("relevance_score")
+                    or 0.0
+                )
                 try:
                     model_score = float(model_score) if model_score else 0.0
                 except (ValueError, TypeError):

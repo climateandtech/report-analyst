@@ -613,7 +613,9 @@ class BenchmarkingUI:
             st.warning("No metrics for this run.")
             return
 
-        st.caption(f"Run: **{run['evaluation_name']}** — one row per model (prediction column).")
+        st.caption(
+            f"Run: **{run['evaluation_name']}** — one row per model (prediction column)."
+        )
         st.dataframe(metrics_df, use_container_width=True)
 
     def _render_classification_calibration_panel(self):
@@ -750,13 +752,15 @@ class BenchmarkingUI:
                 if "csv_classification_evaluations" not in st.session_state:
                     st.session_state.csv_classification_evaluations = []
                 eval_name = f"Classification: {selected_key} ({label_col})"
-                st.session_state.csv_classification_evaluations.append({
-                    "evaluation_name": eval_name,
-                    "dataset_id": selected_key,
-                    "label_col": label_col,
-                    "metrics_df": metrics_df,
-                    "created_at": pd.Timestamp.now(),
-                })
+                st.session_state.csv_classification_evaluations.append(
+                    {
+                        "evaluation_name": eval_name,
+                        "dataset_id": selected_key,
+                        "label_col": label_col,
+                        "metrics_df": metrics_df,
+                        "created_at": pd.Timestamp.now(),
+                    }
+                )
                 st.success("Saved for model comparison in the **Results** tab.")
 
                 # Classification report for every selected model
@@ -768,7 +772,9 @@ class BenchmarkingUI:
                             score_col=score_col,
                         )
                     except Exception as exc:
-                        st.error(f"Failed to compute classification report for `{score_col}`: {exc}")
+                        st.error(
+                            f"Failed to compute classification report for `{score_col}`: {exc}"
+                        )
                         logger.exception("Classification report error")
                         continue
 
@@ -1265,7 +1271,11 @@ class BenchmarkingUI:
                         if default_score == cols[0]:
                             for c in cols:
                                 cl = c.lower()
-                                if "relevance" in cl or "usefulness" in cl or "gpt" in cl:
+                                if (
+                                    "relevance" in cl
+                                    or "usefulness" in cl
+                                    or "gpt" in cl
+                                ):
                                     default_score = c
                                     break
                         position_col_candidates = ["position", "rank", "order", "pos"]
@@ -1281,17 +1291,21 @@ class BenchmarkingUI:
                         query_col = st.selectbox(
                             "Query / criteria column",
                             options=cols,
-                            index=cols.index(default_query)
-                            if default_query in cols
-                            else 0,
+                            index=(
+                                cols.index(default_query)
+                                if default_query in cols
+                                else 0
+                            ),
                             key=f"cfg_query_{dataset_type}_{uploaded_file.name}",
                         )
                         chunk_text_col = st.selectbox(
                             "Chunk text column",
                             options=cols,
-                            index=cols.index(default_chunk)
-                            if default_chunk in cols
-                            else 0,
+                            index=(
+                                cols.index(default_chunk)
+                                if default_chunk in cols
+                                else 0
+                            ),
                             key=f"cfg_chunk_{dataset_type}_{uploaded_file.name}",
                         )
                         score_label = (
@@ -1302,9 +1316,11 @@ class BenchmarkingUI:
                         score_col = st.selectbox(
                             score_label,
                             options=cols,
-                            index=cols.index(default_score)
-                            if default_score in cols
-                            else 0,
+                            index=(
+                                cols.index(default_score)
+                                if default_score in cols
+                                else 0
+                            ),
                             key=f"cfg_score_{dataset_type}_{uploaded_file.name}",
                         )
                         position_options = [
@@ -1327,7 +1343,11 @@ class BenchmarkingUI:
                             position_mode = POSITION_MODE_COLUMN
                             position_column = st.selectbox(
                                 "Position column",
-                                options=[cols_lower[p] for p in position_col_candidates if p in cols_lower],
+                                options=[
+                                    cols_lower[p]
+                                    for p in position_col_candidates
+                                    if p in cols_lower
+                                ],
                                 key=f"cfg_position_col_{dataset_type}_{uploaded_file.name}",
                             )
                         document_options = ["None"] + cols
@@ -1342,7 +1362,9 @@ class BenchmarkingUI:
                             index=default_doc_idx,
                             key=f"cfg_document_{dataset_type}_{uploaded_file.name}",
                         )
-                        document_col = None if document_col_sel == "None" else document_col_sel
+                        document_col = (
+                            None if document_col_sel == "None" else document_col_sel
+                        )
                         if st.button(
                             "Apply column config and use for evaluation",
                             key=f"apply_cfg_{dataset_type}_{uploaded_file.name}",
@@ -1366,7 +1388,9 @@ class BenchmarkingUI:
                                 if "uploaded_datasets" not in st.session_state:
                                     st.session_state.uploaded_datasets = {}
                                 if dataset_key in st.session_state.uploaded_datasets:
-                                    old = st.session_state.uploaded_datasets[dataset_key]
+                                    old = st.session_state.uploaded_datasets[
+                                        dataset_key
+                                    ]
                                     st.info(
                                         f"Replacing previous {dataset_type} dataset: {old.name}"
                                     )
@@ -1423,7 +1447,9 @@ class BenchmarkingUI:
                 except:
                     pass
 
-    def _handle_classification_upload(self, df_raw: pd.DataFrame, uploaded_file, dataset_type: str):
+    def _handle_classification_upload(
+        self, df_raw: pd.DataFrame, uploaded_file, dataset_type: str
+    ):
         """Handle upload of a classification-style dataset (single file with labels and predictions).
 
         In this simplified path we do **no special alignment** – we just wrap the
@@ -1809,7 +1835,9 @@ class BenchmarkingUI:
 
         classification_label_col = None
         if is_classification_mode:
-            st.markdown("**Step 3a – Ground-truth label used for classification metrics**")
+            st.markdown(
+                "**Step 3a – Ground-truth label used for classification metrics**"
+            )
             # Heuristic: prefer 'relevance' or 'usefulness' as label.
             default_label = cols[0]
             for cand in ("relevance", "usefulness", "label", "class"):

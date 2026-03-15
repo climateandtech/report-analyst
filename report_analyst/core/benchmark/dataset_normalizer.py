@@ -115,14 +115,20 @@ def normalize_dataframe_for_benchmark(
         DataFrame with columns query_id, chunk_id, position, score, paragraph, question [, document].
     """
     if query_column not in df.columns:
-        raise ValueError(f"Query column '{query_column}' not in DataFrame columns: {list(df.columns)}")
+        raise ValueError(
+            f"Query column '{query_column}' not in DataFrame columns: {list(df.columns)}"
+        )
     if chunk_text_column not in df.columns:
         raise ValueError(
             f"Chunk text column '{chunk_text_column}' not in DataFrame columns: {list(df.columns)}"
         )
     if score_column not in df.columns:
-        raise ValueError(f"Score column '{score_column}' not in DataFrame columns: {list(df.columns)}")
-    if position_mode == POSITION_MODE_COLUMN and (not position_column or position_column not in df.columns):
+        raise ValueError(
+            f"Score column '{score_column}' not in DataFrame columns: {list(df.columns)}"
+        )
+    if position_mode == POSITION_MODE_COLUMN and (
+        not position_column or position_column not in df.columns
+    ):
         raise ValueError(
             f"Position mode is 'column' but position column '{position_column}' missing or not in DataFrame"
         )
@@ -144,7 +150,11 @@ def normalize_dataframe_for_benchmark(
         )
     else:
         out["query_id"] = out[query_column].apply(
-            lambda x: _stable_query_id_from_text(x) if pd.notna(x) else _stable_query_id_from_text("")
+            lambda x: (
+                _stable_query_id_from_text(x)
+                if pd.notna(x)
+                else _stable_query_id_from_text("")
+            )
         )
 
     # chunk_id from chunk text
@@ -156,14 +166,12 @@ def normalize_dataframe_for_benchmark(
     out["score"] = out[score_column].apply(_parse_score)
 
     # paragraph for matching/display
-    out["paragraph"] = out[chunk_text_column].where(
-        out[chunk_text_column].notna(), ""
-    ).astype(str)
+    out["paragraph"] = (
+        out[chunk_text_column].where(out[chunk_text_column].notna(), "").astype(str)
+    )
 
     # question text for error analysis / display (copy from query/criteria column)
-    out["question"] = out[query_column].where(out[query_column].notna(), "").astype(
-        str
-    )
+    out["question"] = out[query_column].where(out[query_column].notna(), "").astype(str)
 
     # position
     if position_mode == POSITION_MODE_COLUMN and position_column:
@@ -183,7 +191,14 @@ def normalize_dataframe_for_benchmark(
         out["document"] = out[document_column]
 
     # Keep only standard columns so loader sees a clean schema
-    standard_cols = ["query_id", "chunk_id", "position", "score", "paragraph", "question"]
+    standard_cols = [
+        "query_id",
+        "chunk_id",
+        "position",
+        "score",
+        "paragraph",
+        "question",
+    ]
     if document_column:
         standard_cols.append("document")
     out = out[standard_cols].copy()

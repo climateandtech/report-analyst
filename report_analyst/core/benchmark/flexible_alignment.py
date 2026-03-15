@@ -66,9 +66,7 @@ def align_ground_truth_flexible(
             raise ValueError(f"Label column '{col}' not in DataFrame.")
 
     if config.document_col and config.document_col not in df.columns:
-        raise ValueError(
-            f"Document column '{config.document_col}' not in DataFrame."
-        )
+        raise ValueError(f"Document column '{config.document_col}' not in DataFrame.")
     if config.relevant_part_col and config.relevant_part_col not in df.columns:
         raise ValueError(
             f"Relevant part column '{config.relevant_part_col}' not in DataFrame."
@@ -182,9 +180,7 @@ def align_benchmark_flexible(
             raise ValueError(f"Prediction column '{col}' not in DataFrame.")
 
     if config.document_col and config.document_col not in df.columns:
-        raise ValueError(
-            f"Document column '{config.document_col}' not in DataFrame."
-        )
+        raise ValueError(f"Document column '{config.document_col}' not in DataFrame.")
     if config.relevant_part_col and config.relevant_part_col not in df.columns:
         raise ValueError(
             f"Relevant part column '{config.relevant_part_col}' not in DataFrame."
@@ -200,6 +196,7 @@ def align_benchmark_flexible(
     if config.query_id_col:
         out["query_id"] = out[config.query_id_col].astype(str)
     else:
+
         def _mk_qid(row):
             doc_val = (
                 row[config.document_col] if config.document_col else None  # type: ignore[index]
@@ -271,4 +268,3 @@ __all__ = [
     "align_ground_truth_flexible",
     "align_benchmark_flexible",
 ]
-

@@ -539,10 +539,7 @@ def load_flexible_dataset_from_normalized_df(
             f"Normalized DataFrame must have columns {required}. Missing: {missing}"
         )
     source_name = dataset_name or "normalized_dataset"
-    did = (
-        dataset_id
-        or f"{source_name}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
-    )
+    did = dataset_id or f"{source_name}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
     results = []
     for _, row in normalized_df.iterrows():
         row_dict = {}
