@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -10,7 +10,6 @@ from .dataset_normalizer import (
     make_query_id_from_columns,
     make_relevant_part_id_from_text,
 )
-
 
 logger = logging.getLogger(__name__)
 
