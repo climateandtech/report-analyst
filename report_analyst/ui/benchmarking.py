@@ -3,7 +3,7 @@ import logging
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import plotly.express as px
