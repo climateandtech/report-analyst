@@ -25,7 +25,7 @@ include = ["report_analyst", "report_analyst.*"]
 [tool.isort]
 profile = "black"
 line_length = 88
-skip = ["venv", "venv2", "node_modules", "report_analyst_enterprise", ".git", "__pycache__", "htmlcov", "*.egg-info"]
+skip = ["venv", "venv2", "node_modules", "report_analyst_enterprise", ".git", "__pycache__", "htmlcov", "*.egg-info", "report_analyst/core/benchmark/02_classification_calibration.py"]
 
 [tool.black]
 line-length = 88

@@ -10,6 +10,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from ..core.benchmark.classification_calibration import (
+    compute_calibration_metrics,
+    compute_classification_report,
+)
 from ..core.benchmark.dataset_loader import DatasetLoader, DatasetValidationError
 from ..core.benchmark.dataset_mapper import (
     DatasetMapperFactory,
@@ -21,21 +25,17 @@ from ..core.benchmark.dataset_normalizer import (
     POSITION_MODE_SORT_BY_SCORE,
     normalize_dataframe_for_benchmark,
 )
+from ..core.benchmark.error_analysis import (
+    build_error_analysis_dataframe,
+    build_error_analysis_dataframe_from_flexible,
+)
+from ..core.benchmark.evaluation_engine import EvaluationEngine
 from ..core.benchmark.flexible_alignment import (
     BenchmarkAlignConfig,
     GroundTruthAlignConfig,
     align_benchmark_flexible,
     align_ground_truth_flexible,
 )
-from ..core.benchmark.classification_calibration import (
-    compute_calibration_metrics,
-    compute_classification_report,
-)
-from ..core.benchmark.error_analysis import (
-    build_error_analysis_dataframe,
-    build_error_analysis_dataframe_from_flexible,
-)
-from ..core.benchmark.evaluation_engine import EvaluationEngine
 from ..core.benchmark.retrieval_results_loader import (
     load_flexible_dataset_from_csv,
     load_flexible_dataset_from_normalized_df,
