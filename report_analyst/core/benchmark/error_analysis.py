@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Dict, List
 
@@ -252,7 +253,7 @@ def build_error_analysis_dataframe_from_flexible(
                     question_text = data.get("question") or ""
 
         if not report_name or not question_text:
-            # Skip if we can't determine report/question
+            # Skip this pair in report/question-based path; may still be usable in a query-only fallback.
             continue
 
         # Normalize report_name and question_text to avoid duplicates due to whitespace/formatting
@@ -433,6 +434,99 @@ def build_error_analysis_dataframe_from_flexible(
                         "model_score": model_score,
                         "is_really_relevant": is_really_relevant,
                         "chunk_id": retrieved_chunk_id,  # Store the retrieved paragraph ID
+                    }
+                )
+
+    # #region agent log
+    try:
+        bmq_count = len(benchmark_by_query)
+        qq_pairs = sum(len(v) for v in queries_by_report_and_question.values())
+        log_entry2 = {
+            "sessionId": "f7bf10",
+            "runId": "pre-fix",
+            "hypothesisId": "H1",
+            "location": "core/benchmark/error_analysis.py:benchmark_index",
+            "message": "EA flexible benchmark index summary",
+            "data": {
+                "benchmark_query_count": bmq_count,
+                "report_outer_keys": len(queries_by_report_and_question),
+                "report_question_pairs": qq_pairs,
+            },
+            "timestamp": int(pd.Timestamp.now().timestamp() * 1000),
+        }
+        with open(
+            "/home/yauheni/Documents/my_main/.cursor/debug-f7bf10.log", "a"
+        ) as _f:
+            _f.write(json.dumps(log_entry2) + "\n")
+    except Exception:
+        pass
+    # #endregion agent log
+
+    # If we didn't produce any rows using the (report, question) grouping path,
+    # fall back to a simpler query-centric path that only relies on query_id and chunk_id.
+    if not rows:
+        for query_id, benchmark_results in benchmark_by_query.items():
+            gt_chunks = gt_by_query.get(query_id, {})
+            if not gt_chunks:
+                # No ground truth for this query_id
+                continue
+
+            # Sort benchmark results by similarity score and take top-K
+            sorted_results = sorted(
+                benchmark_results, key=get_similarity_score, reverse=True
+            )[:top_k]
+
+            for local_rank, r in enumerate(sorted_results, start=1):
+                data = r.data
+                retrieved_chunk_id = r.get_chunk_id() or ""
+                if not retrieved_chunk_id:
+                    continue
+
+                gt_entry = gt_chunks.get(retrieved_chunk_id, {})
+                expert_score = float(gt_entry.get("score", 0.0))
+                relevant_part_text = gt_entry.get("text", "")
+                report_name = (
+                    gt_entry.get("report")
+                    or data.get("document")
+                    or data.get("report")
+                    or data.get("report_name")
+                    or ""
+                )
+                question_text = gt_entry.get("question") or data.get("question") or ""
+
+                # Model score: keep same priority as main path
+                model_score = (
+                    data.get("relevant_text_sim")
+                    or r.get_score()
+                    or data.get("score")
+                    or data.get("relevance_score")
+                    or 0.0
+                )
+                try:
+                    model_score = float(model_score) if model_score else 0.0
+                except (ValueError, TypeError):
+                    model_score = 0.0
+
+                original_position = r.get_position() or 0
+                is_really_relevant = expert_score > 0
+
+                rows.append(
+                    {
+                        "report_name": str(report_name),
+                        "question_id": query_id,
+                        "question": str(question_text),
+                        "relevant_part_text": str(relevant_part_text),
+                        "retrieved_chunk_text": str(
+                            data.get("paragraph")
+                            or data.get("chunk_text")
+                            or data.get("text")
+                            or ""
+                        ),
+                        "position_in_top_k": local_rank,
+                        "retrieval_rank": original_position,
+                        "model_score": model_score,
+                        "is_really_relevant": is_really_relevant,
+                        "chunk_id": retrieved_chunk_id,
                     }
                 )
 
