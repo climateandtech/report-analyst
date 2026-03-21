@@ -172,6 +172,4 @@ def test_version_compatibility_warning(validator):
     result = validator.validate_service(manifest)
 
     # Should have warnings about version mismatch
-    assert (
-        len(result.warnings) > 0 or result.is_valid
-    )  # May still be valid but with warnings
+    assert len(result.warnings) > 0 or result.is_valid  # May still be valid but with warnings

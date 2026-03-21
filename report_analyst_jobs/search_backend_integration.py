@@ -40,12 +40,8 @@ async def notify_document_ready(
     """
     try:
         async with NATSSearchBackendPublisher(nats_url) as publisher:
-            await publisher.notify_document_ready(
-                resource_id, document_url, chunks_count
-            )
-            logger.info(
-                f"Successfully notified NATS that document {resource_id} is ready"
-            )
+            await publisher.notify_document_ready(resource_id, document_url, chunks_count)
+            logger.info(f"Successfully notified NATS that document {resource_id} is ready")
     except Exception as e:
         logger.error(f"Failed to notify NATS about document {resource_id}: {e}")
         # Don't raise - this is a nice-to-have feature
@@ -63,9 +59,7 @@ def notify_document_ready_sync(
     Use this in synchronous contexts like Celery tasks.
     """
     try:
-        asyncio.run(
-            notify_document_ready(resource_id, document_url, chunks_count, nats_url)
-        )
+        asyncio.run(notify_document_ready(resource_id, document_url, chunks_count, nats_url))
     except Exception as e:
         logger.error(f"Failed to notify NATS about document {resource_id}: {e}")
 
@@ -98,16 +92,12 @@ class SearchBackendNATSIntegration:
             self._connected = False
             logger.info("Disconnected from NATS")
 
-    async def notify_document_ready(
-        self, resource_id: str, document_url: str, chunks_count: int
-    ):
+    async def notify_document_ready(self, resource_id: str, document_url: str, chunks_count: int):
         """Notify that document is ready"""
         if not self._connected:
             await self.connect()
 
-        await self.publisher.notify_document_ready(
-            resource_id, document_url, chunks_count
-        )
+        await self.publisher.notify_document_ready(resource_id, document_url, chunks_count)
         logger.info(f"Notified NATS that document {resource_id} is ready")
 
 

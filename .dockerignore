@@ -1,0 +1,48 @@
+# Virtual environments
+venv/
+venv2/
+
+# Secrets and env
+.env
+.env.*
+!.env.example
+
+# Git and IDE
+.git/
+.gitignore
+.cursor/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+.mypy_cache/
+
+# Build and temp
+*.diff
+/data
+/temp
+/storage
+**/storage/cache/
+report_analyst/temp/
+
+# Node (e.g. enterprise components)
+node_modules/
+report_analyst_enterprise/components/web/node_modules/
+
+# Database and logs
+*.db
+*.log
+
+# macOS
+.DS_Store
+
+# Docs and assessments (not needed in image)
+*.md
+!report_analyst/LICENSE
+!report_analyst_api/LICENSE
+!report_analyst_enterprise/LICENSE
+!report_analyst_jobs/README.md

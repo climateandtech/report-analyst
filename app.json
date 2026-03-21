@@ -1,0 +1,25 @@
+{
+  "name": "Open Sustainability Analyst",
+  "description": "Analyze sustainability reports with AI. Core report_analyst app for ESG/TCFD analysis.",
+  "repository": "https://github.com/climateandtech/report-analyst",
+  "stack": "heroku-24",
+  "buildpacks": [
+    { "url": "heroku-community/apt" },
+    { "url": "heroku/python" }
+  ],
+  "success_url": "/",
+  "env": {
+    "OPENAI_API_KEY": {
+      "description": "Your OpenAI API key for LLM analysis.",
+      "required": true
+    },
+    "OPENAI_API_MODEL": {
+      "description": "OpenAI model to use.",
+      "value": "gpt-4o-mini"
+    },
+    "GOOGLE_API_KEY": {
+      "description": "Optional Google API key for Gemini.",
+      "required": false
+    }
+  }
+}

@@ -22,9 +22,7 @@ class Config:
     GOOGLE_API_KEY: Optional[str] = os.getenv("GOOGLE_API_KEY")
 
     # Search Backend Configuration
-    SEARCH_BACKEND_URL: Optional[str] = os.getenv(
-        "SEARCH_BACKEND_URL", "http://localhost:8001"
-    )
+    SEARCH_BACKEND_URL: Optional[str] = os.getenv("SEARCH_BACKEND_URL", "http://localhost:8001")
     SEARCH_BACKEND_API_KEY: Optional[str] = os.getenv("SEARCH_BACKEND_API_KEY")
 
     # Document Processing

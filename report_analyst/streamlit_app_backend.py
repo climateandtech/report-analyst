@@ -74,9 +74,7 @@ def main():
 
     # Check if backend integration is available
     if not BACKEND_INTEGRATION_AVAILABLE:
-        st.warning(
-            "Backend integration modules not available. Running in fallback mode."
-        )
+        st.warning("Backend integration modules not available. Running in fallback mode.")
         run_fallback_mode()
         return
 
@@ -122,9 +120,7 @@ def handle_complete_backend_flow(orchestrator, uploaded_file, config: BackendCon
         question_set_options = question_loader.get_question_set_options()
     else:
         # Fallback: use a generic approach without hardcoded names
-        question_set_options = (
-            []
-        )  # No predefined options when core functionality unavailable
+        question_set_options = []  # No predefined options when core functionality unavailable
     question_set = st.selectbox(
         "Select Question Set",
         options=question_set_options,
@@ -146,9 +142,7 @@ def handle_complete_backend_flow(orchestrator, uploaded_file, config: BackendCon
         display_backend_analysis_results(st.session_state.backend_analysis_result)
 
 
-def handle_processing_and_analysis_flow(
-    orchestrator, uploaded_file, config: BackendConfig
-):
+def handle_processing_and_analysis_flow(orchestrator, uploaded_file, config: BackendConfig):
     """Handle flows that require processing then analysis"""
 
     # Step 1: Process document
@@ -199,9 +193,7 @@ def configure_questions() -> List[str]:
         question_set_options = question_loader.get_question_set_options() + ["custom"]
     else:
         # Fallback: use a generic approach without hardcoded names
-        question_set_options = [
-            "custom"
-        ]  # Only custom when core functionality unavailable
+        question_set_options = ["custom"]  # Only custom when core functionality unavailable
     question_set_name = st.selectbox(
         "Select Question Set",
         options=question_set_options,
@@ -259,9 +251,7 @@ def display_backend_analysis_results(result: AnalysisResult):
 
     with col1:
         st.write(f"**Analysis Job ID:** {result.analysis_job_id}")
-        st.write(
-            f"**Stored in Backend:** {'Yes' if result.stored_in_backend else 'No'}"
-        )
+        st.write(f"**Stored in Backend:** {'Yes' if result.stored_in_backend else 'No'}")
 
     with col2:
         st.write(f"**Analysis Method:** Complete Backend")
@@ -369,18 +359,14 @@ def run_fallback_mode():
             questions = get_question_set(question_set_name)
 
         if st.button("Run Analysis"):
-            st.success(
-                f"Loaded {len(questions)} questions from {question_set_name.upper()}"
-            )
+            st.success(f"Loaded {len(questions)} questions from {question_set_name.upper()}")
 
             # Display questions (fallback analysis)
             st.subheader("Questions to Analyze")
             for i, question in enumerate(questions, 1):
                 st.write(f"**{i}.** {question}")
 
-            st.info(
-                "This is a demo mode. Backend integration modules are not available."
-            )
+            st.info("This is a demo mode. Backend integration modules are not available.")
     else:
         st.error("Core functionality not available. Please check your installation.")
 

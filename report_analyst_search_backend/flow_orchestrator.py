@@ -87,16 +87,12 @@ class FlowOrchestrator:
             elif flow_type == "complete_backend":
                 return self._process_complete_backend(uploaded_file)
             else:
-                return ProcessingResult(
-                    success=False, error=f"Unknown flow type: {flow_type}"
-                )
+                return ProcessingResult(success=False, error=f"Unknown flow type: {flow_type}")
         except Exception as e:
             logger.error(f"Document processing failed: {e}")
             return ProcessingResult(success=False, error=str(e))
 
-    def analyze_document(
-        self, chunks: List[Dict[str, Any]], questions: List[str]
-    ) -> AnalysisResult:
+    def analyze_document(self, chunks: List[Dict[str, Any]], questions: List[str]) -> AnalysisResult:
         """
         Analyze document based on configuration.
 
@@ -117,16 +113,12 @@ class FlowOrchestrator:
             elif flow_type == "enhanced_integration":
                 return self._analyze_enhanced(chunks, questions)
             else:
-                return AnalysisResult(
-                    success=False, error=f"Analysis not supported for flow: {flow_type}"
-                )
+                return AnalysisResult(success=False, error=f"Analysis not supported for flow: {flow_type}")
         except Exception as e:
             logger.error(f"Document analysis failed: {e}")
             return AnalysisResult(success=False, error=str(e))
 
-    def complete_backend_analysis(
-        self, uploaded_file, question_set: str
-    ) -> AnalysisResult:
+    def complete_backend_analysis(self, uploaded_file, question_set: str) -> AnalysisResult:
         """
         Complete backend analysis flow (Flow 4).
 
@@ -145,16 +137,12 @@ class FlowOrchestrator:
                 file_bytes = uploaded_file.read()
                 import asyncio
 
-                resource_id = asyncio.run(
-                    self.backend_service.upload_pdf(file_bytes, uploaded_file.name)
-                )
+                resource_id = asyncio.run(self.backend_service.upload_pdf(file_bytes, uploaded_file.name))
                 st.success(f"✅ Document uploaded! Resource ID: {resource_id}")
 
             # Step 2: Wait for processing
             with st.spinner("Waiting for PDF processing..."):
-                processing_success = self.backend_service.wait_for_processing(
-                    resource_id
-                )
+                processing_success = self.backend_service.wait_for_processing(resource_id)
                 if not processing_success:
                     return AnalysisResult(success=False, error="PDF processing failed")
 
@@ -163,16 +151,12 @@ class FlowOrchestrator:
 
             # Step 4: Submit analysis job
             with st.spinner("Submitting analysis job to backend..."):
-                analysis_job_id = self.backend_service.submit_analysis_job(
-                    resource_id, question_set
-                )
+                analysis_job_id = self.backend_service.submit_analysis_job(resource_id, question_set)
                 st.success(f"Analysis job submitted! Job ID: {analysis_job_id}")
 
             # Step 5: Wait for analysis
             with st.spinner("Backend is running analysis..."):
-                analysis_results = self.backend_service.wait_for_analysis(
-                    analysis_job_id
-                )
+                analysis_results = self.backend_service.wait_for_analysis(analysis_job_id)
 
             st.success("Analysis completed and stored in backend database!")
             st.info("These results are now available to all authorized users")
@@ -217,18 +201,14 @@ class FlowOrchestrator:
                 file_bytes = uploaded_file.read()
                 import asyncio
 
-                resource_id = asyncio.run(
-                    self.backend_service.upload_pdf(file_bytes, uploaded_file.name)
-                )
+                resource_id = asyncio.run(self.backend_service.upload_pdf(file_bytes, uploaded_file.name))
                 st.success(f"✅ Document uploaded! Resource ID: {resource_id}")
 
             # Wait for processing
             with st.spinner("Waiting for backend processing..."):
                 success = self.backend_service.wait_for_processing(resource_id)
                 if not success:
-                    return ProcessingResult(
-                        success=False, error="Backend processing failed"
-                    )
+                    return ProcessingResult(success=False, error="Backend processing failed")
 
             # Get chunks
             with st.spinner("Retrieving chunks..."):
@@ -236,9 +216,7 @@ class FlowOrchestrator:
                 if not chunks:
                     return ProcessingResult(success=False, error="No chunks retrieved")
 
-            return ProcessingResult(
-                success=True, chunks=chunks, resource_id=resource_id
-            )
+            return ProcessingResult(success=True, chunks=chunks, resource_id=resource_id)
 
         except BackendServiceError as e:
             handle_backend_error(e, "Backend processing")
@@ -251,9 +229,7 @@ class FlowOrchestrator:
             error="Complete backend analysis should use complete_backend_analysis() method",
         )
 
-    def _analyze_local(
-        self, chunks: List[Dict[str, Any]], questions: List[str]
-    ) -> AnalysisResult:
+    def _analyze_local(self, chunks: List[Dict[str, Any]], questions: List[str]) -> AnalysisResult:
         """Analyze locally"""
         st.info("Using local analysis")
 
@@ -275,17 +251,13 @@ class FlowOrchestrator:
             },
         )
 
-    def _analyze_local_with_features(
-        self, chunks: List[Dict[str, Any]], questions: List[str]
-    ) -> AnalysisResult:
+    def _analyze_local_with_features(self, chunks: List[Dict[str, Any]], questions: List[str]) -> AnalysisResult:
         """Analyze locally with optional features"""
         # For now, same as local analysis
         # Could be enhanced with centralized LLM or data lake storage
         return self._analyze_local(chunks, questions)
 
-    def _analyze_enhanced(
-        self, chunks: List[Dict[str, Any]], questions: List[str]
-    ) -> AnalysisResult:
+    def _analyze_enhanced(self, chunks: List[Dict[str, Any]], questions: List[str]) -> AnalysisResult:
         """Enhanced analysis with centralized LLM and data lake"""
         # This would use NATS LLM and store in data lake
         # For now, fallback to local analysis
@@ -298,23 +270,15 @@ class FlowOrchestrator:
 
         # Get dynamic question set options
         if QUESTION_LOADER_AVAILABLE:
-            question_set_options = question_loader.get_question_set_options() + [
-                "custom"
-            ]
+            question_set_options = question_loader.get_question_set_options() + ["custom"]
             # Calculate index for default question set
             try:
-                index = (
-                    question_set_options.index(default_question_set)
-                    if default_question_set in question_set_options
-                    else 0
-                )
+                index = question_set_options.index(default_question_set) if default_question_set in question_set_options else 0
             except ValueError:
                 index = 0
         else:
             # Fallback: use a generic approach without hardcoded names
-            question_set_options = [
-                "custom"
-            ]  # Only custom when question loader unavailable
+            question_set_options = ["custom"]  # Only custom when question loader unavailable
             index = 0
 
         question_set = st.selectbox(
@@ -379,9 +343,7 @@ class FlowOrchestrator:
                     content_type="s3_url",
                     s3_url=content,
                 )
-                processing_result = await handler.handle_external_notification(
-                    service_id, notification
-                )
+                processing_result = await handler.handle_external_notification(service_id, notification)
             else:
                 # Pre-processed chunks
                 from .external_service_handler import ExternalServiceReadyEvent
@@ -392,18 +354,14 @@ class FlowOrchestrator:
                     content_type="chunks",
                     chunks=content,
                 )
-                processing_result = await handler.handle_external_notification(
-                    service_id, notification
-                )
+                processing_result = await handler.handle_external_notification(service_id, notification)
 
             if not processing_result.success:
                 return AnalysisResult(success=False, error=processing_result.error)
 
             chunks = processing_result.chunks
             if not chunks:
-                return AnalysisResult(
-                    success=False, error="No chunks available for analysis"
-                )
+                return AnalysisResult(success=False, error="No chunks available for analysis")
 
             # Convert chunks to analyzer format
             analyzer_chunks = [
@@ -423,9 +381,7 @@ class FlowOrchestrator:
             if "chunk_size" in analysis_config:
                 analyzer.chunk_params["chunk_size"] = analysis_config["chunk_size"]
             if "chunk_overlap" in analysis_config:
-                analyzer.chunk_params["chunk_overlap"] = analysis_config[
-                    "chunk_overlap"
-                ]
+                analyzer.chunk_params["chunk_overlap"] = analysis_config["chunk_overlap"]
             if "top_k" in analysis_config:
                 analyzer.chunk_params["top_k"] = analysis_config["top_k"]
 

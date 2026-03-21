@@ -26,9 +26,7 @@ async def main():
     # Print routing table for inspection
     print("\nRouting Table:")
     for rule in router.get_routing_table():
-        print(
-            f"  {rule['pattern']:30} -> {rule['action']:20} (priority: {rule['priority']})"
-        )
+        print(f"  {rule['pattern']:30} -> {rule['action']:20} (priority: {rule['priority']})")
 
     # Start processing events
     print("\nStarting event router...")

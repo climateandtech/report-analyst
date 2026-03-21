@@ -44,9 +44,7 @@ class DocumentSource(ABC):
         pass
 
     @abstractmethod
-    async def get_chunks(
-        self, document_id: str, configuration: Optional[Dict[str, Any]] = None
-    ) -> List[DocumentChunk]:
+    async def get_chunks(self, document_id: str, configuration: Optional[Dict[str, Any]] = None) -> List[DocumentChunk]:
         """
         Get chunks for a document.
 
@@ -113,9 +111,7 @@ class LocalDocumentSource(DocumentSource):
 
         return document_id
 
-    async def get_chunks(
-        self, document_id: str, configuration: Optional[Dict[str, Any]] = None
-    ) -> List[DocumentChunk]:
+    async def get_chunks(self, document_id: str, configuration: Optional[Dict[str, Any]] = None) -> List[DocumentChunk]:
         """Get chunks using existing analyzer logic"""
         if document_id not in self._document_cache:
             raise ValueError(f"Document {document_id} not found")

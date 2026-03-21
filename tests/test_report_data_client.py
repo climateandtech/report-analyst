@@ -51,9 +51,7 @@ def backend_config():
 
 def test_report_resource_urn_parsing():
     """Test parsing backend URNs"""
-    resource = ReportResource(
-        name="test.pdf", uri="urn:report-analyst:backend:localhost:8000:abc-123"
-    )
+    resource = ReportResource(name="test.pdf", uri="urn:report-analyst:backend:localhost:8000:abc-123")
     parsed = resource.parse_backend_urn()
     assert parsed is not None
     assert parsed["host"] == "localhost:8000"
@@ -62,18 +60,14 @@ def test_report_resource_urn_parsing():
 
 def test_report_resource_resolve_to_http_url():
     """Test resolving URN to HTTP URL"""
-    resource = ReportResource(
-        name="test.pdf", uri="urn:report-analyst:backend:localhost:8000:abc-123"
-    )
+    resource = ReportResource(name="test.pdf", uri="urn:report-analyst:backend:localhost:8000:abc-123")
     url = resource.resolve_to_http_url()
     assert url == "http://localhost:8000/resources/abc-123"
 
 
 def test_report_resource_is_backend_resource():
     """Test backend resource detection"""
-    backend_resource = ReportResource(
-        name="test.pdf", uri="urn:report-analyst:backend:localhost:8000:abc-123"
-    )
+    backend_resource = ReportResource(name="test.pdf", uri="urn:report-analyst:backend:localhost:8000:abc-123")
     local_resource = ReportResource(name="test.pdf", uri="file:///path/to/file.pdf")
 
     assert backend_resource.is_backend_resource is True
@@ -98,9 +92,7 @@ def test_report_data_client_list_local_reports(temp_dir):
     assert resources[0].is_local_resource is True
 
 
-def test_report_data_client_list_backend_reports(
-    backend_config, mock_backend_resources
-):
+def test_report_data_client_list_backend_reports(backend_config, mock_backend_resources):
     """Test listing backend resources"""
     with patch("requests.get") as mock_get:
         mock_response = Mock()
@@ -117,9 +109,7 @@ def test_report_data_client_list_backend_reports(
         assert resources[0].name == "test_report.pdf"
 
 
-def test_report_data_client_combined_listing(
-    temp_dir, backend_config, mock_backend_resources
-):
+def test_report_data_client_combined_listing(temp_dir, backend_config, mock_backend_resources):
     """Test listing from both local and backend sources"""
     # Create local PDF
     test_pdf = temp_dir / "local_report.pdf"
@@ -156,9 +146,7 @@ def test_get_backend_service_for_urn_invalid():
     """Test getting BackendService with invalid URN"""
     from report_analyst_search_backend.config import BackendConfig
 
-    backend_config = BackendConfig(
-        use_backend=True, backend_url="http://localhost:8000"
-    )
+    backend_config = BackendConfig(use_backend=True, backend_url="http://localhost:8000")
     invalid_urn = "file:///path/to/file.pdf"
     service = get_backend_service_for_urn(invalid_urn, [backend_config])
     assert service is None
@@ -177,9 +165,7 @@ def test_get_chunks_for_backend_resource(backend_config):
         }
     ]
 
-    with patch(
-        "report_analyst.core.report_data_client.get_backend_service_for_urn"
-    ) as mock_get_service:
+    with patch("report_analyst.core.report_data_client.get_backend_service_for_urn") as mock_get_service:
         mock_service = Mock()
         mock_service.get_chunks.return_value = mock_chunks
         mock_get_service.return_value = mock_service
@@ -212,9 +198,7 @@ def test_report_resource_urn_with_colons_in_resource_id():
     parsed = resource.parse_backend_urn()
     assert parsed is not None
     assert parsed["host"] == "localhost:8000"
-    assert (
-        parsed["resource_id"] == "abc:123:def"
-    )  # Should preserve all parts after host
+    assert parsed["resource_id"] == "abc:123:def"  # Should preserve all parts after host
 
 
 def test_report_resource_local_file_uri():

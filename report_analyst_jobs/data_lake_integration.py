@@ -113,9 +113,7 @@ class AnalysisResult:
 class DataLakeClient:
     """Client for interacting with the search backend data lake"""
 
-    def __init__(
-        self, backend_url: str = "http://localhost:8000", owner: str = "default"
-    ):
+    def __init__(self, backend_url: str = "http://localhost:8000", owner: str = "default"):
         self.backend_url = backend_url
         self.owner = owner
 
@@ -128,17 +126,13 @@ class DataLakeClient:
                 "deployed_at": datetime.utcnow().isoformat(),
             }
 
-            async with session.post(
-                f"{self.backend_url}/deployments/", json=deployment_data
-            ) as response:
+            async with session.post(f"{self.backend_url}/deployments/", json=deployment_data) as response:
                 if response.status == 200:
                     result = await response.json()
                     logger.info(f"Deployed configuration {config.id} to data lake")
                     return result.get("deployment_id", config.id)
                 else:
-                    raise Exception(
-                        f"Failed to deploy configuration: {response.status}"
-                    )
+                    raise Exception(f"Failed to deploy configuration: {response.status}")
 
     async def upload_document_with_metadata(
         self,
@@ -160,9 +154,7 @@ class DataLakeClient:
                 },
             }
 
-            async with session.post(
-                f"{self.backend_url}/resources/", json=resource_data
-            ) as response:
+            async with session.post(f"{self.backend_url}/resources/", json=resource_data) as response:
                 if response.status == 200:
                     resource = await response.json()
                     logger.info(f"Uploaded document to data lake with metadata")
@@ -185,21 +177,15 @@ class DataLakeClient:
                 },
             }
 
-            async with session.post(
-                f"{self.backend_url}/resources/", json=analysis_data
-            ) as response:
+            async with session.post(f"{self.backend_url}/resources/", json=analysis_data) as response:
                 if response.status == 200:
                     resource = await response.json()
                     logger.info(f"Stored analysis result {result.id} in data lake")
                     return resource["id"]
                 else:
-                    raise Exception(
-                        f"Failed to store analysis result: {response.status}"
-                    )
+                    raise Exception(f"Failed to store analysis result: {response.status}")
 
-    async def get_deployment_data(
-        self, deployment_id: str, data_types: List[str] = None
-    ) -> Dict[str, Any]:
+    async def get_deployment_data(self, deployment_id: str, data_types: List[str] = None) -> Dict[str, Any]:
         """Get all data for a specific deployment"""
         if data_types is None:
             data_types = ["documents", "chunks", "analysis_results"]
@@ -213,16 +199,12 @@ class DataLakeClient:
         async with aiohttp.ClientSession() as session:
             # Get documents for this deployment
             if "documents" in data_types:
-                documents = await self._get_documents_by_deployment(
-                    session, deployment_id
-                )
+                documents = await self._get_documents_by_deployment(session, deployment_id)
                 deployment_data["data"]["documents"] = documents
 
             # Get analysis results for this deployment
             if "analysis_results" in data_types:
-                results = await self._get_analysis_results_by_deployment(
-                    session, deployment_id
-                )
+                results = await self._get_analysis_results_by_deployment(session, deployment_id)
                 deployment_data["data"]["analysis_results"] = results
 
             # Get chunks for documents in this deployment
@@ -232,9 +214,7 @@ class DataLakeClient:
 
         return deployment_data
 
-    async def list_deployments(
-        self, deployment_type: Optional[DeploymentType] = None
-    ) -> List[Dict[str, Any]]:
+    async def list_deployments(self, deployment_type: Optional[DeploymentType] = None) -> List[Dict[str, Any]]:
         """List all deployments for this owner"""
         async with aiohttp.ClientSession() as session:
             # Filter resources by deployment metadata
@@ -242,9 +222,7 @@ class DataLakeClient:
             if deployment_type:
                 params["deployment_type"] = deployment_type.value
 
-            async with session.get(
-                f"{self.backend_url}/deployments/", params=params
-            ) as response:
+            async with session.get(f"{self.backend_url}/deployments/", params=params) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
@@ -280,9 +258,7 @@ class DataLakeClient:
                     }
 
                     for resource in resources:
-                        resource_type = resource.get("resource_metadata", {}).get(
-                            "type", "document"
-                        )
+                        resource_type = resource.get("resource_metadata", {}).get("type", "document")
                         if resource_type == "analysis_result":
                             grouped_data["analysis_results"].append(resource)
                         else:
@@ -292,9 +268,7 @@ class DataLakeClient:
                 else:
                     return {"error": f"Failed to get data: {response.status}"}
 
-    async def _get_documents_by_deployment(
-        self, session: aiohttp.ClientSession, deployment_id: str
-    ) -> List[Dict[str, Any]]:
+    async def _get_documents_by_deployment(self, session: aiohttp.ClientSession, deployment_id: str) -> List[Dict[str, Any]]:
         """Get documents for a specific deployment"""
         async with session.get(
             f"{self.backend_url}/resources/",
@@ -316,9 +290,7 @@ class DataLakeClient:
                 return await response.json()
             return []
 
-    async def _get_chunks_by_deployment(
-        self, session: aiohttp.ClientSession, deployment_id: str
-    ) -> List[Dict[str, Any]]:
+    async def _get_chunks_by_deployment(self, session: aiohttp.ClientSession, deployment_id: str) -> List[Dict[str, Any]]:
         """Get chunks for documents in a specific deployment"""
         # This would use the search endpoint with deployment filtering
         async with session.post(
@@ -347,9 +319,7 @@ class ReportAnalystDataLakeIntegration:
         self.client = DataLakeClient(backend_url, owner)
         self.owner = owner
 
-    async def create_experiment(
-        self, name: str, description: str, question_set: str, config: Dict[str, Any]
-    ) -> str:
+    async def create_experiment(self, name: str, description: str, question_set: str, config: Dict[str, Any]) -> str:
         """Create a new experiment deployment"""
         deployment = DeploymentConfig(
             id=str(uuid.uuid4()),
@@ -365,9 +335,7 @@ class ReportAnalystDataLakeIntegration:
 
         return await self.client.deploy_configuration(deployment)
 
-    async def promote_to_production(
-        self, experiment_id: str, production_name: str
-    ) -> str:
+    async def promote_to_production(self, experiment_id: str, production_name: str) -> str:
         """Promote an experiment to production"""
         # Get experiment data
         experiment_data = await self.client.get_deployment_data(experiment_id)
@@ -387,9 +355,7 @@ class ReportAnalystDataLakeIntegration:
 
         return await self.client.deploy_configuration(production_deployment)
 
-    async def upload_experimental_document(
-        self, document_url: str, experiment_id: str, filename: str = None
-    ) -> str:
+    async def upload_experimental_document(self, document_url: str, experiment_id: str, filename: str = None) -> str:
         """Upload document for experimentation"""
         metadata = DataMetadata(
             source=DataSource.REPORT_ANALYST,
@@ -401,13 +367,9 @@ class ReportAnalystDataLakeIntegration:
             tags=["experiment", "report_analyst"],
         )
 
-        return await self.client.upload_document_with_metadata(
-            document_url, metadata, experiment_id
-        )
+        return await self.client.upload_document_with_metadata(document_url, metadata, experiment_id)
 
-    async def store_experiment_results(
-        self, experiment_id: str, resource_id: str, analysis_results: Dict[str, Any]
-    ) -> str:
+    async def store_experiment_results(self, experiment_id: str, resource_id: str, analysis_results: Dict[str, Any]) -> str:
         """Store analysis results for an experiment"""
         metadata = DataMetadata(
             source=DataSource.REPORT_ANALYST,
@@ -467,14 +429,10 @@ async def example_data_lake_usage():
     analysis_results = {
         "question_set": "tcfd_v2",
         "model_used": "gpt-4o-mini",
-        "results": [
-            {"question": "Climate risks?", "answer": "Significant risks identified..."}
-        ],
+        "results": [{"question": "Climate risks?", "answer": "Significant risks identified..."}],
     }
 
-    result_id = await integration.store_experiment_results(
-        experiment_id, resource_id, analysis_results
-    )
+    result_id = await integration.store_experiment_results(experiment_id, resource_id, analysis_results)
 
     print(f"Stored results: {result_id}")
 

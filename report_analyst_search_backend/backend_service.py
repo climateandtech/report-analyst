@@ -188,9 +188,7 @@ class BackendService:
 
                 return chunks
             else:
-                raise BackendServiceError(
-                    f"Failed to get chunks: {response.status_code}"
-                )
+                raise BackendServiceError(f"Failed to get chunks: {response.status_code}")
 
         except requests.RequestException as e:
             raise BackendServiceError(f"Error getting chunks: {str(e)}")
@@ -234,16 +232,12 @@ class BackendService:
                 job_result = response.json()
                 return job_result.get("job_id")
             else:
-                raise BackendServiceError(
-                    f"Failed to submit analysis job: {response.status_code}"
-                )
+                raise BackendServiceError(f"Failed to submit analysis job: {response.status_code}")
 
         except requests.RequestException as e:
             raise BackendServiceError(f"Error submitting analysis job: {str(e)}")
 
-    def wait_for_analysis(
-        self, analysis_job_id: str, timeout: int = 300
-    ) -> Dict[str, Any]:
+    def wait_for_analysis(self, analysis_job_id: str, timeout: int = 300) -> Dict[str, Any]:
         """
         Wait for analysis job to complete.
 
@@ -285,18 +279,14 @@ class BackendService:
                 # Check timeout
                 elapsed = time.time() - start_time
                 if elapsed > timeout:
-                    raise BackendServiceError(
-                        f"Analysis timed out after {timeout} seconds"
-                    )
+                    raise BackendServiceError(f"Analysis timed out after {timeout} seconds")
 
                 time.sleep(5)
 
             except requests.RequestException as e:
                 raise BackendServiceError(f"Error checking analysis status: {str(e)}")
 
-    def get_analysis_results(
-        self, analysis_job_id: str = None, resource_id: str = None
-    ) -> Optional[Dict[str, Any]]:
+    def get_analysis_results(self, analysis_job_id: str = None, resource_id: str = None) -> Optional[Dict[str, Any]]:
         """
         Get stored analysis results from backend database.
 
@@ -384,25 +374,16 @@ class BackendService:
             if response.status_code == 200:
                 result = response.json()
                 result_id = result.get("id") or result.get("result_id")
-                logger.info(
-                    f"Stored analysis results for resource {resource_id}: {result_id}"
-                )
+                logger.info(f"Stored analysis results for resource {resource_id}: {result_id}")
                 return result_id
             elif response.status_code == 404:
                 # Endpoint doesn't exist, try alternative: use submit_analysis_job pattern
-                logger.warning(
-                    "/analysis/results/ endpoint not found, "
-                    "trying alternative storage method"
-                )
+                logger.warning("/analysis/results/ endpoint not found, " "trying alternative storage method")
                 # Alternative: Store as a new resource with analysis results
-                return self._store_analysis_as_resource(
-                    resource_id, analysis_results, question_set, metadata
-                )
+                return self._store_analysis_as_resource(resource_id, analysis_results, question_set, metadata)
             else:
                 error_text = response.text
-                logger.error(
-                    f"Failed to store analysis results: {response.status_code} - {error_text}"
-                )
+                logger.error(f"Failed to store analysis results: {response.status_code} - {error_text}")
                 return None
 
         except requests.RequestException as e:
@@ -442,14 +423,10 @@ class BackendService:
             if response.status_code == 200:
                 resource = response.json()
                 result_id = resource.get("id")
-                logger.info(
-                    f"Stored analysis results as resource for {resource_id}: {result_id}"
-                )
+                logger.info(f"Stored analysis results as resource for {resource_id}: {result_id}")
                 return result_id
             else:
-                logger.error(
-                    f"Failed to store analysis as resource: {response.status_code}"
-                )
+                logger.error(f"Failed to store analysis as resource: {response.status_code}")
                 return None
 
         except requests.RequestException as e:
@@ -459,9 +436,7 @@ class BackendService:
     def _get_resources(self) -> List[Dict[str, Any]]:
         """Get all resources from backend"""
         try:
-            response = requests.get(
-                f"{self.config.backend_url}/resources/", timeout=self.timeout
-            )
+            response = requests.get(f"{self.config.backend_url}/resources/", timeout=self.timeout)
             return response.json() if response.status_code == 200 else []
         except requests.RequestException:
             return []

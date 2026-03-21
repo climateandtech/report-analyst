@@ -14,20 +14,14 @@ class AnalysisType(str, Enum):
 
 class AnalysisRequest(BaseModel):
     document_id: str = Field(..., description="The ID of the uploaded document")
-    analysis_type: AnalysisType = Field(
-        default=AnalysisType.GENERAL, description="The type of analysis to perform"
-    )
-    custom_instructions: Optional[str] = Field(
-        None, description="Custom instructions for the analysis"
-    )
+    analysis_type: AnalysisType = Field(default=AnalysisType.GENERAL, description="The type of analysis to perform")
+    custom_instructions: Optional[str] = Field(None, description="Custom instructions for the analysis")
 
 
 class QuestionRequest(BaseModel):
     document_id: str = Field(..., description="The ID of the uploaded document")
     question: str = Field(..., description="The question to ask about the document")
-    context: Optional[str] = Field(
-        None, description="Additional context for the question"
-    )
+    context: Optional[str] = Field(None, description="Additional context for the question")
 
 
 class DocumentMetadata(BaseModel):

@@ -39,9 +39,7 @@ load_dotenv()
 # Check for backend configuration first
 use_backend = os.getenv("USE_BACKEND", "false").lower() == "true"
 use_centralized_llm = os.getenv("USE_CENTRALIZED_LLM", "false").lower() == "true"
-use_full_backend_analysis = (
-    os.getenv("USE_FULL_BACKEND_ANALYSIS", "false").lower() == "true"
-)
+use_full_backend_analysis = os.getenv("USE_FULL_BACKEND_ANALYSIS", "false").lower() == "true"
 
 # Check for required environment variables
 openai_key = os.getenv("OPENAI_API_KEY")
@@ -49,9 +47,7 @@ gemini_key = os.getenv("GOOGLE_API_KEY")
 default_model = os.getenv("OPENAI_API_MODEL", "gpt-3.5-turbo-1106")
 
 # Log available model keys
-logger.info(
-    f"API Keys available - OpenAI: {bool(openai_key)}, Gemini: {bool(gemini_key)}"
-)
+logger.info(f"API Keys available - OpenAI: {bool(openai_key)}, Gemini: {bool(gemini_key)}")
 logger.info(
     f"Backend mode - USE_BACKEND: {use_backend}, USE_CENTRALIZED_LLM: {use_centralized_llm}, USE_FULL_BACKEND_ANALYSIS: {use_full_backend_analysis}"
 )
@@ -68,36 +64,26 @@ else:
     # Only check for API keys if not using backend LLM
     # Check if we need to force the default model based on available keys
     if default_model.startswith("gemini-") and not gemini_key:
-        logger.warning(
-            f"Default model is {default_model} but no GOOGLE_API_KEY is available"
-        )
+        logger.warning(f"Default model is {default_model} but no GOOGLE_API_KEY is available")
         if openai_key:
             default_model = "gpt-3.5-turbo-1106"
             logger.info(f"Switching default model to {default_model}")
         else:
             logger.error("No valid API keys available for any models")
-            raise ValueError(
-                "No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY"
-            )
+            raise ValueError("No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY")
     elif default_model.startswith("gpt-") and not openai_key:
-        logger.warning(
-            f"Default model is {default_model} but no OPENAI_API_KEY is available"
-        )
+        logger.warning(f"Default model is {default_model} but no OPENAI_API_KEY is available")
         if gemini_key:
             default_model = "gemini-pro"
             logger.info(f"Switching default model to {default_model}")
         else:
             logger.error("No valid API keys available for any models")
-            raise ValueError(
-                "No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY"
-            )
+            raise ValueError("No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY")
 
     # Ensure we have at least one API key for the selected model type
     if not openai_key and not gemini_key:
         logger.error("No API keys found - set either OPENAI_API_KEY or GOOGLE_API_KEY")
-        raise ValueError(
-            "Set either OPENAI_API_KEY or GOOGLE_API_KEY environment variable"
-        )
+        raise ValueError("Set either OPENAI_API_KEY or GOOGLE_API_KEY environment variable")
 
 if not os.getenv("OPENAI_ORGANIZATION"):
     logger.warning("OPENAI_ORGANIZATION environment variable is not set")
@@ -160,9 +146,7 @@ class DocumentAnalyzer:
         log_analysis_step(f"Using default model from env: {self.default_model}")
 
         # Check if we should use backend for all LLM functionality
-        self.use_backend_llm = use_backend and (
-            use_centralized_llm or use_full_backend_analysis
-        )
+        self.use_backend_llm = use_backend and (use_centralized_llm or use_full_backend_analysis)
 
         if self.use_backend_llm:
             log_analysis_step(
@@ -185,39 +169,29 @@ class DocumentAnalyzer:
                     self.embeddings = OpenAIEmbedding(
                         api_key=openai_key,
                         api_base=os.getenv("OPENAI_API_BASE"),
-                        model_name=os.getenv(
-                            "OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"
-                        ),
+                        model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
                         embed_batch_size=100,
                     )
 
                     # Configure embeddings globally for LlamaIndex
                     Settings.embed_model = self.embeddings
                 else:
-                    logger.warning(
-                        "No OpenAI API key - embedding functionality will be limited"
-                    )
+                    logger.warning("No OpenAI API key - embedding functionality will be limited")
                     self.embeddings = None
 
             except Exception as e:
-                log_analysis_step(
-                    f"Error initializing local LLM clients: {str(e)}", "error"
-                )
+                log_analysis_step(f"Error initializing local LLM clients: {str(e)}", "error")
                 if not self.use_backend_llm:
                     raise
                 else:
                     # In backend mode, local LLM failures are not critical
-                    logger.warning(
-                        "Local LLM initialization failed, but using backend mode"
-                    )
+                    logger.warning("Local LLM initialization failed, but using backend mode")
                     self.llm = None
                     self.embeddings = None
 
         # Initialize caching and text processing (these are always needed)
         self.use_cache = True  # Default to True, can be overridden
-        Settings.ingestion_cache = IngestionCache(
-            cache_dir=str(self.llm_cache_path), cache_type="local"
-        )
+        Settings.ingestion_cache = IngestionCache(cache_dir=str(self.llm_cache_path), cache_type="local")
 
         self.text_splitter = SentenceSplitter(chunk_size=500, chunk_overlap=20)
 
@@ -245,11 +219,7 @@ class DocumentAnalyzer:
         """
         try:
             # Safely get model name, fallback to default_model if llm is None
-            model_name = (
-                self.llm.model
-                if self.llm and hasattr(self.llm, "model")
-                else self.default_model
-            )
+            model_name = self.llm.model if self.llm and hasattr(self.llm, "model") else self.default_model
             params_str = (
                 f"cs{self.chunk_params['chunk_size']}_"
                 f"ov{self.chunk_params['chunk_overlap']}_"
@@ -266,15 +236,11 @@ class DocumentAnalyzer:
                 if len(parts) >= 2:
                     resource_id = parts[-1]  # Get the last part (resource_id)
                     # Use resource_id as identifier (sanitize for filesystem)
-                    safe_id = "".join(
-                        c if c.isalnum() or c in "_-" else "_" for c in resource_id
-                    )
+                    safe_id = "".join(c if c.isalnum() or c in "_-" else "_" for c in resource_id)
                     return f"backend_{safe_id}_{params_str}"
                 else:
                     # Fallback: use full URN (sanitized)
-                    safe_urn = "".join(
-                        c if c.isalnum() or c in "_-" else "_" for c in file_path
-                    )
+                    safe_urn = "".join(c if c.isalnum() or c in "_-" else "_" for c in file_path)
                     return f"backend_{safe_urn}_{params_str}"
             elif file_path.startswith("file://"):
                 # Handle file:// URIs - extract path
@@ -287,9 +253,7 @@ class DocumentAnalyzer:
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to generate cache key: {e}")
             # Fallback: try to extract identifier safely
             if file_path.startswith("urn:report-analyst:backend:"):
-                safe_id = "".join(
-                    c if c.isalnum() or c in "_-" else "_" for c in file_path[-20:]
-                )
+                safe_id = "".join(c if c.isalnum() or c in "_-" else "_" for c in file_path[-20:])
                 return f"backend_{safe_id}_fallback"
             else:
                 try:
@@ -313,16 +277,12 @@ class DocumentAnalyzer:
                 # Convert to LlamaIndex Document objects
                 chunks = [
                     Document(
-                        text=chunk[
-                            "page_content"
-                        ],  # LlamaIndex uses text instead of page_content
+                        text=chunk["page_content"],  # LlamaIndex uses text instead of page_content
                         metadata=chunk["metadata"],
                     )
                     for chunk in chunk_data
                 ]
-                logger.info(
-                    f"[ANALYSIS] ✓ Cache HIT: Loaded {len(chunks)} chunks from cache"
-                )
+                logger.info(f"[ANALYSIS] ✓ Cache HIT: Loaded {len(chunks)} chunks from cache")
                 return chunks
             logger.info("[ANALYSIS] Cache MISS: No cached chunks found")
             return None
@@ -348,9 +308,7 @@ class DocumentAnalyzer:
         except Exception as e:
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to save chunks cache: {e}")
 
-    def _load_vector_store(
-        self, cache_key: str, chunks: List
-    ) -> Optional[LlamaVectorStore]:
+    def _load_vector_store(self, cache_key: str, chunks: List) -> Optional[LlamaVectorStore]:
         """Load vector store from cache if available."""
         try:
             store_dir = self.cache_path / f"{cache_key}_vectors"
@@ -362,9 +320,7 @@ class DocumentAnalyzer:
                     vector_store = LlamaVectorStore(store_dir)
                     # Try to load the store - this will verify if it's valid
                     if vector_store.load():
-                        logger.info(
-                            f"[ANALYSIS] ✓ Cache HIT: Loaded vector store from cache"
-                        )
+                        logger.info(f"[ANALYSIS] ✓ Cache HIT: Loaded vector store from cache")
                         return vector_store
                 except Exception as inner_e:
                     logger.error(
@@ -375,9 +331,7 @@ class DocumentAnalyzer:
             logger.info("[ANALYSIS] Cache MISS: No cached vector store found")
             return None
         except Exception as e:
-            logger.warning(
-                f"[ANALYSIS] Cache ERROR: Failed to load vector store cache: {e}"
-            )
+            logger.warning(f"[ANALYSIS] Cache ERROR: Failed to load vector store cache: {e}")
             logger.debug(f"Full vector store cache error: {str(e)}", exc_info=True)
             return None
 
@@ -441,9 +395,7 @@ Output only the numeric score (0.0-1.0):"""
             log_analysis_step(f"Error scoring chunk relevance: {str(e)}", "error")
             return 0.0
 
-    async def score_chunk_relevance_batch(
-        self, question: str, chunks: List[Dict], single_call: bool = True
-    ) -> List[float]:
+    async def score_chunk_relevance_batch(self, question: str, chunks: List[Dict], single_call: bool = True) -> List[float]:
         """Score a batch of chunks using LLM.
 
         Args:
@@ -454,12 +406,7 @@ Output only the numeric score (0.0-1.0):"""
         try:
             if single_call:
                 # Batch scoring - all chunks in one call
-                chunks_text = "\n\n".join(
-                    [
-                        f"[CHUNK {i+1}]\n{chunk['text']}"
-                        for i, chunk in enumerate(chunks)
-                    ]
-                )
+                chunks_text = "\n\n".join([f"[CHUNK {i+1}]\n{chunk['text']}" for i, chunk in enumerate(chunks)])
 
                 response = await self.llm.achat(
                     prompt=f"""As a senior equity analyst with expertise in climate science evaluating a company's sustainability report, you are tasked with evaluating text fragments for their usefulness in answering specific TCFD questions.
@@ -506,14 +453,9 @@ Output only the scores, one per line, in order:"""
 
                 # Parse scores from response
                 try:
-                    scores = [
-                        float(score.strip())
-                        for score in response.message.content.strip().split("\n")
-                    ]
+                    scores = [float(score.strip()) for score in response.message.content.strip().split("\n")]
                     if len(scores) != len(chunks):
-                        raise ValueError(
-                            f"Got {len(scores)} scores for {len(chunks)} chunks"
-                        )
+                        raise ValueError(f"Got {len(scores)} scores for {len(chunks)} chunks")
                     return scores
                 except Exception as e:
                     log_analysis_step(f"Error parsing batch scores: {str(e)}", "error")
@@ -541,11 +483,7 @@ Output only the scores, one per line, in order:"""
             logger.info(f"- Overlap: {self.chunk_params['chunk_overlap']}")
             logger.info(f"- Top K: {self.chunk_params['top_k']}")
             # Safely get model name, fallback to default_model if llm is None
-            model_name = (
-                self.llm.model
-                if self.llm and hasattr(self.llm, "model")
-                else self.default_model
-            )
+            model_name = self.llm.model if self.llm and hasattr(self.llm, "model") else self.default_model
             logger.info(f"- Model: {model_name}")
             logger.info(f"- Question set: {self.question_set}")
 
@@ -570,9 +508,7 @@ Output only the scores, one per line, in order:"""
             with open(cache_file, "r") as f:
                 cached_data = json.load(f)
                 logger.info(f"Loaded cache data with keys: {list(cached_data.keys())}")
-                logger.info(
-                    f"Cache data structure: {json.dumps(cached_data, indent=2)[:500]}..."
-                )  # Show first 500 chars
+                logger.info(f"Cache data structure: {json.dumps(cached_data, indent=2)[:500]}...")  # Show first 500 chars
                 return cached_data
 
         except Exception as e:
@@ -637,9 +573,7 @@ Output only the scores, one per line, in order:"""
             # 1. Load and chunk the document - use CacheManager with current chunk parameters
             if pre_retrieved_chunks:
                 # Use pre-retrieved chunks (e.g., from backend)
-                logger.info(
-                    f"[ANALYSIS] Using {len(pre_retrieved_chunks)} pre-retrieved chunks"
-                )
+                logger.info(f"[ANALYSIS] Using {len(pre_retrieved_chunks)} pre-retrieved chunks")
                 chunks = pre_retrieved_chunks
                 # Convert backend chunk format to analyzer format if needed
                 if chunks and "chunk_text" in chunks[0]:
@@ -658,9 +592,7 @@ Output only the scores, one per line, in order:"""
                     chunk_size=self.chunk_params["chunk_size"],
                     chunk_overlap=self.chunk_params["chunk_overlap"],
                 )
-                logger.info(
-                    f"[ANALYSIS] Saved {len(chunks)} pre-retrieved chunks to cache"
-                )
+                logger.info(f"[ANALYSIS] Saved {len(chunks)} pre-retrieved chunks to cache")
             else:
                 logger.info(
                     f"[ANALYSIS] Getting document chunks from cache for {file_path} with size={self.chunk_params['chunk_size']}, overlap={self.chunk_params['chunk_overlap']}"
@@ -673,9 +605,7 @@ Output only the scores, one per line, in order:"""
                 logger.info(f"[ANALYSIS] Retrieved {len(chunks)} chunks from cache")
 
                 if not chunks:
-                    logger.info(
-                        f"[ANALYSIS] No chunks found in cache with current parameters, creating new chunks"
-                    )
+                    logger.info(f"[ANALYSIS] No chunks found in cache with current parameters, creating new chunks")
                     # If no chunks in cache with current parameters, create them
                     # Check if file_path is a URN (backend resource)
                     if file_path.startswith("urn:report-analyst:backend:"):
@@ -703,43 +633,29 @@ Output only the scores, one per line, in order:"""
             # 2. Process each question
             for question_number in selected_questions:
                 try:
-                    logger.info(
-                        f"[ANALYSIS] Processing question number {question_number}"
-                    )
+                    logger.info(f"[ANALYSIS] Processing question number {question_number}")
                     question_data = self.get_question_by_number(question_number)
                     if not question_data:
-                        logger.warning(
-                            f"[ANALYSIS] Question {question_number} not found"
-                        )
+                        logger.warning(f"[ANALYSIS] Question {question_number} not found")
                         yield {"error": f"Question {question_number} not found"}
                         continue
 
                     question_id = f"{self.question_set}_{question_number}"
                     logger.info(f"[ANALYSIS] Question ID: {question_id}")
 
-                    yield {
-                        "status": f"Processing question {question_number}: {question_data['text'][:50]}..."
-                    }
+                    yield {"status": f"Processing question {question_number}: {question_data['text'][:50]}..."}
 
                     # 3. Get similar chunks using embeddings with current parameters
-                    logger.info(
-                        f"[ANALYSIS] Getting similar chunks for question {question_id}"
-                    )
-                    similar_chunks = await self._get_similar_chunks(
-                        question_data["text"], chunks, self.chunk_params["top_k"]
-                    )
-                    logger.info(
-                        f"[ANALYSIS] Found {len(similar_chunks)} similar chunks"
-                    )
+                    logger.info(f"[ANALYSIS] Getting similar chunks for question {question_id}")
+                    similar_chunks = await self._get_similar_chunks(question_data["text"], chunks, self.chunk_params["top_k"])
+                    logger.info(f"[ANALYSIS] Found {len(similar_chunks)} similar chunks")
 
                     # 3.5. Apply LLM scoring to chunks if enabled (INDEPENDENT of evidence determination)
                     if use_llm_scoring:
                         logger.info(
                             f"[ANALYSIS] Applying LLM scoring to {len(similar_chunks)} chunks for question {question_id}"
                         )
-                        yield {
-                            "status": f"Scoring chunks with LLM for question {question_number}..."
-                        }
+                        yield {"status": f"Scoring chunks with LLM for question {question_number}..."}
 
                         try:
                             llm_scores = await self.score_chunk_relevance_batch(
@@ -752,18 +668,12 @@ Output only the scores, one per line, in order:"""
                             for i, chunk in enumerate(similar_chunks):
                                 if i < len(llm_scores):
                                     chunk["llm_score"] = llm_scores[i]
-                                    logger.debug(
-                                        f"Applied LLM score {llm_scores[i]:.3f} to chunk {i+1}"
-                                    )
+                                    logger.debug(f"Applied LLM score {llm_scores[i]:.3f} to chunk {i+1}")
                                 else:
                                     chunk["llm_score"] = 0.0
-                                    logger.warning(
-                                        f"No LLM score available for chunk {i+1}"
-                                    )
+                                    logger.warning(f"No LLM score available for chunk {i+1}")
 
-                            logger.info(
-                                f"[ANALYSIS] Applied LLM scores to {len(similar_chunks)} chunks"
-                            )
+                            logger.info(f"[ANALYSIS] Applied LLM scores to {len(similar_chunks)} chunks")
 
                         except Exception as e:
                             logger.error(
@@ -774,38 +684,26 @@ Output only the scores, one per line, in order:"""
                             for chunk in similar_chunks:
                                 chunk["llm_score"] = 0.0
                     else:
-                        logger.info(
-                            f"[ANALYSIS] LLM scoring disabled for question {question_id}"
-                        )
+                        logger.info(f"[ANALYSIS] LLM scoring disabled for question {question_id}")
                         # Ensure llm_score is set to None when not using LLM scoring
                         for chunk in similar_chunks:
                             chunk["llm_score"] = None
 
                     # 4. Run LLM analysis (evidence determination happens here)
-                    logger.info(
-                        f"[ANALYSIS] Running LLM analysis for question {question_id}"
-                    )
-                    result = await self._analyze_chunks(
-                        question_data, similar_chunks, use_llm_scoring
-                    )
-                    logger.info(
-                        f"[ANALYSIS] LLM analysis complete for question {question_id}"
-                    )
+                    logger.info(f"[ANALYSIS] Running LLM analysis for question {question_id}")
+                    result = await self._analyze_chunks(question_data, similar_chunks, use_llm_scoring)
+                    logger.info(f"[ANALYSIS] LLM analysis complete for question {question_id}")
 
                     # Process evidence and update chunks
                     if "EVIDENCE" in result:
-                        logger.info(
-                            f"Processing {len(result['EVIDENCE'])} evidence items"
-                        )
+                        logger.info(f"Processing {len(result['EVIDENCE'])} evidence items")
                         evidence_items = []
                         for evidence_idx, evidence in enumerate(result["EVIDENCE"]):
                             # Extract chunk number from evidence
                             if isinstance(evidence, dict):
                                 chunk_num = evidence.get("chunk")
                                 if chunk_num is not None:
-                                    chunk_idx = (
-                                        chunk_num - 1
-                                    )  # Convert to 0-based index
+                                    chunk_idx = chunk_num - 1  # Convert to 0-based index
                                     if 0 <= chunk_idx < len(similar_chunks):
                                         # Update chunk information - ONLY set evidence flags, NOT llm_score
                                         similar_chunks[chunk_idx].update(
@@ -818,17 +716,13 @@ Output only the scores, one per line, in order:"""
                                         evidence_items.append(
                                             {
                                                 "chunk": chunk_num,
-                                                "text": evidence.get(
-                                                    "text", ""
-                                                ),  # Keep LLM's evidence text
+                                                "text": evidence.get("text", ""),  # Keep LLM's evidence text
                                                 "chunk_text": similar_chunks[chunk_idx][
                                                     "text"
                                                 ],  # Store full chunk text separately
                                                 "score": evidence.get("score", 1.0),
                                                 "order": evidence_idx + 1,
-                                                "metadata": similar_chunks[chunk_idx][
-                                                    "metadata"
-                                                ],
+                                                "metadata": similar_chunks[chunk_idx]["metadata"],
                                             }
                                         )
                                         logger.info(
@@ -842,17 +736,11 @@ Output only the scores, one per line, in order:"""
                         logger.warning("No EVIDENCE field found in result")
 
                     # 5. Save complete analysis
-                    logger.info(
-                        f"[ANALYSIS] Saving analysis result for question {question_id}"
-                    )
+                    logger.info(f"[ANALYSIS] Saving analysis result for question {question_id}")
 
                     # Create config dict for cache manager
                     # Safely get model name, fallback to default_model if llm is None
-                    model_name = (
-                        self.llm.model
-                        if self.llm and hasattr(self.llm, "model")
-                        else self.default_model
-                    )
+                    model_name = self.llm.model if self.llm and hasattr(self.llm, "model") else self.default_model
                     config = {
                         "chunk_size": self.chunk_params["chunk_size"],
                         "chunk_overlap": self.chunk_params["chunk_overlap"],
@@ -871,9 +759,7 @@ Output only the scores, one per line, in order:"""
                     logger.info(f"[ANALYSIS] Analysis saved for question {question_id}")
 
                     # 8. Yield the result
-                    logger.info(
-                        f"[ANALYSIS] Yielding result for question {question_id}"
-                    )
+                    logger.info(f"[ANALYSIS] Yielding result for question {question_id}")
                     yield {
                         "question_number": question_number,
                         "question_id": question_id,
@@ -885,14 +771,10 @@ Output only the scores, one per line, in order:"""
                         f"[ANALYSIS] Error processing question {question_number}: {str(e)}",
                         exc_info=True,
                     )
-                    yield {
-                        "error": f"Error processing question {question_number}: {str(e)}"
-                    }
+                    yield {"error": f"Error processing question {question_number}: {str(e)}"}
 
         except Exception as e:
-            logger.error(
-                f"[ANALYSIS] Error processing document: {str(e)}", exc_info=True
-            )
+            logger.error(f"[ANALYSIS] Error processing document: {str(e)}", exc_info=True)
             yield {"error": f"Error processing document: {str(e)}"}
 
     def _create_chunks(self, file_path: str) -> List[Dict[str, Any]]:
@@ -929,9 +811,7 @@ Output only the scores, one per line, in order:"""
 
             for i in range(0, len(text_chunks), BATCH_SIZE):
                 batch = text_chunks[i : i + BATCH_SIZE]
-                logger.info(
-                    f"Computing embeddings for batch {i//BATCH_SIZE + 1}/{(len(text_chunks)-1)//BATCH_SIZE + 1}"
-                )
+                logger.info(f"Computing embeddings for batch {i//BATCH_SIZE + 1}/{(len(text_chunks)-1)//BATCH_SIZE + 1}")
 
                 # Get text from batch and clean it
                 batch_texts = []
@@ -949,21 +829,13 @@ Output only the scores, one per line, in order:"""
                 try:
                     # Only compute embeddings if we have valid texts
                     if batch_texts:
-                        logger.info(
-                            f"Computing embeddings for {len(batch_texts)} texts in batch"
-                        )
-                        batch_embeddings = self.embeddings.get_text_embedding_batch(
-                            batch_texts
-                        )
-                        logger.info(
-                            f"Successfully computed {len(batch_embeddings)} embeddings"
-                        )
+                        logger.info(f"Computing embeddings for {len(batch_texts)} texts in batch")
+                        batch_embeddings = self.embeddings.get_text_embedding_batch(batch_texts)
+                        logger.info(f"Successfully computed {len(batch_embeddings)} embeddings")
 
                         # Create chunk dictionaries with embeddings
                         for chunk, embedding in zip(batch, batch_embeddings):
-                            if (
-                                embedding is not None
-                            ):  # Only add chunks with valid embeddings
+                            if embedding is not None:  # Only add chunks with valid embeddings
                                 chunk_dict = {
                                     "text": chunk.text,
                                     "metadata": chunk.metadata,
@@ -972,16 +844,12 @@ Output only the scores, one per line, in order:"""
                                     "computed_score": 0.0,  # Will be populated during analysis
                                 }
                                 chunks_data.append(chunk_dict)
-                                logger.debug(
-                                    f"Added chunk with text length {len(chunk.text)}"
-                                )
+                                logger.debug(f"Added chunk with text length {len(chunk.text)}")
                             else:
                                 logger.warning(f"Skipping chunk - embedding is None")
 
                 except Exception as e:
-                    logger.error(
-                        f"Error computing embeddings for batch: {str(e)}", exc_info=True
-                    )
+                    logger.error(f"Error computing embeddings for batch: {str(e)}", exc_info=True)
                     # Continue with next batch, storing chunks without embeddings
                     for chunk in batch:
                         chunk_dict = {
@@ -995,12 +863,8 @@ Output only the scores, one per line, in order:"""
                         logger.warning(f"Added chunk without embedding due to error")
 
             # Log embedding statistics
-            chunks_with_embeddings = sum(
-                1 for c in chunks_data if c["embedding"] is not None
-            )
-            logger.info(
-                f"Created {len(chunks_data)} chunks, {chunks_with_embeddings} with embeddings"
-            )
+            chunks_with_embeddings = sum(1 for c in chunks_data if c["embedding"] is not None)
+            logger.info(f"Created {len(chunks_data)} chunks, {chunks_with_embeddings} with embeddings")
 
             # Only save chunks that have valid embeddings
             valid_chunks = [c for c in chunks_data if c["embedding"] is not None]
@@ -1010,9 +874,7 @@ Output only the scores, one per line, in order:"""
                     self.cache_manager.save_vectors(file_path, valid_chunks)
                     logger.info(f"Successfully saved chunks and vectors to cache")
                 except Exception as e:
-                    logger.error(
-                        f"Failed to save vectors to cache: {str(e)}", exc_info=True
-                    )
+                    logger.error(f"Failed to save vectors to cache: {str(e)}", exc_info=True)
             else:
                 logger.warning("No valid chunks to save to cache")
 
@@ -1030,18 +892,14 @@ Output only the scores, one per line, in order:"""
     ) -> Dict[str, Any]:
         """Analyze chunks using LLM to extract evidence and generate answer."""
         try:
-            logger.info(
-                f"Analyzing {len(chunks)} chunks for question: {question_data['text'][:100]}..."
-            )
+            logger.info(f"Analyzing {len(chunks)} chunks for question: {question_data['text'][:100]}...")
 
             # Process chunks first
             processed_chunks = []
             for i, chunk in enumerate(chunks):
                 logger.debug(f"Processing chunk {i+1}/{len(chunks)}")
                 # Get similarity score from either 'score' (from vector store) or 'similarity_score' (from cache)
-                similarity_score = chunk.get(
-                    "score", chunk.get("similarity_score", 0.0)
-                )
+                similarity_score = chunk.get("score", chunk.get("similarity_score", 0.0))
 
                 # Get LLM score if it exists (independent of evidence)
                 llm_score = chunk.get("llm_score", None)
@@ -1058,9 +916,7 @@ Output only the scores, one per line, in order:"""
                     "relevance_metadata": {},
                 }
                 processed_chunks.append(chunk_data)
-                logger.debug(
-                    f"Processed chunk with similarity score: {similarity_score:.4f}, llm_score: {llm_score}"
-                )
+                logger.debug(f"Processed chunk with similarity score: {similarity_score:.4f}, llm_score: {llm_score}")
 
             # Create analysis prompt with indexed chunks
             messages = self.prompt_manager.get_analysis_messages(
@@ -1090,9 +946,7 @@ Output only the scores, one per line, in order:"""
             # Get LLM response
             try:
                 response = await self.llm.achat(messages)
-                response_text = (
-                    response.message.content
-                )  # Changed from response.content to response.message.content
+                response_text = response.message.content  # Changed from response.content to response.message.content
                 logger.info("=== LLM Response ===")
                 logger.info(response_text)
                 logger.info("=== End LLM Response ===")
@@ -1161,17 +1015,11 @@ Output only the scores, one per line, in order:"""
                                 evidence_items.append(
                                     {
                                         "chunk": chunk_num,
-                                        "text": evidence.get(
-                                            "text", ""
-                                        ),  # Keep LLM's evidence text
-                                        "chunk_text": processed_chunks[chunk_idx][
-                                            "text"
-                                        ],  # Store full chunk text separately
+                                        "text": evidence.get("text", ""),  # Keep LLM's evidence text
+                                        "chunk_text": processed_chunks[chunk_idx]["text"],  # Store full chunk text separately
                                         "score": evidence.get("score", 1.0),
                                         "order": evidence_idx + 1,
-                                        "metadata": processed_chunks[chunk_idx][
-                                            "metadata"
-                                        ],
+                                        "metadata": processed_chunks[chunk_idx]["metadata"],
                                     }
                                 )
                                 logger.info(
@@ -1186,9 +1034,7 @@ Output only the scores, one per line, in order:"""
 
             # Add processed chunks to result
             result["chunks"] = processed_chunks
-            logger.info(
-                f"Analysis complete. Found {sum(1 for c in processed_chunks if c['is_evidence'])} evidence chunks"
-            )
+            logger.info(f"Analysis complete. Found {sum(1 for c in processed_chunks if c['is_evidence'])} evidence chunks")
             return result
 
         except Exception as e:
@@ -1208,15 +1054,9 @@ Output only the scores, one per line, in order:"""
         """Load questions from YAML files"""
         # Look for question set file in multiple possible locations
         possible_paths = [
-            Path(__file__).parent.parent
-            / "questionsets"
-            / f"{self.question_set}_questions.yaml",  # app/questionsets
-            Path(__file__).parent.parent.parent
-            / "questionsets"
-            / f"{self.question_set}_questions.yaml",  # project root
-            Path.cwd()
-            / "questionsets"
-            / f"{self.question_set}_questions.yaml",  # current working directory
+            Path(__file__).parent.parent / "questionsets" / f"{self.question_set}_questions.yaml",  # app/questionsets
+            Path(__file__).parent.parent.parent / "questionsets" / f"{self.question_set}_questions.yaml",  # project root
+            Path.cwd() / "questionsets" / f"{self.question_set}_questions.yaml",  # current working directory
         ]
 
         log_analysis_step(f"Looking for {self.question_set}_questions.yaml in:")
@@ -1240,9 +1080,7 @@ Output only the scores, one per line, in order:"""
         try:
             with open(yaml_file, "r") as f:
                 config = yaml.safe_load(f)
-                log_analysis_step(
-                    f"Loaded YAML content: {str(config)[:200]}..."
-                )  # Show first 200 chars
+                log_analysis_step(f"Loaded YAML content: {str(config)[:200]}...")  # Show first 200 chars
 
                 questions = {}
                 # Convert the questions list into a structured format
@@ -1253,13 +1091,9 @@ Output only the scores, one per line, in order:"""
                             "text": q.get("text", ""),
                             "guidelines": q.get("guidelines", ""),
                         }
-                        log_analysis_step(
-                            f"Added question {q_id}: {questions[q_id]['text'][:50]}..."
-                        )
+                        log_analysis_step(f"Added question {q_id}: {questions[q_id]['text'][:50]}...")
 
-                log_analysis_step(
-                    f"✓ Loaded {len(questions)} questions for {self.question_set}"
-                )
+                log_analysis_step(f"✓ Loaded {len(questions)} questions for {self.question_set}")
                 log_analysis_step(f"Available question IDs: {list(questions.keys())}")
                 return questions
         except Exception as e:
@@ -1279,9 +1113,7 @@ Output only the scores, one per line, in order:"""
             }
 
             # Get the correct prefix for the question set
-            question_prefix = question_set_mapping.get(
-                self.question_set, self.question_set
-            )
+            question_prefix = question_set_mapping.get(self.question_set, self.question_set)
             question_key = f"{question_prefix}_{number}"
 
             logger.debug(f"Looking for question {number} with key: {question_key}")
@@ -1295,9 +1127,7 @@ Output only the scores, one per line, in order:"""
 
     def update_parameters(self, chunk_size: int, chunk_overlap: int, top_k: int):
         """Update analysis parameters and recreate text splitter."""
-        logger.info(
-            f"Updating parameters: size={chunk_size}, overlap={chunk_overlap}, top_k={top_k}"
-        )
+        logger.info(f"Updating parameters: size={chunk_size}, overlap={chunk_overlap}, top_k={top_k}")
 
         self.chunk_params = {
             "chunk_size": chunk_size,
@@ -1306,9 +1136,7 @@ Output only the scores, one per line, in order:"""
         }
 
         # Recreate text splitter with new parameters
-        self.text_splitter = SentenceSplitter(
-            chunk_size=chunk_size, chunk_overlap=chunk_overlap
-        )
+        self.text_splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
         logger.info(f"Updated parameters and recreated text splitter")
 
@@ -1338,21 +1166,15 @@ Output only the scores, one per line, in order:"""
                 "chunk_size": self.chunk_params["chunk_size"],
                 "chunk_overlap": self.chunk_params["chunk_overlap"],
                 "top_k": self.chunk_params["top_k"],
-                "model": (
-                    self.llm.model
-                    if self.llm and hasattr(self.llm, "model")
-                    else self.default_model
-                ),
+                "model": (self.llm.model if self.llm and hasattr(self.llm, "model") else self.default_model),
                 "question_set": self.question_set,
             }
 
             # Check step 1: Chunks without embeddings
-            chunks_without_embeddings = (
-                self.cache_manager.get_chunks_without_embeddings(
-                    file_path=file_path,
-                    chunk_size=config["chunk_size"],
-                    chunk_overlap=config["chunk_overlap"],
-                )
+            chunks_without_embeddings = self.cache_manager.get_chunks_without_embeddings(
+                file_path=file_path,
+                chunk_size=config["chunk_size"],
+                chunk_overlap=config["chunk_overlap"],
             )
             step1_complete = len(chunks_without_embeddings) > 0
 
@@ -1427,9 +1249,7 @@ Output only the scores, one per line, in order:"""
             logger.warning(f"Error parsing config from filename {filename}: {e}")
             return config
 
-    async def _get_similar_chunks(
-        self, query_text: str, chunks: List[Dict], top_k: int
-    ) -> List[Dict]:
+    async def _get_similar_chunks(self, query_text: str, chunks: List[Dict], top_k: int) -> List[Dict]:
         """
         Get chunks most similar to the query text using vector similarity.
 
@@ -1503,9 +1323,7 @@ Output only the scores, one per line, in order:"""
                         if isinstance(parsed_json["SCORE"], str):
                             import re
 
-                            score_match = re.search(
-                                r"\d+(\.\d+)?", parsed_json["SCORE"]
-                            )
+                            score_match = re.search(r"\d+(\.\d+)?", parsed_json["SCORE"])
                             if score_match:
                                 result["SCORE"] = float(score_match.group(0))
 
@@ -1517,8 +1335,7 @@ Output only the scores, one per line, in order:"""
                             chunk = evidence.get("chunk")
                             if chunk is not None:
                                 evidence_item = {
-                                    "chunk_index": int(chunk)
-                                    - 1,  # Convert to 0-based index
+                                    "chunk_index": int(chunk) - 1,  # Convert to 0-based index
                                     "order": len(evidence_list) + 1,
                                     "score": 1.0,  # Default score
                                     "text": evidence.get("text", ""),
@@ -1591,8 +1408,7 @@ Output only the scores, one per line, in order:"""
                             chunk_match = re.search(r"\[CHUNK (\d+)\]", line)
                             if chunk_match:
                                 evidence_item = {
-                                    "chunk_index": int(chunk_match.group(1))
-                                    - 1,  # Convert to 0-based index
+                                    "chunk_index": int(chunk_match.group(1)) - 1,  # Convert to 0-based index
                                     "order": len(evidence_items) + 1,
                                     "score": 1.0,  # Default score
                                     "text": line,
@@ -1601,17 +1417,9 @@ Output only the scores, one per line, in order:"""
 
                         result["EVIDENCE"] = evidence_items
                     elif section_name == "GAPS":
-                        result["GAPS"] = [
-                            line.strip()
-                            for line in section_content.split("\n")
-                            if line.strip()
-                        ]
+                        result["GAPS"] = [line.strip() for line in section_content.split("\n") if line.strip()]
                     elif section_name == "SOURCES":
-                        result["SOURCES"] = [
-                            int(s.strip())
-                            for s in section_content.split(",")
-                            if s.strip().isdigit()
-                        ]
+                        result["SOURCES"] = [int(s.strip()) for s in section_content.split(",") if s.strip().isdigit()]
 
                 return result
 
@@ -1640,9 +1448,7 @@ def create_analysis_dataframes(results: Dict) -> pd.DataFrame:
             continue
 
         # Get question text from analyzer's questions data
-        question_text = questions.get(question_id, {}).get(
-            "text", f"Question {question_id}"
-        )
+        question_text = questions.get(question_id, {}).get("text", f"Question {question_id}")
 
         # Convert lists to strings and ensure proper types
         row = {

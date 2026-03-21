@@ -14,13 +14,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-
-try:
-    from aioresponses import aioresponses
-
-    HAS_AIORESPONSES = True
-except ImportError:
-    HAS_AIORESPONSES = False
+from aioresponses import aioresponses
 
 from report_analyst_search_backend.external_service_client import (
     ExternalServiceClient,
@@ -44,9 +38,7 @@ def external_handler():
 @pytest.fixture
 def external_client():
     """Create external service client"""
-    return ExternalServiceClient(
-        base_url="http://localhost:8000", nats_url="nats://localhost:4222"
-    )
+    return ExternalServiceClient(base_url="http://localhost:8000", nats_url="nats://localhost:4222")
 
 
 @pytest.fixture
@@ -121,9 +113,7 @@ class TestExternalServiceHandler:
             mock_reader_instance.load.return_value = [mock_doc]
             mock_reader.return_value = mock_reader_instance
 
-            result = await external_handler.handle_external_notification(
-                "service-x", notification
-            )
+            result = await external_handler.handle_external_notification("service-x", notification)
 
             assert isinstance(result, ProcessingResult)
             # Should process S3 URL (may fail if S3 client not initialized, but structure is correct)
@@ -138,9 +128,7 @@ class TestExternalServiceHandler:
             chunks=sample_chunks,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification, rechunk_mode="never"
-        )
+        result = await external_handler.handle_external_notification("service-x", notification, rechunk_mode="never")
 
         assert result.success
         assert result.chunks is not None
@@ -157,9 +145,7 @@ class TestExternalServiceHandler:
             pages=sample_pages,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification
-        )
+        result = await external_handler.handle_external_notification("service-x", notification)
 
         assert result.success
         assert result.chunks is not None
@@ -176,9 +162,7 @@ class TestExternalServiceHandler:
             chunks=sample_chunks,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification, rechunk_mode="never"
-        )
+        result = await external_handler.handle_external_notification("service-x", notification, rechunk_mode="never")
 
         assert result.success
         assert len(result.chunks) == 2
@@ -194,9 +178,7 @@ class TestExternalServiceHandler:
             chunks=sample_chunks,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification, rechunk_mode="auto"
-        )
+        result = await external_handler.handle_external_notification("service-x", notification, rechunk_mode="auto")
 
         assert result.success
         assert result.chunks is not None
@@ -245,67 +227,57 @@ class TestExternalServiceClient:
     @pytest.mark.asyncio
     async def test_notify_ready_http(self, external_client):
         """Test notifying via HTTP"""
-        if HAS_AIORESPONSES:
-            with aioresponses() as m:
-                m.post(
-                    "http://localhost:8000/external/services/service-x/notify",
-                    status=200,
-                )
-                result = await external_client.notify_ready(
-                    service_id="service-x",
-                    request_id="req-123",
-                    content_type="chunks",
-                    chunks=[{"id": "1", "text": "test"}],
-                    method="http",
-                )
-                assert result is True
-        else:
-            # Fallback: skip if aioresponses not available
-            pytest.skip("aioresponses not available for HTTP mocking")
+        with aioresponses() as m:
+            m.post(
+                "http://localhost:8000/external/services/service-x/notify",
+                status=200,
+            )
+            result = await external_client.notify_ready(
+                service_id="service-x",
+                request_id="req-123",
+                content_type="chunks",
+                chunks=[{"id": "1", "text": "test"}],
+                method="http",
+            )
+            assert result is True
 
     @pytest.mark.asyncio
     async def test_request_analysis_http(self, external_client):
         """Test requesting analysis via HTTP"""
-        if HAS_AIORESPONSES:
-            with aioresponses() as m:
-                m.post(
-                    "http://localhost:8000/external/services/service-x/analyze",
-                    status=200,
-                    payload={"request_id": "analysis-123"},
-                )
-                request_id = await external_client.request_analysis(
-                    service_id="service-x",
-                    external_request_id="req-123",
-                    content=[{"id": "1", "text": "test"}],
-                    question_set="tcfd",
-                    analysis_config={"model": "gpt-4o-mini"},
-                    method="http",
-                )
-                assert request_id == "analysis-123"
-        else:
-            pytest.skip("aioresponses not available for HTTP mocking")
+        with aioresponses() as m:
+            m.post(
+                "http://localhost:8000/external/services/service-x/analyze",
+                status=200,
+                payload={"request_id": "analysis-123"},
+            )
+            request_id = await external_client.request_analysis(
+                service_id="service-x",
+                external_request_id="req-123",
+                content=[{"id": "1", "text": "test"}],
+                question_set="tcfd",
+                analysis_config={"model": "gpt-4o-mini"},
+                method="http",
+            )
+            assert request_id == "analysis-123"
 
     @pytest.mark.asyncio
     async def test_get_results(self, external_client):
         """Test polling for results"""
-        if HAS_AIORESPONSES:
-            with aioresponses() as m:
-                m.get(
-                    "http://localhost:8000/external/services/service-x/results/analysis-123",
-                    status=200,
-                    payload={
-                        "request_id": "analysis-123",
-                        "status": "completed",
-                        "answers": [],
-                        "top_chunks": [],
-                    },
-                )
-                results = await external_client.get_results("service-x", "analysis-123")
+        with aioresponses() as m:
+            m.get(
+                "http://localhost:8000/external/services/service-x/results/analysis-123",
+                status=200,
+                payload={
+                    "request_id": "analysis-123",
+                    "status": "completed",
+                    "answers": [],
+                    "top_chunks": [],
+                },
+            )
+            results = await external_client.get_results("service-x", "analysis-123")
 
-                assert results is not None
-                assert results["status"] == "completed"
-        else:
-            pytest.skip("aioresponses not available for HTTP mocking")
+            assert results is not None
+            assert results["status"] == "completed"
 
 
 class TestExternalServiceDelivery:
@@ -387,9 +359,7 @@ class TestExternalServiceIntegration:
             chunks=sample_chunks,
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification, rechunk_mode="never"
-        )
+        result = await external_handler.handle_external_notification("service-x", notification, rechunk_mode="never")
 
         assert result.success
         assert result.chunks is not None
@@ -405,9 +375,7 @@ class TestExternalServiceIntegration:
             content_type="invalid_type",
         )
 
-        result = await external_handler.handle_external_notification(
-            "service-x", notification
-        )
+        result = await external_handler.handle_external_notification("service-x", notification)
 
         assert not result.success
         assert result.error is not None
@@ -420,9 +388,7 @@ class TestExternalServiceIntegration:
             s3_url=None,  # Missing S3 URL
         )
 
-        result2 = await external_handler.handle_external_notification(
-            "service-x", notification2
-        )
+        result2 = await external_handler.handle_external_notification("service-x", notification2)
 
         assert not result2.success
         assert "S3 URL not provided" in result2.error

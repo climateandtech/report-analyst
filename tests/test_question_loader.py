@@ -186,9 +186,7 @@ class TestQuestionSetLoader:
         # Should have at least the main question sets
         expected_sets = ["everest", "tcfd", "denali", "kilimanjaro"]
         for expected_set in expected_sets:
-            assert (
-                expected_set in question_sets
-            ), f"Expected {expected_set} in question sets"
+            assert expected_set in question_sets, f"Expected {expected_set} in question sets"
 
             qset = question_sets[expected_set]
             assert qset.name is not None
@@ -303,14 +301,10 @@ class TestQuestionSetLoader:
             from report_analyst.core.question_loader import get_question_loader
 
             question_loader = get_question_loader()
-            question_set_options = question_loader.get_question_set_options() + [
-                "custom"
-            ]
+            question_set_options = question_loader.get_question_set_options() + ["custom"]
         else:
             # Fallback: use a generic approach without hardcoded names
-            question_set_options = [
-                "custom"
-            ]  # Only custom when core functionality unavailable
+            question_set_options = ["custom"]  # Only custom when core functionality unavailable
 
         assert question_set_options == ["custom"]
         assert len(question_set_options) == 1
@@ -325,14 +319,10 @@ class TestQuestionSetLoader:
             from report_analyst.core.question_loader import get_question_loader
 
             question_loader = get_question_loader()
-            question_set_options = question_loader.get_question_set_options() + [
-                "custom"
-            ]
+            question_set_options = question_loader.get_question_set_options() + ["custom"]
         else:
             # Fallback: use a generic approach without hardcoded names
-            question_set_options = [
-                "custom"
-            ]  # Only custom when core functionality unavailable
+            question_set_options = ["custom"]  # Only custom when core functionality unavailable
 
         # Should have all question sets plus custom
         expected_sets = {"everest", "tcfd", "denali", "kilimanjaro", "lucia", "custom"}
@@ -359,16 +349,12 @@ class TestQuestionSetLoader:
             question_set_options = question_loader.get_question_set_options()
         else:
             # Fallback: use a generic approach without hardcoded names
-            question_set_options = (
-                []
-            )  # No predefined options when core functionality unavailable
+            question_set_options = []  # No predefined options when core functionality unavailable
 
         # Should not contain any hardcoded question set names
         hardcoded_names = ["tcfd", "kilimanjaro", "denali", "everest"]
         for name in hardcoded_names:
-            assert (
-                name not in question_set_options
-            ), f"Hardcoded name '{name}' found in fallback options"
+            assert name not in question_set_options, f"Hardcoded name '{name}' found in fallback options"
 
         assert question_set_options == []
 
@@ -387,8 +373,6 @@ class TestQuestionSetLoader:
         # Should contain expected question sets
         expected_sets = ["everest", "tcfd", "denali", "kilimanjaro", "lucia"]
         for expected_set in expected_sets:
-            assert (
-                expected_set in options1
-            ), f"Expected question set '{expected_set}' not found in options"
+            assert expected_set in options1, f"Expected question set '{expected_set}' not found in options"
 
         assert len(options1) == 5

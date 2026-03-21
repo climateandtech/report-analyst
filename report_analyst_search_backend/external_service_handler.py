@@ -58,9 +58,7 @@ class ExternalServiceHandler:
     def _init_s3_client(self):
         """Initialize S3 client if credentials are available"""
         try:
-            if all(
-                os.getenv(var) for var in ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
-            ):
+            if all(os.getenv(var) for var in ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]):
                 self.s3_client = boto3.client(
                     "s3",
                     endpoint_url=os.getenv("S3_ENDPOINT_URL"),
@@ -113,17 +111,13 @@ class ExternalServiceHandler:
             elif notification.content_type == "chunks":
                 if not notification.chunks:
                     return ProcessingResult(success=False, error="Chunks not provided")
-                chunks = await self._process_provided_chunks(
-                    notification.chunks, rechunk_mode
-                )
+                chunks = await self._process_provided_chunks(notification.chunks, rechunk_mode)
                 return ProcessingResult(success=True, chunks=chunks)
 
             elif notification.content_type == "pages":
                 if not notification.pages:
                     return ProcessingResult(success=False, error="Pages not provided")
-                chunks = await self._process_provided_pages(
-                    notification.pages, rechunk_mode
-                )
+                chunks = await self._process_provided_pages(notification.pages, rechunk_mode)
                 return ProcessingResult(success=True, chunks=chunks)
 
             else:
@@ -170,9 +164,7 @@ class ExternalServiceHandler:
             logger.info(f"Downloaded {len(file_bytes)} bytes from S3")
 
             # Save to temporary file for processing
-            with tempfile.NamedTemporaryFile(
-                delete=False, suffix=".pdf", mode="wb"
-            ) as tmp_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", mode="wb") as tmp_file:
                 tmp_file.write(file_bytes)
                 tmp_file_path = tmp_file.name
 
@@ -225,9 +217,7 @@ class ExternalServiceHandler:
             logger.error(f"Error processing S3 URL: {e}")
             raise
 
-    async def _process_provided_chunks(
-        self, chunks: List[Dict[str, Any]], rechunk_mode: str
-    ) -> List[Dict[str, Any]]:
+    async def _process_provided_chunks(self, chunks: List[Dict[str, Any]], rechunk_mode: str) -> List[Dict[str, Any]]:
         """
         Process provided chunks (re-chunk if needed).
 
@@ -245,9 +235,7 @@ class ExternalServiceHandler:
         elif rechunk_mode == "always":
             # Always re-chunk - combine all text and re-chunk
             # This would use the analyzer's chunking logic
-            combined_text = "\n\n".join(
-                chunk.get("text", chunk.get("chunk_text", "")) for chunk in chunks
-            )
+            combined_text = "\n\n".join(chunk.get("text", chunk.get("chunk_text", "")) for chunk in chunks)
             # For now, return normalized chunks - actual re-chunking would be done by analyzer
             logger.info(f"Re-chunking {len(chunks)} chunks (always mode)")
             return self._normalize_chunks(chunks)
@@ -258,14 +246,10 @@ class ExternalServiceHandler:
                 return self._normalize_chunks(chunks)
             else:
                 # Re-chunk needed
-                logger.info(
-                    f"Chunks don't match format, re-chunking {len(chunks)} chunks"
-                )
+                logger.info(f"Chunks don't match format, re-chunking {len(chunks)} chunks")
                 return self._normalize_chunks(chunks)
 
-    async def _process_provided_pages(
-        self, pages: List[Dict[str, Any]], rechunk_mode: str
-    ) -> List[Dict[str, Any]]:
+    async def _process_provided_pages(self, pages: List[Dict[str, Any]], rechunk_mode: str) -> List[Dict[str, Any]]:
         """
         Process provided pages (convert to chunks).
 

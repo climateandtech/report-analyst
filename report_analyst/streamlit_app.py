@@ -72,6 +72,7 @@ logger.info(f"Added {current_dir} to Python path")
 
 # Keep relative imports
 from report_analyst.core.analyzer import DocumentAnalyzer
+from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
     create_combined_dataframe,
@@ -144,9 +145,7 @@ class ReportAnalyzer:
         # Initialize the real document analyzer
         self.analyzer = DocumentAnalyzer()
         self.prompt_manager = PromptManager()
-        self.cache_manager = (
-            self.analyzer.cache_manager
-        )  # Access the cache manager from the analyzer
+        self.cache_manager = self.analyzer.cache_manager  # Access the cache manager from the analyzer
 
     def load_question_set(self, question_set: str) -> Dict:
         """Load questions from the specified question set using centralized loader"""
@@ -206,14 +205,10 @@ class ReportAnalyzer:
             self.analyzer.questions = questions
 
             # Convert selected question IDs to numbers for the analyzer
-            selected_numbers = [
-                questions[q_id]["number"] for q_id in selected_questions
-            ]
+            selected_numbers = [questions[q_id]["number"] for q_id in selected_questions]
 
             # Get the question set prefix from the first selected question
-            question_set = (
-                selected_questions[0].split("_")[0] if selected_questions else "tcfd"
-            )
+            question_set = selected_questions[0].split("_")[0] if selected_questions else "tcfd"
             self.analyzer.question_set = question_set
 
             # Pass use_llm_scoring to process_document
@@ -269,13 +264,11 @@ class ReportAnalyzer:
         force_recompute: bool = False,
     ):
         """Delegate to the analyzer's process_document method"""
-        return self.analyzer.process_document(
-            file_path, selected_questions, use_llm_scoring, single_call, force_recompute
-        )
+        return self.analyzer.process_document(file_path, selected_questions, use_llm_scoring, single_call, force_recompute)
 
 
 def save_uploaded_file(uploaded_file) -> Optional[str]:
-    """Save uploaded file to temp directory"""
+    """Save uploaded file to temp directory or PostgreSQL"""
     try:
         if uploaded_file is None:
             logger.warning("No file was uploaded")
@@ -285,15 +278,73 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
         if isinstance(uploaded_file, (str, Path)):
             return str(uploaded_file)
 
-        # Check if file was already saved in this session
+        # Check if PostgreSQL file storage is enabled (check both keys for persistence)
+        use_postgres_storage = st.session_state.get("postgres_file_storage_enabled", False) or st.session_state.get(
+            "use_postgres_file_storage", False
+        )
+
+        # Check if file was already saved in this session with the SAME storage mode
         file_key = f"saved_file_{uploaded_file.name}"
-        if file_key in st.session_state:
+        storage_mode_key = f"saved_file_mode_{uploaded_file.name}"
+        cached_mode = st.session_state.get(storage_mode_key)
+
+        # Only use cache if storage mode matches
+        if file_key in st.session_state and cached_mode == ("postgres" if use_postgres_storage else "local"):
             return st.session_state[file_key]
 
-        # Otherwise, handle it as an UploadedFile
+        # Get file bytes
+        file_bytes = uploaded_file.getbuffer()
+
+        if use_postgres_storage:
+            try:
+                from report_analyst.core.file_storage import get_file_storage
+
+                # Get database URL from session state or environment
+                database_url = st.session_state.get("database_url")
+                file_storage = get_file_storage(database_url)
+
+                if file_storage:
+                    # Check if file already exists in PostgreSQL
+                    existing_file_id = file_storage.find_by_filename(uploaded_file.name)
+                    if existing_file_id:
+                        # Retrieve from PostgreSQL instead of re-uploading
+                        temp_path = file_storage.save_to_temp(existing_file_id)
+                        if temp_path:
+                            st.session_state[file_key] = temp_path
+                            st.session_state[f"{file_key}_id"] = existing_file_id
+                            st.session_state[storage_mode_key] = "postgres"
+                            logger.info(
+                                f"Retrieved existing file {uploaded_file.name} from PostgreSQL (ID: {existing_file_id})"
+                            )
+                            st.session_state.file_processed = False
+                            return temp_path
+
+                    # Store new file in PostgreSQL
+                    file_id = file_storage.store_file(file_bytes, uploaded_file.name, uploaded_file.type)
+
+                    # Save to temp for processing (retrieve from DB)
+                    temp_path = file_storage.save_to_temp(file_id)
+
+                    if temp_path:
+                        # Store both file_id and path in session state
+                        st.session_state[file_key] = temp_path
+                        st.session_state[f"{file_key}_id"] = file_id
+                        st.session_state[storage_mode_key] = "postgres"
+                        logger.info(f"Stored file {uploaded_file.name} in PostgreSQL (ID: {file_id})")
+                        st.session_state.file_processed = False
+                        return temp_path
+                    else:
+                        logger.warning("Failed to save file from PostgreSQL to temp, falling back to local")
+                else:
+                    logger.warning("PostgreSQL file storage not available, falling back to local")
+            except Exception as e:
+                logger.warning(f"PostgreSQL file storage failed: {str(e)}, falling back to local")
+
+        # Fallback to local file storage
         file_path = Path("temp") / uploaded_file.name
+        file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+            f.write(file_bytes)
         logger.info(f"Successfully saved file: {file_path}")
 
         # Store the path in session state
@@ -333,9 +384,7 @@ def display_dataframes(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame):
         chunks_df,
         use_container_width=True,
         column_config={
-            "Vector Similarity": st.column_config.NumberColumn(
-                "Vector Similarity", format="%.3f"
-            ),
+            "Vector Similarity": st.column_config.NumberColumn("Vector Similarity", format="%.3f"),
             "LLM Score": st.column_config.NumberColumn("LLM Score", format="%.3f"),
             "Chunk Text": st.column_config.TextColumn("Chunk Text", width="large"),
         },
@@ -347,9 +396,7 @@ def convert_df(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
 
 
-def display_download_buttons(
-    analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str
-):
+def display_download_buttons(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str):
     """Display download buttons for analysis results"""
     # Generate unique timestamp for this render
     timestamp = int(time.time() * 1000)
@@ -400,11 +447,7 @@ async def analyze_document_and_display(
     """Analyze document and display results as they come in"""
     try:
         selected_questions_list = list(selected_questions) if selected_questions else []
-        question_set = (
-            selected_questions_list[0].split("_")[0]
-            if selected_questions_list
-            else "tcfd"
-        )
+        question_set = selected_questions_list[0].split("_")[0] if selected_questions_list else "tcfd"
 
         # Use the helper function to generate file key
         file_key = generate_file_key(file_path, st)
@@ -443,9 +486,7 @@ async def analyze_document_and_display(
         )
 
         if cached_answers:
-            log_analysis_step(
-                f"Found {len(cached_answers)} cached answers for {file_key}"
-            )
+            log_analysis_step(f"Found {len(cached_answers)} cached answers for {file_key}")
             # Show cache info
             st.info(f"📁 Loading results from stored: {file_key}")
 
@@ -454,29 +495,19 @@ async def analyze_document_and_display(
                 st.session_state.results["answers"][q_id] = answer
 
             # Update display with cached results
-            logger.info(
-                f"Creating dataframes with cached results for file_key: {file_key}"
-            )
+            logger.info(f"Creating dataframes with cached results for file_key: {file_key}")
             logger.info(
                 f"Current session state settings: chunk_size={st.session_state.get('new_chunk_size')}, overlap={st.session_state.get('new_overlap')}, top_k={st.session_state.get('new_top_k')}, llm_model={st.session_state.get('new_llm_model')}, use_llm_scoring={st.session_state.get('new_llm_scoring')}"
             )
-            analysis_df, chunks_df = create_analysis_dataframes(
-                st.session_state.results["answers"], file_key
-            )
+            analysis_df, chunks_df = create_analysis_dataframes(st.session_state.results["answers"], file_key)
             st.session_state.analysis_df = analysis_df
             st.session_state.chunks_df = chunks_df
 
         # Determine which questions need processing
-        questions_to_process = [
-            q_id
-            for q_id in selected_questions_list
-            if force_recompute or q_id not in cached_answers
-        ]
+        questions_to_process = [q_id for q_id in selected_questions_list if force_recompute or q_id not in cached_answers]
 
         if questions_to_process:
-            log_analysis_step(
-                f"Processing {len(questions_to_process)} uncached questions..."
-            )
+            log_analysis_step(f"Processing {len(questions_to_process)} uncached questions...")
 
             # Update analyzer with question set
             report_analyzer.analyzer.question_set = question_set
@@ -498,9 +529,7 @@ async def analyze_document_and_display(
                 log_analysis_step(f"Received result: {str(result)[:200]}...")
 
                 if "error" in result:
-                    log_analysis_step(
-                        f"Error received from analyzer: {result['error']}", "error"
-                    )
+                    log_analysis_step(f"Error received from analyzer: {result['error']}", "error")
                     st.error(f"Analysis error: {result['error']}")
                     continue
 
@@ -510,24 +539,18 @@ async def analyze_document_and_display(
 
                 question_id = result.get("question_id")
                 if question_id is None:
-                    log_analysis_step(
-                        f"No question_id in result: {str(result)[:200]}...", "warning"
-                    )
+                    log_analysis_step(f"No question_id in result: {str(result)[:200]}...", "warning")
                     continue
 
                 # Store results
                 st.session_state.results["answers"][question_id] = result
 
                 # Update display
-                logger.info(
-                    f"Creating dataframes with updated results for file_key: {file_key}"
-                )
+                logger.info(f"Creating dataframes with updated results for file_key: {file_key}")
                 logger.info(
                     f"Current session state settings: chunk_size={st.session_state.get('new_chunk_size')}, overlap={st.session_state.get('new_overlap')}, top_k={st.session_state.get('new_top_k')}, llm_model={st.session_state.get('new_llm_model')}, use_llm_scoring={st.session_state.get('new_llm_scoring')}"
                 )
-                analysis_df, chunks_df = create_analysis_dataframes(
-                    st.session_state.results["answers"], file_key
-                )
+                analysis_df, chunks_df = create_analysis_dataframes(st.session_state.results["answers"], file_key)
 
                 st.session_state.analysis_df = analysis_df
                 st.session_state.chunks_df = chunks_df
@@ -537,9 +560,7 @@ async def analyze_document_and_display(
         else:
             log_analysis_step("All selected questions have cached answers")
             # Show success message for cached results
-            st.success(
-                f"✓ All {len(selected_questions_list)} selected questions loaded from stored"
-            )
+            st.success(f"✓ All {len(selected_questions_list)} selected questions loaded from stored")
 
         # Mark this file as analyzed with current configuration
         if "analyzed_files" not in st.session_state:
@@ -679,9 +700,7 @@ def display_final_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame):
                 max_value=1,
                 format="%.3f",
             ),
-            "Chunk Text": st.column_config.TextColumn(
-                "Chunk Text", help="Text content of the chunk", width="large"
-            ),
+            "Chunk Text": st.column_config.TextColumn("Chunk Text", help="Text content of the chunk", width="large"),
             "Evidence Reference": st.column_config.CheckboxColumn(
                 "Used as Evidence",
                 help="Whether this chunk was referenced in the analysis",
@@ -714,11 +733,7 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
 
     # Collect backend configs (could be multiple backends in future)
     backend_configs = (
-        [backend_config]
-        if backend_config
-        and hasattr(backend_config, "use_backend")
-        and backend_config.use_backend
-        else []
+        [backend_config] if backend_config and hasattr(backend_config, "use_backend") and backend_config.use_backend else []
     )
 
     resources = client.list_reports(backend_configs=backend_configs)
@@ -749,9 +764,7 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
     return result
 
 
-def display_analysis_results(
-    analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str = None
-) -> None:
+def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str = None) -> None:
     """Display analysis results in a consistent format for both individual and consolidated views"""
     try:
         if analysis_df.empty:
@@ -852,9 +865,7 @@ def display_analysis_results(
         st.error(f"Error displaying results: {str(e)}")
 
 
-def display_consolidated_results(
-    analyzer, question_set, file_path=None, selected_config=None
-):
+def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
     """Display consolidated results for all analyzed documents
 
     Args:
@@ -876,116 +887,69 @@ def display_consolidated_results(
 
         # Get the database identifier for the selected question set
         db_question_set = question_set_mapping.get(question_set, question_set)
-        logger.info(
-            f"Mapping question set '{question_set}' to database identifier '{db_question_set}'"
+        logger.info(f"Mapping question set '{question_set}' to database identifier '{db_question_set}'")
+
+        # Get all available cache configurations
+        cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
+        logger.info(f"Found cache configs: {cache_configs}")
+
+        if not cache_configs:
+            st.warning("No stored analyses found")
+            return
+
+        # Group configurations by file
+        file_configs = {}
+        for config in cache_configs:
+            if len(config) == 6:  # Full config row from cache_status
+                file_path, chunk_size, chunk_overlap, top_k, model, qs = config
+                if qs == db_question_set:  # Only show configs for selected question set using database identifier
+                    if file_path not in file_configs:
+                        file_configs[file_path] = []
+                    file_configs[file_path].append(
+                        {
+                            "chunk_size": chunk_size,
+                            "chunk_overlap": chunk_overlap,
+                            "top_k": top_k,
+                            "model": model,
+                            "question_set": qs,
+                        }
+                    )
+
+        if not file_configs:
+            st.warning(f"No stored results found for question set: {question_set}")
+            return
+
+        # File selection
+        st.subheader("Select Report and Configuration")
+        file_path = st.selectbox(
+            "Select Report",
+            options=list(file_configs.keys()),
+            format_func=lambda x: Path(x).name,
         )
 
-        # If file_path is not provided, try to get it from cache (backward compatibility)
-        if file_path is None:
-            # Get all available cache configurations
-            cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
-            logger.info(f"Found cache configs: {cache_configs}")
+        if file_path:
+            # Show configurations for selected file
+            configs = file_configs[file_path]
+            config_options = []
+            for config in configs:
+                label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
+                config_options.append({"label": label, "config": config})
 
-            if not cache_configs:
-                st.warning("No stored analyses found")
-                return
-
-            # Group configurations by file
-            file_configs = {}
-            for config in cache_configs:
-                if len(config) == 6:  # Full config row from cache_status
-                    fp, chunk_size, chunk_overlap, top_k, model, qs = config
-                    if qs == db_question_set:
-                        if fp not in file_configs:
-                            file_configs[fp] = []
-                        file_configs[fp].append(
-                            {
-                                "chunk_size": chunk_size,
-                                "chunk_overlap": chunk_overlap,
-                                "top_k": top_k,
-                                "model": model,
-                                "question_set": qs,
-                            }
-                        )
-
-            if not file_configs:
-                st.warning(f"No stored results found for question set: {question_set}")
-                return
-
-            # File selection (backward compatibility)
-            st.subheader("Select Report and Configuration")
-            file_path = st.selectbox(
-                "Select Report",
-                options=list(file_configs.keys()),
-                format_func=lambda x: Path(x).name,
+            selected_config = st.selectbox(
+                "Select Configuration",
+                options=config_options,
+                format_func=lambda x: x["label"],
             )
 
-            if not file_path:
-                return
-
-            # Get configs for selected file
-            configs = file_configs[file_path]
-        else:
-            # File path provided, get configs for this file and question set (if not already provided)
-            if selected_config is None:
-                cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
-                configs = []
-                for config in cache_configs:
-                    if len(config) == 6:
-                        fp, chunk_size, chunk_overlap, top_k, model, qs = config
-                        if fp == file_path and qs == db_question_set:
-                            configs.append(
-                                {
-                                    "chunk_size": chunk_size,
-                                    "chunk_overlap": chunk_overlap,
-                                    "top_k": top_k,
-                                    "model": model,
-                                    "question_set": qs,
-                                }
-                            )
-
-                if not configs:
-                    st.warning(
-                        f"No stored results found for {Path(file_path).name} with question set: {question_set}"
-                    )
-                    return
-            else:
-                # Config already provided, wrap it in a list for consistency
-                configs = [selected_config]
-
-        if file_path:
-            # If selected_config is provided, use it; otherwise show selector (backward compatibility)
-            if selected_config is None:
-                # Show configurations for selected file
-                config_options = []
-                for config in configs:
-                    label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
-                    config_options.append({"label": label, "config": config})
-
-                st.subheader("Select Configuration")
-                selected_config_obj = st.selectbox(
-                    "Select Configuration",
-                    options=config_options,
-                    format_func=lambda x: x["label"],
-                )
-
-                if selected_config_obj:
-                    selected_config = selected_config_obj["config"]
-                else:
-                    return
-
             if selected_config:
-                # selected_config is now always the config dict (not wrapped)
-                logger.info(
-                    f"Getting results for {Path(file_path).name} with config: {selected_config}"
-                )
+                logger.info(f"Getting results for {Path(file_path).name} with config: {selected_config['config']}")
 
                 # Add similarity search section for document chunks
                 try:
                     raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
                         file_path=file_path,
-                        chunk_size=selected_config["chunk_size"],
-                        chunk_overlap=selected_config["chunk_overlap"],
+                        chunk_size=selected_config["config"]["chunk_size"],
+                        chunk_overlap=selected_config["config"]["chunk_overlap"],
                     )
 
                     if raw_chunks:
@@ -1001,9 +965,7 @@ def display_consolidated_results(
                         col1, col2 = st.columns([1, 1])
                         with col1:
                             # Question dropdown with shorter, cleaner options
-                            question_options = ["None"] + [
-                                f"{q_id}" for q_id in questions.keys()
-                            ]
+                            question_options = ["None"] + [f"{q_id}" for q_id in questions.keys()]
                             selected_question_id = st.selectbox(
                                 "Select a question to sort by similarity:",
                                 options=question_options,
@@ -1012,13 +974,8 @@ def display_consolidated_results(
                             )
 
                             # Show selected question text below dropdown
-                            if (
-                                selected_question_id != "None"
-                                and selected_question_id in questions
-                            ):
-                                st.caption(
-                                    f"**{selected_question_id}:** {questions[selected_question_id]['text'][:100]}..."
-                                )
+                            if selected_question_id != "None" and selected_question_id in questions:
+                                st.caption(f"**{selected_question_id}:** {questions[selected_question_id]['text'][:100]}...")
                             selected_question = selected_question_id
 
                         with col2:
@@ -1037,89 +994,56 @@ def display_consolidated_results(
                         elif selected_question != "None":
                             if selected_question in questions:
                                 query_text = questions[selected_question]["text"]
-                                st.info(
-                                    f"Using question {selected_question}: {query_text[:100]}..."
-                                )
+                                st.info(f"Using question {selected_question}: {query_text[:100]}...")
 
                         # Process chunks
                         chunks_rows = []
-                        chunks_with_embeddings = [
-                            c for c in raw_chunks if c.get("embedding") is not None
-                        ]
+                        chunks_with_embeddings = [c for c in raw_chunks if c.get("embedding") is not None]
 
                         if query_text and chunks_with_embeddings:
                             # Compute similarity scores
                             try:
                                 # Check if embeddings are available
-                                if (
-                                    not analyzer.analyzer.embeddings
-                                    or analyzer.analyzer.use_backend_llm
-                                ):
+                                if not analyzer.analyzer.embeddings or analyzer.analyzer.use_backend_llm:
                                     st.warning(
                                         "Embeddings not available for similarity search. Using backend mode or embeddings not initialized."
                                     )
                                     query_text = None
                                 else:
                                     # Get query embedding
-                                    query_embedding = (
-                                        analyzer.analyzer.embeddings.get_text_embedding(
-                                            query_text
-                                        )
-                                    )
-                                    query_embedding = np.array(
-                                        query_embedding, dtype=np.float32
-                                    )
+                                    query_embedding = analyzer.analyzer.embeddings.get_text_embedding(query_text)
+                                    query_embedding = np.array(query_embedding, dtype=np.float32)
 
                                     # Compute similarity for each chunk
                                     similarities = []
                                     for chunk in raw_chunks:
                                         if chunk.get("embedding") is not None:
-                                            chunk_embedding = np.frombuffer(
-                                                chunk["embedding"], dtype=np.float32
-                                            )
+                                            chunk_embedding = np.frombuffer(chunk["embedding"], dtype=np.float32)
                                             # Compute cosine similarity
-                                            similarity = np.dot(
-                                                query_embedding, chunk_embedding
-                                            ) / (
-                                                np.linalg.norm(query_embedding)
-                                                * np.linalg.norm(chunk_embedding)
+                                            similarity = np.dot(query_embedding, chunk_embedding) / (
+                                                np.linalg.norm(query_embedding) * np.linalg.norm(chunk_embedding)
                                             )
                                             similarities.append(similarity)
                                         else:
                                             similarities.append(0.0)
 
                                     # Sort chunks by similarity
-                                    chunk_similarity_pairs = list(
-                                        zip(raw_chunks, similarities)
-                                    )
-                                    chunk_similarity_pairs.sort(
-                                        key=lambda x: x[1], reverse=True
-                                    )
+                                    chunk_similarity_pairs = list(zip(raw_chunks, similarities))
+                                    chunk_similarity_pairs.sort(key=lambda x: x[1], reverse=True)
 
                                     # Create rows with similarity scores
-                                    for i, (chunk, similarity) in enumerate(
-                                        chunk_similarity_pairs
-                                    ):
+                                    for i, (chunk, similarity) in enumerate(chunk_similarity_pairs):
                                         chunk_row = {
                                             "Rank": i + 1,
                                             "Similarity": similarity,
-                                            "Text": chunk.get(
-                                                "text", chunk.get("chunk_text", "")
-                                            ),
-                                            "Has Embedding": chunk.get("embedding")
-                                            is not None,
-                                            "Chunk Size": chunk.get(
-                                                "chunk_size", "N/A"
-                                            ),
-                                            "Chunk Overlap": chunk.get(
-                                                "chunk_overlap", "N/A"
-                                            ),
+                                            "Text": chunk.get("text", chunk.get("chunk_text", "")),
+                                            "Has Embedding": chunk.get("embedding") is not None,
+                                            "Chunk Size": chunk.get("chunk_size", "N/A"),
+                                            "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
                                         }
                                         chunks_rows.append(chunk_row)
 
-                                    st.success(
-                                        f"✓ Sorted {len(chunks_rows)} chunks by similarity to query"
-                                    )
+                                    st.success(f"✓ Sorted {len(chunks_rows)} chunks by similarity to query")
 
                             except Exception as e:
                                 st.error(f"Error computing similarity: {str(e)}")
@@ -1131,15 +1055,10 @@ def display_consolidated_results(
                                 for i, chunk in enumerate(raw_chunks):
                                     chunk_row = {
                                         "Chunk #": i + 1,
-                                        "Text": chunk.get(
-                                            "text", chunk.get("chunk_text", "")
-                                        ),
-                                        "Has Embedding": chunk.get("embedding")
-                                        is not None,
+                                        "Text": chunk.get("text", chunk.get("chunk_text", "")),
+                                        "Has Embedding": chunk.get("embedding") is not None,
                                         "Chunk Size": chunk.get("chunk_size", "N/A"),
-                                        "Chunk Overlap": chunk.get(
-                                            "chunk_overlap", "N/A"
-                                        ),
+                                        "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
                                     }
                                     chunks_rows.append(chunk_row)
 
@@ -1148,9 +1067,7 @@ def display_consolidated_results(
                             for i, chunk in enumerate(raw_chunks):
                                 chunk_row = {
                                     "Chunk #": i + 1,
-                                    "Text": chunk.get(
-                                        "text", chunk.get("chunk_text", "")
-                                    ),
+                                    "Text": chunk.get("text", chunk.get("chunk_text", "")),
                                     "Has Embedding": chunk.get("embedding") is not None,
                                     "Chunk Size": chunk.get("chunk_size", "N/A"),
                                     "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
@@ -1224,23 +1141,17 @@ def display_consolidated_results(
                                 column_config=column_config,
                             )
 
-                            st.info(
-                                f"✓ Found {len(chunks_rows)} total document chunks in this configuration."
-                            )
+                            st.info(f"✓ Found {len(chunks_rows)} total document chunks in this configuration.")
                         else:
-                            st.warning(
-                                "No chunks found. Run Step 1 to generate document chunks first."
-                            )
+                            st.warning("No chunks found. Run Step 1 to generate document chunks first.")
 
                 except Exception as e:
-                    logger.warning(
-                        f"Error displaying document chunks with similarity search: {str(e)}"
-                    )
+                    logger.warning(f"Error displaying document chunks with similarity search: {str(e)}")
                     # Continue to show analysis results even if chunk display fails
 
                 # Get cached results
                 cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                    file_path=file_path, config=selected_config
+                    file_path=file_path, config=selected_config["config"]
                 )
 
                 if cached_results:
@@ -1257,28 +1168,15 @@ def display_consolidated_results(
                             result = data.get("result", {})
                             analysis_row = {
                                 "Question ID": question_id,
-                                "Question Text": (
-                                    questions[question_id]["text"]
-                                    if question_id in questions
-                                    else question_id
-                                ),
+                                "Question Text": (questions[question_id]["text"] if question_id in questions else question_id),
                                 "Analysis": result.get("ANSWER", ""),
                                 "Score": float(result.get("SCORE", 0)),
-                                "Key Evidence": "\n".join(
-                                    [
-                                        e.get("text", "")
-                                        for e in result.get("EVIDENCE", [])
-                                    ]
-                                ),
+                                "Key Evidence": "\n".join([e.get("text", "") for e in result.get("EVIDENCE", [])]),
                                 "Gaps": "\n".join(result.get("GAPS", [])),
-                                "Sources": ", ".join(
-                                    map(str, result.get("SOURCES", []))
-                                ),
+                                "Sources": ", ".join(map(str, result.get("SOURCES", []))),
                             }
                             analysis_rows.append(analysis_row)
-                            logger.debug(
-                                f"Added analysis row for {question_id}: {json.dumps(analysis_row, indent=2)}"
-                            )
+                            logger.debug(f"Added analysis row for {question_id}: {json.dumps(analysis_row, indent=2)}")
 
                             # Process chunks if available
                             if "chunks" in data:
@@ -1286,9 +1184,7 @@ def display_consolidated_results(
                                     chunk_row = {
                                         "Question ID": question_id,
                                         "Text": chunk.get("text", ""),
-                                        "Vector Similarity": chunk.get(
-                                            "similarity_score", 0.0
-                                        ),
+                                        "Vector Similarity": chunk.get("similarity_score", 0.0),
                                         "LLM Score": chunk.get("llm_score", 0.0),
                                         "Is Evidence": chunk.get("is_evidence", False),
                                         "Position": chunk.get("chunk_order", 0),
@@ -1305,14 +1201,10 @@ def display_consolidated_results(
                     # Create DataFrames
                     if analysis_rows:
                         analysis_df = pd.DataFrame(analysis_rows)
-                        chunks_df = (
-                            pd.DataFrame(chunks_rows) if chunks_rows else pd.DataFrame()
-                        )
+                        chunks_df = pd.DataFrame(chunks_rows) if chunks_rows else pd.DataFrame()
 
                         # Display results using the existing display function
-                        file_key = (
-                            f"{Path(file_path).stem}_cs{selected_config['chunk_size']}"
-                        )
+                        file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
                         display_analysis_results(analysis_df, chunks_df, file_key)
                     else:
                         st.warning("No results found in stored for this configuration")
@@ -1340,11 +1232,7 @@ def display_cache_selector(file_path: str):
     if "analyzer" in st.session_state:
         # Show cache status using cache manager
         try:
-            cache_entries = (
-                st.session_state.analyzer.analyzer.cache_manager.check_cache_status(
-                    file_path
-                )
-            )
+            cache_entries = st.session_state.analyzer.analyzer.cache_manager.check_cache_status(file_path)
             if cache_entries:
                 st.text(f"Found {len(cache_entries)} cached configurations:")
                 for entry in cache_entries:
@@ -1357,9 +1245,7 @@ def display_cache_selector(file_path: str):
                 with col2:
                     if st.button("Clear Stored Data for File"):
                         try:
-                            st.session_state.analyzer.analyzer.cache_manager.clear_cache(
-                                file_path
-                            )
+                            st.session_state.analyzer.analyzer.cache_manager.clear_cache(file_path)
                             st.success(f"Stored data cleared for file.")
                             # Clear results from session state
                             if "results" in st.session_state:
@@ -1415,17 +1301,13 @@ def update_analyzer_parameters():
     if llm_model.startswith("gemini-") and not os.getenv("GOOGLE_API_KEY"):
         # If somehow a Gemini model was selected but no API key exists
         logger.error(f"Attempt to use Gemini model '{llm_model}' without API key")
-        st.error(
-            f"Cannot use {llm_model} - No Google API key is set. Defaulting to {OPENAI_MODELS[0]}."
-        )
+        st.error(f"Cannot use {llm_model} - No Google API key is set. Defaulting to {OPENAI_MODELS[0]}.")
         # Reset to default OpenAI model
         llm_model = OPENAI_MODELS[0]
         st.session_state.new_llm_model = llm_model
     elif llm_model.startswith("gpt-") and not os.getenv("OPENAI_API_KEY"):
         logger.error(f"Attempt to use OpenAI model '{llm_model}' without API key")
-        st.error(
-            f"OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly."
-        )
+        st.error(f"OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly.")
 
     # Update the analyzer with the new parameters
     try:
@@ -1444,9 +1326,7 @@ def update_analyzer_parameters():
         # Sync LLM scoring checkbox with session state
         if "new_llm_scoring" in st.session_state:
             st.session_state.use_llm_scoring = st.session_state.new_llm_scoring
-            logger.info(
-                f"Updated use_llm_scoring to: {st.session_state.use_llm_scoring}"
-            )
+            logger.info(f"Updated use_llm_scoring to: {st.session_state.use_llm_scoring}")
 
     except Exception as e:
         st.error(f"Error updating parameters: {str(e)}")
@@ -1482,12 +1362,8 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
             logger.info(f"[CACHE] Cache HIT for config: {config}")
             progress_text.success("Found stored results!")
             st.session_state.results = cached_results
-            logger.info(
-                f"[ANALYSIS] Writing results to session state for file: {file_path}"
-            )
-            logger.info(
-                f"[ANALYSIS] Attempting to display results for file: {file_path}"
-            )
+            logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
+            logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
             return
         else:
             logger.info(f"[CACHE] Cache MISS for config: {config}")
@@ -1496,9 +1372,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
 
         # Log the LLM scoring setting
         llm_scoring_enabled = st.session_state.get("new_llm_scoring", False)
-        progress_text.info(
-            f"LLM scoring: {'Enabled' if llm_scoring_enabled else 'Disabled'}"
-        )
+        progress_text.info(f"LLM scoring: {'Enabled' if llm_scoring_enabled else 'Disabled'}")
         logger.info(f"Starting analysis with LLM scoring: {llm_scoring_enabled}")
 
         # Track results
@@ -1524,9 +1398,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         async for result in analyzer.process_document(
             file_path=file_path,
             selected_questions=question_numbers,  # Pass just the numbers
-            use_llm_scoring=st.session_state.get(
-                "new_llm_scoring", False
-            ),  # Use the checkbox value directly
+            use_llm_scoring=st.session_state.get("new_llm_scoring", False),  # Use the checkbox value directly
             force_recompute=st.session_state.get("force_recompute", False),
             pre_retrieved_chunks=pre_retrieved_chunks,  # Pass backend chunks if available
         ):
@@ -1567,9 +1439,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
             final_results = all_results
 
         # When writing results to session state
-        logger.info(
-            f"[ANALYSIS] Writing results to session state for file: {file_path}"
-        )
+        logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
         st.session_state.results = final_results
         logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
         progress_text.success("Analysis complete!")
@@ -1614,15 +1484,17 @@ def main():
             st.session_state.file_processed = False  # Initialize file processed flag
 
         if "analysis_complete" not in st.session_state:
-            st.session_state.analysis_complete = (
-                False  # Initialize analysis complete flag
-            )
+            st.session_state.analysis_complete = False  # Initialize analysis complete flag
 
         # Initialize use_s3_upload in session state if not already set
+        # Respect override_s3_upload if user has temporarily disabled it
         if "use_s3_upload" not in st.session_state:
-            st.session_state.use_s3_upload = (
-                os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
-            )
+            env_s3_upload = os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+            override = st.session_state.get("override_s3_upload", False)
+            st.session_state.use_s3_upload = env_s3_upload and not override
+
+        # Sync API keys from session state to environment at startup
+        APIKeyManager.sync_api_keys_to_env(st.session_state)
 
         st.set_page_config(page_title="Report Analyst", layout="wide")
 
@@ -1663,54 +1535,66 @@ def main():
                 margin-right: 8px;
             }
             
-            /* Add Material Icon to all notifications (unified - using info icon for all) */
-            .stAlert [data-testid="stMarkdownContainer"]::before,
-            [data-testid="stNotification"] [data-testid="stMarkdownContainer"]::before,
-            .stInfo [data-testid="stMarkdownContainer"]::before,
-            .stSuccess [data-testid="stMarkdownContainer"]::before,
-            .stError [data-testid="stMarkdownContainer"]::before,
-            .stWarning [data-testid="stMarkdownContainer"]::before {
-                content: 'info';
-                font-family: 'Material Icons';
-                font-size: 20px;
-                vertical-align: middle;
-                margin-right: 8px;
-                display: inline-block;
-            }
-            
-            /* Alternative selectors for notifications without markdown container */
-            .stAlert p::before,
-            [data-testid="stNotification"] p::before,
-            .stInfo p::before,
-            .stSuccess p::before,
-            .stError p::before,
-            .stWarning p::before {
-                content: 'info';
-                font-family: 'Material Icons';
-                font-size: 20px;
-                vertical-align: middle;
-                margin-right: 8px;
-                display: inline-block;
-            }
-            
-            /* Remove Settings expander icon CSS - it was causing rendering conflicts with Streamlit's built-in expander arrow */
-            
-            /* Fix Streamlit Material Icons - ensure they use Material Icons font */
-            [data-testid="stIconMaterial"],
-            span[data-testid="stIconMaterial"] {
+            /* Fix Material Icons rendering issues for Streamlit's stIconMaterial component */
+            [data-testid="stIconMaterial"] {
                 font-family: 'Material Icons' !important;
+                font-feature-settings: 'liga' !important;
+                -webkit-font-feature-settings: 'liga' !important;
                 font-weight: normal !important;
                 font-style: normal !important;
-                font-size: 20px !important;
-                line-height: 1 !important;
-                letter-spacing: normal !important;
                 text-transform: none !important;
-                display: inline-block !important;
-                white-space: nowrap !important;
-                word-wrap: normal !important;
-                direction: ltr !important;
-                -webkit-font-feature-settings: 'liga' !important;
-                -webkit-font-smoothing: antialiased !important;
+                letter-spacing: normal !important;
+            }
+            
+            /* @font-face fallback for Material Icons */
+            @font-face {
+                font-family: 'Material Icons';
+                font-style: normal;
+                font-weight: 400;
+                src: url(https://fonts.gstatic.com/s/materialicons/v142/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2) format('woff2');
+            }
+            
+            /* Add Material Icon to stAlert elements - only ONE icon per alert */
+            /* Add icon only to the markdown container, NOT to paragraphs to avoid duplicates */
+            [data-testid="stAlert"] [data-testid="stMarkdownContainer"]::before {
+                content: 'info';
+                font-family: 'Material Icons';
+                font-size: 20px;
+                vertical-align: middle;
+                margin-right: 8px;
+                display: inline-block;
+            }
+            
+            /* Remove icons from paragraphs inside stAlert to prevent double icons */
+            [data-testid="stAlert"] p::before {
+                content: none !important;
+                display: none !important;
+            }
+            
+            /* Add icons to custom notifications */
+            [data-testid="stNotification"] [data-testid="stMarkdownContainer"]::before {
+                content: 'info';
+                font-family: 'Material Icons';
+                font-size: 20px;
+                vertical-align: middle;
+                margin-right: 8px;
+                display: inline-block;
+            }
+            
+            /* Remove icons from paragraphs in custom notifications too */
+            [data-testid="stNotification"] p::before {
+                content: none !important;
+                display: none !important;
+            }
+            
+            /* Settings expander icon in sidebar */
+            [data-testid="stSidebar"] [data-testid="stExpander"] summary::before {
+                content: 'settings';
+                font-family: 'Material Icons';
+                font-size: 20px;
+                vertical-align: middle;
+                margin-right: 8px;
+                display: inline-block;
             }
             
             /* Active navigation item - light purple background with dark purple text */
@@ -1851,7 +1735,7 @@ def main():
                 background-color: #E8F5E9 !important;
                 border-radius: 12px !important;
                 padding: 1rem 1.5rem !important;
-                margin: 0.5rem 0 1.5rem 0 !important;
+                margin: 1rem 0 1.5rem 0 !important;
             }
             
             /* Target the horizontal block inside the container (for columns) */
@@ -2857,9 +2741,7 @@ def main():
 
         # Add logo to sidebar
         try:
-            logo_path = (
-                Path(__file__).parent / "assets" / "open-sustainability-analyst.svg"
-            )
+            logo_path = Path(__file__).parent / "assets" / "open-sustainability-analyst.svg"
             if logo_path.exists():
                 with open(logo_path, "rb") as f:
                     logo_data = base64.b64encode(f.read()).decode()
@@ -2886,8 +2768,13 @@ def main():
             with st.sidebar:
                 nav_page = option_menu(
                     menu_title=None,
-                    options=["Upload Report", "Report Analyst", "All Results"],
-                    icons=["house", "file-text", "bar-chart"],
+                    options=[
+                        "Upload Report",
+                        "Report Analyst",
+                        "All Results",
+                        "Settings",
+                    ],
+                    icons=["house", "file-text", "bar-chart", "gear"],
                     menu_icon=None,
                     default_index=0,
                     orientation="vertical",
@@ -2917,31 +2804,284 @@ def main():
                 )
         except ImportError:
             # Fallback to regular radio if package not installed
-            nav_options = ["Upload Report", "Report Analyst", "All Results"]
-            nav_page = st.sidebar.radio(
-                "", nav_options, key="nav_page", label_visibility="collapsed"
-            )
+            nav_options = ["Upload Report", "Report Analyst", "All Results", "Settings"]
+            nav_page = st.sidebar.radio("", nav_options, key="nav_page", label_visibility="collapsed")
 
-        # Settings section in sidebar (consolidates all integration settings)
-        st.sidebar.markdown("---")
-        with st.sidebar.expander("Settings", expanded=False):
-            # Show Enterprise Mode status at the top
-            use_s3_upload = st.session_state.get("use_s3_upload", False)
-            if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
-                st.caption("Enterprise mode")
+        # Show page-specific content based on navigation
+        if nav_page == "Settings":
+            st.title("Settings")
+            st.caption("Configure application settings and integrations")
 
-            # Enterprise Integration (S3+NATS) - always shown first, outside of backend config
-            st.subheader("Enterprise Integration")
-            use_s3_upload = st.checkbox(
-                "Enable S3+NATS Upload",
-                value=st.session_state.use_s3_upload,
-                key="use_s3_upload",
-                help="Upload documents via S3 and process via NATS for enterprise integration",
-            )
+            # Open Source Modules Section
+            st.header("Open Source Modules")
+            st.caption("Core features available in the open source edition")
+
+            # API Keys Configuration
+            st.subheader("API Keys")
+            st.caption("Enter your API keys to enable LLM features. Keys are stored in session state only and not persisted.")
+
+            # Check if keys exist in environment but not in session state
+            env_openai_key = os.getenv("OPENAI_API_KEY")
+            env_google_key = os.getenv("GOOGLE_API_KEY")
+            session_openai_key = st.session_state.get("api_key_openai_api_key")
+            session_google_key = st.session_state.get("api_key_google_api_key")
+
+            has_env_openai = env_openai_key and not session_openai_key
+            has_env_google = env_google_key and not session_google_key
+
+            # Get current values (from session state or environment)
+            current_openai_key = APIKeyManager.get_api_key("OPENAI_API_KEY", st.session_state)
+            current_google_key = APIKeyManager.get_api_key("GOOGLE_API_KEY", st.session_state)
+
+            # OpenAI API Key section
+            with st.expander(
+                "OpenAI API Key",
+                expanded=not has_env_openai or st.session_state.get("override_openai_key", False),
+            ):
+                # Show status for OpenAI key
+                if has_env_openai and not st.session_state.get("override_openai_key", False):
+                    st.info("API key is set from environment variable")
+                    if st.button("Override with new key", key="btn_override_openai"):
+                        st.session_state.override_openai_key = True
+                        st.rerun()
+                elif current_openai_key:
+                    masked_openai = (
+                        f"{current_openai_key[:8]}...{current_openai_key[-4:]}" if len(current_openai_key) > 12 else "***"
+                    )
+                    # Show source of key
+                    if session_openai_key:
+                        st.success(f"✓ API key set in session: `{masked_openai}`")
+                    elif env_openai_key:
+                        st.info(f"API key from environment: `{masked_openai}`")
+                    else:
+                        st.caption(f"Current key: `{masked_openai}`")
+
+                # Track override state
+                override_openai = st.session_state.get("override_openai_key", False)
+
+                if not has_env_openai or override_openai:
+                    # Track previous values to detect changes
+                    prev_openai_key = st.session_state.get("prev_openai_key", current_openai_key)
+
+                    # OpenAI API Key input
+                    openai_key_input = st.text_input(
+                        "OpenAI API Key",
+                        value="",  # Never show the actual key in the input
+                        type="password",
+                        key="openai_api_key_input",
+                        help="Enter your OpenAI API key to use GPT models. Leave empty to use existing key from environment.",
+                        placeholder=("sk-..." if not current_openai_key else "Enter new key to update"),
+                    )
+
+                    # Update API key if user entered a new value (different from current)
+                    if openai_key_input and openai_key_input != current_openai_key:
+                        APIKeyManager.set_api_key("OPENAI_API_KEY", openai_key_input, st.session_state)
+                        st.session_state.prev_openai_key = openai_key_input
+                        st.session_state.override_openai_key = False  # Reset override state
+                        st.success("OpenAI API key updated")
+                    elif openai_key_input == "" and current_openai_key and not has_env_openai:
+                        # User cleared the input - keep existing key (only if not from env)
+                        st.session_state.prev_openai_key = current_openai_key
+                    else:
+                        st.session_state.prev_openai_key = current_openai_key
+
+                    # Cancel override button
+                    if override_openai:
+                        if st.button("Cancel Override", key="cancel_override_openai"):
+                            st.session_state.override_openai_key = False
+                            st.rerun()
+
+            # Google/Gemini API Key section
+            with st.expander(
+                "Google/Gemini API Key",
+                expanded=not has_env_google or st.session_state.get("override_google_key", False),
+            ):
+                # Show status for Google key
+                if has_env_google and not st.session_state.get("override_google_key", False):
+                    st.info("API key is set from environment variable")
+                    if st.button("Override with new key", key="btn_override_google"):
+                        st.session_state.override_google_key = True
+                        st.rerun()
+                elif current_google_key:
+                    masked_google = (
+                        f"{current_google_key[:8]}...{current_google_key[-4:]}" if len(current_google_key) > 12 else "***"
+                    )
+                    st.caption(f"Current key: `{masked_google}`")
+
+                # Track override state
+                override_google = st.session_state.get("override_google_key", False)
+
+                if not has_env_google or override_google:
+                    # Track previous values to detect changes
+                    prev_google_key = st.session_state.get("prev_google_key", current_google_key)
+
+                    # Google/Gemini API Key input
+                    google_key_input = st.text_input(
+                        "Google/Gemini API Key",
+                        value="",  # Never show the actual key in the input
+                        type="password",
+                        key="google_api_key_input",
+                        help="Enter your Google API key to use Gemini models. Leave empty to use existing key from environment.",
+                        placeholder=("Enter your Google API key" if not current_google_key else "Enter new key to update"),
+                    )
+
+                    # Update API key if user entered a new value (different from current)
+                    if google_key_input and google_key_input != current_google_key:
+                        APIKeyManager.set_api_key("GOOGLE_API_KEY", google_key_input, st.session_state)
+                        st.session_state.prev_google_key = google_key_input
+                        st.session_state.override_google_key = False  # Reset override state
+                        st.success("Google API key updated")
+                    elif google_key_input == "" and current_google_key and not has_env_google:
+                        # User cleared the input - keep existing key (only if not from env)
+                        st.session_state.prev_google_key = current_google_key
+                    else:
+                        st.session_state.prev_google_key = current_google_key
+
+                    # Cancel override button
+                    if override_google:
+                        if st.button("Cancel Override", key="cancel_override_google"):
+                            st.session_state.override_google_key = False
+                            st.rerun()
+
+                # Show clear button if key exists (only for session state keys, not env)
+                if current_google_key and not has_env_google:
+                    if st.button("Clear Google Key", key="clear_google_key"):
+                        APIKeyManager.set_api_key("GOOGLE_API_KEY", None, st.session_state)
+                        st.rerun()
+
+            # Show clear button for OpenAI if key exists (only for session state keys, not env)
+            if current_openai_key and not has_env_openai:
+                if st.button("Clear OpenAI Key", key="clear_openai_key"):
+                    APIKeyManager.set_api_key("OPENAI_API_KEY", None, st.session_state)
+                    st.rerun()
 
             st.divider()
 
-            # Backend Integration
+            # Database Configuration (read-only, from environment variables)
+            st.subheader("Database Configuration")
+
+            # Get database URL from environment or default
+            database_url = os.getenv("DATABASE_URL")
+            if database_url is None:
+                # Default to SQLite
+                storage_path = os.getenv("STORAGE_PATH", "./storage")
+                db_path = str(Path(storage_path) / "cache" / "analysis.db")
+                database_url = f"sqlite:///{db_path}"
+                database_type = "SQLite"
+                st.info(
+                    f"**Type:** {database_type}\n\n**Path:** `{db_path}`\n\n*Configure via `STORAGE_PATH` environment variable*"
+                )
+            else:
+                # Parse PostgreSQL URL to show connection details (masked)
+                database_type = "PostgreSQL"
+                try:
+                    # Mask password in display
+                    if "@" in database_url:
+                        parts = database_url.split("@")
+                        if len(parts) == 2:
+                            user_pass = parts[0].split("://")[-1]
+                            if ":" in user_pass:
+                                user = user_pass.split(":")[0]
+                                masked_url = database_url.replace(user_pass, f"{user}:***")
+                            else:
+                                masked_url = database_url
+                        else:
+                            masked_url = database_url
+                    else:
+                        masked_url = database_url
+
+                    # Extract connection details for display
+                    if "postgresql://" in database_url or "postgres://" in database_url:
+                        url_part = database_url.split("://")[-1]
+                        if "@" in url_part:
+                            auth, host_db = url_part.split("@")
+                            user = auth.split(":")[0] if ":" in auth else auth
+                            if ":" in host_db:
+                                host, port_db = host_db.split(":")
+                                if "/" in port_db:
+                                    port, db = port_db.split("/", 1)
+                                else:
+                                    port = port_db
+                                    db = "?"
+                            else:
+                                if "/" in host_db:
+                                    host, db = host_db.split("/", 1)
+                                    port = "5432"
+                                else:
+                                    host = host_db
+                                    port = "5432"
+                                    db = "?"
+
+                            st.info(
+                                f"**Type:** {database_type}\n\n**Host:** `{host}`\n**Port:** `{port}`\n**Database:** `{db}`\n**User:** `{user}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                            )
+                        else:
+                            st.info(
+                                f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                            )
+                    else:
+                        st.info(
+                            f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                        )
+                except Exception:
+                    st.info(
+                        f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                    )
+
+            # Store in session state for use by DocumentAnalyzer
+            st.session_state.database_url = database_url
+
+            st.divider()
+            st.divider()
+
+            # Enterprise Modules Section
+            st.header("Enterprise Modules")
+            st.caption("Features available in the enterprise edition")
+
+            # Enterprise Integration (S3+NATS)
+            st.subheader("Enterprise Integration")
+
+            # Check if USE_S3_UPLOAD is set from environment
+            env_s3_upload = os.getenv("USE_S3_UPLOAD", "").lower() == "true"
+
+            # Show env var status like API keys
+            if env_s3_upload and not st.session_state.get("override_s3_upload", False):
+                st.info("S3+NATS upload is enabled via `USE_S3_UPLOAD` environment variable")
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    if st.button("Disable temporarily", key="btn_override_s3"):
+                        st.session_state.override_s3_upload = True
+                        st.session_state.use_s3_upload = False
+                        st.rerun()
+                use_s3_upload = True
+            else:
+                st.markdown(
+                    """
+                <style>
+                div[data-testid="stCheckbox"] label {
+                    font-family: 'Afacad', sans-serif !important;
+                    white-space: nowrap !important;
+                    min-width: 250px !important;
+                }
+                </style>
+                """,
+                    unsafe_allow_html=True,
+                )
+                use_s3_upload = st.checkbox(
+                    "Enable S3+NATS Upload",
+                    key="use_s3_upload",
+                    help="Upload documents via S3 and process via NATS for enterprise integration",
+                )
+                if not env_s3_upload:
+                    st.caption("*Or set `USE_S3_UPLOAD=true` in environment*")
+
+            # Show Enterprise Mode status only if enabled AND backend is available
+            if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
+                st.info("Enterprise mode enabled")
+
+            st.divider()
+
+            # Backend Integration (Enterprise feature)
             if BACKEND_INTEGRATION_AVAILABLE:
                 config = configure_backend_integration()
                 # Store config in session state for access across pages
@@ -2951,6 +3091,42 @@ def main():
                 st.warning("Backend integration modules not available")
                 config = None
                 st.session_state.backend_config = None
+
+            st.divider()
+
+            # File Storage Configuration (Enterprise feature)
+            st.subheader("File Storage")
+            st.caption("Configure where uploaded files are stored (Enterprise feature)")
+
+            # Get database URL from session state (set above in Database Configuration)
+            database_url_enterprise = st.session_state.get("database_url")
+            is_postgres_enterprise = database_url_enterprise and database_url_enterprise.startswith(
+                ("postgresql://", "postgres://")
+            )
+
+            # Initialize postgres_file_storage_enabled from session state or env
+            if "postgres_file_storage_enabled" not in st.session_state:
+                st.session_state.postgres_file_storage_enabled = (
+                    os.getenv("USE_POSTGRES_FILE_STORAGE", "false").lower() == "true"
+                )
+
+            if is_postgres_enterprise:
+                use_postgres_storage = st.checkbox(
+                    "Store files in PostgreSQL",
+                    value=st.session_state.get("postgres_file_storage_enabled", False),
+                    key="use_postgres_file_storage",
+                    help="Store uploaded files in PostgreSQL database (useful for Heroku deployments). Files are stored as BYTEA/BLOB. This is an enterprise feature.",
+                )
+                # Store in a separate key that persists across page navigation
+                st.session_state.postgres_file_storage_enabled = use_postgres_storage
+
+                if use_postgres_storage:
+                    st.info("📦 Files will be stored in PostgreSQL database")
+                else:
+                    st.caption("Files will be stored in local temp directory")
+            else:
+                st.info("PostgreSQL file storage requires a PostgreSQL database. Currently using SQLite.")
+                st.caption("Files are stored in local temp directory")
 
         # Show page-specific content based on navigation
         if nav_page == "Report Analyst":
@@ -3010,12 +3186,8 @@ def main():
 
                         # Upload date below selector
                         if selected_file_dropdown:
-                            selected_uri = selected_file_dropdown.get(
-                                "uri", selected_file_dropdown.get("path", "")
-                            )
-                            is_backend = selected_uri.startswith(
-                                "urn:report-analyst:backend:"
-                            )
+                            selected_uri = selected_file_dropdown.get("uri", selected_file_dropdown.get("path", ""))
+                            is_backend = selected_uri.startswith("urn:report-analyst:backend:")
 
                             if is_backend:
                                 # For backend resources, show backend info
@@ -3045,9 +3217,7 @@ def main():
                                     import datetime
 
                                     mod_time = file_path_display.stat().st_mtime
-                                    upload_date = datetime.datetime.fromtimestamp(
-                                        mod_time
-                                    ).strftime("%d.%m.%Y")
+                                    upload_date = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y")
                                     st.markdown(
                                         f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>',
                                         unsafe_allow_html=True,
@@ -3172,40 +3342,22 @@ def main():
                                     break
 
                             if selected_file_obj:
-                                selected_uri = selected_file_obj.get(
-                                    "uri", selected_file_obj.get("path", "")
-                                )
-                                is_backend = selected_uri.startswith(
-                                    "urn:report-analyst:backend:"
-                                )
+                                selected_uri = selected_file_obj.get("uri", selected_file_obj.get("path", ""))
+                                is_backend = selected_uri.startswith("urn:report-analyst:backend:")
 
                                 if is_backend:
                                     # For backend resources, use URN for step status check
                                     try:
-                                        step_status = (
-                                            analyzer.analyzer.check_step_completion(
-                                                selected_uri
-                                            )
-                                        )
+                                        step_status = analyzer.analyzer.check_step_completion(selected_uri)
                                     except Exception as e:
-                                        logger.warning(
-                                            f"Error checking step completion: {str(e)}"
-                                        )
+                                        logger.warning(f"Error checking step completion: {str(e)}")
                                 else:
-                                    file_path_for_status = Path(
-                                        selected_file_obj["path"]
-                                    )
+                                    file_path_for_status = Path(selected_file_obj["path"])
                                     if file_path_for_status.exists():
                                         try:
-                                            step_status = (
-                                                analyzer.analyzer.check_step_completion(
-                                                    str(file_path_for_status)
-                                                )
-                                            )
+                                            step_status = analyzer.analyzer.check_step_completion(str(file_path_for_status))
                                         except Exception as e:
-                                            logger.warning(
-                                                f"Error checking step completion: {str(e)}"
-                                            )
+                                            logger.warning(f"Error checking step completion: {str(e)}")
                         except Exception as e:
                             logger.warning(f"Error getting step status: {str(e)}")
 
@@ -3224,57 +3376,142 @@ def main():
                     if "processing_steps_slider" not in st.session_state:
                         st.session_state.processing_steps_slider = "Answer"
 
-                    # Use Streamlit's built-in pills widget
-                    selected_step = st.pills(
-                        "Select processing step",
-                        options=step_options,
-                        format_func=lambda x: step_full_names[x],
-                        default=(
-                            st.session_state.processing_steps_slider
-                            if st.session_state.processing_steps_slider in step_options
-                            else "Answer"
-                        ),
-                        key="processing_steps_slider",
-                        help="Select which processing step to execute",
-                        label_visibility="collapsed",
-                        selection_mode="single",
+                    # Add CSS to make slider labels more visible
+                    st.markdown(
+                        """
+                    <style>
+                    /* Style select slider labels to be more visible */
+                    div[data-testid="stSlider"] label,
+                    div[data-testid="stSlider"] p {
+                        color: #170843 !important;
+                        font-weight: 500 !important;
+                        font-size: 14px !important;
+                        font-family: 'Afacad', sans-serif !important;
+                    }
+                    
+                    /* Make all slider tick labels visible */
+                    [data-baseweb="slider"] [role="slider"] ~ div,
+                    [data-baseweb="slider"] div[role="slider"] ~ div,
+                    [data-baseweb="slider"] div[role="slider"] + div,
+                    [data-baseweb="slider"] > div > div > div {
+                        color: #170843 !important;
+                        font-size: 12px !important;
+                        font-family: 'Afacad', sans-serif !important;
+                        font-weight: 500 !important;
+                        opacity: 1 !important;
+                        visibility: visible !important;
+                    }
+                    </style>
+                    """,
+                        unsafe_allow_html=True,
                     )
+
+                    # Create select slider for step selection
+                    selected_step = st.select_slider(
+                        "Select processing steps",
+                        options=step_options,
+                        value=st.session_state.processing_steps_slider,
+                        key="processing_steps_slider",
+                        help="Select how many processing steps to execute",
+                        label_visibility="collapsed",
+                    )
+
+                    # Display all step labels below the slider
+                    step_cols = st.columns(4)
+                    selected_index = (
+                        step_options.index(selected_step) if selected_step in step_options else len(step_options) - 1
+                    )
+
+                    # Map step names to status keys
+                    step_status_map = {
+                        "Chunk": step_status.get("chunks", False),
+                        "Embed": step_status.get("embeddings", False),
+                        "Map": step_status.get("scoring", False),
+                        "Answer": step_status.get("analysis", False),
+                    }
+
+                    # Check if there's any stored data for this file
+                    # Reuse the file_path_for_status from the step_status check above
+                    has_stored_data = False
+                    if "analyzer" in st.session_state:
+                        try:
+                            # Use file_path_for_status if it was set in the step_status check above
+                            file_to_check = None
+                            if previous_files and "previous_file" in st.session_state:
+                                # Try to find the selected file
+                                selected_file_obj = None
+                                prev_file = st.session_state.previous_file
+
+                                # Handle both dict and string formats
+                                if isinstance(prev_file, dict):
+                                    for f in previous_files:
+                                        if f["name"] == prev_file.get("name") or f.get("path") == prev_file.get("path"):
+                                            selected_file_obj = f
+                                            break
+                                else:
+                                    for f in previous_files:
+                                        if f["name"] == prev_file or f.get("path") == prev_file:
+                                            selected_file_obj = f
+                                            break
+
+                                if selected_file_obj:
+                                    selected_uri = selected_file_obj.get("uri", selected_file_obj.get("path", ""))
+                                    is_backend = selected_uri.startswith("urn:report-analyst:backend:")
+                                    if is_backend:
+                                        file_to_check = None  # Backend resources don't have local file paths
+                                    else:
+                                        file_to_check = Path(selected_file_obj["path"])
+
+                            # If we have a file path, check for stored data
+                            if file_to_check and file_to_check.exists():
+                                cache_entries = st.session_state.analyzer.analyzer.cache_manager.check_cache_status(
+                                    str(file_to_check)
+                                )
+                                # check_cache_status returns a list of tuples, so check if it has any entries
+                                has_stored_data = bool(cache_entries) and len(cache_entries) > 0
+                        except Exception as e:
+                            logger.debug(f"Error checking stored data: {str(e)}")
+                            has_stored_data = False
+
+                    for idx, step_short in enumerate(step_options):
+                        with step_cols[idx]:
+                            step_full = step_full_names[step_short]
+                            is_selected = idx <= selected_index
+                            is_complete = step_status_map.get(step_short, False)
+
+                            # Show checkmark if complete, circle if incomplete
+                            indicator = "✓" if is_complete else "○"
+
+                            # Visual styling for selected steps
+                            if is_selected:
+                                highlight_style = (
+                                    "background-color: rgba(192, 196, 250, 0.1); border: 1px solid #4313C8; color: #4313C8;"
+                                )
+                            else:
+                                highlight_style = "background-color: rgba(192, 196, 250, 0.05); border: 1px solid rgba(67, 19, 200, 0.3); color: #718096;"
+
+                            # Add status badge next to Chunking step - always show
+                            status_badge = ""
+                            if step_short == "Chunk":
+                                badge_text = "Stored" if has_stored_data else "New"
+                                badge_bg = "rgba(192, 196, 250, 0.3)" if has_stored_data else "rgba(192, 196, 250, 0.15)"
+                                status_badge = f"<span style=\"background-color: {badge_bg}; color: #4313C8; border: 1px solid #4313C8; border-radius: 12px; padding: 2px 8px; font-size: 9px; margin-left: 6px; font-family: 'Cousine', monospace; display: inline-block;\">{badge_text}</span>"
+
+                            st.markdown(
+                                f"""
+                            <div style="{highlight_style} border-radius: 8px; padding: 0.5rem; text-align: center; font-size: 11px; font-family: 'Afacad', sans-serif;">
+                                <span>{indicator} {step_full}</span>{status_badge}
+                            </div>
+                            """,
+                                unsafe_allow_html=True,
+                            )
 
                 # Right column: Advanced Parameters
                 with col3:
-                    # Get current values for display
-                    current_top_k = st.session_state.get("new_top_k", 5)
-                    current_chunk_size = st.session_state.get("new_chunk_size", 500)
-                    current_overlap = st.session_state.get("new_overlap", 20)
-                    current_model = st.session_state.get("new_llm_model", "gpt-4o-mini")
+                    st.markdown("**Advanced Parameters**")
 
-                    # Format model name for display
-                    if "gpt-4o-mini" in current_model:
-                        model_display = "GPT-4o Mini"
-                    elif "gpt-4o" in current_model:
-                        model_display = "GPT-4o"
-                    elif "gpt-4" in current_model:
-                        model_display = "GPT-4"
-                    elif "gemini" in current_model.lower():
-                        model_display = "Gemini"
-                    else:
-                        model_display = current_model
-
-                    # Show compact metrics as info widgets (always visible)
-                    metric_cols = st.columns(4)
-                    with metric_cols[0]:
-                        st.metric("Model", model_display)
-                    with metric_cols[1]:
-                        st.metric("Chunk", current_chunk_size)
-                    with metric_cols[2]:
-                        st.metric("Overlap", current_overlap)
-                    with metric_cols[3]:
-                        st.metric("Top-K", current_top_k)
-
-                    # Create expander for the controls
-                    with st.expander("Advanced Parameters", expanded=False):
-                        # Use 2 columns for Advanced Parameters to make it more compact
-                        adv_col1, adv_col2 = st.columns(2)
+                    # Use 2 columns for Advanced Parameters to make it more compact
+                    adv_col1, adv_col2 = st.columns(2)
 
                     with adv_col1:
                         new_top_k = st.number_input(
@@ -3332,10 +3569,7 @@ def main():
                 analyzer.analyzer.update_question_set(selected_set)
 
                 # Clear results if question set changed
-                if (
-                    "last_question_set" not in st.session_state
-                    or st.session_state.last_question_set != selected_set
-                ):
+                if "last_question_set" not in st.session_state or st.session_state.last_question_set != selected_set:
                     if "results" in st.session_state:
                         del st.session_state.results
                     st.session_state.last_question_set = selected_set
@@ -3343,12 +3577,8 @@ def main():
             # Report Analyst page content - questions and analysis
             if previous_files and selected_file_dropdown:
                 # Check if this is a backend resource (URN) or local file
-                selected_uri = selected_file_dropdown.get(
-                    "uri", selected_file_dropdown.get("path", "")
-                )
-                is_backend_resource = selected_uri.startswith(
-                    "urn:report-analyst:backend:"
-                )
+                selected_uri = selected_file_dropdown.get("uri", selected_file_dropdown.get("path", ""))
+                is_backend_resource = selected_uri.startswith("urn:report-analyst:backend:")
 
                 if is_backend_resource:
                     # Handle backend resource
@@ -3359,16 +3589,12 @@ def main():
                     backend_config = st.session_state.get("backend_config")
                     backend_configs = (
                         [backend_config]
-                        if backend_config
-                        and hasattr(backend_config, "use_backend")
-                        and backend_config.use_backend
+                        if backend_config and hasattr(backend_config, "use_backend") and backend_config.use_backend
                         else []
                     )
 
                     # Get chunks from backend
-                    chunks = get_chunks_for_backend_resource(
-                        selected_uri, backend_configs
-                    )
+                    chunks = get_chunks_for_backend_resource(selected_uri, backend_configs)
                     if chunks:
                         # Store chunks in session state for analysis
                         st.session_state.backend_chunks = chunks
@@ -3403,18 +3629,12 @@ def main():
                     else:
                         # No path found in selected file
                         file_path = None
-                        logger.warning(
-                            f"No path found in selected file: {selected_file_dropdown}"
-                        )
+                        logger.warning(f"No path found in selected file: {selected_file_dropdown}")
 
                 # Continue with analysis if we have a valid file path or chunks
-                if (
-                    not is_backend_resource and file_path and Path(file_path).exists()
-                ) or (is_backend_resource and chunks):
+                if (not is_backend_resource and file_path and Path(file_path).exists()) or (is_backend_resource and chunks):
                     # Load questions and handle selection
-                    question_set_data = analyzer.load_question_set(
-                        st.session_state.new_question_set
-                    )
+                    question_set_data = analyzer.load_question_set(st.session_state.new_question_set)
                     questions = question_set_data["questions"]
 
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -3426,16 +3646,12 @@ def main():
                     select_all_key = f"select_all_{st.session_state.new_question_set}"
 
                     # Select All button - styled purple, smaller, below heading
-                    select_all_clicked = st.button(
-                        "Select All", key=select_all_key, type="primary"
-                    )
+                    select_all_clicked = st.button("Select All", key=select_all_key, type="primary")
 
                     # Handle select all button click - toggle state
                     if select_all_clicked:
                         # Toggle the select all state
-                        toggle_key = (
-                            f"select_all_state_{st.session_state.new_question_set}"
-                        )
+                        toggle_key = f"select_all_state_{st.session_state.new_question_set}"
                         if toggle_key not in st.session_state:
                             st.session_state[toggle_key] = False
                         st.session_state[toggle_key] = not st.session_state[toggle_key]
@@ -3472,11 +3688,7 @@ def main():
                                 questions_data = []
                                 for q_id, q_data in questions.items():
                                     if q_id in widget_df["QID"].values:
-                                        is_selected = bool(
-                                            widget_df[widget_df["QID"] == q_id][
-                                                "Select"
-                                            ].iloc[0]
-                                        )
+                                        is_selected = bool(widget_df[widget_df["QID"] == q_id]["Select"].iloc[0])
                                     else:
                                         # Question not in widget state yet, default to False
                                         is_selected = False
@@ -3518,15 +3730,9 @@ def main():
                     edited_df = st.data_editor(
                         questions_df,
                         column_config={
-                            "Select": st.column_config.CheckboxColumn(
-                                "Select", width=70
-                            ),
-                            "QID": st.column_config.TextColumn(
-                                "QID", disabled=True, width=120
-                            ),
-                            "QUESTION": st.column_config.TextColumn(
-                                "Question", disabled=True
-                            ),
+                            "Select": st.column_config.CheckboxColumn("Select", width=70),
+                            "QID": st.column_config.TextColumn("QID", disabled=True, width=120),
+                            "QUESTION": st.column_config.TextColumn("Question", disabled=True),
                         },
                         hide_index=True,
                         use_container_width=True,
@@ -3540,32 +3746,22 @@ def main():
                     # Analysis button and results
                     col1, col2 = st.columns([2, 1])
                     with col1:
-                        analyze_clicked = st.button(
-                            "Analyze Selected Questions", key="analyze_button"
-                        )
+                        analyze_clicked = st.button("Analyze Selected Questions", key="analyze_button")
                     with col2:
-                        reanalyze_clicked = st.button(
-                            "Reanalyze", key="reanalyze_button"
-                        )
+                        reanalyze_clicked = st.button("Reanalyze", key="reanalyze_button")
 
                     if analyze_clicked or reanalyze_clicked:
                         # NOW sync the selection state from the widget
                         # Get selected questions from the edited dataframe
-                        selected_questions = edited_df[edited_df["Select"] == True][
-                            "QID"
-                        ].tolist()
+                        selected_questions = edited_df[edited_df["Select"] == True]["QID"].tolist()
 
                         # Update session state for individual question checkboxes (for backward compatibility)
                         for q_id in questions.keys():
                             is_selected = q_id in selected_questions
-                            st.session_state[f"individual_question_{q_id}"] = (
-                                is_selected
-                            )
+                            st.session_state[f"individual_question_{q_id}"] = is_selected
 
                         if not selected_questions:
-                            st.warning(
-                                "Please select at least one question to analyze."
-                            )
+                            st.warning("Please select at least one question to analyze.")
                         else:
                             try:
                                 # Set force_recompute based on which button was clicked
@@ -3584,12 +3780,8 @@ def main():
                                 progress_text = st.empty()
 
                                 # Check if this is a backend resource
-                                is_backend = (
-                                    st.session_state.get("backend_chunks") is not None
-                                )
-                                backend_uri = st.session_state.get(
-                                    "backend_resource_uri"
-                                )
+                                is_backend = st.session_state.get("backend_chunks") is not None
+                                backend_uri = st.session_state.get("backend_resource_uri")
 
                                 # Use URN as file_path for backend resources, absolute path string for local files
                                 # This maintains backwards compatibility with SQLite cache
@@ -3597,17 +3789,11 @@ def main():
                                     analysis_file_path = backend_uri  # URN string
                                 else:
                                     # Local file - ensure it's absolute path string (backwards compatible)
-                                    analysis_file_path = (
-                                        str(Path(file_path).resolve())
-                                        if file_path
-                                        else file_path
-                                    )
+                                    analysis_file_path = str(Path(file_path).resolve()) if file_path else file_path
 
                                 if reanalyze_clicked:
                                     # For reanalysis, skip cache check and analyze all selected questions
-                                    progress_text.info(
-                                        f"Reanalyzing {len(selected_questions)} questions..."
-                                    )
+                                    progress_text.info(f"Reanalyzing {len(selected_questions)} questions...")
                                     asyncio.run(
                                         run_analysis(
                                             analyzer,
@@ -3618,12 +3804,10 @@ def main():
                                     )
                                 else:
                                     # For normal analysis, check cache first
-                                    cached_results = (
-                                        analyzer.analyzer.cache_manager.get_analysis(
-                                            file_path=analysis_file_path,
-                                            config=config,
-                                            question_ids=selected_questions,
-                                        )
+                                    cached_results = analyzer.analyzer.cache_manager.get_analysis(
+                                        file_path=analysis_file_path,
+                                        config=config,
+                                        question_ids=selected_questions,
                                     )
 
                                     if cached_results:
@@ -3632,30 +3816,22 @@ def main():
                                             question_id,
                                             result,
                                         ) in cached_results.items():
-                                            st.session_state.results["answers"][
-                                                question_id
-                                            ] = result
+                                            st.session_state.results["answers"][question_id] = result
 
                                         # Generate file key for display
-                                        file_key = generate_file_key(
-                                            analysis_file_path, st
-                                        )
+                                        file_key = generate_file_key(analysis_file_path, st)
 
                                         # Update display
-                                        analysis_df, chunks_df = (
-                                            create_analysis_dataframes(
-                                                st.session_state.results["answers"],
-                                                file_key,
-                                            )
+                                        analysis_df, chunks_df = create_analysis_dataframes(
+                                            st.session_state.results["answers"],
+                                            file_key,
                                         )
                                         st.session_state.analysis_df = analysis_df
                                         st.session_state.chunks_df = chunks_df
                                         st.session_state.analysis_complete = True
                                     else:
                                         # Run analysis for uncached questions
-                                        progress_text.info(
-                                            f"Processing {len(selected_questions)} questions..."
-                                        )
+                                        progress_text.info(f"Processing {len(selected_questions)} questions...")
 
                                         try:
                                             # Run analysis for uncached questions
@@ -3677,30 +3853,20 @@ def main():
                                             st.exception(e)
 
                                     # Get final results
-                                    all_results = (
-                                        analyzer.analyzer.cache_manager.get_analysis(
-                                            file_path=str(file_path),
-                                            config=config,
-                                            question_ids=selected_questions,
-                                        )
+                                    all_results = analyzer.analyzer.cache_manager.get_analysis(
+                                        file_path=str(file_path),
+                                        config=config,
+                                        question_ids=selected_questions,
                                     )
 
                                     # Process all results into dataframes
                                     if all_results:
-                                        analysis_df, chunks_df = (
-                                            create_analysis_dataframes(all_results)
-                                        )
+                                        analysis_df, chunks_df = create_analysis_dataframes(all_results)
                                         file_key = Path(file_path).stem
-                                        display_analysis_results(
-                                            analysis_df, chunks_df, file_key
-                                        )
-                                        progress_text.success(
-                                            f"✓ Analysis complete for {len(selected_questions)} questions"
-                                        )
+                                        display_analysis_results(analysis_df, chunks_df, file_key)
+                                        progress_text.success(f"✓ Analysis complete for {len(selected_questions)} questions")
                                     else:
-                                        progress_text.error(
-                                            "No results found after analysis"
-                                        )
+                                        progress_text.error("No results found after analysis")
 
                             except Exception as e:
                                 logger.error(
@@ -3711,20 +3877,22 @@ def main():
                 else:
                     # Show helpful error message
                     if file_path is None:
-                        st.error(
-                            "File not found: No file path available. Please select a valid file."
-                        )
+                        st.error("File not found: No file path available. Please select a valid file.")
                     else:
-                        st.error(
-                            f"File not found: {file_path}. Please ensure the file exists."
-                        )
+                        st.error(f"File not found: {file_path}. Please ensure the file exists.")
             else:
                 st.info("No previously analyzed reports found")
 
         # Upload Report page
         elif nav_page == "Upload Report":
-            # Check if S3+NATS enterprise integration is enabled (from UI checkbox)
-            use_s3_upload = st.session_state.get("use_s3_upload", False)
+            # Check if S3+NATS enterprise integration is enabled
+            # Respect override_s3_upload if user has temporarily disabled it
+            if st.session_state.get("override_s3_upload", False):
+                use_s3_upload = False
+            else:
+                use_s3_upload = (
+                    st.session_state.get("use_s3_upload", False) or os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+                )
 
             # Initialize backend integration with S3+NATS enabled if needed
             if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
@@ -3745,9 +3913,7 @@ def main():
                         deployment_type="enterprise",
                         experiment_name="S3+NATS Upload",
                     )
-                    st.session_state.flow_orchestrator = create_flow_orchestrator(
-                        st.session_state.backend_config
-                    )
+                    st.session_state.flow_orchestrator = create_flow_orchestrator(st.session_state.backend_config)
 
             # Unified upload page styling (shows for both enterprise and regular mode)
             st.markdown(
@@ -3836,6 +4002,50 @@ def main():
                 unsafe_allow_html=True,
             )
 
+            # Try to import JSON Schema form component (enterprise feature)
+            try:
+                # Use the proper Streamlit custom component
+                import json
+
+                from report_analyst_enterprise.components.streamlit_component.backend import (
+                    json_schema_form,
+                )
+
+                # Path is already imported at the top of the file
+
+                JSON_SCHEMA_FORM_AVAILABLE = True
+
+                # Load PDF upload schema
+                schema_path = (
+                    Path(__file__).parent.parent
+                    / "report_analyst_enterprise"
+                    / "components"
+                    / "schemas"
+                    / "pdf_upload_schema.json"
+                )
+                ui_schema_path = (
+                    Path(__file__).parent.parent
+                    / "report_analyst_enterprise"
+                    / "components"
+                    / "schemas"
+                    / "pdf_upload_ui_schema.json"
+                )
+
+                if schema_path.exists() and ui_schema_path.exists():
+                    with open(schema_path) as f:
+                        pdf_upload_schema = json.load(f)
+                    with open(ui_schema_path) as f:
+                        pdf_upload_ui_schema = json.load(f)
+                else:
+                    JSON_SCHEMA_FORM_AVAILABLE = False
+                    pdf_upload_schema = None
+                    pdf_upload_ui_schema = None
+            except ImportError:
+                JSON_SCHEMA_FORM_AVAILABLE = False
+                pdf_upload_schema = None
+                pdf_upload_ui_schema = None
+
+            # File upload with optional metadata form
             uploaded_file = st.file_uploader(
                 "Choose a PDF file",
                 type="pdf",
@@ -3843,48 +4053,84 @@ def main():
                 help="Limit 200MB per file • PDF",
             )
 
+            # Show metadata form if JSON Schema form is available
+            pdf_metadata = None
+            company_metadata = None
+
+            if JSON_SCHEMA_FORM_AVAILABLE:
+                # ESRS Company Information Form
+                esrs_schema_path = (
+                    Path(__file__).parent.parent
+                    / "report_analyst_enterprise"
+                    / "components"
+                    / "schemas"
+                    / "esrs_company_schema.json"
+                )
+                esrs_ui_schema_path = (
+                    Path(__file__).parent.parent
+                    / "report_analyst_enterprise"
+                    / "components"
+                    / "schemas"
+                    / "esrs_company_ui_schema.json"
+                )
+
+                if esrs_schema_path.exists() and esrs_ui_schema_path.exists():
+                    with open(esrs_schema_path) as f:
+                        esrs_company_schema = json.load(f)
+                    with open(esrs_ui_schema_path) as f:
+                        esrs_company_ui_schema = json.load(f)
+
+                    with st.expander("ESRS Company Information", expanded=True):
+                        st.caption("Enter company data aligned with ESRS XBRL taxonomy requirements")
+                        company_metadata = json_schema_form(
+                            schema=esrs_company_schema,
+                            ui_schema=esrs_company_ui_schema,
+                            key="esrs_company_form",
+                            height=700,
+                        )
+                        if company_metadata and company_metadata.get("type") == "submit":
+                            st.success("Company information saved!")
+                            st.session_state.esrs_company_metadata = company_metadata.get("formData", company_metadata)
+
+                # Basic PDF metadata form
+                if pdf_upload_schema:
+                    with st.expander("Add Document Metadata (Optional)", expanded=False):
+                        st.caption("Add metadata like category, tags, and description to help organize your documents.")
+                        pdf_metadata = json_schema_form(
+                            schema=pdf_upload_schema,
+                            ui_schema=pdf_upload_ui_schema,
+                            key="pdf_metadata_form",
+                            height=500,
+                        )
+                        if pdf_metadata:
+                            st.success("Metadata saved!")
+                            # Store in session state for use after upload
+                            st.session_state.pdf_metadata = pdf_metadata
+
             if uploaded_file:
                 # Handle upload based on mode
                 if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
                     # Use S3+NATS enterprise flow
-                    with st.spinner(
-                        "Uploading to S3 and triggering backend processing..."
-                    ):
+                    with st.spinner("Uploading to S3 and triggering backend processing..."):
                         try:
                             # Debug: Check if backend_service exists
                             orchestrator = st.session_state.get("flow_orchestrator")
-                            backend_service = (
-                                getattr(orchestrator, "backend_service", None)
-                                if orchestrator
-                                else None
-                            )
+                            backend_service = getattr(orchestrator, "backend_service", None) if orchestrator else None
 
-                            logger.info(
-                                f"[ENTERPRISE] Debug - orchestrator: {orchestrator is not None}"
-                            )
-                            logger.info(
-                                f"[ENTERPRISE] Debug - backend_service: {backend_service is not None}"
-                            )
+                            logger.info(f"[ENTERPRISE] Debug - orchestrator: {orchestrator is not None}")
+                            logger.info(f"[ENTERPRISE] Debug - backend_service: {backend_service is not None}")
 
                             if not backend_service:
-                                raise Exception(
-                                    "Backend service not initialized properly"
-                                )
+                                raise Exception("Backend service not initialized properly")
 
                             # Get file bytes
                             file_bytes = uploaded_file.getbuffer()
 
                             # Process via S3+NATS flow
-                            result = asyncio.run(
-                                backend_service.upload_pdf(
-                                    file_bytes, uploaded_file.name
-                                )
-                            )
+                            result = asyncio.run(backend_service.upload_pdf(file_bytes, uploaded_file.name))
 
                             if result:
-                                st.success(
-                                    f"File uploaded via S3+NATS: {uploaded_file.name}"
-                                )
+                                st.success(f"File uploaded via S3+NATS: {uploaded_file.name}")
                                 st.info(f"Document ID: {result}")
                                 st.session_state.current_file = result
                                 st.session_state.uploaded_file = uploaded_file
@@ -3908,9 +4154,7 @@ def main():
                 # Local processing (when enterprise mode is off or failed)
                 if not use_s3_upload or not BACKEND_INTEGRATION_AVAILABLE:
                     file_path = save_uploaded_file(uploaded_file)
-                    logger.info(
-                        f"[UPLOAD] Saved uploaded file: {uploaded_file.name} at {file_path}"
-                    )
+                    logger.info(f"[UPLOAD] Saved uploaded file: {uploaded_file.name} at {file_path}")
                     if file_path and file_path != st.session_state.get("current_file"):
                         st.session_state.current_file = file_path
                         st.session_state.uploaded_file = uploaded_file
@@ -3918,13 +4162,9 @@ def main():
                         st.session_state.analysis_triggered = False
                         if "results" in st.session_state:
                             del st.session_state.results
-                        logger.info(
-                            f"[UPLOAD] Added file to session state: {uploaded_file.name}"
-                        )
+                        logger.info(f"[UPLOAD] Added file to session state: {uploaded_file.name}")
                         st.success(f"File uploaded successfully: {uploaded_file.name}")
-                        logger.info(
-                            f"[UPLOAD] Displaying cache selector for file: {file_path}"
-                        )
+                        logger.info(f"[UPLOAD] Displaying cache selector for file: {file_path}")
                         # Removed display_cache_selector - stored data status now shown as pill next to Chunking step
                         if not st.session_state.get("file_processed"):
                             st.session_state.file_processed = True
@@ -3937,9 +4177,7 @@ def main():
 
             # Initialize selected_set from session state if available
             if "consolidated_set" not in st.session_state:
-                st.session_state.consolidated_set = (
-                    list(question_sets.keys())[0] if question_sets else None
-                )
+                st.session_state.consolidated_set = list(question_sets.keys())[0] if question_sets else None
 
             # 1. Question set and report selectors side by side (green containers)
             col1, col2 = st.columns([1, 1])
@@ -3981,7 +4219,7 @@ def main():
                     "tcfd": "tcfd",
                     "s4m": "s4m",
                     "lucia": "lucia",
-                    "everest": "ev",  # Everest questions use 'ev_' prefix, so database stores as 'ev'
+                    "everest": "ev",
                 }
 
                 # Get the database identifier for the selected question set
@@ -3993,10 +4231,8 @@ def main():
                 # Group configurations by file for the selected question set
                 if cache_configs:
                     for config in cache_configs:
-                        if len(config) == 6:  # Full config row from cache_status
-                            file_path, chunk_size, chunk_overlap, top_k, model, qs = (
-                                config
-                            )
+                        if len(config) == 6:
+                            file_path, chunk_size, chunk_overlap, top_k, model, qs = config
                             if qs == db_question_set:
                                 if file_path not in file_configs:
                                     file_configs[file_path] = []
@@ -4044,19 +4280,13 @@ def main():
                                             import datetime
 
                                             mod_time = file_path_display.stat().st_mtime
-                                            upload_date = (
-                                                datetime.datetime.fromtimestamp(
-                                                    mod_time
-                                                ).strftime("%d.%m.%Y")
-                                            )
+                                            upload_date = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y")
                                             st.markdown(
                                                 f'<span class="pdf-upload-date">Uploaded, {upload_date}</span>',
                                                 unsafe_allow_html=True,
                                             )
                     else:
-                        st.warning(
-                            "No stored results found for the selected question set"
-                        )
+                        st.warning("No stored results found for the selected question set")
                         selected_file_path = None
 
                 # 2. Configuration selector - horizontal styled cards
@@ -4076,17 +4306,14 @@ def main():
                         if st.session_state.selected_config_idx >= num_configs:
                             st.session_state.selected_config_idx = 0
 
-                        # Create fixed-width columns: each card is 1 unit, fill rest with spacer
-                        # This ensures cards don't stretch too wide
-                        col_spec = [1] * num_configs  # card columns
-                        remaining_space = max(
-                            0, 4 - num_configs
-                        )  # spacer to fill remaining width
+                        # Create fixed-width columns
+                        col_spec = [1] * num_configs
+                        remaining_space = max(0, 4 - num_configs)
                         if remaining_space > 0:
                             col_spec.append(remaining_space)
 
                         all_cols = st.columns(col_spec)
-                        config_cols = all_cols[:num_configs]  # only card columns
+                        config_cols = all_cols[:num_configs]
 
                         for idx, config in enumerate(configs):
                             with config_cols[idx]:
@@ -4104,9 +4331,7 @@ def main():
                                     model_display = model_name
 
                                 # Check if this config is selected
-                                is_selected = (
-                                    idx == st.session_state.selected_config_idx
-                                )
+                                is_selected = idx == st.session_state.selected_config_idx
 
                                 # Create clickable card
                                 clicked = card(
@@ -4123,33 +4348,21 @@ def main():
                                                 if not is_selected
                                                 else "0 4px 16px rgba(67,19,200,0.25)"
                                             ),
-                                            "background-color": (
-                                                "#4313C8" if is_selected else "#FFFFFF"
-                                            ),
-                                            "border": (
-                                                "2px solid #4313C8"
-                                                if is_selected
-                                                else "1px solid #E5E7EB"
-                                            ),
+                                            "background-color": "#4313C8" if is_selected else "#FFFFFF",
+                                            "border": "2px solid #4313C8" if is_selected else "1px solid #E5E7EB",
                                             "padding": "10px",
                                             "margin": "0",
                                         },
                                         "title": {
                                             "font-size": "15px",
                                             "font-weight": "600",
-                                            "color": (
-                                                "white" if is_selected else "#1F2937"
-                                            ),
+                                            "color": "white" if is_selected else "#1F2937",
                                             "font-family": "'Afacad', sans-serif",
                                             "margin-bottom": "2px",
                                         },
                                         "text": {
                                             "font-size": "11px",
-                                            "color": (
-                                                "rgba(255,255,255,0.85)"
-                                                if is_selected
-                                                else "#6B7280"
-                                            ),
+                                            "color": "rgba(255,255,255,0.85)" if is_selected else "#6B7280",
                                             "font-family": "'Afacad', sans-serif",
                                         },
                                     },
@@ -4184,9 +4397,7 @@ def main():
             theme = st.context.theme if hasattr(st.context, "theme") else {}
             is_dark = theme.get("base", "light") == "dark" if theme else False
             logo_filename = (
-                "assets/climate-and-tech-logo-dark-mode.png"
-                if is_dark
-                else "assets/climateandtech-logo-new-light-mode.png"
+                "assets/climate-and-tech-logo-dark-mode.png" if is_dark else "assets/climateandtech-logo-new-light-mode.png"
             )
             logo_path = Path(__file__).parent / logo_filename
 

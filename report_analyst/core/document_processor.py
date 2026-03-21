@@ -65,9 +65,7 @@ class DocumentProcessor:
                 dest_path.unlink()  # Clean up on error
             raise
 
-    async def _extract_metadata(
-        self, file_path: Path, original_filename: str
-    ) -> DocumentMetadata:
+    async def _extract_metadata(self, file_path: Path, original_filename: str) -> DocumentMetadata:
         """Extract metadata from the document using PyMuPDF"""
         try:
             file_size = file_path.stat().st_size

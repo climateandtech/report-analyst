@@ -61,9 +61,7 @@ async def upload_document(file: UploadFile = File(...)):
 async def analyze_document(request: AnalysisRequest):
     """Analyze a document with specified parameters"""
     try:
-        result = await document_analyzer.analyze(
-            request.document_id, request.analysis_type
-        )
+        result = await document_analyzer.analyze(request.document_id, request.analysis_type)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -73,9 +71,7 @@ async def analyze_document(request: AnalysisRequest):
 async def ask_question(request: QuestionRequest):
     """Ask a question about a document"""
     try:
-        result = await document_analyzer.ask_question(
-            request.document_id, request.question, request.context
-        )
+        result = await document_analyzer.ask_question(request.document_id, request.question, request.context)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

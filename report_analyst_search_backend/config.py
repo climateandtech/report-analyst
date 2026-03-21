@@ -29,11 +29,7 @@ class BackendConfig:
     @property
     def has_advanced_features(self) -> bool:
         """Check if any advanced features are enabled"""
-        return (
-            self.use_centralized_llm
-            or self.use_data_lake
-            or self.use_full_backend_analysis
-        )
+        return self.use_centralized_llm or self.use_data_lake or self.use_full_backend_analysis
 
     @property
     def flow_type(self) -> str:
@@ -78,6 +74,18 @@ def configure_backend_integration() -> BackendConfig:
     # Note: Enterprise Integration (S3+NATS) is now shown in the main Settings section above
 
     # Basic backend toggle
+    st.markdown(
+        """
+    <style>
+    div[data-testid="stCheckbox"] label {
+        font-family: 'Afacad', sans-serif !important;
+        white-space: nowrap !important;
+        min-width: 200px !important;
+    }
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
     use_backend = st.checkbox(
         "Use Search Backend",
         value=False,
@@ -203,9 +211,7 @@ def display_config_status(config: BackendConfig):
             st.info(f"Using centralized LLM via NATS: {config.nats_url}")
 
         if config.use_data_lake:
-            st.info(
-                f"Data lake enabled for owner: {config.owner} ({config.deployment_type})"
-            )
+            st.info(f"Data lake enabled for owner: {config.owner} ({config.deployment_type})")
 
         if config.use_full_backend_analysis:
             st.info("Complete backend analysis enabled - backend does all the work!")

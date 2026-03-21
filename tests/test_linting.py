@@ -17,9 +17,7 @@ def test_black_formatting():
         text=True,
         cwd=Path(__file__).parent.parent,
     )
-    assert (
-        result.returncode == 0
-    ), f"Black formatting check failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"Black formatting check failed:\n{result.stdout}\n{result.stderr}"
 
 
 def test_isort_imports():
@@ -30,9 +28,7 @@ def test_isort_imports():
         text=True,
         cwd=Path(__file__).parent.parent,
     )
-    assert (
-        result.returncode == 0
-    ), f"isort import check failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"isort import check failed:\n{result.stdout}\n{result.stderr}"
 
 
 def test_streamlit_app_imports():

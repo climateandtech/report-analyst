@@ -60,9 +60,7 @@ async def handle_external_service_ready(ctx: EventContext):
     """Handler for external.service.ready events"""
     try:
         service_data = ctx.data
-        logger.info(
-            f"Processing external service ready: {service_data.get('service_id')}"
-        )
+        logger.info(f"Processing external service ready: {service_data.get('service_id')}")
 
         # TODO: Integrate with existing external service handler
 
@@ -76,9 +74,7 @@ async def handle_external_service_analysis(ctx: EventContext):
     """Handler for external.service.analysis.request events"""
     try:
         request_data = ctx.data
-        logger.info(
-            f"Processing external service analysis request: {request_data.get('request_id')}"
-        )
+        logger.info(f"Processing external service analysis request: {request_data.get('request_id')}")
 
         # TODO: Integrate with existing external service analysis logic
 

@@ -21,9 +21,7 @@ def test_processing_steps_slider_exists():
 
     # Verify we're on the Report Analyst page
     assert "nav_page" in at.session_state, "Navigation page should be set"
-    assert (
-        at.session_state["nav_page"] == "Report Analyst"
-    ), "Should be on Report Analyst page"
+    assert at.session_state["nav_page"] == "Report Analyst", "Should be on Report Analyst page"
 
     # Note: The processing steps slider uses st.select_slider and is conditionally rendered
     # It will appear when a file is selected, but we can't easily test that in AppTest
@@ -45,9 +43,7 @@ def test_processing_steps_slider_interactive():
 
     # Verify we're on the Report Analyst page
     assert "nav_page" in at.session_state, "Navigation page should be set"
-    assert (
-        at.session_state["nav_page"] == "Report Analyst"
-    ), "Should be on Report Analyst page"
+    assert at.session_state["nav_page"] == "Report Analyst", "Should be on Report Analyst page"
 
     # Note: The processing steps slider uses st.select_slider and is conditionally rendered
     # Testing interactivity requires a file to be selected, which causes format_func issues

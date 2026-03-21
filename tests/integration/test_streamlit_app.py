@@ -27,13 +27,9 @@ from report_analyst.streamlit_app import (
 @pytest.fixture
 def mock_streamlit():
     """Mock main Streamlit functions"""
-    with patch("streamlit.set_page_config") as mock_config, patch(
-        "streamlit.title"
-    ) as mock_title, patch("streamlit.session_state", {}) as mock_state, patch(
-        "streamlit.selectbox"
-    ) as mock_select, patch(
-        "streamlit.expander"
-    ) as mock_expander, patch(
+    with patch("streamlit.set_page_config") as mock_config, patch("streamlit.title") as mock_title, patch(
+        "streamlit.session_state", {}
+    ) as mock_state, patch("streamlit.selectbox") as mock_select, patch("streamlit.expander") as mock_expander, patch(
         "streamlit.columns"
     ) as mock_columns:
 
@@ -62,26 +58,12 @@ def test_env():
     cache_path = storage_path / "cache"
     cache_path.mkdir(parents=True)
 
-    # Create test database
+    # Create test database using CacheManager (which will create all tables)
     db_path = cache_path / "analysis.db"
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS analysis_cache (
-            file_path TEXT,
-            question_id TEXT,
-            chunk_size INTEGER,
-            chunk_overlap INTEGER,
-            top_k INTEGER,
-            model TEXT,
-            question_set TEXT,
-            result TEXT,
-            created_at TEXT,
-            PRIMARY KEY (file_path, question_id, chunk_size, chunk_overlap, top_k, model, question_set)
-        )
-    """
-    )
-    conn.close()
+    from report_analyst.core.cache_manager import CacheManager
+
+    cache_manager = CacheManager(db_path=str(db_path))
+    # Tables are created automatically by CacheManager.init_db()
 
     # Create test question set
     questions_dir = Path(temp_dir) / "questionsets"
@@ -199,13 +181,9 @@ async def test_analyze_document(report_analyzer, test_env):
         for result in mock_results:
             yield result
 
-    with patch.object(
-        report_analyzer.analyzer, "process_document", new=mock_process_document
-    ):
+    with patch.object(report_analyzer.analyzer, "process_document", new=mock_process_document):
         results = []
-        async for result in report_analyzer.analyze_document(
-            str(file_path), questions, selected_questions
-        ):
+        async for result in report_analyzer.analyze_document(str(file_path), questions, selected_questions):
             results.append(result)
 
         assert len(results) == 3
@@ -286,9 +264,7 @@ def test_check_step_completion(report_analyzer, test_env):
         assert status["chunks"] is True
 
         # Test embeddings complete
-        mock_get_chunks.return_value = [
-            {"id": 1, "text": "chunk1", "embedding": [0.1, 0.2]}
-        ]
+        mock_get_chunks.return_value = [{"id": 1, "text": "chunk1", "embedding": [0.1, 0.2]}]
         status = report_analyzer.analyzer.check_step_completion(str(file_path))
         assert status["embeddings"] is True
 

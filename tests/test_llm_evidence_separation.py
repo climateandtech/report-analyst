@@ -15,12 +15,12 @@ This addresses the user requirement: "llm score is independent from is evidence"
 
 import json
 import os
-import sqlite3
 import sys
 import tempfile
 from pathlib import Path
 
 import pytest
+from sqlalchemy import inspect, text
 
 # Add the app directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -55,22 +55,25 @@ class TestLLMEvidenceSeparation:
     def test_database_schema_separation(self, cache_manager):
         """Test that the database schema has separate fields for similarity_score, llm_score, and is_evidence."""
 
-        with sqlite3.connect(cache_manager.db_path) as conn:
-            cursor = conn.execute("PRAGMA table_info(chunk_relevance)")
-            columns = {row[1]: row[2] for row in cursor.fetchall()}
+        from sqlalchemy import inspect
 
-            # Verify required columns exist with correct types
-            required_columns = {
-                "similarity_score": "REAL",
-                "llm_score": "REAL",
-                "is_evidence": "BOOLEAN",
-            }
+        inspector = inspect(cache_manager.db_manager.get_engine())
+        columns = {col["name"]: str(col["type"]) for col in inspector.get_columns("chunk_relevance")}
 
-            for col, expected_type in required_columns.items():
-                assert col in columns, f"Missing column: {col}"
-                assert (
-                    columns[col] == expected_type
-                ), f"Wrong type for {col}: got {columns[col]}, expected {expected_type}"
+        # Verify required columns exist with correct types
+        # SQLAlchemy type names may differ (Float vs REAL, Boolean vs BOOLEAN)
+        required_columns = {
+            "similarity_score": ["REAL", "FLOAT", "DOUBLE PRECISION"],
+            "llm_score": ["REAL", "FLOAT", "DOUBLE PRECISION"],
+            "is_evidence": ["BOOLEAN", "BOOL"],
+        }
+
+        for col, expected_types in required_columns.items():
+            assert col in columns, f"Missing column: {col}"
+            col_type = columns[col].upper()
+            assert any(
+                expected_type.upper() in col_type for expected_type in expected_types
+            ), f"Column {col} has type {columns[col]}, expected one of {expected_types}"
 
     def test_independent_value_storage(self, cache_manager):
         """Test that LLM score and evidence can be stored independently."""
@@ -139,24 +142,16 @@ class TestLLMEvidenceSeparation:
         # Retrieve and verify
         retrieved = cache_manager.get_analysis(file_path, config, [question_id])
 
-        assert (
-            question_id in retrieved
-        ), f"Failed to retrieve analysis for {question_id}"
+        assert question_id in retrieved, f"Failed to retrieve analysis for {question_id}"
         retrieved_chunks = retrieved[question_id]["chunks"]
 
         # Verify each chunk maintains independent values
         for i, chunk in enumerate(retrieved_chunks):
             original = test_chunks[i]
 
-            assert (
-                chunk["similarity_score"] == original["similarity_score"]
-            ), f"Similarity score mismatch for chunk {i+1}"
-            assert (
-                chunk["llm_score"] == original["llm_score"]
-            ), f"LLM score mismatch for chunk {i+1}"
-            assert (
-                chunk["is_evidence"] == original["is_evidence"]
-            ), f"Evidence flag mismatch for chunk {i+1}"
+            assert chunk["similarity_score"] == original["similarity_score"], f"Similarity score mismatch for chunk {i+1}"
+            assert chunk["llm_score"] == original["llm_score"], f"LLM score mismatch for chunk {i+1}"
+            assert chunk["is_evidence"] == original["is_evidence"], f"Evidence flag mismatch for chunk {i+1}"
 
     def test_independence_principle_examples(self):
         """Test that demonstrates the independence principle with clear examples."""
@@ -255,9 +250,7 @@ class TestLLMEvidenceSeparation:
         assert chunks_after_llm_scoring[0]["llm_score"] == 0.7  # Now set
         assert chunks_after_llm_scoring[0]["is_evidence"] is False  # Still unchanged
 
-        assert (
-            chunks_after_evidence_determination[0]["similarity_score"] == 0.8
-        )  # Unchanged
+        assert chunks_after_evidence_determination[0]["similarity_score"] == 0.8  # Unchanged
         assert chunks_after_evidence_determination[0]["llm_score"] == 0.7  # Unchanged
         assert chunks_after_evidence_determination[0]["is_evidence"] is True  # Now set
 
@@ -293,9 +286,7 @@ if __name__ == "__main__":
         test_suite.test_workflow_separation()
         print("✅ Workflow properly separates concerns")
 
-        print(
-            "\n🎉 All tests passed! LLM score and evidence determination are properly separated."
-        )
+        print("\n🎉 All tests passed! LLM score and evidence determination are properly separated.")
 
     finally:
         try:

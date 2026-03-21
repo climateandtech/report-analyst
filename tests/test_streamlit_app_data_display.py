@@ -41,9 +41,7 @@ def test_file_history_functionality():
     # Check for file history selectbox
     has_file_history = False
     for sb in at.selectbox:
-        if "previously analyzed" in str(sb.label).lower() or "previous_file" in str(
-            sb.key
-        ):
+        if "previously analyzed" in str(sb.label).lower() or "previous_file" in str(sb.key):
             has_file_history = True
             break
 
@@ -64,10 +62,7 @@ def test_question_display_functionality():
 
     # Look for question-related elements in selectboxes
     for sb in at.selectbox:
-        if any(
-            keyword in str(sb.label).lower()
-            for keyword in ["question", "tcfd", "everest", "denali", "kilimanjaro"]
-        ):
+        if any(keyword in str(sb.label).lower() for keyword in ["question", "tcfd", "everest", "denali", "kilimanjaro"]):
             has_question_elements = True
             break
 
@@ -90,9 +85,7 @@ def test_model_selection_display():
             has_model_selection = True
             # Check that it has model options
             options = [str(opt).lower() for opt in sb.options]
-            assert any(
-                "gpt" in opt for opt in options
-            ), "No GPT models found in options"
+            assert any("gpt" in opt for opt in options), "No GPT models found in options"
             break
 
     assert has_model_selection, "Model selection not found"
@@ -116,15 +109,9 @@ def test_configuration_display():
         config_labels.append(str(ni.label).lower())
 
     expected_configs = ["chunk", "overlap", "top", "k"]
-    found_configs = [
-        config
-        for config in expected_configs
-        if any(config in label for label in config_labels)
-    ]
+    found_configs = [config for config in expected_configs if any(config in label for label in config_labels)]
 
-    assert (
-        len(found_configs) >= 2
-    ), f"Expected at least 2 configuration parameters, found: {found_configs}"
+    assert len(found_configs) >= 2, f"Expected at least 2 configuration parameters, found: {found_configs}"
     assert not at.exception
 
 
@@ -147,9 +134,7 @@ def test_analysis_controls_display():
 
     # Check that we're on the right page
     assert "nav_page" in at.session_state, "Navigation page should be set"
-    assert (
-        at.session_state["nav_page"] == "Report Analyst"
-    ), "Should be on Report Analyst page"
+    assert at.session_state["nav_page"] == "Report Analyst", "Should be on Report Analyst page"
 
     # Note: UI elements like buttons and checkboxes are conditionally rendered
     # and may not appear until a file is selected. This is expected behavior.
@@ -225,9 +210,7 @@ def test_dynamic_content_loading():
     # Question sets should be loaded dynamically
     has_question_sets = False
     for sb in at.selectbox:
-        if (
-            "Question Set" in str(sb.label) or "new_question_set" in str(sb.key)
-        ) and len(sb.options) > 0:
+        if ("Question Set" in str(sb.label) or "new_question_set" in str(sb.key)) and len(sb.options) > 0:
             has_question_sets = True
             break
 

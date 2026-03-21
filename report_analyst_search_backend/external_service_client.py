@@ -34,9 +34,7 @@ class ExternalServiceClient:
             base_url: Base URL for HTTP API (defaults to env var)
             nats_url: NATS server URL (defaults to env var)
         """
-        self.base_url = base_url or os.getenv(
-            "REPORT_ANALYST_API_URL", "http://localhost:8000"
-        )
+        self.base_url = base_url or os.getenv("REPORT_ANALYST_API_URL", "http://localhost:8000")
         self.nats_url = nats_url or os.getenv("NATS_URL", "nats://localhost:4222")
         self.nc = None
         self.js = None
@@ -137,8 +135,7 @@ class ExternalServiceClient:
             message_data = json.dumps(notification_dict).encode()
             await self.js.publish("external.service.ready", message_data)
             logger.info(
-                f"Published external service notification via NATS: "
-                f"{notification.service_id}/{notification.request_id}"
+                f"Published external service notification via NATS: " f"{notification.service_id}/{notification.request_id}"
             )
             return True
 
@@ -175,9 +172,7 @@ class ExternalServiceClient:
                         return True
                     else:
                         error_text = await response.text()
-                        logger.error(
-                            f"HTTP notification failed: {response.status} - {error_text}"
-                        )
+                        logger.error(f"HTTP notification failed: {response.status} - {error_text}")
                         return False
 
         except Exception as e:
@@ -255,9 +250,7 @@ class ExternalServiceClient:
             logger.error(f"Failed to request analysis via NATS: {e}")
             return None
 
-    async def _request_analysis_via_http(
-        self, service_id: str, request_data: Dict
-    ) -> Optional[str]:
+    async def _request_analysis_via_http(self, service_id: str, request_data: Dict) -> Optional[str]:
         """Request analysis via HTTP"""
         try:
             url = f"{self.base_url}/external/services/{service_id}/analyze"
@@ -267,24 +260,18 @@ class ExternalServiceClient:
                     if response.status == 200:
                         result = await response.json()
                         request_id = result.get("request_id")
-                        logger.info(
-                            f"Submitted analysis request via HTTP: {request_id}"
-                        )
+                        logger.info(f"Submitted analysis request via HTTP: {request_id}")
                         return request_id
                     else:
                         error_text = await response.text()
-                        logger.error(
-                            f"HTTP analysis request failed: {response.status} - {error_text}"
-                        )
+                        logger.error(f"HTTP analysis request failed: {response.status} - {error_text}")
                         return None
 
         except Exception as e:
             logger.error(f"Failed to request analysis via HTTP: {e}")
             return None
 
-    async def get_results(
-        self, service_id: str, request_id: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_results(self, service_id: str, request_id: str) -> Optional[Dict[str, Any]]:
         """
         Poll for analysis results.
 
@@ -309,9 +296,7 @@ class ExternalServiceClient:
                         return None
                     else:
                         error_text = await response.text()
-                        logger.error(
-                            f"Failed to get results: {response.status} - {error_text}"
-                        )
+                        logger.error(f"Failed to get results: {response.status} - {error_text}")
                         return None
 
         except Exception as e:

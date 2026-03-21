@@ -3,6 +3,7 @@ import os
 import shutil
 import sqlite3
 import tempfile
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
@@ -16,68 +17,58 @@ from report_analyst.core.cache_manager import CacheManager
 
 
 @pytest.fixture(scope="session")
-def test_db():
-    """Create a test database that persists for the entire test session"""
+def test_db_template():
+    """Create a template test database that persists for the entire test session"""
     temp_dir = tempfile.mkdtemp()
-    db_path = Path(temp_dir) / "analysis.db"
-    print(f"\nCreating test database at: {db_path}")  # Debug print
+    db_path = Path(temp_dir) / "analysis_template.db"
+    print(f"\nCreating template test database at: {db_path}")
 
     try:
-        # Use CacheManager to create the database with all required tables
-        from report_analyst.core.cache_manager import CacheManager
-
         cache_manager = CacheManager(str(db_path))
-        print(f"Database created successfully at {db_path}")  # Debug print
+        print(f"Template database created successfully at {db_path}")
 
-        # Verify database exists and is accessible
         if not db_path.exists():
             raise Exception(f"Database file not created at {db_path}")
 
         yield db_path
 
     except Exception as e:
-        print(f"Error setting up test database: {e}")  # Debug print
+        print(f"Error setting up template test database: {e}")
         raise
     finally:
-        print(f"Cleaning up test database at {temp_dir}")  # Debug print
+        print(f"Cleaning up template test database at {temp_dir}")
         shutil.rmtree(temp_dir)
 
 
 @pytest.fixture(scope="function")
-def clean_db(test_db):
-    """Provide a clean database for each test function"""
-    print(f"\nCleaning database at: {test_db}")  # Debug print
-    conn = sqlite3.connect(str(test_db))
-    conn.execute("DELETE FROM analysis_cache")
-    conn.commit()
-    conn.close()
-    return test_db
+def clean_db(test_db_template):
+    """Provide a clean, unique database copy for each test function"""
+    temp_dir = tempfile.mkdtemp()
+    unique_db_path = Path(temp_dir) / f"analysis_{uuid.uuid4().hex}.db"
+    shutil.copy2(test_db_template, unique_db_path)
+    print(f"\nCreating unique database copy at: {unique_db_path}")
+
+    yield unique_db_path
+
+    print(f"Cleaning up unique database at {temp_dir}")
+    shutil.rmtree(temp_dir)
 
 
 @pytest.fixture
 def test_env(clean_db):
     """Setup test environment with all necessary files and mocks"""
     temp_dir = tempfile.mkdtemp()
-    print(f"\nSetting up test environment in: {temp_dir}")  # Debug print
+    print(f"\nSetting up test environment in: {temp_dir}")
 
     # Create storage structure
     storage_path = Path(temp_dir) / "storage"
     (storage_path / "cache").mkdir(parents=True)
     (storage_path / "llm_cache").mkdir(parents=True)
 
-    # Create symlink to test database
+    # Copy the unique database to the expected location
     db_link = storage_path / "cache" / "analysis.db"
-    print(f"Creating symlink: {db_link} -> {clean_db}")  # Debug print
-    try:
-        if db_link.exists() or db_link.is_symlink():
-            db_link.unlink()
-        db_link.symlink_to(clean_db)
-        print(f"Symlink created successfully")  # Debug print
-    except Exception as e:
-        print(f"Error creating symlink: {e}")  # Debug print
-        # Fallback to copy if symlink fails
-        print(f"Falling back to copy")  # Debug print
-        shutil.copy2(clean_db, db_link)
+    shutil.copy2(clean_db, db_link)
+    print(f"Copied database to: {db_link}")
 
     # Create test questions
     questions_dir = Path(temp_dir) / "questionsets"
@@ -193,8 +184,8 @@ def analyzer(test_env, clean_db):
         analyzer.cache_path = analyzer.storage_path / "cache"
         analyzer.llm_cache_path = analyzer.storage_path / "llm_cache"
 
-        # Explicitly set the database path for the cache manager
-        analyzer.cache_manager.db_path = Path(clean_db)  # Use clean_db directly
+        # Reinitialize CacheManager with the unique database copy
+        analyzer.cache_manager = CacheManager(db_path=str(clean_db))
         # Set the mocked LLM instance
         analyzer.llm = mock_llm_instance
         # Force reload questions from test file
@@ -230,10 +221,7 @@ def test_load_questions(analyzer):
     questions = analyzer._load_questions()
     assert len(questions) == 11  # TCFD has 11 questions
     assert "tcfd_1" in questions
-    assert (
-        questions["tcfd_1"]["text"]
-        == "How does the company's board oversee climate-related risks and opportunities?"
-    )
+    assert questions["tcfd_1"]["text"] == "How does the company's board oversee climate-related risks and opportunities?"
     assert "guidelines" in questions["tcfd_1"]
 
 
@@ -241,10 +229,7 @@ def test_get_question_by_number(analyzer):
     """Test getting question by number"""
     question = analyzer.get_question_by_number(1)
     assert question is not None
-    assert (
-        question["text"]
-        == "How does the company's board oversee climate-related risks and opportunities?"
-    )
+    assert question["text"] == "How does the company's board oversee climate-related risks and opportunities?"
     assert "guidelines" in question
 
 
@@ -305,9 +290,7 @@ async def test_process_document_with_cache(analyzer):
     }
 
     # Add to cache
-    analyzer.cache_manager.save_analysis(
-        file_path="test.pdf", question_id="tcfd_1", result=test_answer, config=config
-    )
+    analyzer.cache_manager.save_analysis(file_path="test.pdf", question_id="tcfd_1", result=test_answer, config=config)
 
     # Process document
     results = []
@@ -317,9 +300,7 @@ async def test_process_document_with_cache(analyzer):
             assert result["status"] in ["processing", "complete", "cached"]
 
     # Verify we got the cached result
-    cached_result = analyzer.cache_manager.get_analysis(
-        file_path="test.pdf", config=config, question_ids=["tcfd_1"]
-    )
+    cached_result = analyzer.cache_manager.get_analysis(file_path="test.pdf", config=config, question_ids=["tcfd_1"])
     assert cached_result is not None
     assert cached_result["tcfd_1"]["result"]["ANSWER"] == test_answer["ANSWER"]
 
@@ -388,9 +369,7 @@ def test_process_document_config_with_none_llm(analyzer, test_env):
             results = []
 
             async def collect_results():
-                async for result in analyzer.process_document(
-                    str(test_file), [1], force_recompute=True
-                ):
+                async for result in analyzer.process_document(str(test_file), [1], force_recompute=True):
                     results.append(result)
                     # Stop after we see the first error or status
                     if "error" in result or "status" in result:
@@ -407,9 +386,7 @@ def test_process_document_config_with_none_llm(analyzer, test_env):
 
         except AttributeError as e:
             if "'NoneType' object has no attribute 'model'" in str(e):
-                pytest.fail(
-                    "Config creation failed with None llm - this should be fixed!"
-                )
+                pytest.fail("Config creation failed with None llm - this should be fixed!")
             raise
 
 
@@ -453,9 +430,7 @@ async def test_process_document_pre_retrieved_chunks(analyzer, test_env):
         # Check that chunks were used (status message should indicate chunks loaded)
         status_messages = [r for r in results if "status" in r]
         if status_messages:
-            assert any(
-                "chunk" in str(r.get("status", "")).lower() for r in status_messages
-            )
+            assert any("chunk" in str(r.get("status", "")).lower() for r in status_messages)
 
 
 @pytest.mark.asyncio
@@ -526,9 +501,7 @@ def test_get_all_cached_answers(analyzer):
 
     # Save answers to database
     for qid, answer in test_answers.items():
-        analyzer.cache_manager.save_analysis(
-            file_path=f"test_{qid}.pdf", question_id=qid, result=answer, config=config
-        )
+        analyzer.cache_manager.save_analysis(file_path=f"test_{qid}.pdf", question_id=qid, result=answer, config=config)
 
     # Get all cached answers and verify
     answers = analyzer.get_all_cached_answers("tcfd")
@@ -568,9 +541,7 @@ async def test_document_analysis_workflow(test_env):
 
         # 2. Process document
         results = []
-        async for result in analyzer.process_document(
-            str(test_env["test_file"]), ["tcfd_1", "tcfd_2"]
-        ):
+        async for result in analyzer.process_document(str(test_env["test_file"]), ["tcfd_1", "tcfd_2"]):
             results.append(result)
             # Handle both status and error results
             if "status" in result:
