@@ -1,0 +1,9 @@
+# Report Analyst Enterprise Components Dependencies
+
+# Streamlit for component integration
+streamlit>=1.32.0
+
+# JSON Schema validation (Python side, if needed)
+jsonschema>=4.0.0
+
+

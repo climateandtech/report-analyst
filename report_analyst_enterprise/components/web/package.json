@@ -1,0 +1,29 @@
+{
+  "name": "@report-analyst/json-schema-form",
+  "version": "0.1.0",
+  "description": "Framework-agnostic web component for JSON Schema forms using RJSF",
+  "type": "module",
+  "main": "dist/json-schema-form.es.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@rjsf/core": "^6.1.2",
+    "@rjsf/validator-ajv8": "^6.1.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "vite": "^5.4.21"
+  },
+  "keywords": [
+    "json-schema",
+    "form",
+    "web-component",
+    "rjsf",
+    "framework-agnostic"
+  ]
+}

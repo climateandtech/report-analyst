@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "ESRS Company Information",
+  "description": "Company data structure aligned with ESRS XBRL taxonomy requirements",
+  "required": ["companyName", "lei", "reportingPeriodStart", "reportingPeriodEnd"],
+  "properties": {
+    "companyName": {
+      "type": "string",
+      "title": "Company Legal Name",
+      "description": "Official legal name of the reporting entity",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "lei": {
+      "type": "string",
+      "title": "Legal Entity Identifier (LEI)",
+      "description": "20-character LEI code (e.g., 5493000IBP32UQZ0KL24)",
+      "pattern": "^[A-Z0-9]{20}$",
+      "minLength": 20,
+      "maxLength": 20
+    },
+    "registeredAddress": {
+      "type": "object",
+      "title": "Registered Address",
+      "description": "Legal registered address of the company",
+      "properties": {
+        "street": {
+          "type": "string",
+          "title": "Street Address",
+          "minLength": 1
+        },
+        "city": {
+          "type": "string",
+          "title": "City",
+          "minLength": 1
+        },
+        "postalCode": {
+          "type": "string",
+          "title": "Postal Code",
+          "minLength": 1
+        },
+        "country": {
+          "type": "string",
+          "title": "Country",
+          "description": "ISO 3166-1 alpha-2 country code (e.g., DE, FR, UK)",
+          "pattern": "^[A-Z]{2}$",
+          "minLength": 2,
+          "maxLength": 2
+        }
+      },
+      "required": ["street", "city", "country"]
+    },
+    "industryClassification": {
+      "type": "string",
+      "title": "Industry Classification",
+      "description": "NACE code or industry sector",
+      "enum": [
+        "Agriculture, forestry and fishing",
+        "Mining and quarrying",
+        "Manufacturing",
+        "Electricity, gas, steam and air conditioning supply",
+        "Water supply; sewerage, waste management",
+        "Construction",
+        "Wholesale and retail trade",
+        "Transportation and storage",
+        "Accommodation and food service activities",
+        "Information and communication",
+        "Financial and insurance activities",
+        "Real estate activities",
+        "Professional, scientific and technical activities",
+        "Administrative and support service activities",
+        "Public administration and defence",
+        "Education",
+        "Human health and social work activities",
+        "Arts, entertainment and recreation",
+        "Other service activities"
+      ]
+    },
+    "naceCode": {
+      "type": "string",
+      "title": "NACE Code",
+      "description": "Statistical classification of economic activities (e.g., 25.11)",
+      "pattern": "^[0-9]{2}\\.[0-9]{2}$"
+    },
+    "reportingPeriodStart": {
+      "type": "string",
+      "title": "Reporting Period Start Date",
+      "description": "Start date of the reporting period (YYYY-MM-DD)",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "reportingPeriodEnd": {
+      "type": "string",
+      "title": "Reporting Period End Date",
+      "description": "End date of the reporting period (YYYY-MM-DD)",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "reportingFramework": {
+      "type": "array",
+      "title": "Reporting Framework(s)",
+      "description": "Sustainability reporting frameworks used",
+      "items": {
+        "type": "string",
+        "enum": [
+          "ESRS",
+          "GRI",
+          "TCFD",
+          "SASB",
+          "CDP",
+          "UNGC",
+          "Other"
+        ]
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "consolidationScope": {
+      "type": "string",
+      "title": "Consolidation Scope",
+      "description": "Scope of entities included in the report",
+      "enum": [
+        "Consolidated",
+        "Individual entity",
+        "Combined"
+      ],
+      "default": "Consolidated"
+    },
+    "currency": {
+      "type": "string",
+      "title": "Reporting Currency",
+      "description": "ISO 4217 currency code (e.g., EUR, USD, GBP)",
+      "pattern": "^[A-Z]{3}$",
+      "minLength": 3,
+      "maxLength": 3,
+      "default": "EUR"
+    },
+    "fiscalYearEnd": {
+      "type": "string",
+      "title": "Fiscal Year End Date",
+      "description": "End date of fiscal year (MM-DD)",
+      "pattern": "^[0-9]{2}-[0-9]{2}$"
+    },
+    "website": {
+      "type": "string",
+      "title": "Company Website",
+      "description": "Official company website URL",
+      "format": "uri"
+    },
+    "contactEmail": {
+      "type": "string",
+      "title": "Contact Email",
+      "description": "Email for sustainability reporting inquiries",
+      "format": "email"
+    },
+    "notes": {
+      "type": "string",
+      "title": "Additional Notes",
+      "description": "Any additional information about the company or reporting context"
+    }
+  }
+}
+
+

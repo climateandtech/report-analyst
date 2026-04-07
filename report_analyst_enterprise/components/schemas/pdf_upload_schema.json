@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "PDF Upload Form",
+  "description": "Upload a PDF document with metadata",
+  "required": ["filename", "category"],
+  "properties": {
+    "filename": {
+      "type": "string",
+      "title": "File Name",
+      "description": "Name of the PDF file",
+      "pattern": "^.+\\.pdf$",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "title": "Category",
+      "description": "Document category",
+      "enum": ["sustainability", "financial", "governance", "other"],
+      "default": "sustainability"
+    },
+    "tags": {
+      "type": "array",
+      "title": "Tags",
+      "description": "Tags for categorizing the document",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "description": {
+      "type": "string",
+      "title": "Description",
+      "description": "Optional description of the document"
+    },
+    "year": {
+      "type": "integer",
+      "title": "Year",
+      "description": "Year of the document",
+      "minimum": 2000,
+      "maximum": 2100
+    }
+  }
+}
+
+

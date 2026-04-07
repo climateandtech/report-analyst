@@ -1,0 +1,48 @@
+{
+  "name": {
+    "ui:placeholder": "e.g., custom_analysis_2024",
+    "ui:help": "Use lowercase letters, numbers, underscores, and hyphens only"
+  },
+  "title": {
+    "ui:placeholder": "e.g., Custom Analysis Framework 2024"
+  },
+  "description": {
+    "ui:widget": "textarea",
+    "ui:options": {
+      "rows": 3
+    },
+    "ui:placeholder": "Describe what this question set analyzes..."
+  },
+  "questions": {
+    "ui:options": {
+      "addable": true,
+      "removable": true,
+      "orderable": true
+    },
+    "items": {
+      "id": {
+        "ui:placeholder": "e.g., q1_risk_assessment",
+        "ui:help": "Unique identifier for this question"
+      },
+      "text": {
+        "ui:widget": "textarea",
+        "ui:options": {
+          "rows": 2
+        },
+        "ui:placeholder": "Enter the question text..."
+      },
+      "guidelines": {
+        "ui:widget": "textarea",
+        "ui:options": {
+          "rows": 3
+        },
+        "ui:placeholder": "Optional guidelines for answering..."
+      },
+      "category": {
+        "ui:widget": "select"
+      }
+    }
+  }
+}
+
+
