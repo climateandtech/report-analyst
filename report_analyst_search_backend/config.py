@@ -11,6 +11,13 @@ from typing import Any, Dict, Optional
 import streamlit as st
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass
 class BackendConfig:
     """Configuration for backend integration features"""
@@ -88,7 +95,7 @@ def configure_backend_integration() -> BackendConfig:
     )
     use_backend = st.checkbox(
         "Use Search Backend",
-        value=False,
+        value=_env_bool("USE_BACKEND", False),
         help="Send PDFs to search backend for processing",
     )
 
@@ -116,19 +123,19 @@ def configure_backend_integration() -> BackendConfig:
 
     use_centralized_llm = st.checkbox(
         "Use Centralized LLM (NATS)",
-        value=False,
+        value=_env_bool("USE_CENTRALIZED_LLM", False),
         help="Use search backend's LLM via NATS instead of local LLM calls",
     )
 
     use_data_lake = st.checkbox(
         "Enable Data Lake",
-        value=False,
+        value=_env_bool("USE_DATA_LAKE", False),
         help="Store results in data lake with deployment tracking",
     )
 
     use_full_backend_analysis = st.checkbox(
         "Complete Backend Analysis",
-        value=False,
+        value=_env_bool("USE_FULL_BACKEND_ANALYSIS", False),
         help="Let search backend do all analysis and store results in its database",
     )
 
