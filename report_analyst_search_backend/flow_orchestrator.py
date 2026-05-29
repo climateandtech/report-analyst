@@ -258,11 +258,69 @@ class FlowOrchestrator:
         return self._analyze_local(chunks, questions)
 
     def _analyze_enhanced(self, chunks: List[Dict[str, Any]], questions: List[str]) -> AnalysisResult:
-        """Enhanced analysis with centralized LLM and data lake"""
-        # This would use NATS LLM and store in data lake
-        # For now, fallback to local analysis
-        st.info("Enhanced analysis not fully implemented - using local analysis")
-        return self._analyze_local(chunks, questions)
+        """Enhanced analysis with centralized LLM via platform NATS."""
+        import asyncio
+        import os
+
+        from report_analyst.core.analyzer import DocumentAnalyzer
+
+        st.info("Using platform centralized LLM (NATS)")
+        analyzer = DocumentAnalyzer()
+        if not getattr(analyzer, "use_backend_llm", False):
+            return AnalysisResult(
+                success=False,
+                error="Enhanced integration requires USE_BACKEND and USE_CENTRALIZED_LLM",
+            )
+
+        results = []
+        for question in questions:
+            chunk_texts = [
+                c.get("chunk_text") or c.get("text", "") for c in chunks[:10]
+            ]
+            try:
+                response = asyncio.run(
+                    analyzer.llm.achat(
+                        prompt=f"Question: {question}\n\nContext:\n" + "\n".join(chunk_texts),
+                    )
+                )
+                answer = response.message.content
+            except Exception as exc:
+                return AnalysisResult(success=False, error=str(exc))
+            results.append({"question": question, "answer": answer})
+
+        if self.config.use_backend and results:
+            try:
+                from report_analyst_jobs.contribution import publish_analysis_result
+
+                resource_id = chunks[0].get("resource_id") if chunks else None
+                if resource_id:
+                    asyncio.run(
+                        publish_analysis_result(
+                            resource_id=str(resource_id),
+                            results={"answers": [r["answer"] for r in results], "questions": questions},
+                            provenance={
+                                "model": os.getenv("OPENAI_API_MODEL", "local"),
+                                "provider": "report_analyst",
+                                "mode": "byok_contribution"
+                                if os.getenv("USE_BYOK_CONTRIBUTION", "").lower() in ("1", "true", "yes")
+                                else "centralized",
+                            },
+                        )
+                    )
+            except ImportError:
+                pass
+            except Exception as exc:
+                logger.warning("Could not publish analysis result to platform: %s", exc)
+
+        return AnalysisResult(
+            success=True,
+            results={
+                "questions": questions,
+                "answers": [r["answer"] for r in results],
+                "method": "enhanced_nats_llm",
+            },
+            stored_in_backend=self.config.use_backend,
+        )
 
     def _configure_question_set(self, default_question_set: str) -> str:
         """Configure question set for backend analysis"""

@@ -95,9 +95,7 @@ class NATSLLMClient:
         except Exception as e:
             logger.info(f"LLM stream may already exist: {e}")
 
-        # Subscribe to responses
-        await self.js.subscribe("llm.response", cb=self._handle_response)
-        logger.info("Connected to NATS LLM service")
+        logger.info("Connected to NATS LLM service (per-request reply on llm.response.{id})")
 
     async def disconnect(self):
         """Disconnect from NATS"""
@@ -175,135 +173,49 @@ Summary:"""
         return await self._send_request(request)
 
     async def _send_request(self, request: LLMRequest) -> str:
-        """Send LLM request and wait for response"""
-        # Store request for response matching
-        self.pending_requests[request.id] = asyncio.Event()
+        """Send LLM request and wait for response on llm.response.{request_id}."""
+        reply_subject = f"llm.response.{request.id}"
+        future: asyncio.Future = asyncio.get_event_loop().create_future()
 
-        # Send request
-        await self.js.publish("llm.request", json.dumps(asdict(request), default=str).encode())
+        async def on_reply(msg):
+            try:
+                data = json.loads(msg.data.decode())
+                if data.get("request_id") != request.id:
+                    return
+                if data.get("error"):
+                    if not future.done():
+                        future.set_exception(RuntimeError(data["error"]))
+                elif not future.done():
+                    future.set_result(data.get("response", ""))
+            except Exception as exc:
+                if not future.done():
+                    future.set_exception(exc)
 
-        # Wait for response (with timeout)
+        sub = await self.nc.subscribe(reply_subject, cb=on_reply)
+        payload = {
+            **asdict(request),
+            "request_id": request.id,
+            "reply_subject": reply_subject,
+        }
         try:
-            await asyncio.wait_for(self.pending_requests[request.id].wait(), timeout=60.0)
-
-            # Get response
-            response_data = self.pending_requests.get(f"{request.id}_response")
-            if response_data and not response_data.get("error"):
-                return response_data["response"]
-            else:
-                error = response_data.get("error", "Unknown error") if response_data else "No response received"
-                raise Exception(f"LLM request failed: {error}")
-
+            await self.js.publish("llm.request", json.dumps(payload, default=str).encode())
+            return await asyncio.wait_for(future, timeout=120.0)
         except asyncio.TimeoutError:
-            raise Exception("LLM request timed out")
+            raise Exception("LLM request timed out") from None
         finally:
-            # Cleanup
-            self.pending_requests.pop(request.id, None)
-            self.pending_requests.pop(f"{request.id}_response", None)
-
-    async def _handle_response(self, msg):
-        """Handle LLM response from NATS"""
-        try:
-            response_data = json.loads(msg.data.decode())
-            request_id = response_data.get("request_id")
-
-            if request_id in self.pending_requests:
-                # Store response data
-                self.pending_requests[f"{request_id}_response"] = response_data
-                # Signal completion
-                self.pending_requests[request_id].set()
-
-            await msg.ack()
-        except Exception as e:
-            logger.error(f"Error handling LLM response: {e}")
+            await sub.unsubscribe()
 
 
 class NATSLLMWorker:
-    """Worker that processes LLM requests using search backend capabilities"""
+    """
+    Deprecated: LLM processing runs on ct-platform (app/llm_consumer.py), not in RA.
+    """
 
-    def __init__(self, nats_url: str = "nats://localhost:4222"):
-        self.nats_url = nats_url
-        self.nc = None
-        self.js = None
-
-    async def connect(self):
-        """Connect to NATS"""
-        self.nc = await nats.connect(self.nats_url)
-        self.js = self.nc.jetstream()
-        logger.info("LLM worker connected to NATS")
-
-    async def start_processing(self):
-        """Start processing LLM requests"""
-        await self.js.subscribe("llm.request", cb=self._process_request)
-        logger.info("LLM worker started processing requests")
-
-        try:
-            while True:
-                await asyncio.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("LLM worker shutting down")
-
-    async def _process_request(self, msg):
-        """Process a single LLM request using search backend LLM"""
-        try:
-            request_data = json.loads(msg.data.decode())
-            request = LLMRequest(**request_data)
-
-            logger.info(f"Processing LLM request {request.id} - {request.request_type}")
-
-            # Use search backend's LLM service
-            response_text = await self._call_search_backend_llm(request)
-
-            # Send response
-            response = LLMResponse(
-                request_id=request.id,
-                response=response_text,
-                model_used=request.model,
-                processing_time=1.5,  # Could track actual time
-            )
-
-            await self.js.publish("llm.response", json.dumps(asdict(response), default=str).encode())
-
-            await msg.ack()
-            logger.info(f"LLM request {request.id} completed")
-
-        except Exception as e:
-            logger.error(f"Error processing LLM request: {e}")
-
-            # Send error response
-            error_response = LLMResponse(
-                request_id=request.id,
-                response="",
-                model_used=request.model,
-                error=str(e),
-            )
-
-            await self.js.publish("llm.response", json.dumps(asdict(error_response), default=str).encode())
-            await msg.ack()
-
-    async def _call_search_backend_llm(self, request: LLMRequest) -> str:
-        """Call search backend's LLM service (Ollama or OpenAI)"""
-        # Import search backend's LLM service
-        # This would use the existing EmbeddingService or similar from search backend
-
-        try:
-            # For MVP, simulate using search backend's LLM logic
-            # In reality, this would import and use:
-            # from search.backend.app.services import EmbeddingService
-            # service = EmbeddingService()
-            # response = await service.generate_text(request.prompt, request.model)
-
-            # Simulated response for now
-            if request.request_type == LLMRequestType.ANALYZE_QUESTION:
-                return f"Analysis for question using {request.model}: Based on the provided context, here is a comprehensive answer..."
-            elif request.request_type == LLMRequestType.SUMMARIZE:
-                return f"Summary using {request.model}: This document discusses key topics including..."
-            else:
-                return f"Response using {request.model}: {request.prompt[:100]}..."
-
-        except Exception as e:
-            logger.error(f"Search backend LLM call failed: {e}")
-            raise
+    def __init__(self, *args, **kwargs):
+        raise RuntimeError(
+            "NATSLLMWorker was removed from report-analyst. "
+            "Platform backend handles llm.request via llm_consumer."
+        )
 
 
 # Integration with existing analysis toolkit
@@ -336,16 +248,4 @@ async def example_llm_usage():
 
 
 if __name__ == "__main__":
-    # Start LLM worker
-    import sys
-
-    if len(sys.argv) > 1 and sys.argv[1] == "worker":
-
-        async def run_worker():
-            worker = NATSLLMWorker()
-            await worker.connect()
-            await worker.start_processing()
-
-        asyncio.run(run_worker())
-    else:
-        asyncio.run(example_llm_usage())
+    asyncio.run(example_llm_usage())

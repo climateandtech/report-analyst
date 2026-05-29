@@ -124,9 +124,14 @@ class S3UploadService:
                 "filename": filename,
                 "timestamp": datetime.utcnow().isoformat(),
                 "file_size": len(file_bytes),
-                "source": "report-analyst",
+                "source": os.getenv("NATS_USER", "report-analyst"),
                 "processing_timeout": self.timeout,
+                "persist": os.getenv("UPLOAD_PERSIST", "true").lower()
+                not in ("0", "false", "no"),
             }
+            owner = os.getenv("PLATFORM_OWNER_USER_ID") or os.getenv("ACTING_USER_ID")
+            if owner:
+                control_message["owner_user_id"] = owner
 
             # Use centralized subject pattern (backend will forward docs.* → docs.process.*)
             # Default subject pattern for document uploads

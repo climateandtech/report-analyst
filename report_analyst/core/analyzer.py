@@ -52,14 +52,12 @@ logger.info(
     f"Backend mode - USE_BACKEND: {use_backend}, USE_CENTRALIZED_LLM: {use_centralized_llm}, USE_FULL_BACKEND_ANALYSIS: {use_full_backend_analysis}"
 )
 
-# If using backend for LLM, don't require local API keys
-if use_backend and (use_centralized_llm or use_full_backend_analysis):
-    logger.info("Using backend for LLM functionality - local API keys not required")
-    # Set placeholder values for compatibility
-    if not openai_key:
-        openai_key = "backend-handles-llm"
-    if not gemini_key:
-        gemini_key = "backend-handles-llm"
+# Centralized LLM: platform handles inference via NATS — never use placeholder OpenAI keys
+_centralized_llm_active = use_backend and (use_centralized_llm or use_full_backend_analysis)
+if _centralized_llm_active:
+    logger.info(
+        "Centralized LLM mode — inference via platform/NATS (no local OpenAI/Gemini)"
+    )
 else:
     # Only check for API keys if not using backend LLM
     # Check if we need to force the default model based on available keys
@@ -150,11 +148,12 @@ class DocumentAnalyzer:
 
         if self.use_backend_llm:
             log_analysis_step(
-                "Skipping local LLM initialization - using backend for all LLM functionality",
+                "Initializing NATS-backed LLM (platform centralized)",
                 "info",
             )
-            # Set minimal placeholders for compatibility
-            self.llm = None
+            from .nats_llm_adapter import NATSLLMChatAdapter
+
+            self.llm = NATSLLMChatAdapter(model=os.getenv("PLATFORM_CHAT_MODEL", "gemma3-4b"))
             self.embeddings = None
         else:
             try:
@@ -165,7 +164,7 @@ class DocumentAnalyzer:
                 )
 
                 # Initialize embeddings if OpenAI API key is available
-                if openai_key and openai_key != "backend-handles-llm":
+                if openai_key:
                     self.embeddings = OpenAIEmbedding(
                         api_key=openai_key,
                         api_base=os.getenv("OPENAI_API_BASE"),
