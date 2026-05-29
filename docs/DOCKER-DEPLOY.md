@@ -15,11 +15,15 @@ docker build -t report-analyst .
 
 ```bash
 docker run -p 8080:8080 \
+  -v report-analyst-storage:/app/storage \
   -e REPORT_ANALYST_RUNTIME=core \
+  -e STORAGE_PATH=/app/storage \
   -e OPENAI_API_KEY=your_key \
   -e OPENAI_API_MODEL=gpt-4o-mini \
   report-analyst
 ```
+
+On **Coolify**, use `docker-compose.coolify-customer.yml` (declares `storage-data:/app/storage`) or add a **Persistent Storage** volume mount at `/app/storage` (directory, not the `.sqlite` file alone). Coolify prefixes volume names with the app UUID.
 
 Health: `GET /_stcore/health`
 

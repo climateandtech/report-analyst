@@ -1,0 +1,23 @@
+# Coolify customer deploy: Streamlit + persistent SQLite/vector storage (Heroku-style disk).
+# Coolify prefixes volume names with the app UUID (see Coolify persistent storage docs).
+services:
+  report-analyst:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      REPORT_ANALYST_RUNTIME: ${REPORT_ANALYST_RUNTIME:-core}
+      STORAGE_PATH: /app/storage
+    volumes:
+      - storage-data:/app/storage
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  storage-data:

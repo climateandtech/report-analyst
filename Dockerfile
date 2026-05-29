@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV OPENBLAS_NUM_THREADS=1
 ENV REPORT_ANALYST_RUNTIME=core
+ENV STORAGE_PATH=/app/storage
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
