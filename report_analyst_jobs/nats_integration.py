@@ -12,6 +12,7 @@ Flow:
 import asyncio
 import json
 import logging
+import os
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -25,6 +26,24 @@ from nats.js import JetStreamContext
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def resolve_nats_url() -> str:
+    """NATS URL from env, with token embedded (matches ct-platform get_nats_connection_url)."""
+    nats_url = os.getenv("NATS_URL", "nats://localhost:4222").strip()
+    token = os.getenv("NATS_TOKEN", "").strip()
+    if token and "@" not in nats_url:
+        host_port = nats_url.replace("nats://", "")
+        return f"nats://{token}@{host_port}"
+    return nats_url
+
+
+def resolve_backend_url() -> str:
+    return (
+        os.getenv("BACKEND_URL")
+        or os.getenv("SEARCH_BACKEND_URL")
+        or "http://localhost:8000"
+    ).strip()
 
 
 class JobStatus(str, Enum):
@@ -165,11 +184,11 @@ class SearchBackendClient:
 class NATSJobCoordinator:
     """Coordinates analysis jobs via NATS messaging"""
 
-    def __init__(self, nats_url: str = "nats://localhost:4222"):
-        self.nats_url = nats_url
+    def __init__(self, nats_url: Optional[str] = None):
+        self.nats_url = nats_url or resolve_nats_url()
         self.nc = None
         self.js = None
-        self.search_backend = SearchBackendClient()
+        self.search_backend = SearchBackendClient(resolve_backend_url())
 
     async def connect(self):
         """Connect to NATS server"""
@@ -482,7 +501,7 @@ class NATSSearchBackendPublisher:
 class NATSAnalysisWorker:
     """Worker that processes analysis jobs from NATS"""
 
-    def __init__(self, nats_url: str = "nats://localhost:4222"):
+    def __init__(self, nats_url: Optional[str] = None):
         self.coordinator = NATSJobCoordinator(nats_url)
 
     async def start(self):
@@ -583,7 +602,9 @@ async def example_submit_analysis():
 
 async def example_start_worker():
     """Example: Start a worker to process analysis jobs"""
-    worker = NATSAnalysisWorker()
+    nats_url = resolve_nats_url()
+    logger.info("Starting NATS analysis worker (NATS_URL host=%s)", nats_url.split("@")[-1])
+    worker = NATSAnalysisWorker(nats_url)
     await worker.start()
 
 

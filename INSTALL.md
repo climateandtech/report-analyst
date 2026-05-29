@@ -121,6 +121,12 @@ docker build -t report-analyst:core .
 
 # Enterprise image (adds report_analyst_enterprise, Alembic)
 docker build -f Dockerfile.enterprise -t report-analyst:enterprise .
+
+# REST API (report_analyst_api)
+docker build -f Dockerfile.api -t report-analyst:api .
+
+# NATS jobs worker (platform integration)
+docker build -f Dockerfile.jobs -t report-analyst:jobs .
 ```
 
 On **Apple Silicon (ARM)** use `--platform linux/amd64` so `sqlite-vss` installs (no Linux ARM wheel):  
@@ -137,6 +143,8 @@ docker run -p 8080:8080 -e OPENAI_API_KEY=your_key -e DATABASE_URL=postgresql://
 ```
 
 App is at `http://localhost:8080`.
+
+For API, jobs worker, and platform integration (NATS, search backend, S3), see [`docs/DOCKER-DEPLOY.md`](docs/DOCKER-DEPLOY.md).
 
 ---
 
