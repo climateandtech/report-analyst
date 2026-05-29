@@ -119,14 +119,14 @@ Two images are available: **core** (RPL, Streamlit only) and **enterprise** (cor
 # Core image (Streamlit app only)
 docker build -t report-analyst:core .
 
-# Enterprise image (adds report_analyst_enterprise, Alembic)
-docker build -f Dockerfile.enterprise -t report-analyst:enterprise .
+# Enterprise image (report_analyst_enterprise module)
+docker build -f report_analyst_enterprise/Dockerfile -t report-analyst:enterprise .
 
-# REST API (report_analyst_api)
-docker build -f Dockerfile.api -t report-analyst:api .
+# REST API (report_analyst_api module)
+docker build -f report_analyst_api/Dockerfile -t report-analyst:api .
 
-# NATS jobs worker (platform integration)
-docker build -f Dockerfile.jobs -t report-analyst:jobs .
+# NATS jobs worker (report_analyst_jobs module)
+docker build -f report_analyst_jobs/Dockerfile -t report-analyst:jobs .
 ```
 
 On **Apple Silicon (ARM)** use `--platform linux/amd64` so `sqlite-vss` installs (no Linux ARM wheel):  

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_nats_url() -> str:
-    """NATS URL from env, with token embedded (matches ct-platform get_nats_connection_url)."""
+    """NATS URL from env, with optional token embedded in the connection string."""
     nats_url = os.getenv("NATS_URL", "nats://localhost:4222").strip()
     token = os.getenv("NATS_TOKEN", "").strip()
     if token and "@" not in nats_url:

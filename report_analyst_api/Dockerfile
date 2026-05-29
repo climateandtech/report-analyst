@@ -1,4 +1,4 @@
-# FastAPI service for ct-platform /report-analyst-api proxy (port 8001)
+# FastAPI service (report_analyst_api module)
 FROM python:3.12-slim
 
 WORKDIR /app

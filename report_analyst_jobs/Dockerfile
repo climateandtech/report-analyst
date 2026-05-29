@@ -1,4 +1,4 @@
-# NATS analysis worker (document.ready → report analyst jobs)
+# NATS jobs worker (report_analyst_jobs module)
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -19,7 +19,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY report_analyst_search_backend/requirements.txt report_analyst_search_backend/requirements.txt
 RUN pip install --no-cache-dir -r report_analyst_search_backend/requirements.txt
 
-# Jobs deps (installed from repo; omit report-analyst PyPI pin)
 RUN pip install --no-cache-dir "nats-py>=2.7.0" "aiohttp>=3.9.0" "pydantic>=2.5.0" "pandas>=2.0.0" "numpy>=1.24.0"
 
 COPY report_analyst/ report_analyst/

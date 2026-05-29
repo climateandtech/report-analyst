@@ -396,6 +396,7 @@ The repository uses a **module-based licensing model**:
 | `report_analyst_api/`              | FastAPI API module                           | **Climate+Tech Open License for Good**         |
 | `report_analyst_jobs/`             | Jobs, NATS, integration toolkit              | **Climate+Tech Open License for Good**         |
 | `report_analyst_search_backend/`   | Search/upload backend integration            | **Climate+Tech Open License for Good**         |
+| `report_analyst_enterprise/`       | Enterprise edition (Postgres/pgvector, deploy) | **Climate+Tech Open License for Good**         |
 
 The core analysis module `report_analyst/` is open source under the RPL (Reciprocal Public License). All other modules (API, jobs, search backend, etc.) are provided under the Climate+Tech Open License for Good, and can be dual-licensed for commercial or special use cases upon request.
 
