@@ -1,3 +1,4 @@
+# Deprecated for deploy — use repository root Dockerfile + REPORT_ANALYST_RUNTIME.
 # Enterprise Streamlit image (report_analyst_enterprise module + core RPL app)
 FROM python:3.12-slim
 

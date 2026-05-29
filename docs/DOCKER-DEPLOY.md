@@ -1,32 +1,53 @@
 # Docker deployment
 
-Build images from the **repository root** (`docker build -f <module>/Dockerfile .`).
+One image from the **repository root**. Runtime mode is selected with `REPORT_ANALYST_RUNTIME`:
 
-## Core (RPL) — standalone Streamlit
-
-| Image | Dockerfile | Port |
-|-------|------------|------|
-| Streamlit app | [`Dockerfile`](../Dockerfile) | 8080 |
+| Mode | Env | Processes |
+|------|-----|-----------|
+| **core** (default) | `REPORT_ANALYST_RUNTIME=core` | Streamlit on `:8080` |
+| **enterprise** | `REPORT_ANALYST_RUNTIME=enterprise` | Streamlit `:8080`, FastAPI `:8001`, NATS worker |
 
 ```bash
-docker build -t report-analyst:core .
+docker build -t report-analyst .
+```
+
+## Customer (Streamlit only)
+
+```bash
 docker run -p 8080:8080 \
+  -e REPORT_ANALYST_RUNTIME=core \
   -e OPENAI_API_KEY=your_key \
   -e OPENAI_API_MODEL=gpt-4o-mini \
-  -e OPENBLAS_NUM_THREADS=1 \
-  report-analyst:core
+  report-analyst
 ```
 
 Health: `GET /_stcore/health`
 
-## Licensed modules (Climate+Tech Open License for Good)
+Optional Postgres (enterprise module features in UI):
 
-| Module | Dockerfile | Docs |
-|--------|------------|------|
-| Enterprise Streamlit + Postgres | [`report_analyst_enterprise/Dockerfile`](../report_analyst_enterprise/Dockerfile) | [`report_analyst_enterprise/README.md`](../report_analyst_enterprise/README.md) |
-| REST API | [`report_analyst_api/Dockerfile`](../report_analyst_api/Dockerfile) | [`INSTALL.md`](../INSTALL.md) § API |
-| NATS jobs worker | [`report_analyst_jobs/Dockerfile`](../report_analyst_jobs/Dockerfile) | [`report_analyst_jobs/README.md`](../report_analyst_jobs/README.md) |
+```bash
+docker run -p 8080:8080 \
+  -e REPORT_ANALYST_RUNTIME=core \
+  -e DATABASE_URL=postgresql://... \
+  -e USE_ALEMBIC_MIGRATIONS=true \
+  report-analyst
+```
 
-Search-backend integration (S3, NATS upload, data lake) is implemented in **`report_analyst_search_backend/`** (library module; no separate container image).
+## Internal enterprise (Climate+Tech)
+
+```bash
+docker run -p 8080:8080 -p 8001:8001 \
+  -e REPORT_ANALYST_RUNTIME=enterprise \
+  -e DATABASE_URL=postgresql://... \
+  -e USE_BACKEND=true \
+  -e USE_CENTRALIZED_LLM=true \
+  -e NATS_URL=nats://nats:4222 \
+  report-analyst
+```
+
+- Streamlit health: `GET /_stcore/health`
+- API health: `GET /health` on port 8001
+
+Licensed modules (`report_analyst_enterprise/`, `report_analyst_api/`, `report_analyst_jobs/`, `report_analyst_search_backend/`) ship in the same image; no separate container builds.
 
 See [`INSTALL.md`](../INSTALL.md) for local install without Docker.

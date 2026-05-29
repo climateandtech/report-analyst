@@ -8,32 +8,28 @@ This module adds:
 - **Enterprise Streamlit image** ([Dockerfile](Dockerfile)) — core app plus this module
 - Optional **search-backend integration** UI hooks (via core Streamlit + `report_analyst_search_backend/`)
 
-## Docker (enterprise Streamlit)
+## Docker
 
-Build from the **repository root** (paths in the Dockerfile expect monorepo layout):
+Deploy from the **repository root** using the unified image. Set `REPORT_ANALYST_RUNTIME`:
+
+- `core` — Streamlit only (customer / standalone)
+- `enterprise` — Streamlit + API + NATS worker (Climate+Tech internal)
+
+See [`docs/DOCKER-DEPLOY.md`](../docs/DOCKER-DEPLOY.md).
 
 ```bash
-docker build -f report_analyst_enterprise/Dockerfile -t report-analyst:enterprise .
-docker run -p 8080:8080 \
+docker build -t report-analyst .
+docker run -p 8080:8080 -p 8001:8001 \
+  -e REPORT_ANALYST_RUNTIME=enterprise \
   -e OPENAI_API_KEY=your_key \
   -e DATABASE_URL=postgresql://user:pass@host:5432/db \
   -e USE_ALEMBIC_MIGRATIONS=true \
-  -e USE_POSTGRES_FILE_STORAGE=true \
-  report-analyst:enterprise
+  report-analyst
 ```
 
 ## Platform integration (search backend + NATS)
 
-For a full production stack (upload, chunking, async analysis), deploy alongside:
-
-| Module | Role | Docker |
-|--------|------|--------|
-| `report_analyst_enterprise/` | Analyst UI + Postgres | This Dockerfile |
-| `report_analyst_api/` | REST API | `report_analyst_api/Dockerfile` |
-| `report_analyst_jobs/` | NATS worker | `report_analyst_jobs/Dockerfile` |
-| `report_analyst_search_backend/` | Backend/S3/NATS integration (library) | Used by UI and jobs |
-
-Example integration environment:
+For production (upload, chunking, async analysis), use `REPORT_ANALYST_RUNTIME=enterprise` with:
 
 ```bash
 BACKEND_URL=https://your-search-backend.example.com

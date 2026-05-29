@@ -1,3 +1,4 @@
+# Deprecated for deploy — use repository root Dockerfile + REPORT_ANALYST_RUNTIME=enterprise.
 # NATS jobs worker (report_analyst_jobs module)
 FROM python:3.12-slim
 
