@@ -16,3 +16,44 @@ exclude = '''
     | __pycache__
 )/
 '''
+
+[tool.ruff]
+target-version = "py312"
+line-length = 127
+src = ["report_analyst", "tests"]
+
+[tool.ruff.lint]
+# TODO: expand toward select = ["ALL"] fix-on-touch (docstrings, typing, complexity).
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "S",    # bandit / security
+    "B",    # bugbear
+    "BLE",  # blind except
+    "ASYNC", # async correctness
+    "RUF",  # ruff-specific (incl. security helpers)
+]
+ignore = [
+    "COM812",  # trailing comma (formatter)
+    "ISC001",  # import sorting conflicts with formatter
+    "S101",    # assert — allowed in tests via per-file-ignores
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.pylint]
+max-args = 8
+max-statements = 50
+max-branches = 12
+
+[tool.ruff.format]
+quote-style = "double"
