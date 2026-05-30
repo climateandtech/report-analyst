@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: report-analyst-quality-gate
+        name: report-analyst quality gate (quick)
+        entry: ./scripts/quality-gate.sh quick
+        language: system
+        pass_filenames: false
+        files: ^(report_analyst/|tests/)
