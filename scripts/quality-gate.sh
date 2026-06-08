@@ -98,7 +98,9 @@ if [[ ${#py_files[@]} -gt 0 ]]; then
   BASE_REF="$BASE_REF" "$ROOT/scripts/lint-changed.sh" "${py_files[@]}" || FAILED=1
 fi
 
-if [[ "$SKIP_PYTEST" -eq 0 && ${#CHANGED[@]} -gt 0 ]]; then
+if [[ "$FAILED" -ne 0 ]]; then
+  log "=== pytest skipped: fix ruff/lint on touched files first ==="
+elif [[ "$SKIP_PYTEST" -eq 0 && ${#CHANGED[@]} -gt 0 ]]; then
   ra_py_changes=()
   for p in "${CHANGED[@]}"; do
     if [[ "$p" =~ ^report-analyst/(report_analyst|tests)/.*\.py$ ]]; then
