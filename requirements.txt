@@ -165,8 +165,13 @@ psycopg2-binary==2.9.10
 pytest==8.3.5
 pytest-asyncio==0.25.3
 pytest-cov==7.0.0
+diff-cover>=9.0.0
 pytest-env==1.1.1
 pytest-postgresql==7.0.2
+pytest-randomly==3.16.0
+# pytest-socket installed for no-network enforcement; report-only (not yet --disable-socket in the gate)
+pytest-socket==0.7.0
+pytest-timeout==2.3.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-multipart==0.0.20

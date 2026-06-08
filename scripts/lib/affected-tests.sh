@@ -3,6 +3,10 @@
 # Self-contained copy (kept in sync with platform repo's scripts/lib/affected-tests.sh).
 set -euo pipefail
 
+_lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/coverage-regression.sh
+source "$_lib/coverage-regression.sh"
+
 qg_summary_start() {
   echo "=== AGENT_TEST_SUMMARY_START ==="
   echo "SCOPE: Fix ONLY failures caused by paths YOU changed in this chat."
@@ -208,8 +212,14 @@ qg_run_affected_pytest() {
   fi
 
   local -a cov_args=()
+  local cov_dir="$backend_root/.qg-coverage"
   if qg_pytest_cov_available "$py" && [[ ${#QG_AFFECTED_COV[@]} -gt 0 ]]; then
-    cov_args=(--cov-report=term-missing:skip-covered)
+    mkdir -p "$cov_dir"
+    cov_args=(
+      --cov-report=term-missing:skip-covered
+      --cov-report=xml:"$cov_dir/coverage.xml"
+      --cov-report=json:"$cov_dir/coverage.json"
+    )
     cov_args+=("${QG_AFFECTED_COV[@]}")
   elif [[ ${#QG_AFFECTED_COV[@]} -gt 0 ]]; then
     echo "quality-gate: pytest-cov not installed — running tests without coverage (pip install pytest-cov)" >&2
@@ -241,12 +251,30 @@ qg_run_affected_pytest() {
   rc="${PIPESTATUS[0]}"
   set -e
 
+  local regress_out=""
+  local cov_rc=0
+  if [[ "$rc" -eq 0 && ${#QG_AFFECTED_APP_FILES[@]} -gt 0 && ${#cov_args[@]} -gt 0 ]]; then
+    regress_out="$(mktemp)"
+    set +e
+    qg_run_coverage_regression "$backend_root" "$py" "${QG_AFFECTED_APP_FILES[@]}" >"$regress_out" 2>&1
+    cov_rc=$?
+    set -e
+    if [[ "$cov_rc" -ne 0 ]]; then
+      rc="$cov_rc"
+    fi
+  fi
+
   qg_summary_start
   echo "pytest exit code: $rc"
   echo "tests: ${QG_AFFECTED_TESTS[*]}"
   [[ ${#QG_AFFECTED_COV[@]} -gt 0 ]] && echo "coverage: ${QG_AFFECTED_COV[*]#--cov=}"
   cat "$out"
+  if [[ -n "$regress_out" && -f "$regress_out" ]]; then
+    echo ""
+    cat "$regress_out"
+  fi
   qg_summary_end
   rm -f "$out"
+  [[ -n "$regress_out" ]] && rm -f "$regress_out"
   return "$rc"
 }
