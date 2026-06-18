@@ -125,8 +125,7 @@ def get_api_key_setup_message() -> str:
         return APIKeyManager.get_key_action_message(os.getenv("GOOGLE_API_KEY"))
     return APIKeyManager.get_key_action_message(None)
 
-#the already-created analyzer does not automatically rebuild itself after the key is entered in settings, 
-# so we need to reset it here to make sure it picks up the new key
+
 def reset_report_analyzer() -> None:
     """Recreate the analyzer after API keys change in Settings."""
     DocumentAnalyzer.reset_instance()
