@@ -10,6 +10,32 @@ import os
 from report_analyst.core.api_key_manager import APIKeyManager
 
 
+def test_is_configured_key_only_rejects_known_placeholders():
+    """Placeholder handling should not reject arbitrary future key formats."""
+    assert APIKeyManager.is_configured_key(None) is False
+    assert APIKeyManager.is_configured_key("") is False
+    assert APIKeyManager.is_configured_key("your-openai-api-key") is False
+    assert APIKeyManager.is_configured_key("your-google-api-key") is False
+    assert APIKeyManager.is_configured_key("your-real-future-format") is True
+
+
+def test_get_key_status_explains_missing_placeholder_and_configured():
+    """Key status should distinguish what action users need to take."""
+    assert APIKeyManager.get_key_status(None) == APIKeyManager.KEY_STATUS_MISSING
+    assert APIKeyManager.get_key_status("your-openai-api-key") == APIKeyManager.KEY_STATUS_PLACEHOLDER
+    assert APIKeyManager.get_key_status("sk-real-looking-key") == APIKeyManager.KEY_STATUS_CONFIGURED
+
+
+def test_get_key_action_message_tells_user_next_step():
+    """Action messages should say whether to enter or replace a key."""
+    missing_message = APIKeyManager.get_key_action_message(None)
+    placeholder_message = APIKeyManager.get_key_action_message("your-openai-api-key")
+
+    assert missing_message == "Your API key is missing, Open Settings -> API Keys to configure one."
+    assert placeholder_message == "The API key you entered is false, please replace it with a correct one."
+    assert APIKeyManager.get_key_action_message("sk-real-looking-key") is None
+
+
 def test_set_and_get_api_key():
     """Test setting and getting API keys"""
     session_state = {}
