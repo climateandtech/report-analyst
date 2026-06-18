@@ -12,39 +12,15 @@ from typing import Optional
 class APIKeyManager:
     """Service to manage API keys in session state and environment without persistence"""
 
-    KEY_STATUS_MISSING = "missing"
-    KEY_STATUS_PLACEHOLDER = "placeholder"
-    KEY_STATUS_CONFIGURED = "configured"
-
-    PLACEHOLDER_API_KEYS = {
-        "your-openai-api-key",
-        "your-google-api-key",
-    }
-
-    @staticmethod
-    def get_key_status(value: Optional[str]) -> str:
-        """Classify an API key value so the UI can show the right action."""
-        if not value:
-            return APIKeyManager.KEY_STATUS_MISSING
-
-        normalized_value = value.strip().lower()
-        if normalized_value in APIKeyManager.PLACEHOLDER_API_KEYS:
-            return APIKeyManager.KEY_STATUS_PLACEHOLDER
-
-        return APIKeyManager.KEY_STATUS_CONFIGURED
-
     @staticmethod
     def is_configured_key(value: Optional[str]) -> bool:
-        """Return True only when a non-placeholder API key has been provided."""
-        return APIKeyManager.get_key_status(value) == APIKeyManager.KEY_STATUS_CONFIGURED
+        """Return True when an API key value has been provided."""
+        return bool(value and value.strip())
 
     @staticmethod
     def get_key_action_message(value: Optional[str]) -> Optional[str]:
         """Return a clear message explaining what the user should do next."""
-        status = APIKeyManager.get_key_status(value)
-        if status == APIKeyManager.KEY_STATUS_PLACEHOLDER:
-            return "The API key you entered is false, please replace it with a correct one."
-        if status == APIKeyManager.KEY_STATUS_MISSING:
+        if not APIKeyManager.is_configured_key(value):
             return "Your API key is missing, Open Settings -> API Keys to configure one."
         return None
 

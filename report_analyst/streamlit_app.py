@@ -115,14 +115,7 @@ def has_any_llm_key() -> bool:
 
 
 def get_api_key_setup_message() -> str:
-    """Tell the user whether they need to enter or replace an API key."""
-    openai_status = APIKeyManager.get_key_status(os.getenv("OPENAI_API_KEY"))
-    google_status = APIKeyManager.get_key_status(os.getenv("GOOGLE_API_KEY"))
-
-    if openai_status == APIKeyManager.KEY_STATUS_PLACEHOLDER:
-        return APIKeyManager.get_key_action_message(os.getenv("OPENAI_API_KEY"))
-    if google_status == APIKeyManager.KEY_STATUS_PLACEHOLDER:
-        return APIKeyManager.get_key_action_message(os.getenv("GOOGLE_API_KEY"))
+    """Tell the user to add an API key when none is configured."""
     return APIKeyManager.get_key_action_message(None)
 
 
