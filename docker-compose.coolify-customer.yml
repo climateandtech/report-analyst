@@ -1,8 +1,8 @@
 # Coolify customer deploy: Streamlit + persistent SQLite/vector storage (Heroku-style disk).
-# Traefik routes to report-analyst-auth (nginx) which optionally enforces HTTP Basic Auth
-# from HTTP_BASIC_AUTH_USERNAME / HTTP_BASIC_AUTH_PASSWORD, then proxies to Streamlit.
+# Traefik routes to service `report-analyst` (nginx) which enforces HTTP Basic Auth when
+# HTTP_BASIC_AUTH_* env is set, then proxies to internal `report-analyst-app` (Streamlit).
 services:
-  report-analyst:
+  report-analyst-app:
     build:
       context: .
       dockerfile: Dockerfile
@@ -20,16 +20,16 @@ services:
       retries: 3
       start_period: 15s
 
-  report-analyst-auth:
+  report-analyst:
     build:
       context: ./docker/nginx-basic-auth
       dockerfile: Dockerfile
     environment:
-      UPSTREAM: http://report-analyst:8080
+      UPSTREAM: http://report-analyst-app:8080
       HTTP_BASIC_AUTH_USERNAME: ${HTTP_BASIC_AUTH_USERNAME:-}
       HTTP_BASIC_AUTH_PASSWORD: ${HTTP_BASIC_AUTH_PASSWORD:-}
     depends_on:
-      report-analyst:
+      report-analyst-app:
         condition: service_healthy
     expose:
       - "8080"

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-UPSTREAM="${UPSTREAM:-http://report-analyst:8080}"
+UPSTREAM="${UPSTREAM:-http://report-analyst-app:8080}"
 export UPSTREAM
 
 HTPASSWD="/etc/nginx/.htpasswd"
