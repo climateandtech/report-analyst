@@ -25,7 +25,20 @@ docker run -p 8080:8080 \
 
 On **Coolify**, use `docker-compose.coolify-customer.yml` (declares `storage-data:/app/storage`) or add a **Persistent Storage** volume mount at `/app/storage` (directory, not the `.sqlite` file alone). Coolify prefixes volume names with the app UUID.
 
-Health: `GET /_stcore/health`
+### Coolify customer compose layout
+
+`docker-compose.coolify-customer.yml` runs Streamlit as service **`report-analyst`** on `:8080` (what Traefik routes to).
+
+**HTTP Basic Auth (optional):** Traefik middleware labels on `report-analyst`, injected at deploy time (not in git). Credentials in `.env.customer.<slug>`:
+
+```bash
+HTTP_BASIC_AUTH_USERNAME=demo-user
+HTTP_BASIC_AUTH_PASSWORD=...
+```
+
+Use `coolify-provisioning/scripts/set-app-http-basic-auth.sh` — see `REPORT-ANALYST-DEPLOY.md` § HTTP Basic Auth. Follows [Coolify Basic Auth](https://coolify.io/docs/knowledge-base/proxy/traefik/basic-auth) + [Custom Middlewares](https://coolify.io/docs/knowledge-base/proxy/traefik/custom-middlewares) (`coolify.traefik.middlewares` shorthand).
+
+Health: `GET /_stcore/health`. Unauthenticated requests return **401** when basic auth is enabled.
 
 Optional Postgres (enterprise module features in UI):
 
