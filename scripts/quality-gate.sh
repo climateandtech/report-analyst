@@ -85,7 +85,7 @@ fi
 
 py_files=()
 for p in "${CHANGED[@]}"; do
-  if [[ "$p" =~ ^report-analyst/report_analyst/.*\.py$ || "$p" =~ ^report-analyst/tests/.*\.py$ ]]; then
+  if [[ "$p" =~ ^report-analyst/report_analyst/.*\.py$ || "$p" =~ ^report-analyst/tests/.*\.py$ || "$p" =~ ^report-analyst/scripts/.*\.py$ ]]; then
     py_files+=("${p#report-analyst/}")
   fi
 done

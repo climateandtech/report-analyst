@@ -106,7 +106,13 @@ jobs:
       with:
         fetch-depth: 0
 
-    - uses: astral-sh/ruff-action@v2
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install ruff
+      run: pip install ruff
 
     - name: Run quality gate (ruff on changed files)
       env:

@@ -46,6 +46,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]
+"scripts/**/*.py" = ["S603", "S607"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 12
