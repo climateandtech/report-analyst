@@ -77,6 +77,13 @@ from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
     create_combined_dataframe,
 )
+from report_analyst.core.llm_models import (
+    get_default_llm_model,
+    get_gemini_models,
+    get_llm_models,
+    get_openai_models,
+    llm_model_index,
+)
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
 
@@ -87,18 +94,14 @@ logger.info("Loaded environment variables")
 # Initialize question loader
 question_loader = get_question_loader()
 
-# Define model lists based on available API keys
-OPENAI_MODELS = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"]
+# Model lists — defaults include GPT-5.4 + Gemini 3.x; override via OPENAI_MODELS / GEMINI_MODELS / LLM_MODELS
+OPENAI_MODELS = get_openai_models()
+GEMINI_MODELS = get_gemini_models()
+DEFAULT_LLM_MODEL = get_default_llm_model()
+LLM_MODELS = get_llm_models()
 
-GEMINI_MODELS = ["gemini-1.5-flash", "gemini-1.5-pro"]
-
-# Only include models with available API keys
-LLM_MODELS = OPENAI_MODELS.copy()
-
-# Check for Google API key and add Gemini models if available
 if os.getenv("GOOGLE_API_KEY"):
-    logger.info("Google API key found - adding Gemini models to available options")
-    LLM_MODELS.extend(GEMINI_MODELS)
+    logger.info("Google API key found - Gemini models included when configured")
 else:
     logger.warning("No Google API key found - Gemini models will not be available")
 
@@ -1463,7 +1466,7 @@ def main():
             st.session_state.top_k = 10  # Default number of chunks to retrieve
 
         if "llm_model" not in st.session_state:
-            st.session_state.llm_model = "gpt-4o-mini"  # Default model
+            st.session_state.llm_model = DEFAULT_LLM_MODEL
 
         if "question_set" not in st.session_state:
             st.session_state.question_set = "tcfd"  # Default question set
@@ -3545,7 +3548,7 @@ def main():
                         new_llm_model = st.selectbox(
                             "LLM Model",
                             options=LLM_MODELS,
-                            index=0,  # Ensure a default is selected
+                            index=llm_model_index(LLM_MODELS, DEFAULT_LLM_MODEL),
                             key="new_llm_model",
                             on_change=update_analyzer_parameters,
                         )
