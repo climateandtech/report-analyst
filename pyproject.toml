@@ -44,6 +44,15 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.isort]
+known-first-party = [
+    "report_analyst",
+    "report_analyst_api",
+    "report_analyst_enterprise",
+    "report_analyst_jobs",
+    "report_analyst_search_backend",
+]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]
 "scripts/**/*.py" = ["S603", "S607"]
