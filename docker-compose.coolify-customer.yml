@@ -1,7 +1,7 @@
 # Coolify customer deploy: Streamlit + persistent SQLite/vector storage (Heroku-style disk).
 # Traefik routes to service `report-analyst` on :8080.
-# HTTP Basic Auth (optional): set TRAEFIK_BASIC_AUTH_USERS on the Coolify app
-# (htpasswd line via set-app-http-basic-auth.sh). Per Coolify Custom Middlewares docs.
+# HTTP Basic Auth: applied via Coolify API custom_labels (set-app-http-basic-auth.sh).
+# Do not add traefik basicauth labels here — Coolify does not interpolate compose env in labels.
 services:
   report-analyst:
     build:
@@ -14,9 +14,6 @@ services:
       - storage-data:/app/storage
     expose:
       - "8080"
-    labels:
-      - 'coolify.traefik.middlewares=ra-basic-auth'
-      - 'traefik.http.middlewares.ra-basic-auth.basicauth.users=${TRAEFIK_BASIC_AUTH_USERS}'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/_stcore/health"]
       interval: 30s
