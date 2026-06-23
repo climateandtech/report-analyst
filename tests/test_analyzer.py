@@ -1,18 +1,13 @@
-import json
 import os
 import shutil
-import sqlite3
 import tempfile
 import uuid
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import yaml
-
-from report_analyst.core.analyzer import DocumentAnalyzer, log_analysis_step
+from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.cache_manager import CacheManager
 
 
@@ -24,7 +19,7 @@ def test_db_template():
     print(f"\nCreating template test database at: {db_path}")
 
     try:
-        cache_manager = CacheManager(str(db_path))
+        CacheManager(str(db_path))
         print(f"Template database created successfully at {db_path}")
 
         if not db_path.exists():
@@ -86,22 +81,34 @@ def test_env(clean_db):
                     },
                     {
                         "id": "tcfd_2",
-                        "text": "What is the role of management in assessing and managing climate-related risks and opportunities?",
+                        "text": (
+                            "What is the role of management in assessing and managing "
+                            "climate-related risks and opportunities?"
+                        ),
                         "guidelines": "Test guidelines 2",
                     },
                     {
                         "id": "tcfd_3",
-                        "text": "What are the most relevant climate-related risks and opportunities identified by the organisation?",
+                        "text": (
+                            "What are the most relevant climate-related risks and opportunities "
+                            "identified by the organisation?"
+                        ),
                         "guidelines": "Test guidelines 3",
                     },
                     {
                         "id": "tcfd_4",
-                        "text": "How do climate-related risks and opportunities impact the organisation's business, strategy and financial planning?",
+                        "text": (
+                            "How do climate-related risks and opportunities impact the organisation's "
+                            "business, strategy and financial planning?"
+                        ),
                         "guidelines": "Test guidelines 4",
                     },
                     {
                         "id": "tcfd_5",
-                        "text": "How resilient is the organisation's strategy when considering different climate-related scenarios?",
+                        "text": (
+                            "How resilient is the organisation's strategy when considering "
+                            "different climate-related scenarios?"
+                        ),
                         "guidelines": "Test guidelines 5",
                     },
                     {
@@ -116,7 +123,10 @@ def test_env(clean_db):
                     },
                     {
                         "id": "tcfd_8",
-                        "text": "How are the processes for identifying, assessing, and managing climate-related risks integrated into overall risk management?",
+                        "text": (
+                            "How are the processes for identifying, assessing, and managing "
+                            "climate-related risks integrated into overall risk management?"
+                        ),
                         "guidelines": "Test guidelines 8",
                     },
                     {
@@ -131,7 +141,10 @@ def test_env(clean_db):
                     },
                     {
                         "id": "tcfd_11",
-                        "text": "What targets does the organisation use to understand and manage climate-related risks and opportunities?",
+                        "text": (
+                            "What targets does the organisation use to understand and manage "
+                            "climate-related risks and opportunities?"
+                        ),
                         "guidelines": "Test guidelines 11",
                     },
                 ],
@@ -145,7 +158,7 @@ def test_env(clean_db):
     os.environ["STORAGE_PATH"] = str(storage_path)
     os.environ["QUESTIONSETS_PATH"] = str(questions_dir)
 
-    print(f"Test environment setup complete")  # Debug print
+    print("Test environment setup complete")  # Debug print
 
     yield {
         "temp_dir": temp_dir,
@@ -155,16 +168,18 @@ def test_env(clean_db):
         "db_path": clean_db,
     }
 
-    print(f"Cleaning up test environment")  # Debug print
+    print("Cleaning up test environment")  # Debug print
     shutil.rmtree(temp_dir)
 
 
 @pytest.fixture(scope="function")
 def analyzer(test_env, clean_db):
     """Create a DocumentAnalyzer instance with mocked LLM"""
-    with patch("langchain_openai.ChatOpenAI") as mock_llm, patch(
-        "llama_index.embeddings.openai.OpenAIEmbedding"
-    ) as mock_embedding, patch("llama_index.core.Settings") as mock_settings:
+    with (
+        patch("langchain_openai.ChatOpenAI") as mock_llm,
+        patch("llama_index.embeddings.openai.OpenAIEmbedding") as mock_embedding,
+        patch("llama_index.core.Settings"),
+    ):
         # Configure mock LLM
         mock_llm_instance = Mock(
             model="gpt-3.5-turbo-test",
@@ -515,9 +530,11 @@ def test_get_all_cached_answers(analyzer):
 @pytest.mark.asyncio
 async def test_document_analysis_workflow(test_env):
     """Test the main document analysis workflow"""
-    with patch("langchain_openai.ChatOpenAI") as mock_llm, patch(
-        "llama_index.embeddings.openai.OpenAIEmbedding"
-    ) as mock_embedding, patch("llama_index.core.Settings") as mock_settings:
+    with (
+        patch("langchain_openai.ChatOpenAI") as mock_llm,
+        patch("llama_index.embeddings.openai.OpenAIEmbedding") as mock_embedding,
+        patch("llama_index.core.Settings"),
+    ):
         # Configure mock LLM responses
         mock_llm.return_value = Mock(
             model="gpt-3.5-turbo-test",
