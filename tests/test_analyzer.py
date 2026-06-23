@@ -188,7 +188,8 @@ def analyzer(test_env, clean_db):
         analyzer.cache_manager = CacheManager(db_path=str(clean_db))
         # Set the mocked LLM instance
         analyzer.llm = mock_llm_instance
-        # Force reload questions from test file
+        # Force reload questions from test file (reset singleton state from other tests)
+        analyzer.question_set = "tcfd"
         analyzer.questions = analyzer._load_questions()
 
         # Add mock for _analyze_single_question
