@@ -176,10 +176,7 @@ def check_module_regression(
                 issues.append(
                     CoverageIssue(
                         kind="new_module",
-                        message=(
-                            f"{rel}: {cov.percent:.1f}% covered "
-                            f"(new module minimum {min_new:.1f}%)"
-                        ),
+                        message=(f"{rel}: {cov.percent:.1f}% covered " f"(new module minimum {min_new:.1f}%)"),
                     )
                 )
             continue
@@ -191,10 +188,7 @@ def check_module_regression(
             issues.append(
                 CoverageIssue(
                     kind="regression",
-                    message=(
-                        f"{rel}: {cov.percent:.1f}% covered "
-                        f"(baseline {base_pct:.1f}%, max drop {max_drop:.1f}%)"
-                    ),
+                    message=(f"{rel}: {cov.percent:.1f}% covered " f"(baseline {base_pct:.1f}%, max drop {max_drop:.1f}%)"),
                 )
             )
     return issues
@@ -252,9 +246,7 @@ def format_report(
         lines.append(diff_cover_output)
     if diff_cover_rc != 0:
         lines.append("")
-        lines.append(
-            f"CHANGED_LINES: FAIL (require covered changed lines; diff-cover exit {diff_cover_rc})"
-        )
+        lines.append(f"CHANGED_LINES: FAIL (require covered changed lines; diff-cover exit {diff_cover_rc})")
     elif diff_cover_output and "skipped" not in diff_cover_output.lower():
         lines.append("")
         lines.append("CHANGED_LINES: OK")
