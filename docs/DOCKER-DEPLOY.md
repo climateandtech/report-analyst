@@ -29,7 +29,7 @@ On **Coolify**, use `docker-compose.coolify-customer.yml` (declares `storage-dat
 
 `docker-compose.coolify-customer.yml` runs Streamlit as service **`report-analyst`** on `:8080` (what Traefik routes to).
 
-**HTTP Basic Auth (optional):** Traefik middleware labels on `report-analyst`, injected at deploy time (not in git). Credentials in `.env.customer.<slug>`:
+**HTTP Basic Auth (optional):** compose service labels + `TRAEFIK_BASIC_AUTH_USERS` env (set by `set-app-http-basic-auth.sh`). Credentials in `.env.customer.<slug>`:
 
 ```bash
 HTTP_BASIC_AUTH_USERNAME=demo-user
