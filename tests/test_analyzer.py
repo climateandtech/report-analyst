@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import yaml
+
 from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.cache_manager import CacheManager
 
