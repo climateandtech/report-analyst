@@ -1,5 +1,6 @@
 # Coolify customer deploy: Streamlit + persistent SQLite/vector storage (Heroku-style disk).
-# Coolify prefixes volume names with the app UUID (see Coolify persistent storage docs).
+# Traefik routes to report-analyst-auth (nginx) which optionally enforces HTTP Basic Auth
+# from HTTP_BASIC_AUTH_USERNAME / HTTP_BASIC_AUTH_PASSWORD, then proxies to Streamlit.
 services:
   report-analyst:
     build:
@@ -18,6 +19,26 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  report-analyst-auth:
+    build:
+      context: ./docker/nginx-basic-auth
+      dockerfile: Dockerfile
+    environment:
+      UPSTREAM: http://report-analyst:8080
+      HTTP_BASIC_AUTH_USERNAME: ${HTTP_BASIC_AUTH_USERNAME:-}
+      HTTP_BASIC_AUTH_PASSWORD: ${HTTP_BASIC_AUTH_PASSWORD:-}
+    depends_on:
+      report-analyst:
+        condition: service_healthy
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -S -O /dev/null http://127.0.0.1:8080/ 2>&1 | grep -qE 'HTTP/1.1 (200|401)'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
   storage-data:
