@@ -1,8 +1,29 @@
 # Coolify customer deploy: Streamlit + persistent SQLite/vector storage (Heroku-style disk).
-# Traefik routes to service `report-analyst` on :8080.
-# HTTP Basic Auth: applied via Coolify API custom_labels (set-app-http-basic-auth.sh).
-# Do not add traefik basicauth labels here — Coolify does not interpolate compose env in labels.
+# Traefik routes to `report-analyst-auth:8080` when HTTP Basic Auth is enabled
+# (set-app-http-basic-auth.sh), else `report-analyst:8080`.
+# Auth uses nginx + Coolify app env HTTP_BASIC_AUTH_* (not Traefik label substitution).
 services:
+  report-analyst-auth:
+    build:
+      context: ./docker/nginx-basic-auth
+      dockerfile: Dockerfile
+    environment:
+      HTTP_BASIC_AUTH_USERNAME: ${HTTP_BASIC_AUTH_USERNAME:-}
+      HTTP_BASIC_AUTH_PASSWORD: ${HTTP_BASIC_AUTH_PASSWORD:-}
+      UPSTREAM_HOST: report-analyst
+      UPSTREAM_PORT: "8080"
+    expose:
+      - "8080"
+    depends_on:
+      report-analyst:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   report-analyst:
     build:
       context: .
