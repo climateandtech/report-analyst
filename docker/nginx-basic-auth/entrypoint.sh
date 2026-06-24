@@ -19,8 +19,13 @@ fi
 cat > "$CONF" <<EOF
 server {
     listen 8080;
-    ${AUTH_DIRECTIVES}
+    location /health {
+        auth_basic off;
+        return 200 'ok';
+        add_header Content-Type text/plain;
+    }
     location / {
+        ${AUTH_DIRECTIVES}
         proxy_pass http://${UPSTREAM};
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
