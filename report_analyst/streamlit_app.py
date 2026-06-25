@@ -441,6 +441,7 @@ async def analyze_document_and_display(
     use_llm_scoring: bool = False,
     single_call: bool = True,
     force_recompute: bool = False,
+    max_processing_step: str = "answer",
 ):
     """Analyze document and display results as they come in"""
     try:
@@ -522,6 +523,7 @@ async def analyze_document_and_display(
                 single_call,
                 force_recompute,
                 pre_retrieved_chunks=pre_retrieved_chunks,
+                max_processing_step=max_processing_step,
             ):
                 # Add debug logging to see what results we're getting
                 log_analysis_step(f"Received result: {str(result)[:200]}...")
@@ -761,6 +763,48 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
             }
         )
     return result
+
+
+def display_cached_document_chunks(
+    report_analyzer,
+    file_path: str,
+    *,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
+) -> int:
+    """Render document chunks from cache (Chunk/Embed steps — no question analysis required)."""
+    raw_chunks = report_analyzer.cache_manager.get_document_chunks(
+        file_path=file_path,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+    if not raw_chunks:
+        st.warning("No chunks found in cache for this file and configuration.")
+        return 0
+
+    rows = []
+    for i, chunk in enumerate(raw_chunks):
+        rows.append(
+            {
+                "Chunk #": i + 1,
+                "Text": chunk.get("text", chunk.get("chunk_text", "")),
+                "Has Embedding": chunk.get("embedding") is not None,
+            }
+        )
+
+    st.subheader("Document Chunks")
+    st.dataframe(
+        pd.DataFrame(rows),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Chunk #": st.column_config.NumberColumn("Chunk #", width="small"),
+            "Text": st.column_config.TextColumn("Text", width="large"),
+            "Has Embedding": st.column_config.CheckboxColumn("Has Embedding"),
+        },
+    )
+    st.info(f"Found {len(rows)} document chunks.")
+    return len(rows)
 
 
 def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str | None = None) -> None:
@@ -1302,8 +1346,22 @@ def selected_question_ids_from_editor(edited_df: pd.DataFrame) -> list[str]:
     return edited_df.loc[selected, "QID"].astype(str).tolist()
 
 
+def processing_step_needs_questions_for(step: str) -> bool:
+    """True when the step runs question scoring/answer (Map or Answer)."""
+    from report_analyst.core.analyzer import normalize_processing_step
+
+    return normalize_processing_step(step) in ("map", "answer")
+
+
 def processing_step_needs_questions() -> bool:
-    return get_max_processing_step() in ("map", "answer")
+    return processing_step_needs_questions_for(get_max_processing_step())
+
+
+def is_partial_processing_step(step: str | None = None) -> bool:
+    """True for Chunk/Embed — pipeline stops before Map/Answer LLM work."""
+    if step is None:
+        step = get_max_processing_step()
+    return not processing_step_needs_questions_for(step)
 
 
 def update_analyzer_parameters():
@@ -1465,7 +1523,25 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
         logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
         st.session_state.results = final_results
         logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
-        progress_text.success("Analysis complete!")
+
+        from report_analyst.core.analyzer import PROCESSING_STEP_LABELS, normalize_processing_step
+
+        step_key = normalize_processing_step(max_processing_step)
+        if is_partial_processing_step(step_key):
+            chunk_params = analyzer.analyzer.chunk_params
+            chunk_count = display_cached_document_chunks(
+                analyzer,
+                file_path,
+                chunk_size=chunk_params["chunk_size"],
+                chunk_overlap=chunk_params["chunk_overlap"],
+            )
+            label = PROCESSING_STEP_LABELS.get(step_key, step_key)
+            if chunk_count:
+                progress_text.success(f"Completed {label} step ({chunk_count} chunks).")
+            else:
+                progress_text.warning(f"Completed {label} step, but no chunks were found in cache.")
+        else:
+            progress_text.success("Analysis complete!")
 
     except Exception as e:
         progress_text.error(f"Error during analysis: {e!s}")
@@ -3786,10 +3862,11 @@ def main():
                         max_step = get_max_processing_step()
                         needs_questions = processing_step_needs_questions()
 
-                        if not selected_questions and needs_questions:
+                        if needs_questions and not selected_questions:
                             st.warning("Please select at least one question to analyze.")
-                        elif not selected_questions and not needs_questions:
+                        elif is_partial_processing_step(max_step):
                             try:
+                                update_analyzer_parameters()
                                 st.session_state.force_recompute = reanalyze_clicked
                                 progress_text = st.empty()
                                 is_backend = st.session_state.get("backend_chunks") is not None
@@ -3808,7 +3885,6 @@ def main():
                                         max_processing_step=max_step,
                                     )
                                 )
-                                progress_text.success(f"Completed {max_step} step.")
                             except Exception as e:
                                 st.error(f"Error analyzing document: {e!s}")
                         else:
@@ -3893,6 +3969,7 @@ def main():
                                                     selected_questions=selected_questions,
                                                     use_llm_scoring=st.session_state.new_llm_scoring,
                                                     single_call=st.session_state.new_batch_scoring,
+                                                    max_processing_step=max_step,
                                                 )
                                             )
 

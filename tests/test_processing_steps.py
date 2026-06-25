@@ -351,6 +351,186 @@ def test_processing_step_needs_questions(slider, needs_questions):
         app.st.session_state = original
 
 
+@pytest.mark.parametrize(
+    ("step", "partial"),
+    [
+        ("Chunk", True),
+        ("Embed", True),
+        ("Map", False),
+        ("Answer", False),
+    ],
+)
+def test_is_partial_processing_step(step, partial):
+    import report_analyst.streamlit_app as app
+
+    assert app.is_partial_processing_step(step) is partial
+    assert app.processing_step_needs_questions_for(step) is not partial
+
+
+def test_chunk_with_selected_questions_is_partial_not_full_answer():
+    """Regression: Chunk + selected questions must not take the Map/Answer LLM path."""
+    import report_analyst.streamlit_app as app
+
+    assert app.is_partial_processing_step("Chunk") is True
+    assert app.processing_step_needs_questions_for("Chunk") is False
+
+
+def test_display_cached_document_chunks_renders_rows(monkeypatch):
+    import report_analyst.streamlit_app as app
+
+    report_analyzer = Mock()
+    report_analyzer.cache_manager.get_document_chunks.return_value = [
+        {"text": "Paragraph one.", "embedding": None},
+        {"text": "Paragraph two.", "embedding": object()},
+    ]
+
+    dataframe_calls: list = []
+
+    def capture_dataframe(df, **kwargs):
+        dataframe_calls.append(df)
+        return Mock()
+
+    monkeypatch.setattr(app.st, "subheader", Mock())
+    monkeypatch.setattr(app.st, "info", Mock())
+    monkeypatch.setattr(app.st, "warning", Mock())
+    monkeypatch.setattr(app.st, "dataframe", capture_dataframe)
+    monkeypatch.setattr(app.st, "column_config", Mock(NumberColumn=Mock, TextColumn=Mock, CheckboxColumn=Mock))
+
+    count = app.display_cached_document_chunks(
+        report_analyzer,
+        "/tmp/report.pdf",
+        chunk_size=500,
+        chunk_overlap=20,
+    )
+
+    assert count == 2
+    assert len(dataframe_calls) == 1
+    assert list(dataframe_calls[0]["Text"]) == ["Paragraph one.", "Paragraph two."]
+
+
+@pytest.mark.asyncio
+async def test_report_analyzer_analyze_document_forwards_max_processing_step(clean_db, tmp_path):
+    """analyze_document must pass max_processing_step through to process_document."""
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "forward-step.pdf")
+
+    async def fake_process_document(*args, **kwargs):
+        yield {"status": f"Completed {kwargs.get('max_processing_step')} step"}
+
+    wrapper = app.ReportAnalyzer()
+    wrapper.analyzer.process_document = fake_process_document
+    wrapper.analyzer.question_set = "tcfd"
+
+    events = []
+    async for event in wrapper.analyze_document(
+        file_path,
+        {"tcfd_1": {"number": 1, "text": "Q1"}},
+        ["tcfd_1"],
+        max_processing_step="chunk",
+    ):
+        events.append(event)
+
+    assert any("chunk" in e.get("status", "") for e in events)
+
+
+@pytest.mark.asyncio
+async def test_analyze_document_and_display_chunk_step_does_not_default_to_answer(
+    monkeypatch, clean_db, tmp_path
+):
+    """Regression: analyze_document_and_display without max_processing_step ran full Answer (OpenAI 401)."""
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "display-chunk.pdf")
+    captured: dict = {}
+
+    async def fake_analyze_document(*args, **kwargs):
+        captured["max_processing_step"] = kwargs.get("max_processing_step")
+        yield {"status": "Completed Chunk step (2 chunks)"}
+
+    class FakeSessionState(dict):
+        def get(self, key, default=None):
+            return super().get(key, default)
+
+    fake_st = FakeSessionState(
+        {
+            "chunk_size": 500,
+            "chunk_overlap": 20,
+            "top_k": 5,
+            "llm_model": "gpt-4o-mini",
+            "question_set": "tcfd",
+            "results": {"answers": {}},
+            "current_question_set": "tcfd",
+            "analyzed_files": set(),
+            "force_recompute": True,
+        }
+    )
+
+    report_analyzer = Mock()
+    report_analyzer.analyze_document = fake_analyze_document
+    report_analyzer.cache_manager = Mock(get_analysis=Mock(return_value={}))
+
+    monkeypatch.setattr(app, "st", Mock(session_state=fake_st, empty=Mock(return_value=Mock())))
+    monkeypatch.setattr(app, "generate_file_key", Mock(return_value="test_key"))
+
+    await app.analyze_document_and_display(
+        report_analyzer,
+        file_path=file_path,
+        questions={"tcfd_1": {"number": 1, "text": "Q1"}},
+        selected_questions=["tcfd_1"],
+        force_recompute=True,
+        max_processing_step="chunk",
+    )
+
+    assert captured.get("max_processing_step") == "chunk"
+
+
+@pytest.mark.asyncio
+async def test_analyze_document_and_display_default_max_step_is_answer(monkeypatch, tmp_path):
+    """Document prior default: omitting max_processing_step means full Answer pipeline."""
+    import report_analyst.streamlit_app as app
+
+    captured: dict = {}
+
+    async def fake_analyze_document(*args, **kwargs):
+        captured["max_processing_step"] = kwargs.get("max_processing_step")
+        yield {"status": "done"}
+
+    class FakeSessionState(dict):
+        def get(self, key, default=None):
+            return super().get(key, default)
+
+    fake_st = FakeSessionState(
+        {
+            "chunk_size": 500,
+            "chunk_overlap": 20,
+            "top_k": 5,
+            "llm_model": "gpt-4o-mini",
+            "question_set": "tcfd",
+            "results": {"answers": {}},
+            "current_question_set": "tcfd",
+            "analyzed_files": set(),
+            "force_recompute": True,
+        }
+    )
+
+    report_analyzer = Mock()
+    report_analyzer.analyze_document = fake_analyze_document
+    report_analyzer.cache_manager = Mock(get_analysis=Mock(return_value={}))
+
+    monkeypatch.setattr(app, "st", Mock(session_state=fake_st, empty=Mock(return_value=Mock())))
+
+    await app.analyze_document_and_display(
+        report_analyzer,
+        file_path=str(tmp_path / "full.pdf"),
+        questions={"tcfd_1": {"number": 1, "text": "Q1"}},
+        selected_questions=["tcfd_1"],
+        force_recompute=True,
+    )
+
+    assert captured.get("max_processing_step") == "answer"
+
+
 def test_get_max_processing_step_reads_streamlit_slider():
     import report_analyst.streamlit_app as app
 
