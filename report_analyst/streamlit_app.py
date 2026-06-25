@@ -225,9 +225,7 @@ class ReportAnalyzer:
             # Convert selected question IDs to numbers for the analyzer
             selected_numbers = [questions[q_id]["number"] for q_id in selected_questions]
 
-            # Get the question set prefix from the first selected question
-            question_set = selected_questions[0].split("_")[0] if selected_questions else "tcfd"
-            self.analyzer.question_set = question_set
+            # question_set is set by update_question_set() on the Analyze page
 
             # Pass use_llm_scoring to process_document
             async for result in self.analyzer.process_document(
@@ -247,7 +245,7 @@ class ReportAnalyzer:
                 # Handle results with question_number
                 if "question_number" in result:
                     question_number = result["question_number"]
-                    question_id = f"{question_set}_{question_number}"
+                    question_id = result.get("question_id") or f"{self.analyzer.question_set}_{question_number}"
 
                     # Create a new result with the question_id
                     new_result = {
@@ -480,7 +478,7 @@ async def analyze_document_and_display(
     try:
         APIKeyManager.sync_api_keys_to_env(st.session_state)
         selected_questions_list = list(selected_questions) if selected_questions else []
-        question_set = selected_questions_list[0].split("_")[0] if selected_questions_list else "tcfd"
+        question_set = st.session_state.get("new_question_set", st.session_state.get("question_set", "tcfd"))
 
         # Use the helper function to generate file key
         file_key = generate_file_key(file_path, st)
@@ -1511,16 +1509,12 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
         # Track results
         all_results = {}
 
-        # Convert selected_questions from full IDs (e.g., "tcfd_1") to just numbers (e.g., 1)
+        # Convert selected_questions (e.g. esrs_e1_climate_examples_1) to 1-based numbers
         question_numbers = []
         for q_id in selected_questions:
-            # Extract the number part from the question ID
-            parts = q_id.split("_")
-            if len(parts) > 1:
-                try:
-                    question_numbers.append(int(parts[1]))
-                except ValueError:
-                    progress_text.warning(f"Invalid question ID format: {q_id}")
+            suffix = q_id.rsplit("_", 1)[-1]
+            if suffix.isdigit():
+                question_numbers.append(int(suffix))
             else:
                 progress_text.warning(f"Invalid question ID format: {q_id}")
 

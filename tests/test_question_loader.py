@@ -405,7 +405,7 @@ class TestLocalEsrsE1QuestionSets:
         assert qset.shortcut == "esrs-e1"
 
     def test_baseline_guidelines_structure(self, local_loader):
-        q = local_loader.get_questions("esrs_e1_climate")["esrs_e1_f1"]
+        q = local_loader.get_questions("esrs_e1_climate")["esrs_e1_climate_1"]
         guidelines = q["guidelines"]
         assert guidelines.strip().startswith("- ANSWER type:")
         assert "classification" in guidelines.splitlines()[0]
@@ -415,17 +415,17 @@ class TestLocalEsrsE1QuestionSets:
 
     def test_quantity_questions_use_quantity_answer_type(self, local_loader):
         questions = local_loader.get_questions("esrs_e1_climate")
-        for qid in ("esrs_e1_f4", "esrs_e1_f7", "esrs_e1_f9", "esrs_e1_f10", "esrs_e1_f11", "esrs_e1_f12"):
+        for qid in ("esrs_e1_climate_4", "esrs_e1_climate_7", "esrs_e1_climate_9", "esrs_e1_climate_10", "esrs_e1_climate_11", "esrs_e1_climate_12"):
             first_line = questions[qid]["guidelines"].strip().splitlines()[0]
             assert "quantity" in first_line, qid
 
     def test_f5_cross_question_deferred_flag(self, local_loader):
-        g = local_loader.get_questions("esrs_e1_climate")["esrs_e1_f5"]["guidelines"]
+        g = local_loader.get_questions("esrs_e1_climate")["esrs_e1_climate_5"]["guidelines"]
         assert "Not applicable" in g.splitlines()[0]
         assert "deferred" in g.lower()
 
     def test_examples_variant_has_few_shots(self, local_loader):
         qset = local_loader.get_question_set("esrs_e1_climate_examples")
-        for qid in ("esrs_e1_f1", "esrs_e1_f2", "esrs_e1_f4", "esrs_e1_f5", "esrs_e1_f8", "esrs_e1_f13", "esrs_e1_f15"):
+        for qid in ("esrs_e1_climate_examples_1", "esrs_e1_climate_examples_2", "esrs_e1_climate_examples_4", "esrs_e1_climate_examples_5", "esrs_e1_climate_examples_8", "esrs_e1_climate_examples_13", "esrs_e1_climate_examples_15"):
             assert "Example:" in qset.questions[qid]["guidelines"], qid
 
