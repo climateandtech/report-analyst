@@ -190,3 +190,63 @@ def test_api_key_from_session_state_overrides_env():
 
     # Clean up
     del os.environ["OPENAI_API_KEY"]
+
+
+def test_test_openai_api_key_success(monkeypatch):
+    class FakeModel:
+        def __init__(self, model_id: str):
+            self.id = model_id
+
+    class FakePage:
+        def __iter__(self):
+            yield FakeModel("gpt-4o-mini")
+            yield FakeModel("gpt-4o")
+
+    class FakeModels:
+        def list(self, **_kwargs):
+            return FakePage()
+
+    class FakeOpenAI:
+        def __init__(self, api_key=None, base_url=None, **_kwargs):
+            self.models = FakeModels()
+
+    monkeypatch.setattr("openai.OpenAI", FakeOpenAI)
+    monkeypatch.setattr("openai.AuthenticationError", Exception)
+
+    result = APIKeyManager.test_openai_api_key("sk-test", limit=1)
+
+    assert result["ok"] is True
+    assert result["models_scanned"] == 2
+    assert result["sample_models"] == ["gpt-4o-mini"]
+    assert result["chat_and_embedding_models"] == ["gpt-4o-mini", "gpt-4o"]
+
+
+def test_looks_like_openai_api_key():
+    assert APIKeyManager.looks_like_openai_api_key("sk-proj-abc")
+    assert not APIKeyManager.looks_like_openai_api_key("No results found after analysis")
+
+
+def test_test_openai_api_key_missing():
+    result = APIKeyManager.test_openai_api_key(None)
+    assert result["ok"] is False
+    assert "No API key" in result["error"]
+
+
+def test_test_openai_api_key_auth_failure(monkeypatch):
+    class AuthError(Exception):
+        message = "Incorrect API key provided"
+
+    class FakeOpenAI:
+        def __init__(self, api_key=None, base_url=None, **_kwargs):
+            self.models = self
+
+        def list(self, **_kwargs):
+            raise AuthError()
+
+    monkeypatch.setattr("openai.OpenAI", FakeOpenAI)
+    monkeypatch.setattr("openai.AuthenticationError", AuthError)
+
+    result = APIKeyManager.test_openai_api_key("sk-bad")
+
+    assert result["ok"] is False
+    assert "Incorrect API key" in result["error"]

@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import json
 import logging
 import os
 import sys
@@ -9,7 +8,6 @@ import traceback
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -63,6 +61,7 @@ logger.info(f"Added {current_dir} to Python path")
 
 # Keep relative imports
 from report_analyst.consolidated_results_view import render_consolidated_report_view
+from report_analyst.core.analysis_result_utils import split_analysis_results
 from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
@@ -479,13 +478,16 @@ async def analyze_document_and_display(
 ):
     """Analyze document and display results as they come in"""
     try:
+        APIKeyManager.sync_api_keys_to_env(st.session_state)
         selected_questions_list = list(selected_questions) if selected_questions else []
         question_set = selected_questions_list[0].split("_")[0] if selected_questions_list else "tcfd"
 
         # Use the helper function to generate file key
         file_key = generate_file_key(file_path, st)
 
-        # Initialize or clear results if question set changed
+        from report_analyst.core.analysis_result_utils import normalize_results_container
+
+        # Initialize or clear results if question set changed; normalize legacy flat shape
         if (
             "results" not in st.session_state
             or "current_question_set" not in st.session_state
@@ -494,6 +496,8 @@ async def analyze_document_and_display(
             st.session_state.results = {"answers": {}}
             st.session_state.current_question_set = question_set
             st.session_state.analyzed_files = set()
+        else:
+            st.session_state.results = normalize_results_container(st.session_state.results)
 
         # Create status placeholder
         status_placeholder = st.empty()
@@ -501,13 +505,7 @@ async def analyze_document_and_display(
         log_analysis_step(f"Starting analysis with question set: {question_set}")
 
         # Get current configuration
-        config = {
-            "chunk_size": st.session_state.chunk_size,
-            "chunk_overlap": st.session_state.chunk_overlap,
-            "top_k": st.session_state.top_k,
-            "model": st.session_state.llm_model,
-            "question_set": question_set,
-        }
+        config = build_analysis_config_from_session()
 
         # Load cached answers using the cache manager
         cached_answers = (
@@ -542,8 +540,9 @@ async def analyze_document_and_display(
         if questions_to_process:
             log_analysis_step(f"Processing {len(questions_to_process)} uncached questions...")
 
-            # Update analyzer with question set
+            # Update analyzer with question set and refresh LLM client for current API keys
             report_analyzer.analyzer.question_set = question_set
+            report_analyzer.analyzer.update_llm_model(st.session_state.llm_model)
 
             # Process only uncached questions
             # Check if we have pre-retrieved chunks (for backend resources)
@@ -1186,11 +1185,202 @@ def is_partial_processing_step(step: str | None = None) -> bool:
     return not processing_step_needs_questions_for(step)
 
 
+def resolve_analysis_results_after_run(
+    analyzer,
+    analysis_file_path: str,
+    config: dict,
+    selected_questions: list[str],
+) -> dict:
+    """Load cached answer results; fall back to in-session answers from this run."""
+    cache_results = analyzer.analyzer.cache_manager.get_analysis(
+        file_path=analysis_file_path,
+        config=config,
+        question_ids=selected_questions,
+    )
+    if cache_results:
+        return cache_results
+
+    session_results = st.session_state.get("results")
+    if not isinstance(session_results, dict):
+        return {}
+
+    from report_analyst.core.analysis_result_utils import session_answers_map
+
+    answers = session_answers_map(session_results)
+    if selected_questions:
+        return {qid: answers[qid] for qid in selected_questions if qid in answers}
+    return dict(answers)
+
+
+def build_analysis_config_from_session() -> dict:
+    """Analysis cache key from sidebar widgets (new_*), with fallbacks to synced session values."""
+    return {
+        "chunk_size": st.session_state.get("new_chunk_size", st.session_state.get("chunk_size", 500)),
+        "chunk_overlap": st.session_state.get("new_overlap", st.session_state.get("chunk_overlap", 20)),
+        "top_k": st.session_state.get("new_top_k", st.session_state.get("top_k", 5)),
+        "model": st.session_state.get("new_llm_model", st.session_state.get("llm_model", get_default_llm_model())),
+        "question_set": st.session_state.get("new_question_set", st.session_state.get("question_set", "tcfd")),
+    }
+
+
+async def run_report_answer_workflow(
+    analyzer,
+    *,
+    analysis_file_path: str,
+    file_path,
+    questions: dict,
+    selected_questions: list[str],
+    config: dict,
+    max_step: str,
+    reanalyze: bool,
+    progress_text,
+) -> None:
+    """Shared Analyze/Reanalyze path — always renders results via finalize."""
+    if reanalyze:
+        progress_text.info(f"Reanalyzing {len(selected_questions)} questions...")
+        await run_analysis(
+            analyzer,
+            file_path=analysis_file_path,
+            selected_questions=selected_questions,
+            progress_text=progress_text,
+            max_processing_step=max_step,
+        )
+    else:
+        cached_results = analyzer.analyzer.cache_manager.get_analysis(
+            file_path=analysis_file_path,
+            config=config,
+            question_ids=selected_questions,
+        )
+
+        from report_analyst.core.analysis_result_utils import normalize_results_container
+
+        if cached_results:
+            st.session_state.results = normalize_results_container(st.session_state.get("results"))
+            for question_id, result in cached_results.items():
+                st.session_state.results["answers"][question_id] = result
+
+            file_key = generate_file_key(analysis_file_path, st)
+            analysis_df, chunks_df = create_analysis_dataframes(
+                st.session_state.results["answers"],
+                file_key,
+            )
+            st.session_state.analysis_df = analysis_df
+            st.session_state.chunks_df = chunks_df
+            st.session_state.analysis_complete = True
+        else:
+            progress_text.info(f"Processing {len(selected_questions)} questions...")
+            await analyze_document_and_display(
+                analyzer,
+                file_path=analysis_file_path,
+                questions=questions,
+                selected_questions=selected_questions,
+                use_llm_scoring=st.session_state.get("new_llm_scoring", False),
+                single_call=st.session_state.get("new_batch_scoring", True),
+                max_processing_step=max_step,
+            )
+
+    finalize_report_analysis_results(
+        analyzer,
+        analysis_file_path,
+        config,
+        selected_questions,
+        max_step,
+        progress_text,
+        file_path,
+    )
+
+
+def finalize_report_analysis_results(
+    analyzer,
+    analysis_file_path: str,
+    config: dict,
+    selected_questions: list[str],
+    max_step: str,
+    progress_text,
+    file_path,
+) -> None:
+    """Show post-run UI; answer results come from analysis_cache, chunks from document_chunks."""
+    from report_analyst.core.analyzer import normalize_processing_step
+
+    step_key = normalize_processing_step(max_step)
+
+    if step_key == "answer":
+        all_results = resolve_analysis_results_after_run(
+            analyzer,
+            analysis_file_path,
+            config,
+            selected_questions,
+        )
+        successes, failures = split_analysis_results(all_results)
+        if failures:
+            st.error("Analysis failed for the selected question(s):")
+            for question_id, message in failures.items():
+                st.error(f"{question_id}: {message}")
+        if successes:
+            analysis_df, chunks_df = create_analysis_dataframes(successes)
+            file_key = Path(file_path).stem
+            display_analysis_results(analysis_df, chunks_df, file_key)
+            if failures:
+                progress_text.warning(
+                    f"Partial analysis: {len(successes)} question(s) succeeded, {len(failures)} failed."
+                )
+            else:
+                progress_text.success(f"✓ Analysis complete for {len(successes)} questions")
+            return
+        chunk_params = analyzer.analyzer.chunk_params
+        chunk_count, _embedded = display_cached_document_chunks(
+            analyzer,
+            analysis_file_path,
+            chunk_size=chunk_params["chunk_size"],
+            chunk_overlap=chunk_params["chunk_overlap"],
+        )
+        if failures:
+            progress_text.error("Analysis failed. Fix the error above and use Reanalyze.")
+        elif chunk_count:
+            progress_text.warning(
+                "No answer results yet. Document chunks are shown above — check API keys and Reanalyze."
+            )
+        else:
+            progress_text.error("No results found after analysis")
+        return
+
+    # Chunk / Embed / Map — show on-disk document_chunks (same source as All Results tab)
+    chunk_params = analyzer.analyzer.chunk_params
+    chunk_count, embedded_count = display_cached_document_chunks(
+        analyzer,
+        analysis_file_path,
+        chunk_size=chunk_params["chunk_size"],
+        chunk_overlap=chunk_params["chunk_overlap"],
+    )
+
+    if step_key == "map":
+        progress_text.success(
+            f"✓ Completed Map step for {len(selected_questions)} question(s). "
+            f"{chunk_count} chunks on disk ({embedded_count} with embeddings). "
+            "Slide to Answer for Q&A results, or open All Results for chunk search."
+        )
+    elif step_key == "embed":
+        if embedded_count == 0:
+            progress_text.error(
+                f"Embed stored {chunk_count} chunks but none have embeddings. "
+                "Check OPENAI_API_KEY in Settings."
+            )
+        else:
+            progress_text.success(
+                f"✓ Completed Embed step ({embedded_count}/{chunk_count} chunks with embeddings stored)."
+            )
+    elif chunk_count:
+        progress_text.success(f"✓ Completed Chunk step ({chunk_count} chunks stored).")
+    else:
+        progress_text.warning("No chunks found in cache for this file and configuration.")
+
+
 def update_analyzer_parameters():
     """Update analyzer parameters based on session state."""
     if "analyzer" not in st.session_state:
         return
 
+    APIKeyManager.sync_api_keys_to_env(st.session_state)
     analyzer = st.session_state.analyzer
 
     # Get the current parameters from session state
@@ -1199,15 +1389,17 @@ def update_analyzer_parameters():
     top_k = st.session_state.new_top_k
     llm_model = st.session_state.new_llm_model
 
-    # Validate selected model availability
-    if llm_model.startswith("gemini-") and not os.getenv("GOOGLE_API_KEY"):
+    # Validate selected model availability (session override takes precedence)
+    openai_key = APIKeyManager.get_api_key("OPENAI_API_KEY", st.session_state)
+    google_key = APIKeyManager.get_api_key("GOOGLE_API_KEY", st.session_state)
+    if llm_model.startswith("gemini-") and not google_key:
         # If somehow a Gemini model was selected but no API key exists
         logger.error(f"Attempt to use Gemini model '{llm_model}' without API key")
         st.error(f"Cannot use {llm_model} - No Google API key is set. Defaulting to {OPENAI_MODELS[0]}.")
         # Reset to default OpenAI model
         llm_model = OPENAI_MODELS[0]
         st.session_state.new_llm_model = llm_model
-    elif llm_model.startswith("gpt-") and not os.getenv("OPENAI_API_KEY"):
+    elif llm_model.startswith("gpt-") and not openai_key:
         logger.error(f"Attempt to use OpenAI model '{llm_model}' without API key")
         st.error("OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly.")
 
@@ -1242,14 +1434,10 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
         step_key = normalize_processing_step(max_processing_step)
         partial = is_partial_processing_step(step_key)
 
-        # Get current configuration
-        config = {
-            "chunk_size": st.session_state.chunk_size,
-            "chunk_overlap": st.session_state.chunk_overlap,
-            "top_k": st.session_state.top_k,
-            "model": st.session_state.llm_model,
-            "question_set": st.session_state.question_set,
-        }
+        # Get current configuration (must match sidebar widgets / save_analysis keys)
+        config = build_analysis_config_from_session()
+        APIKeyManager.sync_api_keys_to_env(st.session_state)
+
         logger.info(f"[ANALYSIS] User triggered analysis for file: {file_path}")
         logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
         if "questions" in st.session_state:
@@ -1302,9 +1490,11 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
                 question_ids=question_ids,
             )
             if cached_results and not force_recompute:
+                from report_analyst.core.analysis_result_utils import normalize_results_container
+
                 logger.info(f"[CACHE] Cache HIT for config: {config}")
                 progress_text.success("Found stored results!")
-                st.session_state.results = cached_results
+                st.session_state.results = normalize_results_container(cached_results)
                 logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
                 logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
                 return
@@ -1384,9 +1574,11 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
             # If no results from cache, use the ones we just processed
             final_results = all_results
 
+        from report_analyst.core.analysis_result_utils import normalize_results_container
+
         # When writing results to session state
         logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
-        st.session_state.results = final_results
+        st.session_state.results = normalize_results_container(final_results)
         logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
 
         if partial:
@@ -1415,7 +1607,20 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
             else:
                 progress_text.warning(f"Completed {label} step, but no chunks were found in cache.")
         else:
-            progress_text.success("Analysis complete!")
+            if step_failed:
+                progress_text.error("Analysis failed for one or more questions.")
+            elif all_results:
+                successes, failures = split_analysis_results(final_results)
+                if failures and successes:
+                    progress_text.warning(
+                        f"Partial analysis: {len(successes)} succeeded, {len(failures)} failed."
+                    )
+                elif failures:
+                    progress_text.error("Analysis failed for all selected questions.")
+                else:
+                    progress_text.success("Analysis complete!")
+            else:
+                progress_text.error("No results found after analysis.")
 
     except Exception as e:
         progress_text.error(f"Error during analysis: {e!s}")
@@ -1448,7 +1653,7 @@ def main():
             st.session_state.force_recompute = False  # Default recompute setting
 
         if "results" not in st.session_state:
-            st.session_state.results = {}  # Initialize empty results
+            st.session_state.results = {"answers": {}}
 
         if "current_file" not in st.session_state:
             st.session_state.current_file = None  # Initialize current file
@@ -2848,10 +3053,15 @@ def main():
 
                     # Update API key if user entered a new value (different from current)
                     if openai_key_input and openai_key_input != current_openai_key:
-                        APIKeyManager.set_api_key("OPENAI_API_KEY", openai_key_input, st.session_state)
-                        st.session_state.prev_openai_key = openai_key_input
-                        st.session_state.override_openai_key = False  # Reset override state
-                        st.success("OpenAI API key updated")
+                        if not APIKeyManager.looks_like_openai_api_key(openai_key_input):
+                            st.error("That doesn't look like an OpenAI API key (expected sk-...).")
+                        else:
+                            APIKeyManager.set_api_key("OPENAI_API_KEY", openai_key_input, st.session_state)
+                            st.session_state.prev_openai_key = openai_key_input
+                            st.session_state.override_openai_key = False  # Reset override state
+                            st.session_state.pop("openai_api_key_input", None)
+                            st.success("OpenAI API key updated")
+                            st.rerun()
                     elif openai_key_input == "" and current_openai_key and not has_env_openai:
                         # User cleared the input - keep existing key (only if not from env)
                         st.session_state.prev_openai_key = current_openai_key
@@ -2863,6 +3073,28 @@ def main():
                         if st.button("Cancel Override", key="cancel_override_openai"):
                             st.session_state.override_openai_key = False
                             st.rerun()
+
+                test_key = (st.session_state.get("openai_api_key_input") or "").strip() or current_openai_key
+                if st.button(
+                    "Test OpenAI key",
+                    key="btn_test_openai_key",
+                    help="Calls GET /v1/models to verify the key (no token usage)",
+                ):
+                    if not test_key:
+                        st.warning("Enter or set an OpenAI API key first.")
+                    else:
+                        with st.spinner("Testing OpenAI key..."):
+                            openai_test_result = APIKeyManager.test_openai_api_key(test_key)
+                        if openai_test_result.get("ok"):
+                            scanned = openai_test_result.get("models_scanned", 0)
+                            relevant = openai_test_result.get("chat_and_embedding_models") or []
+                            st.success(
+                                f"Key valid — scanned {scanned} model(s) from {openai_test_result['endpoint']}"
+                                + (f"; {len(relevant)} chat/embedding model(s) found" if relevant else "")
+                            )
+                        else:
+                            st.error(openai_test_result.get("error", "OpenAI key test failed"))
+                        st.json(openai_test_result)
 
             # Google/Gemini API Key section
             with st.expander(
@@ -2926,6 +3158,7 @@ def main():
             if current_openai_key and not has_env_openai:
                 if st.button("Clear OpenAI Key", key="clear_openai_key"):
                     APIKeyManager.set_api_key("OPENAI_API_KEY", None, st.session_state)
+                    st.session_state.pop("openai_api_key_input", None)
                     st.rerun()
 
             st.divider()
@@ -3388,11 +3621,10 @@ def main():
                         unsafe_allow_html=True,
                     )
 
-                    # Create select slider for step selection
+                    # Create select slider for step selection (key binds to session state; no value=)
                     selected_step = st.select_slider(
                         "Select processing steps",
                         options=step_options,
-                        value=st.session_state.processing_steps_slider,
                         key="processing_steps_slider",
                         help="Select how many processing steps to execute",
                         label_visibility="collapsed",
@@ -3772,19 +4004,10 @@ def main():
                                 st.error(f"Error analyzing document: {e!s}")
                         else:
                             try:
-                                # Set force_recompute based on which button was clicked
+                                update_analyzer_parameters()
                                 st.session_state.force_recompute = reanalyze_clicked
 
-                                # Get current configuration
-                                config = {
-                                    "chunk_size": st.session_state.new_chunk_size,
-                                    "chunk_overlap": st.session_state.new_overlap,
-                                    "top_k": st.session_state.new_top_k,
-                                    "model": st.session_state.new_llm_model,
-                                    "question_set": st.session_state.new_question_set,
-                                }
-
-                                # Initialize progress display
+                                config = build_analysis_config_from_session()
                                 progress_text = st.empty()
 
                                 # Check if this is a backend resource
@@ -3796,87 +4019,25 @@ def main():
                                 if is_backend and backend_uri:
                                     analysis_file_path = backend_uri  # URN string
                                 else:
-                                    # Local file - ensure it's absolute path string (backwards compatible)
                                     analysis_file_path = str(Path(file_path).resolve()) if file_path else file_path
 
-                                if reanalyze_clicked:
-                                    # For reanalysis, skip cache check and analyze all selected questions
-                                    progress_text.info(f"Reanalyzing {len(selected_questions)} questions...")
+                                try:
                                     asyncio.run(
-                                        run_analysis(
+                                        run_report_answer_workflow(
                                             analyzer,
-                                            file_path=analysis_file_path,
+                                            analysis_file_path=analysis_file_path,
+                                            file_path=file_path,
+                                            questions=questions,
                                             selected_questions=selected_questions,
+                                            config=config,
+                                            max_step=max_step,
+                                            reanalyze=reanalyze_clicked,
                                             progress_text=progress_text,
-                                            max_processing_step=get_max_processing_step(),
                                         )
                                     )
-                                else:
-                                    # For normal analysis, check cache first
-                                    cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                                        file_path=analysis_file_path,
-                                        config=config,
-                                        question_ids=selected_questions,
-                                    )
-
-                                    if cached_results:
-                                        # Process cached results
-                                        for (
-                                            question_id,
-                                            result,
-                                        ) in cached_results.items():
-                                            st.session_state.results["answers"][question_id] = result
-
-                                        # Generate file key for display
-                                        file_key = generate_file_key(analysis_file_path, st)
-
-                                        # Update display
-                                        analysis_df, chunks_df = create_analysis_dataframes(
-                                            st.session_state.results["answers"],
-                                            file_key,
-                                        )
-                                        st.session_state.analysis_df = analysis_df
-                                        st.session_state.chunks_df = chunks_df
-                                        st.session_state.analysis_complete = True
-                                    else:
-                                        # Run analysis for uncached questions
-                                        progress_text.info(f"Processing {len(selected_questions)} questions...")
-
-                                        try:
-                                            # Run analysis for uncached questions
-                                            asyncio.run(
-                                                analyze_document_and_display(
-                                                    analyzer,
-                                                    file_path=analysis_file_path,  # Use URN for backend, file path for local
-                                                    questions=questions,
-                                                    selected_questions=selected_questions,
-                                                    use_llm_scoring=st.session_state.new_llm_scoring,
-                                                    single_call=st.session_state.new_batch_scoring,
-                                                    max_processing_step=max_step,
-                                                )
-                                            )
-
-                                            progress_text.success("Analysis complete!")
-
-                                        except Exception as e:
-                                            st.error(f"Error during analysis: {e!s}")
-                                            st.exception(e)
-
-                                    # Get final results
-                                    all_results = analyzer.analyzer.cache_manager.get_analysis(
-                                        file_path=str(file_path),
-                                        config=config,
-                                        question_ids=selected_questions,
-                                    )
-
-                                    # Process all results into dataframes
-                                    if all_results:
-                                        analysis_df, chunks_df = create_analysis_dataframes(all_results)
-                                        file_key = Path(file_path).stem
-                                        display_analysis_results(analysis_df, chunks_df, file_key)
-                                        progress_text.success(f"✓ Analysis complete for {len(selected_questions)} questions")
-                                    else:
-                                        progress_text.error("No results found after analysis")
+                                except Exception as e:
+                                    st.error(f"Error during analysis: {e!s}")
+                                    st.exception(e)
 
                             except Exception as e:
                                 logger.error(

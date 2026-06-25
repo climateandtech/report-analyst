@@ -6,11 +6,16 @@ Keys are only kept in memory for the current session.
 """
 
 import os
-from typing import Optional
+from typing import Any, Optional
 
 
 class APIKeyManager:
     """Service to manage API keys in session state and environment without persistence"""
+
+    @staticmethod
+    def looks_like_openai_api_key(value: str) -> bool:
+        """Rough format check — OpenAI secret keys start with sk-."""
+        return bool(value.strip().startswith("sk-"))
 
     @staticmethod
     def set_api_key(key_name: str, value: Optional[str], session_state: dict) -> None:
@@ -78,3 +83,49 @@ class APIKeyManager:
                 value = session_state[session_key]
                 if value:
                     os.environ[key_name] = value
+
+    @staticmethod
+    def test_openai_api_key(api_key: Optional[str] = None, *, limit: int = 8, max_scan: int = 200) -> dict[str, Any]:
+        """Validate an OpenAI key via GET /v1/models (auth check only, no token usage)."""
+        if not api_key:
+            return {"ok": False, "endpoint": "GET /v1/models", "error": "No API key to test"}
+
+        try:
+            from openai import AuthenticationError, OpenAI
+
+            client_kwargs: dict[str, Any] = {"api_key": api_key}
+            base_url = os.getenv("OPENAI_API_BASE")
+            if base_url:
+                client_kwargs["base_url"] = base_url
+            client = OpenAI(**client_kwargs)
+            page = client.models.list()
+
+            listed_ids: list[str] = []
+            chat_and_embedding: list[str] = []
+            for model in page:
+                listed_ids.append(model.id)
+                if model.id.startswith(("gpt-", "text-embedding", "o1", "o3")):
+                    chat_and_embedding.append(model.id)
+                if len(listed_ids) >= max_scan:
+                    break
+
+            return {
+                "ok": True,
+                "endpoint": "GET /v1/models",
+                "models_scanned": len(listed_ids),
+                "sample_models": listed_ids[:limit],
+                "chat_and_embedding_models": chat_and_embedding[:20],
+                "note": (
+                    "sample_models are the first entries returned by the API (not your full catalog). "
+                    "Use chat_and_embedding_models for Report Analyst–relevant IDs."
+                ),
+                "object": "list",
+            }
+        except AuthenticationError as exc:
+            return {
+                "ok": False,
+                "endpoint": "GET /v1/models",
+                "error": getattr(exc, "message", None) or str(exc),
+            }
+        except Exception as exc:
+            return {"ok": False, "endpoint": "GET /v1/models", "error": str(exc)}

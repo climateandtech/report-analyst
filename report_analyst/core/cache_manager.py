@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from llama_index.core import Document, QueryBundle
-from llama_index.core.indices import VectorStoreIndex
+from llama_index.core import Document
 from sqlalchemy import text
 
+from .analysis_result_utils import is_stored_analysis_error
 from .database_manager import DatabaseManager
 from .database_schema import indexes, metadata
 
@@ -80,7 +80,7 @@ class CacheManager:
 
             logger.info("Database schema initialized successfully")
         except Exception as e:
-            logger.error(f"Error initializing database schema: {str(e)}", exc_info=True)
+            logger.error(f"Error initializing database schema: {e!s}", exc_info=True)
             raise
 
     def _load_vector_store(self, file_path: str, chunks: List[Dict]) -> None:
@@ -116,7 +116,7 @@ class CacheManager:
             logger.info(f"Loaded {len(documents)} chunks into vector store for {file_path}")
 
         except Exception as e:
-            logger.error(f"Error loading vector store: {str(e)}", exc_info=True)
+            logger.error(f"Error loading vector store: {e!s}", exc_info=True)
             raise
 
     async def get_similar_chunks(
@@ -176,11 +176,19 @@ class CacheManager:
             return chunks
 
         except Exception as e:
-            logger.error(f"Error getting similar chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error getting similar chunks: {e!s}", exc_info=True)
             return []
 
     def save_analysis(self, file_path: str, question_id: str, result: Dict, config: Dict):
         """Save analysis result to cache with improved logging"""
+        if is_stored_analysis_error(result):
+            logger.error(
+                "Refusing to cache failed analysis for %s - %s: %s",
+                file_path,
+                question_id,
+                result.get("ANSWER", result.get("error", "unknown error")),
+            )
+            return
         try:
             logger.info(f"Saving analysis for {file_path} - {question_id}")
             logger.info(f"Configuration: {json.dumps(config, indent=2)}")
@@ -392,7 +400,7 @@ class CacheManager:
                                 f"Saving raw values to DB - similarity_score: {chunk.get('similarity_score')}, llm_score: {chunk.get('llm_score')}, is_evidence: {chunk.get('is_evidence')}"
                             )
                         else:
-                            logger.warning(f"Could not find chunk in document_chunks table")
+                            logger.warning("Could not find chunk in document_chunks table")
 
                 # Save to analysis cache
                 logger.info("Saving to analysis cache")
@@ -449,7 +457,7 @@ class CacheManager:
                 logger.info("Successfully saved complete analysis")
 
         except Exception as e:
-            logger.error(f"Error saving analysis: {str(e)}", exc_info=True)
+            logger.error(f"Error saving analysis: {e!s}", exc_info=True)
             raise
 
     def get_analysis(self, file_path: str, config: Dict, question_ids: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -593,10 +601,21 @@ class CacheManager:
                                 f"  Similarity range: {min(c['similarity_score'] for c in results[question_id]['chunks']):.4f} - {max(c['similarity_score'] for c in results[question_id]['chunks']):.4f}"
                             )
 
-                return results
+                filtered: Dict[str, Any] = {}
+                for question_id, entry in results.items():
+                    payload = entry.get("result", entry)
+                    if is_stored_analysis_error(payload):
+                        logger.warning(
+                            "Omitting cached analysis error for %s: %s",
+                            question_id,
+                            payload.get("ANSWER", payload.get("error", "")),
+                        )
+                        continue
+                    filtered[question_id] = entry
+                return filtered
 
         except Exception as e:
-            logger.error(f"Error retrieving analysis: {str(e)}", exc_info=True)
+            logger.error(f"Error retrieving analysis: {e!s}", exc_info=True)
             raise
 
     def save_vectors(self, file_path: str, chunks: List[Dict[str, Any]]) -> None:
@@ -639,7 +658,7 @@ class CacheManager:
                             }
                         )
                     except Exception as e:
-                        logger.warning(f"Error preparing chunk {i} for storage: {str(e)}")
+                        logger.warning(f"Error preparing chunk {i} for storage: {e!s}")
                         continue
 
                 if chunk_data:
@@ -692,7 +711,7 @@ class CacheManager:
                     logger.warning("No valid chunks to save")
 
         except Exception as e:
-            logger.error(f"Error saving vectors: {str(e)}", exc_info=True)
+            logger.error(f"Error saving vectors: {e!s}", exc_info=True)
             raise
 
     def get_vectors(self, file_path: str) -> List[Dict[str, Any]]:
@@ -745,7 +764,7 @@ class CacheManager:
                 logger.info(f"Retrieved {len(chunks)} vectors for {file_path}")
                 return chunks
         except Exception as e:
-            logger.error(f"Error retrieving vectors: {str(e)}", exc_info=True)
+            logger.error(f"Error retrieving vectors: {e!s}", exc_info=True)
             return []
 
     def clear_cache(self, file_path: Optional[str] = None):
@@ -767,7 +786,7 @@ class CacheManager:
                     conn.execute(text("DELETE FROM document_chunks"))
                     logger.info("Cleared all cache")
         except Exception as e:
-            logger.error(f"Error clearing cache: {str(e)}", exc_info=True)
+            logger.error(f"Error clearing cache: {e!s}", exc_info=True)
 
     def list_analysis_keys(self) -> List[Dict[str, str]]:
         """List distinct (file_path, question_set) pairs that have stored analysis. Used for UI dropdowns driven by stored data."""
@@ -823,7 +842,7 @@ class CacheManager:
                 return rows
 
         except Exception as e:
-            logger.error(f"Error checking cache status: {str(e)}", exc_info=True)
+            logger.error(f"Error checking cache status: {e!s}", exc_info=True)
             return []
 
     def list_document_chunk_configs(self) -> List[tuple]:
@@ -1070,7 +1089,7 @@ class CacheManager:
                 logger.info(f"Verification: Found {count} chunks in database for {file_path}")
 
         except Exception as e:
-            logger.error(f"Error saving document chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error saving document chunks: {e!s}", exc_info=True)
             raise
 
     def get_document_chunks(self, file_path: str, chunk_size: int = None, chunk_overlap: int = None) -> List[Dict]:
@@ -1147,7 +1166,7 @@ class CacheManager:
                 return chunks
 
         except Exception as e:
-            logger.error(f"Error getting document chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error getting document chunks: {e!s}", exc_info=True)
             return []
 
     def get_chunks_without_embeddings(self, file_path: str, chunk_size: int = None, chunk_overlap: int = None) -> List[Dict]:
@@ -1202,7 +1221,7 @@ class CacheManager:
                 return chunks
 
         except Exception as e:
-            logger.error(f"Error getting chunks without embeddings: {str(e)}", exc_info=True)
+            logger.error(f"Error getting chunks without embeddings: {e!s}", exc_info=True)
             return []
 
     def has_chunk_scoring(self, file_path: str, config: Dict) -> bool:
@@ -1230,5 +1249,5 @@ class CacheManager:
                 return count > 0
 
         except Exception as e:
-            logger.error(f"Error checking chunk scoring: {str(e)}")
+            logger.error(f"Error checking chunk scoring: {e!s}")
             return False

@@ -47,6 +47,9 @@ def make_run_analysis_session(**overrides):
         "new_top_k": 5,
         "new_llm_model": "gpt-4o-mini",
         "new_question_set": "tcfd",
+        "new_llm_scoring": False,
+        "new_batch_scoring": True,
+        "results": {"answers": {}},
     }
     base.update(overrides)
     return FakeSessionState(base)
@@ -874,7 +877,7 @@ async def test_run_analysis_answer_cache_hit_returns_without_process(monkeypatch
 
     report_analyzer.process_document.assert_not_called()
     progress.success.assert_called_once_with("Found stored results!")
-    assert fake_st["results"]["tcfd_1"]["result"]["ANSWER"] == "Yes"
+    assert fake_st["results"]["answers"]["tcfd_1"]["result"]["ANSWER"] == "Yes"
 
 
 @pytest.mark.asyncio
@@ -1090,3 +1093,165 @@ async def test_run_analysis_embed_failure_does_not_show_success(monkeypatch, tmp
 
     progress.error.assert_called()
     progress.success.assert_not_called()
+
+
+def test_finalize_report_analysis_results_map_shows_on_disk_chunks(monkeypatch):
+    app, _ = patch_streamlit_app(monkeypatch)
+    progress = Mock()
+    analyzer = Mock()
+    analyzer.analyzer.chunk_params = {"chunk_size": 500, "chunk_overlap": 20}
+    display = Mock(return_value=(480, 480))
+    monkeypatch.setattr(app, "display_cached_document_chunks", display)
+
+    app.finalize_report_analysis_results(
+        analyzer,
+        "/abs/Befesa_Annual_Report_2025.pdf",
+        {"chunk_size": 500, "chunk_overlap": 20, "top_k": 5, "model": "gpt-4o-mini", "question_set": "tcfd"},
+        ["tcfd_2", "tcfd_4"],
+        "Map",
+        progress,
+        "/abs/Befesa_Annual_Report_2025.pdf",
+    )
+
+    display.assert_called_once()
+    progress.success.assert_called_once()
+    msg = progress.success.call_args[0][0]
+    assert "Map step" in msg
+    assert "480" in msg
+    progress.error.assert_not_called()
+
+
+def test_resolve_analysis_results_prefers_cache(monkeypatch):
+    app, fake_st = patch_streamlit_app(monkeypatch)
+    analyzer = Mock()
+    analyzer.analyzer.cache_manager.get_analysis.return_value = {"tcfd_1": {"result": {"ANSWER": "yes"}}}
+
+    results = app.resolve_analysis_results_after_run(
+        analyzer,
+        "/abs/report.pdf",
+        {},
+        ["tcfd_1"],
+    )
+
+    assert results == {"tcfd_1": {"result": {"ANSWER": "yes"}}}
+
+
+def test_resolve_analysis_results_falls_back_to_session_answers(monkeypatch):
+    app, fake_st = patch_streamlit_app(monkeypatch)
+    fake_st["results"] = {"answers": {"tcfd_2": {"result": {"ANSWER": "cached in session"}}}}
+    analyzer = Mock()
+    analyzer.analyzer.cache_manager.get_analysis.return_value = None
+
+    results = app.resolve_analysis_results_after_run(
+        analyzer,
+        "/abs/report.pdf",
+        {},
+        ["tcfd_2"],
+    )
+
+    assert results == {"tcfd_2": {"result": {"ANSWER": "cached in session"}}}
+
+
+@pytest.mark.asyncio
+async def test_analyze_document_and_display_accepts_flat_session_after_reanalyze(monkeypatch, tmp_path):
+    """Regression: Reanalyze stores flat results; Analyze must not KeyError on 'answers'."""
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "flat-session.pdf")
+    fake_st = make_run_analysis_session(
+        results={"tcfd_1": {"result": {"ANSWER": "from reanalyze", "SCORE": 1.0}}},
+        current_question_set="tcfd",
+    )
+    monkeypatch.setattr(app, "st", Mock(session_state=fake_st, empty=Mock(), info=Mock(), success=Mock(), error=Mock()))
+    monkeypatch.setattr(app, "APIKeyManager", Mock(sync_api_keys_to_env=Mock()))
+    monkeypatch.setattr(app, "log_analysis_step", Mock())
+    monkeypatch.setattr(
+        app,
+        "create_analysis_dataframes",
+        Mock(return_value=(Mock(), Mock())),
+    )
+
+    report_analyzer = Mock()
+    report_analyzer.cache_manager.get_analysis.return_value = {}
+
+    async def fake_analyze_document(*args, **kwargs):
+        yield {
+            "question_id": "tcfd_2",
+            "result": {"ANSWER": "second question", "SCORE": 0.8, "EVIDENCE": []},
+        }
+
+    report_analyzer.analyze_document = fake_analyze_document
+
+    await app.analyze_document_and_display(
+        report_analyzer,
+        file_path=file_path,
+        questions={"tcfd_2": {"text": "Q2", "guidelines": "", "id": "tcfd_2", "number": 2}},
+        selected_questions=["tcfd_2"],
+    )
+
+    assert fake_st["results"]["answers"]["tcfd_2"]["result"]["ANSWER"] == "second question"
+
+
+def test_finalize_report_analysis_results_shows_error_not_success_for_cached_failures(monkeypatch):
+    """Regression: legacy error strings in cache must not produce a green success banner."""
+    app, _ = patch_streamlit_app(monkeypatch)
+    progress = Mock()
+    st_error = Mock()
+    monkeypatch.setattr(app.st, "error", st_error)
+    analyzer = Mock()
+    analyzer.analyzer.cache_manager.get_analysis.return_value = {
+        "tcfd_1": {
+            "result": {
+                "ANSWER": "Error analyzing document: 'str' object is not callable",
+                "SCORE": 0,
+                "EVIDENCE": [],
+            },
+            "chunks": [{"text": "chunk", "similarity_score": 0.8, "llm_score": None, "is_evidence": False}],
+        }
+    }
+    analyzer.analyzer.chunk_params = {"chunk_size": 500, "chunk_overlap": 20}
+    monkeypatch.setattr(app, "create_analysis_dataframes", Mock(return_value=(Mock(), Mock())))
+    monkeypatch.setattr(app, "display_analysis_results", Mock())
+    monkeypatch.setattr(app, "display_cached_document_chunks", Mock(return_value=(480, 480)))
+
+    app.finalize_report_analysis_results(
+        analyzer,
+        "/abs/report.pdf",
+        {"chunk_size": 500, "chunk_overlap": 20, "top_k": 5, "model": "gpt-4o-mini", "question_set": "tcfd"},
+        ["tcfd_1"],
+        "Answer",
+        progress,
+        "/abs/report.pdf",
+    )
+
+    progress.success.assert_not_called()
+    st_error.assert_called()
+    app.display_analysis_results.assert_not_called()
+    app.display_cached_document_chunks.assert_called_once()
+
+
+def test_finalize_report_analysis_results_after_reanalyze_shows_success_table(monkeypatch):
+    """finalize displays tables when cache has a valid answer."""
+    app, _ = patch_streamlit_app(monkeypatch)
+    progress = Mock()
+    analyzer = Mock()
+    analyzer.analyzer.cache_manager.get_analysis.return_value = {
+        "tcfd_1": {"result": {"ANSWER": "Board oversees climate.", "SCORE": 0.9, "EVIDENCE": []}, "chunks": []}
+    }
+    analyzer.analyzer.chunk_params = {"chunk_size": 500, "chunk_overlap": 20}
+    display = Mock()
+    monkeypatch.setattr(app, "create_analysis_dataframes", Mock(return_value=(Mock(), Mock())))
+    monkeypatch.setattr(app, "display_analysis_results", display)
+
+    app.finalize_report_analysis_results(
+        analyzer,
+        "/abs/Befesa_Annual_Report_2025.pdf",
+        {"chunk_size": 500, "chunk_overlap": 20, "top_k": 5, "model": "gpt-4o-mini", "question_set": "tcfd"},
+        ["tcfd_1"],
+        "Answer",
+        progress,
+        "/abs/Befesa_Annual_Report_2025.pdf",
+    )
+
+    display.assert_called_once()
+    progress.success.assert_called_once()

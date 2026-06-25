@@ -127,7 +127,15 @@ class DocumentAnalyzer:
     _instance = None
     _initialized = False
 
+    @classmethod
+    def _reset_singleton_if_stale(cls) -> None:
+        """Drop cached singleton after hot reload when instance predates new methods."""
+        if cls._instance is not None and not hasattr(cls._instance, "_ensure_llm_client"):
+            cls._instance = None
+            cls._initialized = False
+
     def __new__(cls):
+        cls._reset_singleton_if_stale()
         if cls._instance is None:
             cls._instance = super(DocumentAnalyzer, cls).__new__(cls)
         return cls._instance
@@ -177,6 +185,8 @@ class DocumentAnalyzer:
                     model_name=self.default_model,
                     cache_dir=str(self.llm_cache_path),
                 )
+                self._llm_client_model = self.default_model
+                self._llm_api_key = os.getenv(self._api_key_env_for_model(self.default_model))
 
                 # Initialize embeddings if OpenAI API key is available
                 if openai_key:
@@ -186,6 +196,7 @@ class DocumentAnalyzer:
                         model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
                         embed_batch_size=100,
                     )
+                    self._embeddings_api_key = openai_key
 
                     # Configure embeddings globally for LlamaIndex
                     Settings.embed_model = self.embeddings
@@ -357,6 +368,7 @@ class DocumentAnalyzer:
         log_analysis_step(f"Computing relevance score for chunk: {chunk_text[:100]}...")
 
         try:
+            self._ensure_llm_client()
             response = await self.llm.achat(
                 prompt=f"""As a senior equity analyst with expertise in climate science evaluating a company's sustainability report, you are tasked with evaluating text fragments for their usefulness in answering specific TCFD questions.
 
@@ -422,6 +434,7 @@ Output only the numeric score (0.0-1.0):"""
                 # Batch scoring - all chunks in one call
                 chunks_text = "\n\n".join([f"[CHUNK {i+1}]\n{chunk['text']}" for i, chunk in enumerate(chunks)])
 
+                self._ensure_llm_client()
                 response = await self.llm.achat(
                     prompt=f"""As a senior equity analyst with expertise in climate science evaluating a company's sustainability report, you are tasked with evaluating text fragments for their usefulness in answering specific TCFD questions.
 
@@ -877,13 +890,15 @@ Output only the scores, one per line, in order:"""
         openai_key = os.getenv("OPENAI_API_KEY")
         if not openai_key:
             raise RuntimeError("OpenAI embeddings unavailable — set OPENAI_API_KEY for the Embed step.")
-        if self.embeddings is None:
+        cached_key = getattr(self, "_embeddings_api_key", None)
+        if self.embeddings is None or cached_key != openai_key:
             self.embeddings = OpenAIEmbedding(
                 api_key=openai_key,
                 api_base=os.getenv("OPENAI_API_BASE"),
                 model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
                 embed_batch_size=100,
             )
+            self._embeddings_api_key = openai_key
             Settings.embed_model = self.embeddings
 
     def _add_embeddings_to_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -984,6 +999,7 @@ Output only the scores, one per line, in order:"""
 
             # Get LLM response
             try:
+                self._ensure_llm_client()
                 response = await self.llm.achat(messages)
                 response_text = response.message.content  # Changed from response.content to response.message.content
                 logger.info("=== LLM Response ===")
@@ -1078,16 +1094,7 @@ Output only the scores, one per line, in order:"""
 
         except Exception as e:
             logger.error(f"Error analyzing chunks: {e!s}", exc_info=True)
-            return {
-                "ANSWER": f"Error analyzing document: {e!s}",
-                "SCORE": 0,
-                "EVIDENCE": [],
-                "GAPS": ["Error during analysis"],
-                "SOURCES": [],
-                "chunks": processed_chunks if "processed_chunks" in locals() else [],
-                "question_text": question_data["text"],
-                "guidelines": question_data.get("guidelines", ""),
-            }
+            raise
 
     def _load_questions(self) -> dict:
         """Load questions from YAML files"""
@@ -1179,15 +1186,39 @@ Output only the scores, one per line, in order:"""
 
         logger.info("Updated parameters and recreated text splitter")
 
+    def _api_key_env_for_model(self, model_name: str) -> str:
+        if model_name.startswith("gpt-"):
+            return "OPENAI_API_KEY"
+        if model_name.startswith("gemini-") or model_name.startswith("models/gemini-"):
+            return "GOOGLE_API_KEY"
+        raise ValueError(f"Unsupported model: {model_name}")
+
+    def _llm_model_name(self) -> str:
+        if self.llm and hasattr(self.llm, "model"):
+            return self.llm.model
+        return self.default_model
+
+    def _ensure_llm_client(self, model_name: str | None = None) -> None:
+        """Initialize or refresh the LLM client when model or API key changes."""
+        if self.use_backend_llm:
+            return
+        model_name = model_name or self._llm_model_name()
+        env_var = self._api_key_env_for_model(model_name)
+        current_key = os.getenv(env_var)
+        cached_key = getattr(self, "_llm_api_key", None)
+        cached_model = getattr(self, "_llm_client_model", None)
+        if self.llm is None or cached_model != model_name or cached_key != current_key:
+            self.llm = get_llm(
+                model_name=model_name,
+                cache_dir=str(self.llm_cache_path),
+            )
+            self._llm_api_key = current_key
+            self._llm_client_model = model_name
+
     def update_llm_model(self, model_name: str):
         """Update the LLM model."""
         log_analysis_step(f"Updating LLM model to: {model_name}")
-
-        # Initialize LLM with caching using the provider factory
-        self.llm = get_llm(
-            model_name=model_name,
-            cache_dir=str(self.llm_cache_path),
-        )
+        self._ensure_llm_client(model_name)
 
     def get_all_cached_answers(self, question_set: str) -> Dict[str, Any]:
         """Get all cached answers for a question set"""
@@ -1464,13 +1495,7 @@ Output only the scores, one per line, in order:"""
 
         except Exception as e:
             logger.error(f"Error parsing analysis response: {e!s}", exc_info=True)
-            return {
-                "ANSWER": f"Error parsing analysis: {e!s}",
-                "SCORE": 0,
-                "EVIDENCE": [],
-                "GAPS": ["Error during analysis"],
-                "SOURCES": [],
-            }
+            raise ValueError(f"Error parsing analysis: {e!s}") from e
 
 
 def create_analysis_dataframes(results: Dict) -> pd.DataFrame:

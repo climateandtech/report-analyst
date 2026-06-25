@@ -5,6 +5,7 @@ import os
 from collections.abc import Iterable
 from typing import Any, Optional
 
+import tiktoken
 from llama_index.llms.gemini import Gemini
 
 # LlamaIndex LLM imports
@@ -12,6 +13,42 @@ from llama_index.llms.openai import OpenAI
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+
+def _tiktoken_encoding_name_for_model(model_name: str) -> str:
+    """Resolve a tiktoken encoding when ``encoding_for_model`` has no catalog entry."""
+    explicit = os.getenv("OPENAI_TIKTOKEN_ENCODING", "").strip()
+    if explicit:
+        return explicit
+
+    lowered = model_name.lower()
+    if lowered.startswith("gpt-5") or "4o" in lowered:
+        return "o200k_base"
+    if lowered.startswith("gpt-4") or lowered.startswith("gpt-3.5"):
+        return "cl100k_base"
+    return "o200k_base"
+
+
+def _tiktoken_encoding_for_model(model_name: str) -> tiktoken.Encoding:
+    """Return tiktoken encoding for an OpenAI model ID, with fallback for new IDs."""
+    try:
+        return tiktoken.encoding_for_model(model_name)
+    except KeyError:
+        encoding_name = _tiktoken_encoding_name_for_model(model_name)
+        logger.warning(
+            "tiktoken has no mapping for %r; using %s (override via OPENAI_TIKTOKEN_ENCODING)",
+            model_name,
+            encoding_name,
+        )
+        return tiktoken.get_encoding(encoding_name)
+
+
+class ReportAnalystOpenAI(OpenAI):
+    """OpenAI LLM with tiktoken fallback for model IDs ahead of tiktoken releases."""
+
+    @property
+    def _tokenizer(self) -> tiktoken.Encoding:
+        return _tiktoken_encoding_for_model(self._get_model_name())
 
 
 def _ensure_openai_model_registered(model_name: str) -> None:
@@ -78,7 +115,7 @@ def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
             raise ValueError("OPENAI_API_KEY environment variable is required for OpenAI models")
 
         _ensure_openai_model_registered(model_name)
-        return OpenAI(
+        return ReportAnalystOpenAI(
             model=model_name,
             api_key=api_key,
             api_base=os.getenv("OPENAI_API_BASE"),
