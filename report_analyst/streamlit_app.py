@@ -62,6 +62,7 @@ if str(current_dir) not in sys.path:
 logger.info(f"Added {current_dir} to Python path")
 
 # Keep relative imports
+from report_analyst.consolidated_results_view import render_consolidated_report_view
 from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
@@ -949,61 +950,94 @@ def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame,
         st.error(f"Error displaying results: {e!s}")
 
 
-def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
-    """Display consolidated results for all analyzed documents
+def build_all_results_file_configs(
+    cache_manager,
+    db_question_set: str,
+    *,
+    default_top_k: int,
+    default_model: str,
+) -> dict[str, list[dict]]:
+    """Merge analysis_cache configs with document_chunks-only configs for All Results."""
+    file_configs: dict[str, list[dict]] = {}
 
-    Args:
-        analyzer: ReportAnalyzer instance
-        question_set: Selected question set identifier
-        file_path: Optional file path. If provided, skip file selection and use this file.
-                   If None, will attempt to get file from cache (backward compatibility).
-        selected_config: Optional configuration dict. If provided, skip config selection and use this config.
-                        If None, will attempt to get config from cache (backward compatibility).
-    """
+    def add_config(
+        file_path: str,
+        chunk_size: int,
+        chunk_overlap: int,
+        top_k: int,
+        model: str,
+        question_set: str,
+        *,
+        chunks_only: bool = False,
+    ) -> None:
+        configs = file_configs.setdefault(str(file_path), [])
+        if any(c["chunk_size"] == chunk_size and c["chunk_overlap"] == chunk_overlap for c in configs):
+            return
+        entry = {
+            "chunk_size": chunk_size,
+            "chunk_overlap": chunk_overlap,
+            "top_k": top_k,
+            "model": model,
+            "question_set": question_set,
+        }
+        if chunks_only:
+            entry["chunks_only"] = True
+        configs.append(entry)
+
+    for config in cache_manager.check_cache_status():
+        if len(config) != 6:
+            continue
+        fp, chunk_size, chunk_overlap, top_k, model, qs = config
+        if qs == db_question_set:
+            add_config(fp, chunk_size, chunk_overlap, top_k, model, qs)
+
+    for fp, chunk_size, chunk_overlap in cache_manager.list_document_chunk_configs():
+        add_config(
+            fp,
+            chunk_size,
+            chunk_overlap,
+            default_top_k,
+            default_model,
+            db_question_set,
+            chunks_only=True,
+        )
+
+    return file_configs
+
+
+def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
+    """Display consolidated results for all analyzed documents."""
     try:
-        # Create mapping from question set names to database identifiers
         question_set_mapping = {
             "tcfd": "tcfd",
             "s4m": "s4m",
             "lucia": "lucia",
-            "everest": "ev",  # Everest questions use 'ev_' prefix, so database stores as 'ev'
+            "everest": "ev",
         }
-
-        # Get the database identifier for the selected question set
         db_question_set = question_set_mapping.get(question_set, question_set)
-        logger.info(f"Mapping question set '{question_set}' to database identifier '{db_question_set}'")
 
-        # Get all available cache configurations
-        cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
-        logger.info(f"Found cache configs: {cache_configs}")
-
-        if not cache_configs:
-            st.warning("No stored analyses found")
+        if file_path is not None and selected_config is not None:
+            config = selected_config.get("config", selected_config)
+            render_consolidated_report_view(
+                analyzer,
+                question_set,
+                file_path,
+                config,
+                display_analysis_results=display_analysis_results,
+            )
             return
 
-        # Group configurations by file
-        file_configs = {}
-        for config in cache_configs:
-            if len(config) == 6:  # Full config row from cache_status
-                file_path, chunk_size, chunk_overlap, top_k, model, qs = config
-                if qs == db_question_set:  # Only show configs for selected question set using database identifier
-                    if file_path not in file_configs:
-                        file_configs[file_path] = []
-                    file_configs[file_path].append(
-                        {
-                            "chunk_size": chunk_size,
-                            "chunk_overlap": chunk_overlap,
-                            "top_k": top_k,
-                            "model": model,
-                            "question_set": qs,
-                        }
-                    )
+        file_configs = build_all_results_file_configs(
+            analyzer.analyzer.cache_manager,
+            db_question_set,
+            default_top_k=st.session_state.get("top_k", 5),
+            default_model=st.session_state.get("llm_model", DEFAULT_LLM_MODEL),
+        )
 
         if not file_configs:
-            st.warning(f"No stored results found for question set: {question_set}")
+            st.warning("No stored analyses or cached document chunks found")
             return
 
-        # File selection
         st.subheader("Select Report and Configuration")
         file_path = st.selectbox(
             "Select Report",
@@ -1011,289 +1045,36 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
             format_func=lambda x: Path(x).name,
         )
 
-        if file_path:
-            # Show configurations for selected file
-            configs = file_configs[file_path]
-            config_options = []
-            for config in configs:
-                label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
-                config_options.append({"label": label, "config": config})
+        if not file_path:
+            return
 
-            selected_config = st.selectbox(
-                "Select Configuration",
-                options=config_options,
-                format_func=lambda x: x["label"],
+        configs = file_configs[file_path]
+        config_options = [
+            {
+                "label": (
+                    f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, "
+                    f"Top-K: {config['top_k']}, Model: {config['model']}"
+                    + (" (chunks only)" if config.get("chunks_only") else "")
+                ),
+                "config": config,
+            }
+            for config in configs
+        ]
+
+        selected_option = st.selectbox(
+            "Select Configuration",
+            options=config_options,
+            format_func=lambda x: x["label"],
+        )
+
+        if selected_option:
+            render_consolidated_report_view(
+                analyzer,
+                question_set,
+                file_path,
+                selected_option["config"],
+                display_analysis_results=display_analysis_results,
             )
-
-            if selected_config:
-                logger.info(f"Getting results for {Path(file_path).name} with config: {selected_config['config']}")
-
-                # Add similarity search section for document chunks
-                try:
-                    raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
-                        file_path=file_path,
-                        chunk_size=selected_config["config"]["chunk_size"],
-                        chunk_overlap=selected_config["config"]["chunk_overlap"],
-                    )
-
-                    if raw_chunks:
-                        # Add similarity search controls
-                        st.subheader("Similarity Search")
-
-                        # Get questions for the current question set
-                        # Make sure analyzer is using the correct question set
-                        if analyzer.analyzer.question_set != question_set:
-                            analyzer.analyzer.update_question_set(question_set)
-                        questions = analyzer.analyzer.questions
-
-                        col1, col2 = st.columns([1, 1])
-                        with col1:
-                            # Question dropdown with shorter, cleaner options
-                            question_options = ["None"] + [f"{q_id}" for q_id in questions.keys()]
-                            selected_question_id = st.selectbox(
-                                "Select a question to sort by similarity:",
-                                options=question_options,
-                                key="chunk_similarity_question",
-                                help="Choose a question from the current question set",
-                            )
-
-                            # Show selected question text below dropdown
-                            if selected_question_id != "None" and selected_question_id in questions:
-                                st.caption(f"**{selected_question_id}:** {questions[selected_question_id]['text'][:100]}...")
-                            selected_question = selected_question_id
-
-                        with col2:
-                            # Free text input
-                            custom_question = st.text_input(
-                                "Or enter custom question:",
-                                placeholder="Enter your own question to compare chunks against...",
-                                key="chunk_similarity_custom",
-                            )
-
-                        # Determine which question to use
-                        query_text = None
-                        if custom_question.strip():
-                            query_text = custom_question.strip()
-                            st.info(f"Using custom question: {query_text[:100]}...")
-                        elif selected_question != "None":
-                            if selected_question in questions:
-                                query_text = questions[selected_question]["text"]
-                                st.info(f"Using question {selected_question}: {query_text[:100]}...")
-
-                        # Process chunks
-                        chunks_rows = []
-                        chunks_with_embeddings = [c for c in raw_chunks if c.get("embedding") is not None]
-
-                        if query_text and chunks_with_embeddings:
-                            # Compute similarity scores
-                            try:
-                                # Check if embeddings are available
-                                if not analyzer.analyzer.embeddings or analyzer.analyzer.use_backend_llm:
-                                    st.warning(
-                                        "Embeddings not available for similarity search. Using backend mode or embeddings not initialized."
-                                    )
-                                    query_text = None
-                                else:
-                                    # Get query embedding
-                                    query_embedding = analyzer.analyzer.embeddings.get_text_embedding(query_text)
-                                    query_embedding = np.array(query_embedding, dtype=np.float32)
-
-                                    # Compute similarity for each chunk
-                                    similarities = []
-                                    for chunk in raw_chunks:
-                                        if chunk.get("embedding") is not None:
-                                            chunk_embedding = np.frombuffer(chunk["embedding"], dtype=np.float32)
-                                            # Compute cosine similarity
-                                            similarity = np.dot(query_embedding, chunk_embedding) / (
-                                                np.linalg.norm(query_embedding) * np.linalg.norm(chunk_embedding)
-                                            )
-                                            similarities.append(similarity)
-                                        else:
-                                            similarities.append(0.0)
-
-                                    # Sort chunks by similarity
-                                    chunk_similarity_pairs = list(zip(raw_chunks, similarities, strict=False))
-                                    chunk_similarity_pairs.sort(key=lambda x: x[1], reverse=True)
-
-                                    # Create rows with similarity scores
-                                    for i, (chunk, similarity) in enumerate(chunk_similarity_pairs):
-                                        chunk_row = {
-                                            "Rank": i + 1,
-                                            "Similarity": similarity,
-                                            "Text": chunk.get("text", chunk.get("chunk_text", "")),
-                                            "Has Embedding": chunk.get("embedding") is not None,
-                                            "Chunk Size": chunk.get("chunk_size", "N/A"),
-                                            "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
-                                        }
-                                        chunks_rows.append(chunk_row)
-
-                                    st.success(f"✓ Sorted {len(chunks_rows)} chunks by similarity to query")
-
-                            except Exception as e:
-                                st.error(f"Error computing similarity: {e!s}")
-                                logger.error(
-                                    f"Error computing similarity: {e!s}",
-                                    exc_info=True,
-                                )
-                                # Fall back to original display
-                                for i, chunk in enumerate(raw_chunks):
-                                    chunk_row = {
-                                        "Chunk #": i + 1,
-                                        "Text": chunk.get("text", chunk.get("chunk_text", "")),
-                                        "Has Embedding": chunk.get("embedding") is not None,
-                                        "Chunk Size": chunk.get("chunk_size", "N/A"),
-                                        "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
-                                    }
-                                    chunks_rows.append(chunk_row)
-
-                        else:
-                            # No query or no embeddings - show original order
-                            for i, chunk in enumerate(raw_chunks):
-                                chunk_row = {
-                                    "Chunk #": i + 1,
-                                    "Text": chunk.get("text", chunk.get("chunk_text", "")),
-                                    "Has Embedding": chunk.get("embedding") is not None,
-                                    "Chunk Size": chunk.get("chunk_size", "N/A"),
-                                    "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
-                                }
-                                chunks_rows.append(chunk_row)
-
-                            if query_text and not chunks_with_embeddings:
-                                st.warning(
-                                    "No chunks with embeddings found. Run Step 2 to generate embeddings for similarity search."
-                                )
-
-                        # Display chunks
-                        if chunks_rows:
-                            chunks_df = pd.DataFrame(chunks_rows)
-
-                            # Configure columns based on whether we have similarity scores
-                            if query_text and chunks_with_embeddings:
-                                column_config = {
-                                    "Rank": st.column_config.NumberColumn(
-                                        "Rank",
-                                        width="small",
-                                    ),
-                                    "Similarity": st.column_config.NumberColumn(
-                                        "Similarity",
-                                        format="%.4f",
-                                        width="small",
-                                    ),
-                                    "Text": st.column_config.TextColumn(
-                                        "Text",
-                                        width="large",
-                                    ),
-                                    "Has Embedding": st.column_config.CheckboxColumn(
-                                        "Has Embedding",
-                                    ),
-                                    "Chunk Size": st.column_config.NumberColumn(
-                                        "Chunk Size",
-                                        width="small",
-                                    ),
-                                    "Chunk Overlap": st.column_config.NumberColumn(
-                                        "Chunk Overlap",
-                                        width="small",
-                                    ),
-                                }
-                            else:
-                                column_config = {
-                                    "Chunk #": st.column_config.NumberColumn(
-                                        "Chunk #",
-                                        width="small",
-                                    ),
-                                    "Text": st.column_config.TextColumn(
-                                        "Text",
-                                        width="large",
-                                    ),
-                                    "Has Embedding": st.column_config.CheckboxColumn(
-                                        "Has Embedding",
-                                    ),
-                                    "Chunk Size": st.column_config.NumberColumn(
-                                        "Chunk Size",
-                                        width="small",
-                                    ),
-                                    "Chunk Overlap": st.column_config.NumberColumn(
-                                        "Chunk Overlap",
-                                        width="small",
-                                    ),
-                                }
-
-                            st.dataframe(
-                                data=chunks_df,
-                                use_container_width=True,
-                                hide_index=True,
-                                column_config=column_config,
-                            )
-
-                            st.info(f"✓ Found {len(chunks_rows)} total document chunks in this configuration.")
-                        else:
-                            st.warning("No chunks found. Run Step 1 to generate document chunks first.")
-
-                except Exception as e:
-                    logger.warning(f"Error displaying document chunks with similarity search: {e!s}")
-                    # Continue to show analysis results even if chunk display fails
-
-                # Get cached results
-                cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                    file_path=file_path, config=selected_config["config"]
-                )
-
-                if cached_results:
-                    # Get questions data
-                    questions = analyzer.analyzer.questions
-
-                    # Process results into analysis rows
-                    analysis_rows = []
-                    chunks_rows = []
-
-                    for question_id, data in cached_results.items():
-                        try:
-                            # Create analysis row
-                            result = data.get("result", {})
-                            analysis_row = {
-                                "Question ID": question_id,
-                                "Question Text": (questions[question_id]["text"] if question_id in questions else question_id),
-                                "Analysis": result.get("ANSWER", ""),
-                                "Score": float(result.get("SCORE", 0)),
-                                "Key Evidence": "\n".join([e.get("text", "") for e in result.get("EVIDENCE", [])]),
-                                "Gaps": "\n".join(result.get("GAPS", [])),
-                                "Sources": ", ".join(map(str, result.get("SOURCES", []))),
-                            }
-                            analysis_rows.append(analysis_row)
-                            logger.debug(f"Added analysis row for {question_id}: {json.dumps(analysis_row, indent=2)}")
-
-                            # Process chunks if available
-                            if "chunks" in data:
-                                for chunk in data["chunks"]:
-                                    chunk_row = {
-                                        "Question ID": question_id,
-                                        "Text": chunk.get("text", ""),
-                                        "Vector Similarity": chunk.get("similarity_score", 0.0),
-                                        "LLM Score": chunk.get("llm_score", 0.0),
-                                        "Is Evidence": chunk.get("is_evidence", False),
-                                        "Position": chunk.get("chunk_order", 0),
-                                    }
-                                    chunks_rows.append(chunk_row)
-
-                        except Exception as e:
-                            logger.error(
-                                f"Error processing result for question {question_id}: {e!s}",
-                                exc_info=True,
-                            )
-                            continue
-
-                    # Create DataFrames
-                    if analysis_rows:
-                        analysis_df = pd.DataFrame(analysis_rows)
-                        chunks_df = pd.DataFrame(chunks_rows) if chunks_rows else pd.DataFrame()
-
-                        # Display results using the existing display function
-                        file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
-                        display_analysis_results(analysis_df, chunks_df, file_key)
-                    else:
-                        st.warning("No results found in stored for this configuration")
-                else:
-                    st.warning("No stored results found for this configuration")
 
     except Exception as e:
         logger.error(f"Error displaying consolidated results: {e!s}", exc_info=True)
@@ -4450,26 +4231,13 @@ def main():
                 # Get the database identifier for the selected question set
                 db_question_set = question_set_mapping.get(selected_set, selected_set)
 
-                # Get all available cache configurations
-                cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
-
-                # Group configurations by file for the selected question set
-                if cache_configs:
-                    for config in cache_configs:
-                        if len(config) == 6:
-                            file_path, chunk_size, chunk_overlap, top_k, model, qs = config
-                            if qs == db_question_set:
-                                if file_path not in file_configs:
-                                    file_configs[file_path] = []
-                                file_configs[file_path].append(
-                                    {
-                                        "chunk_size": chunk_size,
-                                        "chunk_overlap": chunk_overlap,
-                                        "top_k": top_k,
-                                        "model": model,
-                                        "question_set": qs,
-                                    }
-                                )
+                # Get all available cache + document-chunk configurations
+                file_configs = build_all_results_file_configs(
+                    analyzer.analyzer.cache_manager,
+                    db_question_set,
+                    default_top_k=st.session_state.get("top_k", 10),
+                    default_model=st.session_state.get("llm_model", DEFAULT_LLM_MODEL),
+                )
 
                 with col2:
                     # Report selector in green container
@@ -4511,7 +4279,7 @@ def main():
                                                 unsafe_allow_html=True,
                                             )
                     else:
-                        st.warning("No stored results found for the selected question set")
+                        st.warning("No stored results or cached document chunks found for the selected question set")
                         selected_file_path = None
 
                 # 2. Configuration selector - horizontal styled cards
@@ -4559,9 +4327,13 @@ def main():
                                 is_selected = idx == st.session_state.selected_config_idx
 
                                 # Create clickable card
+                                card_suffix = " · chunks only" if config.get("chunks_only") else ""
                                 clicked = card(
                                     title=model_display,
-                                    text=f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · Top-K: {config['top_k']}",
+                                    text=(
+                                        f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · "
+                                        f"Top-K: {config['top_k']}{card_suffix}"
+                                    ),
                                     key=f"config_card_{idx}",
                                     styles={
                                         "card": {

@@ -826,6 +826,53 @@ class CacheManager:
             logger.error(f"Error checking cache status: {str(e)}", exc_info=True)
             return []
 
+    def list_document_chunk_configs(self) -> List[tuple]:
+        """Distinct (file_path, chunk_size, chunk_overlap) rows from document_chunks."""
+        try:
+            with self.db_manager.get_connection() as conn:
+                result_obj = conn.execute(
+                    text(
+                        """
+                        SELECT DISTINCT file_path, chunk_size, chunk_overlap
+                        FROM document_chunks
+                        ORDER BY file_path, chunk_size, chunk_overlap
+                        """
+                    )
+                )
+                return list(result_obj.fetchall())
+        except Exception as e:
+            logger.error(f"Error listing document chunk configs: {e}", exc_info=True)
+            return []
+
+    def resolve_document_chunks(
+        self,
+        file_path: str,
+        chunk_size: int | None = None,
+        chunk_overlap: int | None = None,
+    ) -> List[Dict]:
+        """Load document chunks, falling back to the same filename on a different path."""
+        chunks = self.get_document_chunks(file_path, chunk_size, chunk_overlap)
+        if chunks:
+            return chunks
+
+        target_name = Path(file_path).name
+        for alt_path, cs, co in self.list_document_chunk_configs():
+            if Path(alt_path).name != target_name:
+                continue
+            if chunk_size is not None and cs != chunk_size:
+                continue
+            if chunk_overlap is not None and co != chunk_overlap:
+                continue
+            chunks = self.get_document_chunks(alt_path, chunk_size, chunk_overlap)
+            if chunks:
+                logger.info(
+                    "Resolved document chunks for %s via alternate path %s",
+                    file_path,
+                    alt_path,
+                )
+                return chunks
+        return []
+
     def get_all_answers_by_question_set(self, question_set: str) -> Dict[str, Any]:
         """Get all cached answers for a specific question set"""
         try:
