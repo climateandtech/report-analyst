@@ -4,6 +4,7 @@ Tests for the QuestionSetLoader functionality
 
 import os
 import tempfile
+from pathlib import Path
 
 import pytest
 import yaml
@@ -129,7 +130,7 @@ class TestQuestionSetLoader:
         """Test get_question_set_options method returns list of question set IDs"""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create multiple test question set files
-            for i, name in enumerate(["test1", "test2", "test3"]):
+            for name in ["test1", "test2", "test3"]:
                 test_questions = {
                     "name": f"{name.title()} Questions",
                     "shortcut": name,
@@ -301,7 +302,7 @@ class TestQuestionSetLoader:
             from report_analyst.core.question_loader import get_question_loader
 
             question_loader = get_question_loader()
-            question_set_options = question_loader.get_question_set_options() + ["custom"]
+            question_set_options = [*question_loader.get_question_set_options(), "custom"]
         else:
             # Fallback: use a generic approach without hardcoded names
             question_set_options = ["custom"]  # Only custom when core functionality unavailable
@@ -319,7 +320,7 @@ class TestQuestionSetLoader:
             from report_analyst.core.question_loader import get_question_loader
 
             question_loader = get_question_loader()
-            question_set_options = question_loader.get_question_set_options() + ["custom"]
+            question_set_options = [*question_loader.get_question_set_options(), "custom"]
         else:
             # Fallback: use a generic approach without hardcoded names
             question_set_options = ["custom"]  # Only custom when core functionality unavailable
@@ -376,3 +377,55 @@ class TestQuestionSetLoader:
             assert expected_set in options1, f"Expected question set '{expected_set}' not found in options"
 
         assert len(options1) == 5
+
+LOCAL_ESRS_E1 = Path(__file__).resolve().parents[1] / "local" / "questionsets"
+LOCAL_ESRS_BASELINE = LOCAL_ESRS_E1 / "esrs_e1_climate_questions.yaml"
+
+
+@pytest.mark.skipif(not LOCAL_ESRS_BASELINE.is_file(), reason="local ESRS E1 questionset not present")
+class TestLocalEsrsE1QuestionSets:
+    """Load gitignored local/questionsets ESRS E1 variants (client-specific, not in CI)."""
+
+    @pytest.fixture
+    def local_loader(self):
+        original = os.environ.get("QUESTIONSETS_PATH")
+        os.environ["QUESTIONSETS_PATH"] = str(LOCAL_ESRS_E1)
+        loader = QuestionSetLoader()
+        yield loader
+        loader.reload()
+        if original is not None:
+            os.environ["QUESTIONSETS_PATH"] = original
+        elif "QUESTIONSETS_PATH" in os.environ:
+            del os.environ["QUESTIONSETS_PATH"]
+
+    def test_baseline_loads_sixteen_questions(self, local_loader):
+        qset = local_loader.get_question_set("esrs_e1_climate")
+        assert qset is not None
+        assert len(qset.questions) == 16
+        assert qset.shortcut == "esrs-e1"
+
+    def test_baseline_guidelines_structure(self, local_loader):
+        q = local_loader.get_questions("esrs_e1_climate")["esrs_e1_f1"]
+        guidelines = q["guidelines"]
+        assert guidelines.strip().startswith("- ANSWER type:")
+        assert "classification" in guidelines.splitlines()[0]
+        for section in ("## Overall answer policy", "## JSON mapping", "## Answer type"):
+            assert section not in guidelines
+        assert "Few-shot examples" not in guidelines
+
+    def test_quantity_questions_use_quantity_answer_type(self, local_loader):
+        questions = local_loader.get_questions("esrs_e1_climate")
+        for qid in ("esrs_e1_f4", "esrs_e1_f7", "esrs_e1_f9", "esrs_e1_f10", "esrs_e1_f11", "esrs_e1_f12"):
+            first_line = questions[qid]["guidelines"].strip().splitlines()[0]
+            assert "quantity" in first_line, qid
+
+    def test_f5_cross_question_deferred_flag(self, local_loader):
+        g = local_loader.get_questions("esrs_e1_climate")["esrs_e1_f5"]["guidelines"]
+        assert "Not applicable" in g.splitlines()[0]
+        assert "deferred" in g.lower()
+
+    def test_examples_variant_has_few_shots(self, local_loader):
+        qset = local_loader.get_question_set("esrs_e1_climate_examples")
+        for qid in ("esrs_e1_f1", "esrs_e1_f2", "esrs_e1_f4", "esrs_e1_f5", "esrs_e1_f8", "esrs_e1_f13", "esrs_e1_f15"):
+            assert "Example:" in qset.questions[qid]["guidelines"], qid
+
