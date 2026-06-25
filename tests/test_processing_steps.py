@@ -19,6 +19,61 @@ from report_analyst.core.analyzer import (
 from report_analyst.core.cache_manager import CacheManager
 
 
+class FakeSessionState(dict):
+    def get(self, key, default=None):
+        return super().get(key, default)
+
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+
+def make_run_analysis_session(**overrides):
+    base = {
+        "chunk_size": 500,
+        "chunk_overlap": 20,
+        "top_k": 5,
+        "llm_model": "gpt-4o-mini",
+        "question_set": "tcfd",
+        "force_recompute": False,
+        "new_llm_scoring": False,
+        "new_chunk_size": 500,
+        "new_overlap": 20,
+        "new_top_k": 5,
+        "new_llm_model": "gpt-4o-mini",
+        "new_question_set": "tcfd",
+    }
+    base.update(overrides)
+    return FakeSessionState(base)
+
+
+def patch_streamlit_app(monkeypatch, **session_overrides):
+    import report_analyst.streamlit_app as app
+
+    fake_st = make_run_analysis_session(**session_overrides)
+    monkeypatch.setattr(app, "st", Mock(session_state=fake_st))
+    return app, fake_st
+
+
+async def _async_status_events(*statuses):
+    for status in statuses:
+        yield {"status": status}
+
+
+@pytest.fixture(autouse=True)
+def _isolate_streamlit_module(monkeypatch):
+    """Reset streamlit_app.st between tests so random order does not leak mocks."""
+    import streamlit as real_streamlit
+    import report_analyst.streamlit_app as app
+
+    monkeypatch.setattr(app, "st", real_streamlit, raising=False)
+
+
 @pytest.fixture(scope="session")
 def _processing_steps_db_template():
     temp_dir = tempfile.mkdtemp()
@@ -121,6 +176,95 @@ async def test_process_document_chunk_step_stops_before_llm(analyzer, clean_db, 
     statuses = [e.get("status", "") for e in events if "status" in e]
     assert any("Completed Chunk" in s for s in statuses)
     assert not any("error" in e for e in events)
+
+
+@pytest.mark.asyncio
+async def test_process_document_chunk_step_reuses_cached_chunks(analyzer, clean_db, tmp_path):
+    file_path = str(tmp_path / "cached-chunk.pdf")
+    analyzer.cache_manager = CacheManager(db_path=str(clean_db))
+    analyzer.cache_manager.save_text_only_chunks(
+        file_path=file_path,
+        chunks=[{"text": "From cache.", "metadata": {"page": 1}}],
+        chunk_size=500,
+        chunk_overlap=20,
+    )
+
+    with patch.object(analyzer, "_create_text_chunks", side_effect=AssertionError("should not re-chunk")):
+        events = await _collect_process_events(
+            analyzer,
+            file_path=file_path,
+            selected_questions=[],
+            max_processing_step="chunk",
+        )
+
+    assert any("Completed Chunk" in e.get("status", "") for e in events)
+
+
+@pytest.mark.asyncio
+async def test_process_document_chunk_step_uses_text_chunks_not_embedded_create(analyzer, clean_db, tmp_path):
+    file_path = str(tmp_path / "new-chunk.pdf")
+    text_chunks = [{"text": "Fresh chunk.", "metadata": {}, "embedding": None}]
+    analyzer.cache_manager = CacheManager(db_path=str(clean_db))
+
+    with patch.object(analyzer, "_create_text_chunks", return_value=text_chunks) as mock_text, patch.object(
+        analyzer, "_create_chunks", side_effect=AssertionError("chunk step must not embed")
+    ):
+        await _collect_process_events(
+            analyzer,
+            file_path=file_path,
+            selected_questions=[],
+            max_processing_step="chunk",
+        )
+
+    mock_text.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_process_document_embed_step_skips_reembed_when_already_embedded(analyzer, clean_db, tmp_path):
+    file_path = str(tmp_path / "already-embedded.pdf")
+    embedded = [
+        {
+            "text": "Has embedding.",
+            "metadata": {},
+            "embedding": np.array([0.1, 0.2], dtype=np.float32),
+        }
+    ]
+    analyzer.cache_manager = CacheManager(db_path=str(clean_db))
+
+    with patch.object(analyzer.cache_manager, "get_document_chunks", return_value=embedded), patch.object(
+        analyzer, "_add_embeddings_to_chunks", side_effect=AssertionError("should not re-embed")
+    ):
+        events = await _collect_process_events(
+            analyzer,
+            file_path=file_path,
+            selected_questions=[],
+            max_processing_step="embed",
+        )
+
+    assert any("Completed Embed" in e.get("status", "") for e in events)
+
+
+@pytest.mark.asyncio
+async def test_process_document_answer_step_requires_questions(analyzer, clean_db, tmp_path):
+    file_path = str(tmp_path / "answer-no-questions.pdf")
+    embedded = [
+        {
+            "text": "Embedded chunk.",
+            "metadata": {},
+            "embedding": np.array([0.2, 0.3], dtype=np.float32),
+        }
+    ]
+    analyzer.cache_manager = CacheManager(db_path=str(clean_db))
+
+    with patch.object(analyzer.cache_manager, "get_document_chunks", return_value=embedded):
+        events = await _collect_process_events(
+            analyzer,
+            file_path=file_path,
+            selected_questions=[],
+            max_processing_step="answer",
+        )
+
+    assert any("Select at least one question" in e.get("error", "") for e in events)
 
 
 @pytest.mark.asyncio
@@ -339,10 +483,6 @@ async def test_process_document_map_with_llm_scoring_uses_scoring_not_answer(ana
 def test_processing_step_needs_questions(slider, needs_questions):
     import report_analyst.streamlit_app as app
 
-    class FakeSessionState(dict):
-        def get(self, key, default=None):
-            return super().get(key, default)
-
     original = app.st.session_state
     app.st.session_state = FakeSessionState({"processing_steps_slider": slider})
     try:
@@ -396,7 +536,7 @@ def test_display_cached_document_chunks_renders_rows(monkeypatch):
     monkeypatch.setattr(app.st, "dataframe", capture_dataframe)
     monkeypatch.setattr(app.st, "column_config", Mock(NumberColumn=Mock, TextColumn=Mock, CheckboxColumn=Mock))
 
-    count = app.display_cached_document_chunks(
+    count, embedded = app.display_cached_document_chunks(
         report_analyzer,
         "/tmp/report.pdf",
         chunk_size=500,
@@ -404,6 +544,7 @@ def test_display_cached_document_chunks_renders_rows(monkeypatch):
     )
 
     assert count == 2
+    assert embedded == 1
     assert len(dataframe_calls) == 1
     assert list(dataframe_calls[0]["Text"]) == ["Paragraph one.", "Paragraph two."]
 
@@ -418,12 +559,12 @@ async def test_report_analyzer_analyze_document_forwards_max_processing_step(cle
     async def fake_process_document(*args, **kwargs):
         yield {"status": f"Completed {kwargs.get('max_processing_step')} step"}
 
-    wrapper = app.ReportAnalyzer()
-    wrapper.analyzer.process_document = fake_process_document
-    wrapper.analyzer.question_set = "tcfd"
+    wrapper = Mock()
+    wrapper.analyzer = Mock(process_document=fake_process_document, question_set="tcfd")
 
     events = []
-    async for event in wrapper.analyze_document(
+    async for event in app.ReportAnalyzer.analyze_document(
+        wrapper,
         file_path,
         {"tcfd_1": {"number": 1, "text": "Q1"}},
         ["tcfd_1"],
@@ -448,22 +589,11 @@ async def test_analyze_document_and_display_chunk_step_does_not_default_to_answe
         captured["max_processing_step"] = kwargs.get("max_processing_step")
         yield {"status": "Completed Chunk step (2 chunks)"}
 
-    class FakeSessionState(dict):
-        def get(self, key, default=None):
-            return super().get(key, default)
-
-    fake_st = FakeSessionState(
-        {
-            "chunk_size": 500,
-            "chunk_overlap": 20,
-            "top_k": 5,
-            "llm_model": "gpt-4o-mini",
-            "question_set": "tcfd",
-            "results": {"answers": {}},
-            "current_question_set": "tcfd",
-            "analyzed_files": set(),
-            "force_recompute": True,
-        }
+    fake_st = make_run_analysis_session(
+        results={"answers": {}},
+        current_question_set="tcfd",
+        analyzed_files=set(),
+        force_recompute=True,
     )
 
     report_analyzer = Mock()
@@ -486,6 +616,43 @@ async def test_analyze_document_and_display_chunk_step_does_not_default_to_answe
 
 
 @pytest.mark.asyncio
+async def test_run_analysis_chunk_step_ignores_stale_analysis_cache(monkeypatch, tmp_path):
+    """Regression: empty question_ids analysis_cache hit hid chunks on Chunk/Embed reruns."""
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "cached-chunks.pdf")
+    progress = Mock()
+    report_analyzer = Mock()
+    report_analyzer.analyzer.chunk_params = {"chunk_size": 500, "chunk_overlap": 20}
+    report_analyzer.cache_manager.get_analysis.return_value = {"tcfd_1": {"result": {"ANSWER": "Yes"}}}
+    report_analyzer.cache_manager.get_document_chunks.return_value = [
+        {"text": "Cached chunk text.", "embedding": None},
+    ]
+
+    display_calls: list = []
+
+    def capture_display(*args, **kwargs):
+        display_calls.append(kwargs)
+        return 1, 1
+
+    monkeypatch.setattr(app, "st", Mock(session_state=make_run_analysis_session()))
+    monkeypatch.setattr(app, "display_cached_document_chunks", capture_display)
+
+    await app.run_analysis(
+        report_analyzer,
+        file_path=file_path,
+        selected_questions=[],
+        progress_text=progress,
+        max_processing_step="chunk",
+    )
+
+    report_analyzer.cache_manager.get_analysis.assert_not_called()
+    assert display_calls
+    progress.success.assert_called_once()
+    assert "stored chunks" in progress.success.call_args[0][0].lower()
+
+
+@pytest.mark.asyncio
 async def test_analyze_document_and_display_default_max_step_is_answer(monkeypatch, tmp_path):
     """Document prior default: omitting max_processing_step means full Answer pipeline."""
     import report_analyst.streamlit_app as app
@@ -496,22 +663,11 @@ async def test_analyze_document_and_display_default_max_step_is_answer(monkeypat
         captured["max_processing_step"] = kwargs.get("max_processing_step")
         yield {"status": "done"}
 
-    class FakeSessionState(dict):
-        def get(self, key, default=None):
-            return super().get(key, default)
-
-    fake_st = FakeSessionState(
-        {
-            "chunk_size": 500,
-            "chunk_overlap": 20,
-            "top_k": 5,
-            "llm_model": "gpt-4o-mini",
-            "question_set": "tcfd",
-            "results": {"answers": {}},
-            "current_question_set": "tcfd",
-            "analyzed_files": set(),
-            "force_recompute": True,
-        }
+    fake_st = make_run_analysis_session(
+        results={"answers": {}},
+        current_question_set="tcfd",
+        analyzed_files=set(),
+        force_recompute=True,
     )
 
     report_analyzer = Mock()
@@ -534,10 +690,6 @@ async def test_analyze_document_and_display_default_max_step_is_answer(monkeypat
 def test_get_max_processing_step_reads_streamlit_slider():
     import report_analyst.streamlit_app as app
 
-    class FakeSessionState(dict):
-        def get(self, key, default=None):
-            return super().get(key, default)
-
     original = app.st.session_state
     app.st.session_state = FakeSessionState({"processing_steps_slider": "Chunk"})
     try:
@@ -545,3 +697,396 @@ def test_get_max_processing_step_reads_streamlit_slider():
         assert app.processing_step_needs_questions() is False
     finally:
         app.st.session_state = original
+
+
+@pytest.mark.parametrize("slider", ["Chunk", "Embed", "Map", "Answer"])
+def test_get_max_processing_step_normalizes_all_slider_values(slider):
+    import report_analyst.streamlit_app as app
+
+    original = app.st.session_state
+    app.st.session_state = FakeSessionState({"processing_steps_slider": slider})
+    try:
+        assert app.get_max_processing_step() == slider.lower()
+    finally:
+        app.st.session_state = original
+
+
+def test_display_cached_document_chunks_empty_returns_zero(monkeypatch):
+    import report_analyst.streamlit_app as app
+
+    report_analyzer = Mock()
+    report_analyzer.cache_manager.get_document_chunks.return_value = []
+    monkeypatch.setattr(app.st, "warning", Mock())
+
+    count, embedded = app.display_cached_document_chunks(report_analyzer, "/tmp/missing.pdf")
+
+    assert count == 0
+    assert embedded == 0
+    app.st.warning.assert_called_once()
+
+
+def test_display_cached_document_chunks_uses_chunk_text_fallback(monkeypatch):
+    import report_analyst.streamlit_app as app
+
+    report_analyzer = Mock()
+    report_analyzer.cache_manager.get_document_chunks.return_value = [{"chunk_text": "Legacy text.", "embedding": None}]
+
+    captured: list = []
+
+    def capture_dataframe(df, **kwargs):
+        captured.append(df)
+
+    monkeypatch.setattr(app.st, "subheader", Mock())
+    monkeypatch.setattr(app.st, "info", Mock())
+    monkeypatch.setattr(app.st, "dataframe", capture_dataframe)
+    monkeypatch.setattr(app.st, "column_config", Mock(NumberColumn=Mock, TextColumn=Mock, CheckboxColumn=Mock))
+
+    count, embedded = app.display_cached_document_chunks(report_analyzer, "/tmp/report.pdf")
+
+    assert count == 1
+    assert embedded == 0
+    assert captured[0]["Text"].iloc[0] == "Legacy text."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("step", ["chunk", "embed"])
+async def test_run_analysis_partial_step_shows_cached_document_chunks(monkeypatch, tmp_path, step):
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / f"cached-{step}.pdf")
+    progress = Mock()
+    report_analyzer = Mock()
+    report_analyzer.analyzer.chunk_params = {"chunk_size": 500, "chunk_overlap": 20}
+    report_analyzer.cache_manager.get_document_chunks.return_value = [
+        {"text": "Cached chunk.", "embedding": object() if step == "embed" else None},
+    ]
+
+    display_calls: list = []
+
+    monkeypatch.setattr(app, "st", Mock(session_state=make_run_analysis_session()))
+    monkeypatch.setattr(
+        app,
+        "display_cached_document_chunks",
+        lambda *a, **k: display_calls.append(k) or (1, 1 if step == "embed" else 0),
+    )
+
+    await app.run_analysis(
+        report_analyzer,
+        file_path=file_path,
+        selected_questions=[],
+        progress_text=progress,
+        max_processing_step=step,
+    )
+
+    report_analyzer.cache_manager.get_analysis.assert_not_called()
+    assert display_calls
+    progress.success.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_embed_step_reruns_when_only_text_chunks_cached(monkeypatch, tmp_path):
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "needs-embed.pdf")
+    progress = Mock()
+    report_analyzer = Mock()
+    report_analyzer.analyzer.chunk_params = {"chunk_size": 500, "chunk_overlap": 20}
+    report_analyzer.cache_manager.get_document_chunks.return_value = [
+        {"text": "Text only.", "embedding": None},
+    ]
+
+    async def fake_process_document(*args, **kwargs):
+        async for event in _async_status_events("Completed Embed step (1 chunks)"):
+            yield event
+
+    report_analyzer.process_document = fake_process_document
+    display_calls: list = []
+
+    monkeypatch.setattr(app, "st", Mock(session_state=make_run_analysis_session()))
+    monkeypatch.setattr(app, "display_cached_document_chunks", lambda *a, **k: display_calls.append(1) or (1, 1))
+
+    await app.run_analysis(
+        report_analyzer,
+        file_path=file_path,
+        selected_questions=[],
+        progress_text=progress,
+        max_processing_step="embed",
+    )
+
+    progress.info.assert_any_call("Starting analysis...")
+    assert display_calls
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_chunk_force_recompute_runs_process_document(monkeypatch, tmp_path):
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "force-chunk.pdf")
+    progress = Mock()
+    report_analyzer = Mock()
+    report_analyzer.analyzer.chunk_params = {"chunk_size": 500, "chunk_overlap": 20}
+    report_analyzer.cache_manager.get_document_chunks.return_value = [
+        {"text": "Old cache.", "embedding": None},
+    ]
+
+    async def fake_process_document(*args, **kwargs):
+        async for event in _async_status_events("Completed Chunk step (2 chunks)"):
+            yield event
+
+    report_analyzer.process_document = fake_process_document
+    display_mock = Mock(return_value=(2, 0))
+    monkeypatch.setattr(app, "st", Mock(session_state=make_run_analysis_session(force_recompute=True)))
+    monkeypatch.setattr(app, "display_cached_document_chunks", display_mock)
+
+    await app.run_analysis(
+        report_analyzer,
+        file_path=file_path,
+        selected_questions=[],
+        progress_text=progress,
+        max_processing_step="chunk",
+    )
+
+    progress.info.assert_any_call("Starting analysis...")
+    display_mock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_answer_cache_hit_returns_without_process(monkeypatch, tmp_path):
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "answer-cached.pdf")
+    progress = Mock()
+    report_analyzer = Mock()
+    report_analyzer.cache_manager.get_analysis.return_value = {
+        "tcfd_1": {"result": {"ANSWER": "Yes", "SCORE": 0.9}},
+    }
+
+    fake_st = make_run_analysis_session()
+    monkeypatch.setattr(app, "st", Mock(session_state=fake_st))
+
+    await app.run_analysis(
+        report_analyzer,
+        file_path=file_path,
+        selected_questions=["tcfd_1"],
+        progress_text=progress,
+        max_processing_step="answer",
+    )
+
+    report_analyzer.process_document.assert_not_called()
+    progress.success.assert_called_once_with("Found stored results!")
+    assert fake_st["results"]["tcfd_1"]["result"]["ANSWER"] == "Yes"
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_answer_uses_full_question_ids_without_double_prefix(monkeypatch, tmp_path):
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "answer-ids.pdf")
+    progress = Mock()
+    report_analyzer = Mock()
+    report_analyzer.cache_manager.get_analysis.return_value = {}
+
+    async def fake_process_document(*args, **kwargs):
+        yield {"question_number": 1, "result": {"ANSWER": "Done", "SCORE": 1.0}}
+
+    report_analyzer.process_document = fake_process_document
+
+    monkeypatch.setattr(app, "st", Mock(session_state=make_run_analysis_session(force_recompute=True)))
+
+    await app.run_analysis(
+        report_analyzer,
+        file_path=file_path,
+        selected_questions=["tcfd_1", "tcfd_2"],
+        progress_text=progress,
+        max_processing_step="answer",
+    )
+
+    report_analyzer.cache_manager.get_analysis.assert_called()
+    call_kwargs = report_analyzer.cache_manager.get_analysis.call_args_list[0].kwargs
+    assert call_kwargs["question_ids"] == ["tcfd_1", "tcfd_2"]
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_answer_prefixes_numeric_question_ids(monkeypatch, tmp_path):
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "answer-numeric.pdf")
+    progress = Mock()
+    report_analyzer = Mock()
+    report_analyzer.cache_manager.get_analysis.return_value = {}
+
+    async def fake_process_document(*args, **kwargs):
+        if False:
+            yield {}
+
+    report_analyzer.process_document = fake_process_document
+    patch_streamlit_app(monkeypatch, force_recompute=True)
+
+    await app.run_analysis(
+        report_analyzer,
+        file_path=file_path,
+        selected_questions=["1", "2"],
+        progress_text=progress,
+        max_processing_step="answer",
+    )
+
+    call_kwargs = report_analyzer.cache_manager.get_analysis.call_args_list[0].kwargs
+    assert call_kwargs["question_ids"] == ["tcfd_1", "tcfd_2"]
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_answer_cache_miss_runs_process_and_completes(monkeypatch, tmp_path):
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "answer-run.pdf")
+    progress = Mock()
+    report_analyzer = Mock()
+    report_analyzer.cache_manager.get_analysis.side_effect = [{}, {"tcfd_1": {"result": {"ANSWER": "Done"}}}]
+
+    async def fake_process_document(*args, **kwargs):
+        yield {"question_number": 1, "result": {"ANSWER": "Done", "SCORE": 1.0}}
+
+    report_analyzer.process_document = fake_process_document
+    monkeypatch.setattr(app, "st", Mock(session_state=make_run_analysis_session(force_recompute=True)))
+
+    await app.run_analysis(
+        report_analyzer,
+        file_path=file_path,
+        selected_questions=["tcfd_1"],
+        progress_text=progress,
+        max_processing_step="answer",
+    )
+
+    progress.success.assert_called_with("Analysis complete!")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("max_step", "expected"),
+    [
+        ("chunk", "chunk"),
+        ("embed", "embed"),
+        ("map", "map"),
+        ("answer", "answer"),
+    ],
+)
+async def test_report_analyzer_analyze_document_forwards_all_processing_steps(
+    max_step, expected, clean_db, tmp_path
+):
+    import report_analyst.streamlit_app as app
+
+    captured: dict = {}
+
+    async def fake_process_document(*args, **kwargs):
+        captured["max_processing_step"] = kwargs.get("max_processing_step")
+        yield {"status": "ok"}
+
+    wrapper = Mock()
+    wrapper.analyzer = Mock(process_document=fake_process_document, question_set="tcfd")
+
+    async for _ in app.ReportAnalyzer.analyze_document(
+        wrapper,
+        str(tmp_path / "doc.pdf"),
+        {"tcfd_1": {"number": 1, "text": "Q1"}},
+        ["tcfd_1"],
+        max_processing_step=max_step,
+    ):
+        pass
+
+    assert captured["max_processing_step"] == expected
+
+
+@pytest.mark.asyncio
+async def test_analyze_document_and_display_respects_cached_answers_without_force_recompute(monkeypatch, tmp_path):
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "display-cache.pdf")
+    report_analyzer = Mock()
+    report_analyzer.cache_manager.get_analysis.return_value = {
+        "tcfd_1": {"result": {"ANSWER": "Cached"}},
+    }
+
+    async def fail_analyze_document(*args, **kwargs):
+        raise AssertionError("should not re-analyze when cache hit")
+
+    report_analyzer.analyze_document = fail_analyze_document
+
+    fake_st = make_run_analysis_session(
+        results={"answers": {}},
+        current_question_set="tcfd",
+        analyzed_files=set(),
+        force_recompute=False,
+    )
+
+    monkeypatch.setattr(app, "st", Mock(session_state=fake_st, info=Mock(), empty=Mock(return_value=Mock())))
+    monkeypatch.setattr(app, "generate_file_key", Mock(return_value="file_key"))
+    monkeypatch.setattr(app, "create_analysis_dataframes", Mock(return_value=(Mock(), Mock())))
+
+    await app.analyze_document_and_display(
+        report_analyzer,
+        file_path=file_path,
+        questions={"tcfd_1": {"number": 1, "text": "Q1"}},
+        selected_questions=["tcfd_1"],
+        max_processing_step="answer",
+    )
+
+    assert fake_st["results"]["answers"]["tcfd_1"]["result"]["ANSWER"] == "Cached"
+
+
+@pytest.mark.asyncio
+async def test_report_analyzer_process_document_forwards_pre_retrieved_chunks_and_max_step():
+    import report_analyst.streamlit_app as app
+
+    captured: dict = {}
+
+    async def fake_process_document(*args, **kwargs):
+        captured["pre_retrieved_chunks"] = kwargs.get("pre_retrieved_chunks")
+        captured["max_processing_step"] = kwargs.get("max_processing_step")
+        yield {"status": "done"}
+
+    report_analyzer = app.ReportAnalyzer()
+    report_analyzer.analyzer.process_document = fake_process_document
+    pre_chunks = [{"text": "chunk one"}]
+
+    async for _ in report_analyzer.process_document(
+        file_path="test.pdf",
+        selected_questions=[1],
+        pre_retrieved_chunks=pre_chunks,
+        max_processing_step="chunk",
+    ):
+        pass
+
+    assert captured["pre_retrieved_chunks"] == pre_chunks
+    assert captured["max_processing_step"] == "chunk"
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_embed_failure_does_not_show_success(monkeypatch, tmp_path):
+    """Regression: OpenAI embed errors must not be followed by a success banner."""
+    import report_analyst.streamlit_app as app
+
+    file_path = str(tmp_path / "embed-fail.pdf")
+    progress = Mock()
+    report_analyzer = Mock()
+    report_analyzer.analyzer.chunk_params = {"chunk_size": 500, "chunk_overlap": 20}
+    report_analyzer.cache_manager.get_document_chunks.return_value = [
+        {"text": "Chunk without embedding.", "embedding": None},
+    ]
+
+    async def fake_process_document(*args, **kwargs):
+        yield {"error": "Error processing document: Incorrect API key"}
+
+    report_analyzer.process_document = fake_process_document
+    monkeypatch.setattr(app, "st", Mock(session_state=make_run_analysis_session(force_recompute=True)))
+    monkeypatch.setattr(app, "display_cached_document_chunks", Mock(return_value=(1, 0)))
+
+    await app.run_analysis(
+        report_analyzer,
+        file_path=file_path,
+        selected_questions=[],
+        progress_text=progress,
+        max_processing_step="embed",
+    )
+
+    progress.error.assert_called()
+    progress.success.assert_not_called()

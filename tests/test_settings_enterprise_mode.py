@@ -11,6 +11,36 @@ from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
+from report_analyst.streamlit_app import (
+    env_s3_upload_requested,
+    is_enterprise_runtime,
+    s3_nats_upload_enabled,
+)
+
+
+def test_core_runtime_ignores_use_s3_upload_env():
+    """Local/core dev should not enable S3+NATS from USE_S3_UPLOAD alone."""
+    with patch.dict(
+        os.environ,
+        {"USE_S3_UPLOAD": "true", "REPORT_ANALYST_RUNTIME": "core"},
+        clear=False,
+    ):
+        assert is_enterprise_runtime() is False
+        assert env_s3_upload_requested() is True
+        assert s3_nats_upload_enabled(session_state={}) is False
+        assert s3_nats_upload_enabled(session_state={"use_s3_upload": True}) is True
+
+
+def test_enterprise_runtime_honors_use_s3_upload_env():
+    with patch.dict(
+        os.environ,
+        {"USE_S3_UPLOAD": "true", "REPORT_ANALYST_RUNTIME": "enterprise"},
+        clear=False,
+    ):
+        assert is_enterprise_runtime() is True
+        assert s3_nats_upload_enabled(session_state={}) is True
+        assert s3_nats_upload_enabled(session_state={"override_s3_upload": True}) is False
+
 
 def test_enterprise_mode_message_only_when_checked():
     """Test that enterprise mode message only shows when checkbox is checked"""
@@ -40,8 +70,9 @@ def test_enterprise_mode_message_only_when_checked():
 
         # After unchecking, the message should NOT appear
         page_text = str(at)
-        if "Enterprise mode enabled" in page_text:
-            assert False, "Enterprise mode message should not appear when checkbox is unchecked"
+        assert "Enterprise mode enabled" not in page_text, (
+            "Enterprise mode message should not appear when checkbox is unchecked"
+        )
 
         # Now check the checkbox
         checkbox.set_value(True)
@@ -79,8 +110,9 @@ def test_enterprise_mode_checkbox_state_persistence():
 
         # Check that enterprise mode message is NOT shown when unchecked
         page_text = str(at)
-        if "Enterprise mode enabled" in page_text:
-            assert False, "Enterprise mode message should NOT appear when checkbox is unchecked"
+        assert "Enterprise mode enabled" not in page_text, (
+            "Enterprise mode message should NOT appear when checkbox is unchecked"
+        )
 
         # Rerun - state should persist
         at.run(timeout=10)
@@ -88,31 +120,29 @@ def test_enterprise_mode_checkbox_state_persistence():
 
 
 def test_enterprise_mode_env_var_detection():
-    """Test that the app correctly detects USE_S3_UPLOAD env var"""
-    # This test verifies the env var detection logic works
-    # When USE_S3_UPLOAD=true is in env, session state should be True
-    env_value = os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
+    """Enterprise runtime should honor USE_S3_UPLOAD on startup."""
+    with patch.dict(
+        os.environ,
+        {"USE_S3_UPLOAD": "true", "REPORT_ANALYST_RUNTIME": "enterprise"},
+        clear=False,
+    ):
+        at = AppTest.from_file("report_analyst/streamlit_app.py")
+        at.run(timeout=10)
 
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+        at.session_state["nav_page"] = "Settings"
+        at.run(timeout=10)
 
-    # Navigate to Settings
-    at.session_state["nav_page"] = "Settings"
-    at.run(timeout=10)
+        try:
+            session_value = at.session_state["use_s3_upload"]
+        except KeyError:
+            session_value = False
 
-    # Session state should match env var (unless overridden)
-    # AppTest session_state doesn't support .get(), access with try/except
-    try:
-        session_value = at.session_state["use_s3_upload"]
-    except KeyError:
-        session_value = False
-
-    # If env var is true, session should be true (unless override)
-    if env_value:
-        # When env is true, session should be true unless overridden
         try:
             override = at.session_state["override_s3_upload"]
         except KeyError:
             override = False
+
         if not override:
-            assert session_value is True, "use_s3_upload should be True when USE_S3_UPLOAD=true"
+            assert session_value is True, (
+                "use_s3_upload should be True when USE_S3_UPLOAD=true in enterprise runtime"
+            )

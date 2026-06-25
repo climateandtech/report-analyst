@@ -81,6 +81,29 @@ from report_analyst.core.question_loader import get_question_loader
 load_dotenv()
 logger.info("Loaded environment variables")
 
+
+def is_enterprise_runtime() -> bool:
+    """True when deploy entrypoint selected enterprise (S3+NATS + platform backend)."""
+    return os.getenv("REPORT_ANALYST_RUNTIME", "core").lower() == "enterprise"
+
+
+def env_s3_upload_requested() -> bool:
+    return os.getenv("USE_S3_UPLOAD", "false").lower() in ("true", "1", "yes")
+
+
+def s3_nats_upload_enabled(*, session_state: Any | None = None) -> bool:
+    """
+    Whether Upload should use S3+NATS and the platform backend.
+
+    Core/local runtime ignores USE_S3_UPLOAD unless the user opts in via Settings.
+    """
+    ss = session_state if session_state is not None else st.session_state
+    if ss.get("override_s3_upload", False):
+        return False
+    if not is_enterprise_runtime():
+        return bool(ss.get("use_s3_upload", False))
+    return bool(ss.get("use_s3_upload", False)) or env_s3_upload_requested()
+
 # Initialize question loader
 question_loader = get_question_loader()
 
@@ -258,9 +281,19 @@ class ReportAnalyzer:
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
+        max_processing_step: str = "answer",
     ):
         """Delegate to the analyzer's process_document method"""
-        return self.analyzer.process_document(file_path, selected_questions, use_llm_scoring, single_call, force_recompute)
+        return self.analyzer.process_document(
+            file_path,
+            selected_questions,
+            use_llm_scoring,
+            single_call,
+            force_recompute,
+            pre_retrieved_chunks=pre_retrieved_chunks,
+            max_processing_step=max_processing_step,
+        )
 
 
 def save_uploaded_file(uploaded_file) -> Optional[str]:
@@ -771,8 +804,12 @@ def display_cached_document_chunks(
     *,
     chunk_size: int | None = None,
     chunk_overlap: int | None = None,
-) -> int:
-    """Render document chunks from cache (Chunk/Embed steps — no question analysis required)."""
+) -> tuple[int, int]:
+    """Render document chunks from cache (Chunk/Embed steps — no question analysis required).
+
+    Returns:
+        (total_chunks, chunks_with_embeddings)
+    """
     raw_chunks = report_analyzer.cache_manager.get_document_chunks(
         file_path=file_path,
         chunk_size=chunk_size,
@@ -780,15 +817,19 @@ def display_cached_document_chunks(
     )
     if not raw_chunks:
         st.warning("No chunks found in cache for this file and configuration.")
-        return 0
+        return 0, 0
 
     rows = []
+    embedded_count = 0
     for i, chunk in enumerate(raw_chunks):
+        has_embedding = chunk.get("embedding") is not None
+        if has_embedding:
+            embedded_count += 1
         rows.append(
             {
                 "Chunk #": i + 1,
                 "Text": chunk.get("text", chunk.get("chunk_text", "")),
-                "Has Embedding": chunk.get("embedding") is not None,
+                "Has Embedding": has_embedding,
             }
         )
 
@@ -803,8 +844,8 @@ def display_cached_document_chunks(
             "Has Embedding": st.column_config.CheckboxColumn("Has Embedding"),
         },
     )
-    st.info(f"Found {len(rows)} document chunks.")
-    return len(rows)
+    st.info(f"Found {len(rows)} document chunks ({embedded_count} with embeddings).")
+    return len(rows), embedded_count
 
 
 def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str | None = None) -> None:
@@ -1415,6 +1456,11 @@ def update_analyzer_parameters():
 async def run_analysis(analyzer, file_path, selected_questions, progress_text, max_processing_step: str = "answer"):
     """Run analysis and update the UI with progress"""
     try:
+        from report_analyst.core.analyzer import PROCESSING_STEP_LABELS, normalize_processing_step
+
+        step_key = normalize_processing_step(max_processing_step)
+        partial = is_partial_processing_step(step_key)
+
         # Get current configuration
         config = {
             "chunk_size": st.session_state.chunk_size,
@@ -1429,24 +1475,60 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
             logger.info(
                 f"[ANALYSIS] Selected question texts: {[st.session_state.questions[q]['text'] for q in selected_questions if q in st.session_state.questions]}"
             )
-        logger.info(
-            f"[CACHE] Looking up cache for file: {file_path} with config: {config} and questions: {selected_questions}"
-        )
-        # Check if we have cached results first
-        cached_results = analyzer.cache_manager.get_analysis(
-            file_path=file_path,
-            config=config,
-            question_ids=[f"{config['question_set']}_{q}" for q in selected_questions],
-        )
-        if cached_results and not st.session_state.get("force_recompute", False):
-            logger.info(f"[CACHE] Cache HIT for config: {config}")
-            progress_text.success("Found stored results!")
-            st.session_state.results = cached_results
-            logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
-            logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
-            return
+
+        force_recompute = st.session_state.get("force_recompute", False)
+
+        if partial:
+            # Chunk/Embed use document_chunks cache — not analysis_cache. An empty question_ids
+            # lookup would match prior Answer results and exit without showing chunks.
+            logger.info(f"[CACHE] Skipping analysis_cache lookup for partial step: {step_key}")
+            if not force_recompute:
+                chunk_params = analyzer.analyzer.chunk_params
+                raw_chunks = analyzer.cache_manager.get_document_chunks(
+                    file_path=file_path,
+                    chunk_size=chunk_params["chunk_size"],
+                    chunk_overlap=chunk_params["chunk_overlap"],
+                )
+                needs_embed = step_key == "embed" and not any(c.get("embedding") is not None for c in raw_chunks)
+                if raw_chunks and not needs_embed:
+                    chunk_count, embedded_count = display_cached_document_chunks(
+                        analyzer,
+                        file_path,
+                        chunk_size=chunk_params["chunk_size"],
+                        chunk_overlap=chunk_params["chunk_overlap"],
+                    )
+                    label = PROCESSING_STEP_LABELS.get(step_key, step_key)
+                    if step_key == "embed" and embedded_count == 0:
+                        progress_text.warning(
+                            f"Found {chunk_count} chunks but none have embeddings yet. "
+                            "Run Embed again with a valid OPENAI_API_KEY."
+                        )
+                    else:
+                        progress_text.success(
+                            f"Found stored chunks ({chunk_count}) — {label} step already complete."
+                        )
+                    return
         else:
+            logger.info(
+                f"[CACHE] Looking up cache for file: {file_path} with config: {config} and questions: {selected_questions}"
+            )
+            question_ids = selected_questions
+            if selected_questions and not all("_" in q for q in selected_questions):
+                question_ids = [f"{config['question_set']}_{q}" for q in selected_questions]
+            cached_results = analyzer.cache_manager.get_analysis(
+                file_path=file_path,
+                config=config,
+                question_ids=question_ids,
+            )
+            if cached_results and not force_recompute:
+                logger.info(f"[CACHE] Cache HIT for config: {config}")
+                progress_text.success("Found stored results!")
+                st.session_state.results = cached_results
+                logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
+                logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
+                return
             logger.info(f"[CACHE] Cache MISS for config: {config}")
+
         # If no cached results or force recompute, run analysis
         progress_text.info("Starting analysis...")
 
@@ -1475,6 +1557,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
         pre_retrieved_chunks = st.session_state.get("backend_chunks")
 
         # First update the analyzer's process_document method to use progress_text instead of yielding status
+        step_failed = False
         async for result in analyzer.process_document(
             file_path=file_path,
             selected_questions=question_numbers,  # Pass just the numbers
@@ -1485,6 +1568,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
         ):
             # Handle errors by displaying them but not storing them
             if "error" in result:
+                step_failed = True
                 progress_text.error(f"Error: {result['error']}")
                 continue
 
@@ -1524,19 +1608,28 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
         st.session_state.results = final_results
         logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
 
-        from report_analyst.core.analyzer import PROCESSING_STEP_LABELS, normalize_processing_step
-
-        step_key = normalize_processing_step(max_processing_step)
-        if is_partial_processing_step(step_key):
+        if partial:
+            if step_failed:
+                return
             chunk_params = analyzer.analyzer.chunk_params
-            chunk_count = display_cached_document_chunks(
+            chunk_count, embedded_count = display_cached_document_chunks(
                 analyzer,
                 file_path,
                 chunk_size=chunk_params["chunk_size"],
                 chunk_overlap=chunk_params["chunk_overlap"],
             )
             label = PROCESSING_STEP_LABELS.get(step_key, step_key)
-            if chunk_count:
+            if step_key == "embed":
+                if embedded_count == 0:
+                    progress_text.error(
+                        "Embed step did not produce embeddings. "
+                        "Set a valid OPENAI_API_KEY in Settings (Embed uses OpenAI only, not Gemini)."
+                    )
+                else:
+                    progress_text.success(
+                        f"Completed Embed step ({embedded_count}/{chunk_count} chunks with embeddings)."
+                    )
+            elif chunk_count:
                 progress_text.success(f"Completed {label} step ({chunk_count} chunks).")
             else:
                 progress_text.warning(f"Completed {label} step, but no chunks were found in cache.")
@@ -1586,11 +1679,11 @@ def main():
             st.session_state.analysis_complete = False  # Initialize analysis complete flag
 
         # Initialize use_s3_upload in session state if not already set
-        # Respect override_s3_upload if user has temporarily disabled it
         if "use_s3_upload" not in st.session_state:
-            env_s3_upload = os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
-            override = st.session_state.get("override_s3_upload", False)
-            st.session_state.use_s3_upload = env_s3_upload and not override
+            if is_enterprise_runtime() and env_s3_upload_requested():
+                st.session_state.use_s3_upload = not st.session_state.get("override_s3_upload", False)
+            else:
+                st.session_state.use_s3_upload = False
 
         # Sync API keys from session state to environment at startup
         APIKeyManager.sync_api_keys_to_env(st.session_state)
@@ -3140,11 +3233,15 @@ def main():
             # Enterprise Integration (S3+NATS)
             st.subheader("Enterprise Integration")
 
-            # Check if USE_S3_UPLOAD is set from environment
-            env_s3_upload = os.getenv("USE_S3_UPLOAD", "").lower() == "true"
+            env_s3_upload = env_s3_upload_requested()
+            enterprise_runtime = is_enterprise_runtime()
 
-            # Show env var status like API keys
-            if env_s3_upload and not st.session_state.get("override_s3_upload", False):
+            # Enterprise deploy: env can force S3+NATS on (with temporary override)
+            if (
+                enterprise_runtime
+                and env_s3_upload
+                and not st.session_state.get("override_s3_upload", False)
+            ):
                 st.info("S3+NATS upload is enabled via `USE_S3_UPLOAD` environment variable")
                 col1, col2 = st.columns([1, 3])
                 with col1:
@@ -3166,12 +3263,17 @@ def main():
                 """,
                     unsafe_allow_html=True,
                 )
+                if env_s3_upload and not enterprise_runtime:
+                    st.caption(
+                        "`USE_S3_UPLOAD` is set but ignored in core runtime (local dev). "
+                        "Enable below only if the platform backend is running."
+                    )
                 use_s3_upload = st.checkbox(
                     "Enable S3+NATS Upload",
                     key="use_s3_upload",
                     help="Upload documents via S3 and process via NATS for enterprise integration",
                 )
-                if not env_s3_upload:
+                if enterprise_runtime and not env_s3_upload:
                     st.caption("*Or set `USE_S3_UPLOAD=true` in environment*")
 
             # Show Enterprise Mode status only if enabled AND backend is available
@@ -4012,14 +4114,7 @@ def main():
 
         # Upload Report page
         elif nav_page == "Upload Report":
-            # Check if S3+NATS enterprise integration is enabled
-            # Respect override_s3_upload if user has temporarily disabled it
-            if st.session_state.get("override_s3_upload", False):
-                use_s3_upload = False
-            else:
-                use_s3_upload = (
-                    st.session_state.get("use_s3_upload", False) or os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
-                )
+            use_s3_upload = s3_nats_upload_enabled()
 
             # Initialize backend integration with S3+NATS enabled if needed
             if use_s3_upload and BACKEND_INTEGRATION_AVAILABLE:
@@ -4273,9 +4368,12 @@ def main():
                                 f"[ENTERPRISE] Error in S3+NATS upload: {e}",
                                 exc_info=True,
                             )
-                            st.error(f"Error uploading via S3+NATS: {e!s}")
-                            st.info("Falling back to local processing...")
-                            # Fall through to local processing
+                            st.session_state.override_s3_upload = True
+                            st.session_state.use_s3_upload = False
+                            st.warning(
+                                f"S3+NATS upload unavailable ({e!s}). "
+                                "Saved locally instead; re-enable in Settings when the backend is up."
+                            )
                             use_s3_upload = False
 
                 # Local processing (when enterprise mode is off or failed)

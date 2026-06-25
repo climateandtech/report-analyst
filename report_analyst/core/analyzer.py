@@ -872,10 +872,23 @@ Output only the scores, one per line, in order:"""
             logger.error(f"Error creating text chunks: {e!s}", exc_info=True)
             raise
 
+    def _ensure_embeddings_client(self) -> None:
+        """Initialize or refresh OpenAI embeddings client from current OPENAI_API_KEY."""
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
+            raise RuntimeError("OpenAI embeddings unavailable — set OPENAI_API_KEY for the Embed step.")
+        if self.embeddings is None:
+            self.embeddings = OpenAIEmbedding(
+                api_key=openai_key,
+                api_base=os.getenv("OPENAI_API_BASE"),
+                model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
+                embed_batch_size=100,
+            )
+            Settings.embed_model = self.embeddings
+
     def _add_embeddings_to_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Compute embeddings for existing text chunks."""
-        if not self.embeddings:
-            raise RuntimeError("OpenAI embeddings unavailable — set OPENAI_API_KEY for the Embed step.")
+        self._ensure_embeddings_client()
 
         embedded: List[Dict[str, Any]] = []
         batch_size = 100
