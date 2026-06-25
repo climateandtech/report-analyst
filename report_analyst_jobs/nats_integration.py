@@ -17,11 +17,10 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 import nats
-from nats.js import JetStreamContext
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,11 +38,7 @@ def resolve_nats_url() -> str:
 
 
 def resolve_backend_url() -> str:
-    return (
-        os.getenv("BACKEND_URL")
-        or os.getenv("SEARCH_BACKEND_URL")
-        or "http://localhost:8000"
-    ).strip()
+    return (os.getenv("BACKEND_URL") or os.getenv("SEARCH_BACKEND_URL") or "http://localhost:8000").strip()
 
 
 class JobStatus(str, Enum):

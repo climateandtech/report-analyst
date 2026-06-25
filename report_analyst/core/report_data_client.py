@@ -129,7 +129,7 @@ class ReportDataClient:
                     logger.warning(f"Skipping {file.name}: PDF has 0 pages, likely invalid")
                     continue
             except Exception as e:
-                logger.warning(f"Skipping {file.name}: cannot open as PDF ({str(e)})")
+                logger.warning(f"Skipping {file.name}: cannot open as PDF ({e!s})")
                 continue
 
             # Create file:// URI

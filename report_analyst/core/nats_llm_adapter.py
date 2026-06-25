@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Any, List, Optional, Union
 
 import nats
-from llama_index.core.llms import ChatMessage, ChatResponse, MessageRole
+from llama_index.core.llms import ChatMessage, MessageRole
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class NATSLLMChatAdapter:
 
     async def achat(
         self,
-        messages: Union[str, List[ChatMessage], List[Any]] = None,
+        messages: Union[str, List[ChatMessage], List[Any]] | None = None,
         prompt: Optional[str] = None,
         **kwargs: Any,
     ) -> _ChatResponseWrapper:

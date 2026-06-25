@@ -1,6 +1,7 @@
 """Tests for report PDF upload directory resolution."""
 
 import pytest
+
 from report_analyst.core.report_data_client import ReportDataClient
 from report_analyst.core.service import get_report_temp_dir, get_report_upload_dir
 

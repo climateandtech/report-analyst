@@ -19,7 +19,6 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional
 
 import boto3
 import nats
@@ -78,7 +77,7 @@ class S3UploadService:
                 logger.info("Connected to NATS with JetStream")
             except Exception as e:
                 logger.error(f"Failed to connect to NATS: {e}")
-                raise S3UploadServiceError(f"NATS connection failed: {str(e)}")
+                raise S3UploadServiceError(f"NATS connection failed: {e!s}")
 
     async def close(self):
         """Close NATS connection if open"""
@@ -126,8 +125,7 @@ class S3UploadService:
                 "file_size": len(file_bytes),
                 "source": os.getenv("NATS_USER", "report-analyst"),
                 "processing_timeout": self.timeout,
-                "persist": os.getenv("UPLOAD_PERSIST", "true").lower()
-                not in ("0", "false", "no"),
+                "persist": os.getenv("UPLOAD_PERSIST", "true").lower() not in ("0", "false", "no"),
             }
             owner = os.getenv("PLATFORM_OWNER_USER_ID") or os.getenv("ACTING_USER_ID")
             if owner:
@@ -152,7 +150,7 @@ class S3UploadService:
                 self.nc = None
                 self.js = None
                 logger.info(f"Published control message for {filename}")
-                logger.info(f"Closed connection")
+                logger.info("Closed connection")
 
             except Exception as publish_error:
                 logger.error(f"NATS publish failed: {publish_error}")
@@ -166,7 +164,7 @@ class S3UploadService:
                 await self._cleanup_s3_object(s3_key)
             except Exception as cleanup_e:
                 logger.warning(f"Failed to cleanup S3 object: {cleanup_e}")
-            raise S3UploadServiceError(f"S3+NATS upload failed: {str(e)}")
+            raise S3UploadServiceError(f"S3+NATS upload failed: {e!s}")
 
     async def _upload_to_s3(self, file_bytes: bytes, s3_key: str, filename: str) -> str:
         """Upload file to S3 and return URL"""
@@ -206,7 +204,7 @@ class S3UploadService:
 
         except Exception as e:
             logger.error(f"S3 upload failed: {e}")
-            raise S3UploadServiceError(f"S3 upload failed: {str(e)}")
+            raise S3UploadServiceError(f"S3 upload failed: {e!s}")
 
     def _get_s3_bucket(self) -> str:
         """Get S3 bucket name from config or environment (matches backend/PDF service)"""

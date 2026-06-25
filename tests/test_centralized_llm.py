@@ -61,7 +61,9 @@ async def test_nats_llm_adapter_achat_uses_per_request_reply_subject():
                 await cb(msg)
 
         asyncio.get_event_loop().call_soon(lambda: asyncio.create_task(deliver()))
-        return MagicMock()
+        sub = MagicMock()
+        sub.unsubscribe = AsyncMock()
+        return sub
 
     mock_nc.subscribe = AsyncMock(side_effect=fake_subscribe)
     mock_js.publish = AsyncMock()

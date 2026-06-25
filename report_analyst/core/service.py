@@ -106,7 +106,7 @@ def get_reports_for_api(question_set_id: Optional[str] = None) -> List[Dict[str,
 
 
 def get_analysis_keys_for_api() -> List[Dict[str, Any]]:
-    """Return full report × question_set pairs for selectors.
+    """Return full report x question_set pairs for selectors.
 
     This endpoint is intentionally not limited to stored cache keys so UI selectors
     can present all available combinations.

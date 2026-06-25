@@ -1,16 +1,11 @@
-import asyncio
-import json
 import os
 import shutil
-import sqlite3
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
-import streamlit as st
 import yaml
 
 from report_analyst.core.analyzer import DocumentAnalyzer
@@ -62,7 +57,7 @@ def test_env():
     db_path = cache_path / "analysis.db"
     from report_analyst.core.cache_manager import CacheManager
 
-    cache_manager = CacheManager(db_path=str(db_path))
+    CacheManager(db_path=str(db_path))
     # Tables are created automatically by CacheManager.init_db()
 
     # Create test question set
@@ -127,22 +122,6 @@ def test_report_analyzer_initialization(report_analyzer, test_env):
 def test_load_question_set(report_analyzer, test_env):
     """Test loading question sets"""
     # Mock the questions file loading
-    test_questions = {
-        "name": "TCFD Questions",
-        "description": "Test TCFD questions",
-        "questions": [
-            {
-                "id": "tcfd_1",
-                "text": "Test question 1",
-                "guidelines": "Test guidelines 1",
-            },
-            {
-                "id": "tcfd_2",
-                "text": "Test question 2",
-                "guidelines": "Test guidelines 2",
-            },
-        ],
-    }
 
     # Test with actual TCFD questions (not mocked)
     question_set = report_analyzer.load_question_set("tcfd")

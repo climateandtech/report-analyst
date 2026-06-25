@@ -2,25 +2,17 @@ import hashlib
 import json
 import logging
 import os
-import pickle
 import re
-import shutil
-import sqlite3
-import sys
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 import yaml
 from dotenv import load_dotenv
-from langchain.chains import RetrievalQA
-from langchain.chains.summarize import load_summarize_chain
-from langchain.prompts import PromptTemplate
-from langchain_openai import ChatOpenAI
 from llama_index.core import Document, Settings
 from llama_index.core.ingestion import IngestionCache
-from llama_index.core.llms import ChatMessage, MessageRole
+from llama_index.core.llms import ChatMessage
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.file import PyMuPDFReader
@@ -55,9 +47,7 @@ logger.info(
 # Centralized LLM: platform handles inference via NATS — never use placeholder OpenAI keys
 _centralized_llm_active = use_backend and (use_centralized_llm or use_full_backend_analysis)
 if _centralized_llm_active:
-    logger.info(
-        "Centralized LLM mode — inference via platform/NATS (no local OpenAI/Gemini)"
-    )
+    logger.info("Centralized LLM mode — inference via platform/NATS (no local OpenAI/Gemini)")
 else:
     # Only check for API keys if not using backend LLM
     # Check if we need to force the default model based on available keys
@@ -179,7 +169,7 @@ class DocumentAnalyzer:
                     self.embeddings = None
 
             except Exception as e:
-                log_analysis_step(f"Error initializing local LLM clients: {str(e)}", "error")
+                log_analysis_step(f"Error initializing local LLM clients: {e!s}", "error")
                 if not self.use_backend_llm:
                     raise
                 else:
@@ -257,8 +247,8 @@ class DocumentAnalyzer:
             else:
                 try:
                     return f"{Path(file_path).stem}_fallback"
-                except:
-                    return f"unknown_fallback"
+                except Exception:
+                    return "unknown_fallback"
 
     def _get_vector_store_collection_name(self, cache_key: str) -> str:
         """Generate a valid collection name from cache key."""
@@ -319,7 +309,7 @@ class DocumentAnalyzer:
                     vector_store = LlamaVectorStore(store_dir)
                     # Try to load the store - this will verify if it's valid
                     if vector_store.load():
-                        logger.info(f"[ANALYSIS] ✓ Cache HIT: Loaded vector store from cache")
+                        logger.info("[ANALYSIS] ✓ Cache HIT: Loaded vector store from cache")
                         return vector_store
                 except Exception as inner_e:
                     logger.error(
@@ -331,7 +321,7 @@ class DocumentAnalyzer:
             return None
         except Exception as e:
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to load vector store cache: {e}")
-            logger.debug(f"Full vector store cache error: {str(e)}", exc_info=True)
+            logger.debug(f"Full vector store cache error: {e!s}", exc_info=True)
             return None
 
     async def score_chunk_relevance(self, question: str, chunk_text: str) -> float:
@@ -391,7 +381,7 @@ Output only the numeric score (0.0-1.0):"""
             return score
 
         except Exception as e:
-            log_analysis_step(f"Error scoring chunk relevance: {str(e)}", "error")
+            log_analysis_step(f"Error scoring chunk relevance: {e!s}", "error")
             return 0.0
 
     async def score_chunk_relevance_batch(self, question: str, chunks: List[Dict], single_call: bool = True) -> List[float]:
@@ -457,7 +447,7 @@ Output only the scores, one per line, in order:"""
                         raise ValueError(f"Got {len(scores)} scores for {len(chunks)} chunks")
                     return scores
                 except Exception as e:
-                    log_analysis_step(f"Error parsing batch scores: {str(e)}", "error")
+                    log_analysis_step(f"Error parsing batch scores: {e!s}", "error")
                     return [0.0] * len(chunks)
 
             else:
@@ -470,14 +460,14 @@ Output only the scores, one per line, in order:"""
                 return scores
 
         except Exception as e:
-            log_analysis_step(f"Error in batch scoring: {str(e)}", "error")
+            log_analysis_step(f"Error in batch scoring: {e!s}", "error")
             return [0.0] * len(chunks)
 
     def _load_cached_answers(self, file_path: str) -> Dict:
         """Load cached answers for a file with exact configuration match"""
         try:
             # Log current configuration
-            logger.info(f"Current configuration:")
+            logger.info("Current configuration:")
             logger.info(f"- Chunk size: {self.chunk_params['chunk_size']}")
             logger.info(f"- Overlap: {self.chunk_params['chunk_overlap']}")
             logger.info(f"- Top K: {self.chunk_params['top_k']}")
@@ -501,7 +491,7 @@ Output only the scores, one per line, in order:"""
             logger.info(f"Looking for cache file: {cache_file}")
 
             if not cache_file.exists():
-                logger.info(f"No cache file found for current configuration")
+                logger.info("No cache file found for current configuration")
                 return {}
 
             with open(cache_file, "r") as f:
@@ -511,7 +501,7 @@ Output only the scores, one per line, in order:"""
                 return cached_data
 
         except Exception as e:
-            logger.error(f"Error loading cache: {str(e)}")
+            logger.error(f"Error loading cache: {e!s}")
             return {}
 
     def _validate_cache_filename(self, filename: str) -> bool:
@@ -604,12 +594,12 @@ Output only the scores, one per line, in order:"""
                 logger.info(f"[ANALYSIS] Retrieved {len(chunks)} chunks from cache")
 
                 if not chunks:
-                    logger.info(f"[ANALYSIS] No chunks found in cache with current parameters, creating new chunks")
+                    logger.info("[ANALYSIS] No chunks found in cache with current parameters, creating new chunks")
                     # If no chunks in cache with current parameters, create them
                     # Check if file_path is a URN (backend resource)
                     if file_path.startswith("urn:report-analyst:backend:"):
                         logger.warning(
-                            f"[ANALYSIS] URN detected but no pre-retrieved chunks provided. Cannot process backend resource without chunks."
+                            "[ANALYSIS] URN detected but no pre-retrieved chunks provided. Cannot process backend resource without chunks."
                         )
                         yield {
                             "error": "Backend resource requires pre-retrieved chunks. Please ensure chunks are retrieved from backend first."
@@ -676,7 +666,7 @@ Output only the scores, one per line, in order:"""
 
                         except Exception as e:
                             logger.error(
-                                f"[ANALYSIS] Error applying LLM scores: {str(e)}",
+                                f"[ANALYSIS] Error applying LLM scores: {e!s}",
                                 exc_info=True,
                             )
                             # Set default scores if LLM scoring fails
@@ -767,14 +757,14 @@ Output only the scores, one per line, in order:"""
 
                 except Exception as e:
                     logger.error(
-                        f"[ANALYSIS] Error processing question {question_number}: {str(e)}",
+                        f"[ANALYSIS] Error processing question {question_number}: {e!s}",
                         exc_info=True,
                     )
-                    yield {"error": f"Error processing question {question_number}: {str(e)}"}
+                    yield {"error": f"Error processing question {question_number}: {e!s}"}
 
         except Exception as e:
-            logger.error(f"[ANALYSIS] Error processing document: {str(e)}", exc_info=True)
-            yield {"error": f"Error processing document: {str(e)}"}
+            logger.error(f"[ANALYSIS] Error processing document: {e!s}", exc_info=True)
+            yield {"error": f"Error processing document: {e!s}"}
 
     def _create_chunks(self, file_path: str) -> List[Dict[str, Any]]:
         """Create document chunks with embeddings"""
@@ -822,7 +812,7 @@ Output only the scores, one per line, in order:"""
                         text = " ".join(text.replace("\x00", "").split())
                         batch_texts.append(text)
                     else:
-                        logger.warning(f"Skipping empty or invalid chunk")
+                        logger.warning("Skipping empty or invalid chunk")
                         continue
 
                 try:
@@ -833,7 +823,7 @@ Output only the scores, one per line, in order:"""
                         logger.info(f"Successfully computed {len(batch_embeddings)} embeddings")
 
                         # Create chunk dictionaries with embeddings
-                        for chunk, embedding in zip(batch, batch_embeddings):
+                        for chunk, embedding in zip(batch, batch_embeddings, strict=False):
                             if embedding is not None:  # Only add chunks with valid embeddings
                                 chunk_dict = {
                                     "text": chunk.text,
@@ -845,10 +835,10 @@ Output only the scores, one per line, in order:"""
                                 chunks_data.append(chunk_dict)
                                 logger.debug(f"Added chunk with text length {len(chunk.text)}")
                             else:
-                                logger.warning(f"Skipping chunk - embedding is None")
+                                logger.warning("Skipping chunk - embedding is None")
 
                 except Exception as e:
-                    logger.error(f"Error computing embeddings for batch: {str(e)}", exc_info=True)
+                    logger.error(f"Error computing embeddings for batch: {e!s}", exc_info=True)
                     # Continue with next batch, storing chunks without embeddings
                     for chunk in batch:
                         chunk_dict = {
@@ -859,7 +849,7 @@ Output only the scores, one per line, in order:"""
                             "computed_score": 0.0,
                         }
                         chunks_data.append(chunk_dict)
-                        logger.warning(f"Added chunk without embedding due to error")
+                        logger.warning("Added chunk without embedding due to error")
 
             # Log embedding statistics
             chunks_with_embeddings = sum(1 for c in chunks_data if c["embedding"] is not None)
@@ -871,16 +861,16 @@ Output only the scores, one per line, in order:"""
                 logger.info(f"Saving {len(valid_chunks)} valid chunks to cache")
                 try:
                     self.cache_manager.save_vectors(file_path, valid_chunks)
-                    logger.info(f"Successfully saved chunks and vectors to cache")
+                    logger.info("Successfully saved chunks and vectors to cache")
                 except Exception as e:
-                    logger.error(f"Failed to save vectors to cache: {str(e)}", exc_info=True)
+                    logger.error(f"Failed to save vectors to cache: {e!s}", exc_info=True)
             else:
                 logger.warning("No valid chunks to save to cache")
 
             return chunks_data
 
         except Exception as e:
-            logger.error(f"Error creating chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error creating chunks: {e!s}", exc_info=True)
             raise
 
     async def _analyze_chunks(
@@ -950,7 +940,7 @@ Output only the scores, one per line, in order:"""
                 logger.info(response_text)
                 logger.info("=== End LLM Response ===")
             except Exception as e:
-                logger.error(f"Error getting LLM response: {str(e)}")
+                logger.error(f"Error getting LLM response: {e!s}")
                 raise
 
             # Parse the response
@@ -1037,9 +1027,9 @@ Output only the scores, one per line, in order:"""
             return result
 
         except Exception as e:
-            logger.error(f"Error analyzing chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error analyzing chunks: {e!s}", exc_info=True)
             return {
-                "ANSWER": f"Error analyzing document: {str(e)}",
+                "ANSWER": f"Error analyzing document: {e!s}",
                 "SCORE": 0,
                 "EVIDENCE": [],
                 "GAPS": ["Error during analysis"],
@@ -1096,7 +1086,7 @@ Output only the scores, one per line, in order:"""
                 log_analysis_step(f"Available question IDs: {list(questions.keys())}")
                 return questions
         except Exception as e:
-            log_analysis_step(f"Error loading questions: {str(e)}", "error")
+            log_analysis_step(f"Error loading questions: {e!s}", "error")
             logger.exception("Full error:")  # This will log the full traceback
             return {}
 
@@ -1120,7 +1110,7 @@ Output only the scores, one per line, in order:"""
 
             return self.questions.get(question_key)
         except Exception as e:
-            log_analysis_step(f"Error getting question {number}: {str(e)}", "error")
+            log_analysis_step(f"Error getting question {number}: {e!s}", "error")
             logger.exception("Full error:")
             return None
 
@@ -1137,7 +1127,7 @@ Output only the scores, one per line, in order:"""
         # Recreate text splitter with new parameters
         self.text_splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
-        logger.info(f"Updated parameters and recreated text splitter")
+        logger.info("Updated parameters and recreated text splitter")
 
     def update_llm_model(self, model_name: str):
         """Update the LLM model."""
@@ -1201,7 +1191,7 @@ Output only the scores, one per line, in order:"""
             }
 
         except Exception as e:
-            logger.error(f"Error checking step completion: {str(e)}")
+            logger.error(f"Error checking step completion: {e!s}")
             return {
                 "chunks": False,
                 "embeddings": False,
@@ -1282,7 +1272,7 @@ Output only the scores, one per line, in order:"""
             return similar_chunks
 
         except Exception as e:
-            logger.error(f"Error getting similar chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error getting similar chunks: {e!s}", exc_info=True)
             return []
 
     def _parse_analysis_response(self, response_text: str) -> Dict[str, Any]:
@@ -1423,9 +1413,9 @@ Output only the scores, one per line, in order:"""
                 return result
 
         except Exception as e:
-            logger.error(f"Error parsing analysis response: {str(e)}", exc_info=True)
+            logger.error(f"Error parsing analysis response: {e!s}", exc_info=True)
             return {
-                "ANSWER": f"Error parsing analysis: {str(e)}",
+                "ANSWER": f"Error parsing analysis: {e!s}",
                 "SCORE": 0,
                 "EVIDENCE": [],
                 "GAPS": ["Error during analysis"],

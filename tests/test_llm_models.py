@@ -1,7 +1,5 @@
 """Tests for env-configurable LLM model lists."""
 
-import os
-
 import pytest
 
 import report_analyst.core.llm_models as llm_models

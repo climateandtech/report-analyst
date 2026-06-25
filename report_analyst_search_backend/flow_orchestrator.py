@@ -274,9 +274,7 @@ class FlowOrchestrator:
 
         results = []
         for question in questions:
-            chunk_texts = [
-                c.get("chunk_text") or c.get("text", "") for c in chunks[:10]
-            ]
+            chunk_texts = [c.get("chunk_text") or c.get("text", "") for c in chunks[:10]]
             try:
                 response = asyncio.run(
                     analyzer.llm.achat(
@@ -301,9 +299,11 @@ class FlowOrchestrator:
                             provenance={
                                 "model": os.getenv("OPENAI_API_MODEL", "local"),
                                 "provider": "report_analyst",
-                                "mode": "byok_contribution"
-                                if os.getenv("USE_BYOK_CONTRIBUTION", "").lower() in ("1", "true", "yes")
-                                else "centralized",
+                                "mode": (
+                                    "byok_contribution"
+                                    if os.getenv("USE_BYOK_CONTRIBUTION", "").lower() in ("1", "true", "yes")
+                                    else "centralized"
+                                ),
                             },
                         )
                     )

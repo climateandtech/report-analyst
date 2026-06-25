@@ -213,8 +213,7 @@ class NATSLLMWorker:
 
     def __init__(self, *args, **kwargs):
         raise RuntimeError(
-            "NATSLLMWorker was removed from report-analyst. "
-            "Platform backend handles llm.request via llm_consumer."
+            "NATSLLMWorker was removed from report-analyst. " "Platform backend handles llm.request via llm_consumer."
         )
 
 
