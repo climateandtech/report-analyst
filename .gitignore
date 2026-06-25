@@ -40,7 +40,8 @@ inputlucia
 # macOS system files
 .DS_Store
 
-# Deployment guides and assessments (keep local, don't commit)
+# Client-specific questionsets (deploy via QUESTIONSETS_PATH / SSH, not in image)
+report_analyst/questionsets/esrs_e1_*.yaml
 CLOUDFLARE_ASSESSMENT.md
 CLOUDFLARE_QUICK_SUMMARY.md
 DEPLOYMENT_GUIDE.md
