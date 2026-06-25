@@ -4,6 +4,8 @@
 set -eu
 
 UPSTREAM="${UPSTREAM_HOST:-report-analyst}:${UPSTREAM_PORT:-8080}"
+# nginx default is 1m; Streamlit uploads use PUT /_stcore/upload_file/ (often multi-MB PDFs).
+CLIENT_MAX_BODY_SIZE="${NGINX_CLIENT_MAX_BODY_SIZE:-200m}"
 AUTH_FILE=/etc/nginx/auth.htpasswd
 CONF=/etc/nginx/conf.d/default.conf
 
@@ -19,6 +21,7 @@ fi
 cat > "$CONF" <<EOF
 server {
     listen 8080;
+    client_max_body_size ${CLIENT_MAX_BODY_SIZE};
     location /health {
         auth_basic off;
         return 200 'ok';

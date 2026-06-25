@@ -10,6 +10,7 @@ to avoid SIGSEGV on macOS/ARM.
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
@@ -34,16 +35,40 @@ def get_questions_for_api(question_set_id: str) -> Dict[str, Any]:
     return loader.get_questions(question_set_id)
 
 
-def get_report_temp_dir():
-    """Return the directory used for local report PDFs (async uploads and report_path). Same as API _resolve_analyze_path."""
-    from pathlib import Path
+def get_report_upload_dir():
+    """Return the directory for uploaded report PDFs.
 
-    path = os.environ.get("REPORT_ANALYST_TEMP")
-    if path:
-        return Path(os.path.realpath(path))
-    # Default: project/temp (relative to report_analyst package parent)
+    Precedence:
+      1. REPORT_ANALYST_UPLOAD_DIR (explicit)
+      2. REPORT_ANALYST_TEMP (legacy API name)
+      3. TEMP_DIR (legacy config name)
+      4. {STORAGE_PATH}/uploads when STORAGE_PATH is set (Coolify volume)
+      5. {project_root}/temp (local dev default)
+
+    Creates the directory if missing.
+    """
+    for key in ("REPORT_ANALYST_UPLOAD_DIR", "REPORT_ANALYST_TEMP", "TEMP_DIR"):
+        path = os.environ.get(key)
+        if path:
+            upload_dir = Path(os.path.realpath(path))
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            return upload_dir
+
+    storage_path = os.environ.get("STORAGE_PATH")
+    if storage_path:
+        upload_dir = Path(os.path.realpath(storage_path)) / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        return upload_dir
+
     root = Path(__file__).resolve().parent.parent.parent
-    return root / "temp"
+    upload_dir = root / "temp"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    return upload_dir
+
+
+def get_report_temp_dir():
+    """Alias for :func:`get_report_upload_dir` (historical name used by the API)."""
+    return get_report_upload_dir()
 
 
 def get_reports_for_api(question_set_id: Optional[str] = None) -> List[Dict[str, Any]]:

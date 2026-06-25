@@ -25,6 +25,8 @@ docker run -p 8080:8080 \
 
 On **Coolify**, use `docker-compose.coolify-customer.yml` (declares `storage-data:/app/storage`) or add a **Persistent Storage** volume mount at `/app/storage` (directory, not the `.sqlite` file alone). Coolify prefixes volume names with the app UUID.
 
+Uploaded PDFs default to **`/app/storage/uploads/`** when `STORAGE_PATH=/app/storage` (same volume as SQLite cache). Override with `REPORT_ANALYST_UPLOAD_DIR`.
+
 ### Coolify customer compose layout
 
 `docker-compose.coolify-customer.yml` runs Streamlit as service **`report-analyst`** on `:8080` (what Traefik routes to).
@@ -39,6 +41,8 @@ HTTP_BASIC_AUTH_PASSWORD=...
 Use `coolify-provisioning/scripts/set-app-http-basic-auth.sh` — see `REPORT-ANALYST-DEPLOY.md` § HTTP Basic Auth. Follows [Coolify Basic Auth](https://coolify.io/docs/knowledge-base/proxy/traefik/basic-auth) + [Custom Middlewares](https://coolify.io/docs/knowledge-base/proxy/traefik/custom-middlewares) (`coolify.traefik.middlewares` shorthand).
 
 Health: `GET /_stcore/health`. Unauthenticated requests return **401** when basic auth is enabled.
+
+When basic auth uses the **`report-analyst-auth` nginx sidecar**, set `NGINX_CLIENT_MAX_BODY_SIZE` (default `200m`) so PDF uploads via Streamlit `/_stcore/upload_file/` are not rejected with **413** (nginx’s built-in limit is 1 MB).
 
 Optional Postgres (enterprise module features in UI):
 

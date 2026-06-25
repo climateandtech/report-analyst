@@ -142,8 +142,9 @@ class ReportAnalyzer:
 
     def __init__(self):
         """Initialize the analyzer"""
-        self.temp_dir = Path("temp")
-        self.temp_dir.mkdir(exist_ok=True)
+        from report_analyst.core.service import get_report_upload_dir
+
+        self.temp_dir = get_report_upload_dir()
 
         # Initialize the real document analyzer
         self.analyzer = DocumentAnalyzer()
@@ -343,9 +344,11 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
             except Exception as e:
                 logger.warning(f"PostgreSQL file storage failed: {str(e)}, falling back to local")
 
-        # Fallback to local file storage
-        file_path = Path("temp") / uploaded_file.name
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        # Fallback to local file storage (STORAGE_PATH/uploads on Coolify when STORAGE_PATH is set)
+        from report_analyst.core.service import get_report_upload_dir
+
+        upload_dir = get_report_upload_dir()
+        file_path = upload_dir / uploaded_file.name
         with open(file_path, "wb") as f:
             f.write(file_bytes)
         logger.info(f"Successfully saved file: {file_path}")
@@ -732,7 +735,9 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
     """Get list of files for Streamlit dropdown (UI adapter)"""
     from report_analyst.core.report_data_client import ReportDataClient
 
-    client = ReportDataClient()
+    from report_analyst.core.service import get_report_upload_dir
+
+    client = ReportDataClient(temp_dir=get_report_upload_dir())
 
     # Collect backend configs (could be multiple backends in future)
     backend_configs = (

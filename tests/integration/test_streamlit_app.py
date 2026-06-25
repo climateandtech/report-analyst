@@ -117,9 +117,10 @@ def report_analyzer(test_env):
     return analyzer
 
 
-def test_report_analyzer_initialization(report_analyzer):
+def test_report_analyzer_initialization(report_analyzer, test_env):
     """Test ReportAnalyzer initialization"""
     assert isinstance(report_analyzer.analyzer, DocumentAnalyzer)
+    assert report_analyzer.temp_dir.resolve() == (test_env["storage_path"] / "uploads").resolve()
     assert report_analyzer.temp_dir.exists()
 
 
@@ -202,8 +203,10 @@ def test_save_uploaded_file(test_env):
     # Test saving the file
     file_path = save_uploaded_file(mock_file)
     assert file_path is not None
-    assert Path(file_path).exists()
-    assert Path(file_path).read_bytes() == b"%PDF-1.4\n%Test PDF"
+    expected = test_env["storage_path"] / "uploads" / "test.pdf"
+    assert Path(file_path).resolve() == expected.resolve()
+    assert expected.exists()
+    assert expected.read_bytes() == b"%PDF-1.4\n%Test PDF"
 
 
 def test_display_dataframes():

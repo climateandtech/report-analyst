@@ -225,17 +225,21 @@ class PostgreSQLFileStorage:
             logger.error(f"Error finding file by filename {filename}: {str(e)}")
             return None
 
-    def save_to_temp(self, file_id: str, temp_dir: Path = Path("temp")) -> Optional[str]:
+    def save_to_temp(self, file_id: str, temp_dir: Optional[Path] = None) -> Optional[str]:
         """
         Retrieve file from PostgreSQL and save to temporary directory.
 
         Args:
             file_id: Unique identifier for the stored file
-            temp_dir: Directory to save the file to
+            temp_dir: Directory to save the file to (defaults to get_report_upload_dir())
 
         Returns:
             Path to the temporary file, or None if not found
         """
+        if temp_dir is None:
+            from report_analyst.core.service import get_report_upload_dir
+
+            temp_dir = get_report_upload_dir()
         try:
             file_info = self.get_file_info(file_id)
             if not file_info:
