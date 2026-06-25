@@ -2,6 +2,7 @@
 
 import logging
 import os
+from collections.abc import Iterable
 from typing import Any, Optional
 
 from llama_index.llms.gemini import Gemini
@@ -11,6 +12,32 @@ from llama_index.llms.openai import OpenAI
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+
+def _ensure_openai_model_registered(model_name: str) -> None:
+    """Register one OpenAI model ID with LlamaIndex when absent from its whitelist."""
+    try:
+        from llama_index.llms.openai.utils import ALL_AVAILABLE_MODELS
+    except ImportError:
+        return
+
+    if model_name in ALL_AVAILABLE_MODELS:
+        return
+
+    context_window = int(os.getenv("OPENAI_MODEL_CONTEXT_WINDOW", "128000"))
+    ALL_AVAILABLE_MODELS[model_name] = context_window
+    logger.info(
+        "Registered OpenAI model %r with LlamaIndex (context_window=%s)",
+        model_name,
+        context_window,
+    )
+
+
+def register_openai_model_ids(model_ids: Iterable[str]) -> None:
+    """Register configured OpenAI chat model IDs with LlamaIndex's whitelist."""
+    for model_id in model_ids:
+        if model_id.startswith("gpt-"):
+            _ensure_openai_model_registered(model_id)
 
 
 def centralized_llm_requested() -> bool:
@@ -50,6 +77,7 @@ def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
             logger.error(f"Cannot initialize OpenAI model '{model_name}' - OPENAI_API_KEY environment variable is not set")
             raise ValueError("OPENAI_API_KEY environment variable is required for OpenAI models")
 
+        _ensure_openai_model_registered(model_name)
         return OpenAI(
             model=model_name,
             api_key=api_key,

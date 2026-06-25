@@ -891,6 +891,53 @@ class CacheManager:
             logger.error(f"Error retrieving answers for question set {question_set}: {e}")
             raise
 
+    def save_text_only_chunks(self, file_path: str, chunks: List[Dict], chunk_size: int, chunk_overlap: int) -> None:
+        """Save document chunks without embeddings (Chunk step)."""
+        try:
+            logger.info(f"Saving {len(chunks)} text-only chunks for {file_path}")
+            timestamp = datetime.now().isoformat()
+
+            with self.db_manager.get_connection() as conn:
+                for chunk in chunks:
+                    metadata_json = json.dumps(chunk.get("metadata", {}))
+                    params = {
+                        "file_path": str(file_path),
+                        "chunk_text": chunk["text"],
+                        "chunk_size": chunk_size,
+                        "chunk_overlap": chunk_overlap,
+                        "metadata": metadata_json,
+                        "created_at": timestamp,
+                    }
+                    if self.db_manager.is_postgres():
+                        conn.execute(
+                            text(
+                                """
+                                INSERT INTO document_chunks
+                                (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                                VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, NULL, :metadata, :created_at)
+                                ON CONFLICT (file_path, chunk_text, chunk_size, chunk_overlap) DO UPDATE
+                                SET metadata = EXCLUDED.metadata,
+                                    created_at = EXCLUDED.created_at
+                            """
+                            ),
+                            params,
+                        )
+                    else:
+                        conn.execute(
+                            text(
+                                """
+                                INSERT OR REPLACE INTO document_chunks
+                                (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                                VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, NULL, :metadata, :created_at)
+                            """
+                            ),
+                            params,
+                        )
+            logger.info(f"Saved {len(chunks)} text-only chunks")
+        except Exception as e:
+            logger.error(f"Error saving text-only chunks: {e}")
+            raise
+
     def save_document_chunks(self, file_path: str, chunks: List[Dict], chunk_size: int, chunk_overlap: int) -> None:
         """Save document chunks to cache with their embeddings."""
         try:

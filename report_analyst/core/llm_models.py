@@ -15,11 +15,13 @@ from __future__ import annotations
 import os
 import re
 
+# gpt-5.x and env overrides are registered with LlamaIndex on each model-list read
+# (see llm_models._sync_openai_model_registry). gpt-4o-mini is the safe default.
 DEFAULT_OPENAI_MODELS: tuple[str, ...] = (
-    "gpt-5.4-mini",
-    "gpt-5.4",
     "gpt-4o-mini",
     "gpt-4o",
+    "gpt-5.4-mini",
+    "gpt-5.4",
     "gpt-4-turbo",
     "gpt-3.5-turbo",
 )
@@ -51,7 +53,25 @@ def _dedupe_preserve_order(models: list[str]) -> list[str]:
     return out
 
 
+def _openai_model_ids_to_register() -> list[str]:
+    """All gpt-* IDs from defaults, env lists, and default-selection env vars."""
+    ids: list[str] = list(DEFAULT_OPENAI_MODELS)
+    ids.extend(_parse_csv_models(os.getenv("OPENAI_MODELS")))
+    ids.extend(_parse_csv_models(os.getenv("LLM_MODELS")))
+    preferred = (os.getenv("OPENAI_API_MODEL") or os.getenv("DEFAULT_MODEL") or "").strip()
+    if preferred.startswith("gpt-"):
+        ids.append(preferred)
+    return [model_id for model_id in _dedupe_preserve_order(ids) if model_id.startswith("gpt-")]
+
+
+def _sync_openai_model_registry() -> None:
+    from .llm_providers import register_openai_model_ids
+
+    register_openai_model_ids(_openai_model_ids_to_register())
+
+
 def get_openai_models() -> list[str]:
+    _sync_openai_model_registry()
     override = _parse_csv_models(os.getenv("OPENAI_MODELS"))
     if override:
         return override
@@ -66,6 +86,7 @@ def get_gemini_models() -> list[str]:
 
 
 def get_llm_models(*, include_gemini: bool | None = None) -> list[str]:
+    _sync_openai_model_registry()
     combined = _parse_csv_models(os.getenv("LLM_MODELS"))
     if combined:
         return _dedupe_preserve_order(combined)
@@ -79,6 +100,7 @@ def get_llm_models(*, include_gemini: bool | None = None) -> list[str]:
 
 
 def get_default_llm_model() -> str:
+    _sync_openai_model_registry()
     preferred = (os.getenv("OPENAI_API_MODEL") or os.getenv("DEFAULT_MODEL") or "").strip()
     models = get_llm_models()
     if preferred:

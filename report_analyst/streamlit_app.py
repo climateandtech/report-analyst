@@ -178,6 +178,7 @@ class ReportAnalyzer:
         single_call: bool = True,
         force_recompute: bool = False,
         pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
+        max_processing_step: str = "answer",
     ) -> AsyncGenerator[Dict, None]:
         """Analyze a document using the provided questions
 
@@ -213,6 +214,7 @@ class ReportAnalyzer:
                 single_call,
                 force_recompute,
                 pre_retrieved_chunks=pre_retrieved_chunks,
+                max_processing_step=max_processing_step,
             ):
                 # Pass through status and error messages
                 if "status" in result or "error" in result:
@@ -1281,6 +1283,17 @@ def get_current_settings(st) -> dict:
     }
 
 
+def get_max_processing_step() -> str:
+    """Return processing step key from Streamlit session state (Chunk/Embed/Map/Answer slider)."""
+    from report_analyst.core.analyzer import normalize_processing_step
+
+    return normalize_processing_step(st.session_state.get("processing_steps_slider", "Answer"))
+
+
+def processing_step_needs_questions() -> bool:
+    return get_max_processing_step() in ("map", "answer")
+
+
 def update_analyzer_parameters():
     """Update analyzer parameters based on session state."""
     if "analyzer" not in st.session_state:
@@ -1329,7 +1342,7 @@ def update_analyzer_parameters():
         st.error(f"Error updating parameters: {e!s}")
 
 
-async def run_analysis(analyzer, file_path, selected_questions, progress_text):
+async def run_analysis(analyzer, file_path, selected_questions, progress_text, max_processing_step: str = "answer"):
     """Run analysis and update the UI with progress"""
     try:
         # Get current configuration
@@ -1398,6 +1411,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
             use_llm_scoring=st.session_state.get("new_llm_scoring", False),  # Use the checkbox value directly
             force_recompute=st.session_state.get("force_recompute", False),
             pre_retrieved_chunks=pre_retrieved_chunks,  # Pass backend chunks if available
+            max_processing_step=max_processing_step,
         ):
             # Handle errors by displaying them but not storing them
             if "error" in result:
@@ -3757,8 +3771,34 @@ def main():
                             is_selected = q_id in selected_questions
                             st.session_state[f"individual_question_{q_id}"] = is_selected
 
-                        if not selected_questions:
+                        max_step = get_max_processing_step()
+                        needs_questions = processing_step_needs_questions()
+
+                        if not selected_questions and needs_questions:
                             st.warning("Please select at least one question to analyze.")
+                        elif not selected_questions and not needs_questions:
+                            try:
+                                st.session_state.force_recompute = reanalyze_clicked
+                                progress_text = st.empty()
+                                is_backend = st.session_state.get("backend_chunks") is not None
+                                backend_uri = st.session_state.get("backend_resource_uri")
+                                if is_backend and backend_uri:
+                                    analysis_file_path = backend_uri
+                                else:
+                                    analysis_file_path = str(Path(file_path).resolve()) if file_path else file_path
+                                progress_text.info(f"Running {max_step} step...")
+                                asyncio.run(
+                                    run_analysis(
+                                        analyzer,
+                                        file_path=analysis_file_path,
+                                        selected_questions=[],
+                                        progress_text=progress_text,
+                                        max_processing_step=max_step,
+                                    )
+                                )
+                                progress_text.success(f"Completed {max_step} step.")
+                            except Exception as e:
+                                st.error(f"Error analyzing document: {e!s}")
                         else:
                             try:
                                 # Set force_recompute based on which button was clicked
@@ -3797,6 +3837,7 @@ def main():
                                             file_path=analysis_file_path,
                                             selected_questions=selected_questions,
                                             progress_text=progress_text,
+                                            max_processing_step=get_max_processing_step(),
                                         )
                                     )
                                 else:

@@ -11,11 +11,11 @@ def _clear_model_env(monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
 
-def test_default_openai_models_include_gpt_54():
+def test_default_openai_models_use_gpt_4o_mini_as_safe_default():
     models = llm_models.get_openai_models()
-    assert models[0] == "gpt-5.4-mini"
+    assert models[0] == "gpt-4o-mini"
+    assert "gpt-5.4-mini" in models
     assert "gpt-5.4" in models
-    assert "gpt-4o-mini" in models
 
 
 def test_default_gemini_models_include_latest():
@@ -58,12 +58,12 @@ def test_default_llm_model_from_openai_api_model(monkeypatch):
 
 
 def test_default_llm_model_falls_back_to_first_list_entry(monkeypatch):
-    assert llm_models.get_default_llm_model() == "gpt-5.4-mini"
+    assert llm_models.get_default_llm_model() == "gpt-4o-mini"
 
 
 def test_models_for_api_shape(monkeypatch):
     rows = llm_models.get_models_for_api(include_gemini=False)
-    assert rows[0]["id"] == "gpt-5.4-mini"
+    assert rows[0]["id"] == "gpt-4o-mini"
     assert "GPT" in rows[0]["name"]
 
 
