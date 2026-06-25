@@ -1290,6 +1290,18 @@ def get_max_processing_step() -> str:
     return normalize_processing_step(st.session_state.get("processing_steps_slider", "Answer"))
 
 
+def selected_question_ids_from_editor(edited_df: pd.DataFrame) -> list[str]:
+    """Return QID values for rows checked in the question data editor.
+
+    Use element-wise boolean filtering — never ``edited_df["Select"] is True`` (identity
+    check on the Series object yields KeyError: False when used as a row indexer).
+    """
+    if edited_df.empty or "Select" not in edited_df.columns or "QID" not in edited_df.columns:
+        return []
+    selected = edited_df["Select"].fillna(False).astype(bool)
+    return edited_df.loc[selected, "QID"].astype(str).tolist()
+
+
 def processing_step_needs_questions() -> bool:
     return get_max_processing_step() in ("map", "answer")
 
@@ -3764,7 +3776,7 @@ def main():
                     if analyze_clicked or reanalyze_clicked:
                         # NOW sync the selection state from the widget
                         # Get selected questions from the edited dataframe
-                        selected_questions = edited_df[edited_df["Select"] is True]["QID"].tolist()
+                        selected_questions = selected_question_ids_from_editor(edited_df)
 
                         # Update session state for individual question checkboxes (for backward compatibility)
                         for q_id in questions.keys():
