@@ -34,6 +34,14 @@ PROCESSING_STEP_LABELS = {
     "answer": "Answer",
 }
 
+# Legacy: map question_set id → YAML question id prefix (when ids differ from set name)
+QUESTION_SET_ID_PREFIX = {
+    "everest": "ev",
+    "tcfd": "tcfd",
+    "s4m": "s4m",
+    "lucia": "lucia",
+}
+
 
 def normalize_processing_step(step: str | None) -> str:
     """Map UI labels (Chunk/Embed/...) or keys to a processing step key."""
@@ -567,7 +575,7 @@ Output only the scores, one per line, in order:"""
     async def process_document(
         self,
         file_path: str,
-        selected_questions: List[int],
+        selected_questions: List[str | int],
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
@@ -578,7 +586,7 @@ Output only the scores, one per line, in order:"""
 
         Args:
             file_path: Path to document file or URN for backend resources
-            selected_questions: List of question numbers to process
+            selected_questions: Question ids (``tcfd_1``, ``esrs_e1_climate_examples_9``) or legacy numbers
             use_llm_scoring: Whether to use LLM for chunk scoring
             single_call: Whether to use single LLM call per question
             force_recompute: Whether to force recomputation
@@ -695,18 +703,24 @@ Output only the scores, one per line, in order:"""
                 yield {"error": "Select at least one question for Map or Answer steps."}
                 return
 
-            # 2. Process each question
-            for question_number in selected_questions:
+            question_ids = self.normalize_question_ids(selected_questions)
+            for bad_ref in self.unresolved_question_refs(selected_questions):
+                yield {"error": f"Question {bad_ref} not found"}
+            if not question_ids:
+                return
+
+            # 2. Process each question by canonical id
+            for question_id in question_ids:
                 try:
-                    logger.info(f"[ANALYSIS] Processing question number {question_number}")
-                    question_data = self.get_question_by_number(question_number)
-                    if not question_data:
-                        logger.warning(f"[ANALYSIS] Question {question_number} not found")
-                        yield {"error": f"Question {question_number} not found"}
+                    resolved = self.resolve_question(question_id)
+                    if not resolved:
+                        logger.warning(f"[ANALYSIS] Question {question_id} not found")
+                        yield {"error": f"Question {question_id} not found"}
                         continue
 
-                    question_id = f"{self.question_set}_{question_number}"
-                    logger.info(f"[ANALYSIS] Question ID: {question_id}")
+                    question_id, question_data = resolved
+                    question_number = self._question_number_from_id(question_id)
+                    logger.info(f"[ANALYSIS] Processing question {question_id}")
 
                     yield {"status": f"Processing question {question_number}: {question_data['text'][:50]}..."}
 
@@ -839,10 +853,10 @@ Output only the scores, one per line, in order:"""
 
                 except Exception as e:
                     logger.error(
-                        f"[ANALYSIS] Error processing question {question_number}: {e!s}",
+                        f"[ANALYSIS] Error processing question {question_id}: {e!s}",
                         exc_info=True,
                     )
-                    yield {"error": f"Error processing question {question_number}: {e!s}"}
+                    yield {"error": f"Error processing question {question_id}: {e!s}"}
 
         except Exception as e:
             logger.error(f"[ANALYSIS] Error processing document: {e!s}", exc_info=True)
@@ -1097,8 +1111,24 @@ Output only the scores, one per line, in order:"""
             raise
 
     def _load_questions(self) -> dict:
-        """Load questions from YAML files"""
-        # Look for question set file in multiple possible locations
+        """Load questions from YAML files (storage path via question_loader, then bundled)."""
+        from report_analyst.core.question_loader import get_question_loader
+
+        qset = get_question_loader().get_question_set(self.question_set)
+        if qset:
+            questions = {
+                q_id: {
+                    "text": q_data.get("text", ""),
+                    "guidelines": q_data.get("guidelines", ""),
+                }
+                for q_id, q_data in qset.questions.items()
+            }
+            log_analysis_step(
+                f"✓ Loaded {len(questions)} questions for {self.question_set} via question_loader"
+            )
+            return questions
+
+        # Fallback: bundled questionsets only (no QUESTIONSETS_PATH override)
         possible_paths = [
             Path(__file__).parent.parent / "questionsets" / f"{self.question_set}_questions.yaml",  # app/questionsets
             Path(__file__).parent.parent.parent / "questionsets" / f"{self.question_set}_questions.yaml",  # project root
@@ -1147,29 +1177,64 @@ Output only the scores, one per line, in order:"""
             logger.exception("Full error:")  # This will log the full traceback
             return {}
 
-    def get_question_by_number(self, number: int) -> Optional[Dict]:
-        """Get question data by its number."""
-        try:
-            # Handle question set to prefix mapping
-            question_set_mapping = {
-                "everest": "ev",
-                "tcfd": "tcfd",
-                "s4m": "s4m",
-                "lucia": "lucia",
-            }
+    def question_id_for_number(self, number: int) -> Optional[str]:
+        """Legacy: map 1-based question number to canonical question id in self.questions."""
+        prefix = QUESTION_SET_ID_PREFIX.get(self.question_set, self.question_set)
+        key = f"{prefix}_{number}"
+        if key in self.questions:
+            return key
+        return None
 
-            # Get the correct prefix for the question set
-            question_prefix = question_set_mapping.get(self.question_set, self.question_set)
-            question_key = f"{question_prefix}_{number}"
+    def resolve_question(self, ref: str | int) -> Optional[tuple[str, Dict]]:
+        """Resolve a question reference to (canonical_id, question_data).
 
-            logger.debug(f"Looking for question {number} with key: {question_key}")
-            logger.debug(f"Available question keys: {list(self.questions.keys())}")
-
-            return self.questions.get(question_key)
-        except Exception as e:
-            log_analysis_step(f"Error getting question {number}: {e!s}", "error")
-            logger.exception("Full error:")
+        Accepts full YAML ids (``tcfd_1``, ``esrs_e1_climate_examples_9``, ``ev_1``)
+        or legacy 1-based numbers / bare digit strings when question_set is set.
+        """
+        if isinstance(ref, str):
+            ref = ref.strip()
+            if ref in self.questions:
+                return ref, self.questions[ref]
+            if ref.isdigit():
+                return self.resolve_question(int(ref))
             return None
+
+        qid = self.question_id_for_number(ref)
+        if qid is None:
+            return None
+        return qid, self.questions[qid]
+
+    def normalize_question_ids(self, selected: List[str | int]) -> List[str]:
+        """Return canonical question ids, preserving order and dropping duplicates."""
+        seen: set[str] = set()
+        ids: List[str] = []
+        for ref in selected:
+            resolved = self.resolve_question(ref)
+            if resolved is None:
+                continue
+            qid = resolved[0]
+            if qid not in seen:
+                seen.add(qid)
+                ids.append(qid)
+        return ids
+
+    def unresolved_question_refs(self, selected: List[str | int]) -> List[str]:
+        """Return selection entries that did not resolve to a loaded question."""
+        unresolved: List[str] = []
+        for ref in selected:
+            if self.resolve_question(ref) is None:
+                unresolved.append(str(ref))
+        return unresolved
+
+    @staticmethod
+    def _question_number_from_id(question_id: str) -> Optional[int]:
+        suffix = question_id.rsplit("_", 1)[-1]
+        return int(suffix) if suffix.isdigit() else None
+
+    def get_question_by_number(self, number: int) -> Optional[Dict]:
+        """Get question data by its number (legacy — prefer resolve_question with full id)."""
+        resolved = self.resolve_question(number)
+        return resolved[1] if resolved else None
 
     def update_parameters(self, chunk_size: int, chunk_overlap: int, top_k: int):
         """Update analysis parameters and recreate text splitter."""

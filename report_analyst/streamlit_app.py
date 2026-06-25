@@ -222,15 +222,10 @@ class ReportAnalyzer:
             # Update analyzer with the current questions
             self.analyzer.questions = questions
 
-            # Convert selected question IDs to numbers for the analyzer
-            selected_numbers = [questions[q_id]["number"] for q_id in selected_questions]
-
-            # question_set is set by update_question_set() on the Analyze page
-
-            # Pass use_llm_scoring to process_document
+            # Pass canonical question ids through to the analyzer
             async for result in self.analyzer.process_document(
                 file_path,
-                selected_numbers,
+                selected_questions,
                 use_llm_scoring,
                 single_call,
                 force_recompute,
@@ -275,7 +270,7 @@ class ReportAnalyzer:
     def process_document(
         self,
         file_path: str,
-        selected_questions: List[int] | None = None,
+        selected_questions: List[str | int] | None = None,
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
@@ -1242,6 +1237,7 @@ async def run_report_answer_workflow(
             selected_questions=selected_questions,
             progress_text=progress_text,
             max_processing_step=max_step,
+            questions=questions,
         )
     else:
         cached_results = analyzer.analyzer.cache_manager.get_analysis(
@@ -1424,7 +1420,14 @@ def update_analyzer_parameters():
         st.error(f"Error updating parameters: {e!s}")
 
 
-async def run_analysis(analyzer, file_path, selected_questions, progress_text, max_processing_step: str = "answer"):
+async def run_analysis(
+    analyzer,
+    file_path,
+    selected_questions,
+    progress_text,
+    max_processing_step: str = "answer",
+    questions: dict | None = None,
+):
     """Run analysis and update the UI with progress"""
     try:
         from report_analyst.core.analyzer import PROCESSING_STEP_LABELS, normalize_processing_step
@@ -1435,6 +1438,13 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
         # Get current configuration (must match sidebar widgets / save_analysis keys)
         config = build_analysis_config_from_session()
         APIKeyManager.sync_api_keys_to_env(st.session_state)
+
+        question_set = config["question_set"]
+        analyzer.analyzer.question_set = question_set
+        if questions:
+            analyzer.analyzer.questions = questions
+        else:
+            analyzer.analyzer.update_question_set(question_set)
 
         logger.info(f"[ANALYSIS] User triggered analysis for file: {file_path}")
         logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
@@ -1509,15 +1519,6 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
         # Track results
         all_results = {}
 
-        # Convert selected_questions (e.g. esrs_e1_climate_examples_1) to 1-based numbers
-        question_numbers = []
-        for q_id in selected_questions:
-            suffix = q_id.rsplit("_", 1)[-1]
-            if suffix.isdigit():
-                question_numbers.append(int(suffix))
-            else:
-                progress_text.warning(f"Invalid question ID format: {q_id}")
-
         # Check if we have pre-retrieved chunks (for backend resources)
         pre_retrieved_chunks = st.session_state.get("backend_chunks")
 
@@ -1525,7 +1526,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
         step_failed = False
         async for result in analyzer.process_document(
             file_path=file_path,
-            selected_questions=question_numbers,  # Pass just the numbers
+            selected_questions=selected_questions,
             use_llm_scoring=st.session_state.get("new_llm_scoring", False),  # Use the checkbox value directly
             force_recompute=st.session_state.get("force_recompute", False),
             pre_retrieved_chunks=pre_retrieved_chunks,  # Pass backend chunks if available
@@ -1548,7 +1549,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
                 # Try to construct question_id from question_number
                 question_number = result.get("question_number")
                 if question_number:
-                    question_id = f"{st.session_state.question_set}_{question_number}"
+                    question_id = f"{config['question_set']}_{question_number}"
                 else:
                     # Skip results without question_id or question_number
                     continue
