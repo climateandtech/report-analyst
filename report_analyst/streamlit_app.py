@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import html
 import json
 import logging
 import os
@@ -62,6 +63,25 @@ def log_analysis_step(message: str, level: str = "info"):
     """Helper function to log analysis steps with consistent formatting"""
     log_func = getattr(logger, level)
     log_func(f"[ANALYSIS] {message}")
+
+
+def render_api_key_missing_alert(container, message: str, prefix: str = "Error:") -> None:
+    escaped_prefix = html.escape(prefix)
+    escaped_message = html.escape(message)
+    prefix_markup = f"<strong>{escaped_prefix}</strong> " if prefix else ""
+    container.markdown(
+        f"""
+        <div class="api-key-missing-alert">
+            <span class="api-key-missing-alert-icon">!</span>
+            <span>{prefix_markup}{escaped_message}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def is_api_key_missing_message(message: str) -> bool:
+    return "No API key configured" in message or "Your API key is missing" in message
 
 
 # Add the report-analyst directory to the Python path
@@ -552,7 +572,10 @@ async def analyze_document_and_display(
 
                 if "error" in result:
                     log_analysis_step(f"Error received from analyzer: {result['error']}", "error")
-                    st.error(f"Analysis error: {result['error']}")
+                    if is_api_key_missing_message(result["error"]):
+                        render_api_key_missing_alert(st, result["error"], "Analysis error:")
+                    else:
+                        st.error(f"Analysis error: {result['error']}")
                     continue
 
                 if "status" in result:
@@ -1323,7 +1346,7 @@ def update_analyzer_parameters():
     available_models = get_available_llm_models()
 
     if not available_models:
-        st.info(get_api_key_setup_message())
+        render_api_key_missing_alert(st, get_api_key_setup_message(), "")
         return
 
     # Validate selected model availability
@@ -1433,7 +1456,10 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         ):
             # Handle errors by displaying them but not storing them
             if "error" in result:
-                progress_text.error(f"Error: {result['error']}")
+                if is_api_key_missing_message(result["error"]):
+                    render_api_key_missing_alert(progress_text, result["error"])
+                else:
+                    progress_text.error(f"Error: {result['error']}")
                 continue
 
             # Handle status updates by displaying them but not storing them
@@ -1614,6 +1640,33 @@ def main():
             [data-testid="stNotification"] p::before {
                 content: none !important;
                 display: none !important;
+            }
+
+            .api-key-missing-alert {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                color: #b42318;
+                background-color: #fff4f2;
+                border: 1px solid #fecdca;
+                border-radius: 6px;
+                padding: 12px 16px;
+                margin: 8px 0 16px;
+                line-height: 1.4;
+            }
+
+            .api-key-missing-alert-icon {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 20px;
+                height: 20px;
+                min-width: 20px;
+                border-radius: 50%;
+                background-color: #d92d20;
+                color: #ffffff;
+                font-weight: 700;
+                line-height: 1;
             }
             
             /* Settings expander icon in sidebar */
@@ -2838,7 +2891,7 @@ def main():
 
         # Show page-specific content based on navigation
         if not has_any_llm_key() and nav_page != "Settings":
-            st.warning(get_api_key_setup_message())
+            render_api_key_missing_alert(st, get_api_key_setup_message(), "")
 
         if nav_page == "Settings":
             st.title("Settings")
@@ -2852,7 +2905,7 @@ def main():
             st.subheader("API Keys")
             st.caption("Enter your API keys to enable LLM features. Keys are stored in session state only and not persisted.")
             if not has_any_llm_key():
-                st.warning(get_api_key_setup_message())
+                render_api_key_missing_alert(st, get_api_key_setup_message(), "")
 
             # Check if keys exist in environment but not in session state
             env_openai_key = os.getenv("OPENAI_API_KEY")
