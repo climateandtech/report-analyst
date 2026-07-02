@@ -16,6 +16,20 @@ from report_analyst.core.analyzer import DocumentAnalyzer, log_analysis_step
 from report_analyst.core.cache_manager import CacheManager
 
 
+def test_document_analyzer_starts_without_api_keys(monkeypatch):
+    """DocumentAnalyzer should not fail before users can enter BYOK settings."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_MODEL", "gpt-4o-mini")
+
+    DocumentAnalyzer.reset_instance()
+    analyzer = DocumentAnalyzer()
+
+    assert analyzer.llm is None
+
+    DocumentAnalyzer.reset_instance()
+
+
 @pytest.fixture(scope="session")
 def test_db_template():
     """Create a template test database that persists for the entire test session"""

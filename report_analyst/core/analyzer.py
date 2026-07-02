@@ -25,6 +25,7 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.file import PyMuPDFReader
 
+from .api_key_manager import APIKeyManager
 from .cache_manager import CacheManager
 from .llm_providers import get_llm
 from .prompt_manager import PromptManager
@@ -69,21 +70,18 @@ else:
             default_model = "gpt-3.5-turbo-1106"
             logger.info(f"Switching default model to {default_model}")
         else:
-            logger.error("No valid API keys available for any models")
-            raise ValueError("No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY")
+            logger.warning("No API key found")
     elif default_model.startswith("gpt-") and not openai_key:
         logger.warning(f"Default model is {default_model} but no OPENAI_API_KEY is available")
         if gemini_key:
             default_model = "gemini-pro"
             logger.info(f"Switching default model to {default_model}")
         else:
-            logger.error("No valid API keys available for any models")
-            raise ValueError("No valid API keys found. Set either OPENAI_API_KEY or GOOGLE_API_KEY")
+            logger.warning("No API key found")
 
     # Ensure we have at least one API key for the selected model type
     if not openai_key and not gemini_key:
-        logger.error("No API keys found - set either OPENAI_API_KEY or GOOGLE_API_KEY")
-        raise ValueError("Set either OPENAI_API_KEY or GOOGLE_API_KEY environment variable")
+        logger.warning("No API keys found")
 
 if not os.getenv("OPENAI_ORGANIZATION"):
     logger.warning("OPENAI_ORGANIZATION environment variable is not set")
@@ -114,6 +112,12 @@ class DocumentAnalyzer:
     _instance = None
     _initialized = False
 
+    @classmethod
+    def reset_instance(cls):
+        """Reset the singleton so new API keys can be picked up after Settings changes."""
+        cls._instance = None
+        cls._initialized = False
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DocumentAnalyzer, cls).__new__(cls)
@@ -142,7 +146,7 @@ class DocumentAnalyzer:
         self.questions = self._load_questions()
 
         # Use model from environment variables as default
-        self.default_model = default_model
+        self.default_model = self._select_default_model(default_model)
         log_analysis_step(f"Using default model from env: {self.default_model}")
 
         # Check if we should use backend for all LLM functionality
@@ -157,37 +161,7 @@ class DocumentAnalyzer:
             self.llm = None
             self.embeddings = None
         else:
-            try:
-                # Initialize LLM with caching using the provider factory
-                self.llm = get_llm(
-                    model_name=self.default_model,
-                    cache_dir=str(self.llm_cache_path),
-                )
-
-                # Initialize embeddings if OpenAI API key is available
-                if openai_key and openai_key != "backend-handles-llm":
-                    self.embeddings = OpenAIEmbedding(
-                        api_key=openai_key,
-                        api_base=os.getenv("OPENAI_API_BASE"),
-                        model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
-                        embed_batch_size=100,
-                    )
-
-                    # Configure embeddings globally for LlamaIndex
-                    Settings.embed_model = self.embeddings
-                else:
-                    logger.warning("No OpenAI API key - embedding functionality will be limited")
-                    self.embeddings = None
-
-            except Exception as e:
-                log_analysis_step(f"Error initializing local LLM clients: {str(e)}", "error")
-                if not self.use_backend_llm:
-                    raise
-                else:
-                    # In backend mode, local LLM failures are not critical
-                    logger.warning("Local LLM initialization failed, but using backend mode")
-                    self.llm = None
-                    self.embeddings = None
+            self._initialize_llm_clients()
 
         # Initialize caching and text processing (these are always needed)
         self.use_cache = True  # Default to True, can be overridden
@@ -210,6 +184,58 @@ class DocumentAnalyzer:
         logger.info("Initialized DocumentAnalyzer with cache manager")
 
         self._initialized = True
+
+    @staticmethod
+    def _has_key_for_model(model_name: str) -> bool:
+        if model_name.startswith("gpt-"):
+            return APIKeyManager.is_configured_key(os.getenv("OPENAI_API_KEY"))
+        if model_name.startswith("gemini-") or model_name.startswith("models/gemini-"):
+            return APIKeyManager.is_configured_key(os.getenv("GOOGLE_API_KEY"))
+        return False
+
+    @staticmethod
+    def _select_default_model(requested_model: str) -> str:
+        has_openai_key = APIKeyManager.is_configured_key(os.getenv("OPENAI_API_KEY"))
+        has_google_key = APIKeyManager.is_configured_key(os.getenv("GOOGLE_API_KEY"))
+        if requested_model.startswith("gemini-") and not has_google_key and has_openai_key:
+            return "gpt-4o-mini"
+        if requested_model.startswith("gpt-") and not has_openai_key and has_google_key:
+            return "gemini-1.5-flash"
+        return requested_model
+
+    def _initialize_llm_clients(self) -> None:
+        """Initialize LLM clients only when the needed key exists."""
+        self.llm = None
+        self.embeddings = None
+
+        if not self._has_key_for_model(self.default_model):
+            logger.warning("No API key configured for %s; LLM initialization deferred", self.default_model)
+            return
+
+        try:
+            self.llm = get_llm(
+                model_name=self.default_model,
+                cache_dir=str(self.llm_cache_path),
+            )
+
+            current_openai_key = os.getenv("OPENAI_API_KEY")
+            if APIKeyManager.is_configured_key(current_openai_key):
+                self.embeddings = OpenAIEmbedding(
+                    api_key=current_openai_key,
+                    api_base=os.getenv("OPENAI_API_BASE"),
+                    model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
+                    embed_batch_size=100,
+                )
+                Settings.embed_model = self.embeddings
+            else:
+                logger.warning("No OpenAI API key - embedding functionality will be limited")
+        except ValueError as e:
+            log_analysis_step(f"LLM initialization deferred: {str(e)}", "warning")
+            self.llm = None
+            self.embeddings = None
+        except Exception as e:
+            log_analysis_step(f"Error initializing local LLM clients: {str(e)}", "error")
+            raise
 
     def _get_cache_key(self, file_path: str) -> str:
         """Generate a unique cache key based on file and all analysis parameters.
@@ -566,6 +592,12 @@ Output only the scores, one per line, in order:"""
             logger.info(
                 f"[ANALYSIS] Current chunk parameters: size={self.chunk_params['chunk_size']}, overlap={self.chunk_params['chunk_overlap']}, top_k={self.chunk_params['top_k']}"
             )
+
+            if not self.use_backend_llm and self.llm is None:
+                yield {
+                    "error": "No API key configured. Open Settings → API Keys and add an OpenAI or Google/Gemini key before running analysis."
+                }
+                return
 
             # Store the current file path for use in _get_similar_chunks
             self.current_file_path = file_path
@@ -1143,6 +1175,12 @@ Output only the scores, one per line, in order:"""
     def update_llm_model(self, model_name: str):
         """Update the LLM model."""
         log_analysis_step(f"Updating LLM model to: {model_name}")
+
+        self.default_model = model_name
+        if not self._has_key_for_model(model_name):
+            self.llm = None
+            logger.warning("Cannot initialize %s without its API key", model_name)
+            return
 
         # Initialize LLM with caching using the provider factory
         self.llm = get_llm(

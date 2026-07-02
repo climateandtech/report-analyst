@@ -13,6 +13,18 @@ class APIKeyManager:
     """Service to manage API keys in session state and environment without persistence"""
 
     @staticmethod
+    def is_configured_key(value: Optional[str]) -> bool:
+        """Return True when an API key value has been provided."""
+        return bool(value and value.strip())
+
+    @staticmethod
+    def get_key_action_message(value: Optional[str]) -> Optional[str]:
+        """Return a clear message explaining what the user should do next."""
+        if not APIKeyManager.is_configured_key(value):
+            return "Your API key is missing, Open Settings -> API Keys to configure one."
+        return None
+
+    @staticmethod
     def set_api_key(key_name: str, value: Optional[str], session_state: dict) -> None:
         """
         Set an API key in session state and environment variables.
