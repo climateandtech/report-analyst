@@ -22,9 +22,7 @@ try:
 except ImportError:
     HAS_AIORESPONSES = False
 
-from report_analyst_search_backend.external_service_client import (
-    ExternalServiceClient,
-)
+from report_analyst_search_backend.external_service_client import ExternalServiceClient
 from report_analyst_search_backend.external_service_delivery import (
     ExternalServiceDelivery,
 )

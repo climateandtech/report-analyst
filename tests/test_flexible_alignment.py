@@ -3,7 +3,10 @@
 import pandas as pd
 import pytest
 
-from report_analyst.core.benchmark.dataset_mapper import generate_chunk_id, generate_query_id
+from report_analyst.core.benchmark.dataset_mapper import (
+    generate_chunk_id,
+    generate_query_id,
+)
 from report_analyst.core.benchmark.flexible_alignment import (
     BenchmarkAlignConfig,
     GroundTruthAlignConfig,
@@ -48,7 +51,9 @@ class TestAlignGroundTruthFlexible:
             "relevance",
             "score",
         ]
-        assert aligned.loc[0, "query_id"] == generate_query_id("doc_a", "What is scope 1?")
+        assert aligned.loc[0, "query_id"] == generate_query_id(
+            "doc_a", "What is scope 1?"
+        )
         assert aligned.loc[0, "chunk_id"] == generate_chunk_id("Scope 1 emissions data")
         assert aligned.loc[0, "relevant_part_id"] == aligned.loc[0, "chunk_id"]
         assert aligned.loc[0, "score"] == 2.0
@@ -80,7 +85,9 @@ class TestAlignBenchmarkFlexible:
             }
         )
 
-    def test_reuses_existing_query_id_and_deduplicates_ranking_column(self, raw_benchmark):
+    def test_reuses_existing_query_id_and_deduplicates_ranking_column(
+        self, raw_benchmark
+    ):
         config = BenchmarkAlignConfig(
             document_col=None,
             question_col=None,
@@ -122,7 +129,9 @@ class TestAlignBenchmarkFlexible:
 
         aligned = align_benchmark_flexible(raw, config)
 
-        assert aligned.loc[0, "query_id"] == generate_query_id("doc_a", "What is scope 1?")
+        assert aligned.loc[0, "query_id"] == generate_query_id(
+            "doc_a", "What is scope 1?"
+        )
 
     def test_raises_when_neither_query_id_nor_question_provided(self, raw_benchmark):
         config = BenchmarkAlignConfig(

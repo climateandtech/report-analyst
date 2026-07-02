@@ -3,7 +3,10 @@
 import pandas as pd
 import pytest
 
-from report_analyst.core.benchmark.dataset_mapper import generate_chunk_id, generate_query_id
+from report_analyst.core.benchmark.dataset_mapper import (
+    generate_chunk_id,
+    generate_query_id,
+)
 from report_analyst.core.benchmark.dataset_normalizer import (
     POSITION_MODE_ROW_ORDER,
     POSITION_MODE_SORT_BY_SCORE,
