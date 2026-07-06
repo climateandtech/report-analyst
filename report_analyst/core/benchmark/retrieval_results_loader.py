@@ -522,6 +522,50 @@ def load_flexible_dataset_from_csv(
     )
 
 
+def load_flexible_dataset_from_normalized_df(
+    normalized_df: pd.DataFrame,
+    dataset_id: Optional[str] = None,
+    dataset_name: Optional[str] = None,
+) -> BenchmarkDataset:
+    """
+    Build a BenchmarkDataset from a DataFrame that already has standard columns
+    (query_id, chunk_id, position, score, and optionally paragraph, document).
+    Used after normalize_dataframe_for_benchmark() so the evaluation pipeline sees consistent schema.
+    """
+    required = ["query_id", "chunk_id", "position", "score"]
+    missing = [c for c in required if c not in normalized_df.columns]
+    if missing:
+        raise ValueError(
+            f"Normalized DataFrame must have columns {required}. Missing: {missing}"
+        )
+    source_name = dataset_name or "normalized_dataset"
+    did = dataset_id or f"{source_name}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
+    results = []
+    for _, row in normalized_df.iterrows():
+        row_dict = {}
+        for col in normalized_df.columns:
+            val = row[col]
+            row_dict[col] = None if pd.isna(val) else val
+        results.append(FlexibleDatasetRow(data=row_dict))
+    logger.info(
+        "Loaded %d rows from normalized DataFrame for dataset '%s' (type: IR)",
+        len(results),
+        did,
+    )
+    return BenchmarkDataset(
+        dataset_id=did,
+        name=source_name,
+        description="Flexible dataset from normalized column mapping (type: information_retrieval)",
+        version="1.0",
+        question_set=None,
+        dataset_type=DatasetType.INFORMATION_RETRIEVAL,
+        source="csv",
+        source_path=None,
+        column_mapping={c: c for c in normalized_df.columns},
+        results=results,
+    )
+
+
 def load_flexible_dataset_from_sqlite(
     db_path: str,
     table_name: str = "benchmark_results",

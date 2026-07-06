@@ -35,7 +35,10 @@ For **benchmark** alignment:
 - **relevant_text_sim** — optional; similarity score for ranking  
 - **label** / **relevance** — optional; relevance label  
 
-If your file already has `query_id`, `chunk_id`, `position`, and `score` (or the accepted variants), it can be used without alignment. Otherwise use **Dataset Alignment** (CSV or Excel only) to convert to the expected structure.
+If your file already has `query_id`, `chunk_id`, `position`, and `score` (or the accepted variants), it can be used without alignment. Otherwise you can:
+
+1. **Use a preset mapping** — Choose a dataset config (e.g. ClimRetrieve) under **Dataset Alignment** (CSV or Excel only) to convert to the expected structure.
+2. **Flexible alignment wizard** — In the **Datasets** tab, use **Flexible Dataset Alignment (Wizard)** to:\n   - Select which columns represent the query/criteria (single description or document + question).\n   - Choose the chunk text column and, optionally, expert-annotated relevant parts.\n   - Choose one or more ground-truth label columns (e.g. `relevance`, `usefulness`).\n   - Choose one or more prediction/similarity columns on the benchmark side (e.g. model scores, `relevant_text_sim`).\n\n   The wizard produces aligned ground truth and benchmark tables with a unified schema (`query_id`, `chunk_id`, optional `relevant_part_id`, text fields, labels, and predictions) so that both **ranking** and **classification** metrics can be derived from the same aligned data.\n3. **Configure columns manually** — In the upload flow, you can still use **Or configure columns manually** to map your columns directly to `query_id`, `chunk_id`, `position`, `score`, and `document` when you only need the basic IR schema. This is lighter than the wizard but provides fewer guarantees about compatibility between ground truth and benchmark datasets.
 
 ---
 
@@ -98,9 +101,10 @@ questions:
 
 | Format | Use case | Alignment |
 |--------|----------|-----------|
-| **CSV** | Ground truth or benchmark (IR) | Yes — use Dataset Alignment if your columns differ. |
+| **CSV** | Ground truth or benchmark (IR) | Yes — use Dataset Alignment (preset), the **Flexible alignment wizard**, or **Configure columns manually** if your columns differ. |
 | **Excel** | Ground truth or benchmark (IR) | Yes — same as CSV. |
 | **YAML** | Benchmark (content schema) | No — must match the schema above. |
 | **JSON** | Benchmark (content schema) | No — same structure as YAML. |
 
-For column mapping (e.g. ClimRetrieve), see `report_analyst/config/datasets/climretrieve.yaml` and add configs under `report_analyst/config/datasets/` for other conventions.
+- For **preset** column mapping (e.g. ClimRetrieve), see `report_analyst/config/datasets/climretrieve.yaml` and add configs under `report_analyst/config/datasets/` for other conventions.
+- For **custom** column names (e.g. `description`, `chunk_text`, `relevance`, `usefulness`, model prediction columns), you can either use the **Flexible alignment wizard** (recommended when you want both ranking and classification metrics) or **Configure columns manually** in the Dataset Management upload flow when you only need the basic IR schema.
