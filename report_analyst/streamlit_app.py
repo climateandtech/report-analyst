@@ -69,7 +69,7 @@ def render_api_key_missing_alert(container, message: str, prefix: str = "Error:"
     escaped_prefix = html.escape(prefix)
     escaped_message = html.escape(message).replace(
         " For permanent access:",
-        ' <strong>For permanent access:</strong>',
+        " <strong>For permanent access:</strong>",
     )
     prefix_markup = f"<strong>{escaped_prefix}</strong> " if prefix else ""
     container.markdown(
