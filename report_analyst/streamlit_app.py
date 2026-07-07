@@ -67,13 +67,16 @@ def log_analysis_step(message: str, level: str = "info"):
 
 def render_api_key_missing_alert(container, message: str, prefix: str = "Error:") -> None:
     escaped_prefix = html.escape(prefix)
-    escaped_message = html.escape(message)
+    escaped_message = html.escape(message).replace(
+        " For permanent access:",
+        ' <strong>For permanent access:</strong>',
+    )
     prefix_markup = f"<strong>{escaped_prefix}</strong> " if prefix else ""
     container.markdown(
         f"""
         <div class="api-key-missing-alert">
             <span class="api-key-missing-alert-icon">!</span>
-            <span>{prefix_markup}{escaped_message}</span>
+            <span class="api-key-missing-alert-message">{prefix_markup}{escaped_message}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1667,6 +1670,10 @@ def main():
                 color: #ffffff;
                 font-weight: 700;
                 line-height: 1;
+            }
+
+            .api-key-missing-alert-message {
+                display: block;
             }
             
             /* Settings expander icon in sidebar */

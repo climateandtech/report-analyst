@@ -21,7 +21,10 @@ class APIKeyManager:
     def get_key_action_message(value: Optional[str]) -> Optional[str]:
         """Return a clear message explaining what the user should do next."""
         if not APIKeyManager.is_configured_key(value):
-            return "Your API key is missing, Open Settings -> API Keys to configure one."
+            return (
+                "Your API key is missing. You can add one in Settings -> API Keys for this session. "
+                "For permanent access: ask your system administrator to configure it in the environment."
+            )
         return None
 
     @staticmethod
