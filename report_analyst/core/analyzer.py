@@ -595,7 +595,11 @@ Output only the scores, one per line, in order:"""
 
             if not self.use_backend_llm and self.llm is None:
                 yield {
-                    "error": "No API key configured. Open Settings → API Keys and add an OpenAI or Google/Gemini key before running analysis."
+                    "error": (
+                        "No API key configured. Add an OpenAI or Google/Gemini key in Settings → API Keys "
+                        "for this session. For permanent access: ask your system administrator to configure it "
+                        "in the environment."
+                    )
                 }
                 return
 

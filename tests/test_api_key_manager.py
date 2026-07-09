@@ -22,7 +22,10 @@ def test_get_key_action_message_tells_user_next_step():
     """Action messages should tell users to configure a missing key."""
     missing_message = APIKeyManager.get_key_action_message(None)
 
-    assert missing_message == "Your API key is missing, Open Settings -> API Keys to configure one."
+    assert (
+        missing_message == "Your API key is missing. You can add one in Settings -> API Keys for this session. "
+        "For permanent access: ask your system administrator to configure it in the environment."
+    )
     assert APIKeyManager.get_key_action_message("sk-real-looking-key") is None
 
 
