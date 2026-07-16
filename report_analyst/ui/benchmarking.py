@@ -399,7 +399,7 @@ class BenchmarkingUI:
                 "and one or more numeric prediction/score columns."
             )
             # Reuse the classification calibration panel so you can configure and run it here
-            self._render_classification_calibration_panel(key_prefix="evaluate")
+            self._render_classification_calibration_panel("evaluate")
 
     def render_results_dashboard(self):
         """Render evaluation results dashboard"""
@@ -476,7 +476,7 @@ class BenchmarkingUI:
             # Model comparison from stored classification calibration runs
             self._render_classification_model_comparison()
             # Classification calibration for datasets with labels/scores
-            self._render_classification_calibration_panel(key_prefix="result")
+            self._render_classification_calibration_panel("result")
 
         # Detailed evaluation view
         if filtered_evals:
@@ -731,7 +731,9 @@ class BenchmarkingUI:
             key=f"{key_prefix}calibration_ece_bins",
         )
 
-        if st.button("Compute classification calibration", key=f"{key_prefix}calibration_compute"):
+        if st.button(
+            "Compute classification calibration", key=f"{key_prefix}calibration_compute"
+        ):
             with st.spinner("Computing calibration metrics..."):
                 try:
                     metrics_df = compute_calibration_metrics(
