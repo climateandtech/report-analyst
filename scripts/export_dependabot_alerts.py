@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import csv
+import datetime
 import json
 import logging
 import subprocess
@@ -8,6 +9,20 @@ import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def get_repo_info() -> tuple[str, str]:
+    """Retrieve the current GitHub owner and repository name using gh CLI."""
+    result = subprocess.run(
+        ["gh", "repo", "view", "--json", "owner,name"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    data = json.loads(result.stdout)
+    owner = data["owner"]["login"]
+    repo = data["name"]
+    return owner, repo
 
 
 def run_gh_api(owner: str, repo: str) -> list[dict]:
@@ -43,17 +58,11 @@ def run_gh_api(owner: str, repo: str) -> list[dict]:
 
 
 def main() -> None:
-    # Read repository information from command-line arguments.
-    # Fall back to the default repository when no arguments are provided.
-    owner = sys.argv[1] if len(sys.argv) > 1 else "climateandtech"
-    print(sys.argv)
-    repo = sys.argv[2] if len(sys.argv) > 2 else "report-analyst"
+    owner, repo = get_repo_info()
+    date = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M")
+    output_path = Path(f"../{repo}/data/dependabot_alerts/{date}_dependabot_alerts.csv")
 
-    # Use the third command-line argument as the output path.
-    # If it is missing, save the CSV in the current directory.
-    output_path = Path(sys.argv[3] if len(sys.argv) > 3 else "../report-analyst/data/dependabot_alerts/dependabot_alerts.csv")
-
-    # Retrieve all Dependabot alerts from the selected repository.
+    # Retrieve all Dependabot alerts from the selected repository
     alerts = run_gh_api(owner, repo)
 
     # Transform the nested GitHub API response into flat dictionaries
