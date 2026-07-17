@@ -157,7 +157,7 @@ Pygments==2.19.1
 PyMuPDF==1.24.0
 PyMuPDFb==1.24.0
 pyparsing==3.2.1
-pypdf==5.2.0
+pypdf==6.8.0
 PyPika==0.48.9
 pyproject_hooks==1.2.0
 psycopg2-binary==2.9.10
