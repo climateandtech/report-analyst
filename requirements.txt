@@ -161,8 +161,8 @@ pypdf==5.2.0
 PyPika==0.48.9
 pyproject_hooks==1.2.0
 psycopg2-binary==2.9.10
-pytest==8.3.5
-pytest-asyncio==0.25.3
+pytest==9.0.3
+pytest-asyncio==1.4.0
 pytest-cov==7.0.0
 pytest-env==1.1.1
 pytest-postgresql==7.0.2
