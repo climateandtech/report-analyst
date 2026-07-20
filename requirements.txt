@@ -51,8 +51,6 @@ GitPython==3.1.44
 google-auth==2.38.0
 google-generativeai>=0.3.0
 googleapis-common-protos==1.66.0
-gradio==5.20.1
-gradio_client==1.7.2
 graphql-core==3.2.6
 greenlet==3.1.1
 groovy==0.1.2
