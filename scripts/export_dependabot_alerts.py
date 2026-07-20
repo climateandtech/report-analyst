@@ -5,7 +5,6 @@ import datetime
 import json
 import logging
 import subprocess
-import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
