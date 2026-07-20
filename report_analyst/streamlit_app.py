@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import html
 import json
 import logging
 import os
@@ -64,6 +65,28 @@ def log_analysis_step(message: str, level: str = "info"):
     log_func(f"[ANALYSIS] {message}")
 
 
+def render_api_key_missing_alert(container, message: str, prefix: str = "Error:") -> None:
+    escaped_prefix = html.escape(prefix)
+    escaped_message = html.escape(message).replace(
+        " For permanent access:",
+        " <strong>For permanent access:</strong>",
+    )
+    prefix_markup = f"<strong>{escaped_prefix}</strong> " if prefix else ""
+    container.markdown(
+        f"""
+        <div class="api-key-missing-alert">
+            <span class="api-key-missing-alert-icon">!</span>
+            <span class="api-key-missing-alert-message">{prefix_markup}{escaped_message}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def is_api_key_missing_message(message: str) -> bool:
+    return "No API key configured" in message or "Your API key is missing" in message
+
+
 # Add the report-analyst directory to the Python path
 current_dir = Path(__file__).parent.parent
 if str(current_dir) not in sys.path:
@@ -82,7 +105,6 @@ from report_analyst.core.llm_models import (
     get_gemini_models,
     get_llm_models,
     get_openai_models,
-    llm_model_index,
 )
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
@@ -100,10 +122,36 @@ GEMINI_MODELS = get_gemini_models()
 DEFAULT_LLM_MODEL = get_default_llm_model()
 LLM_MODELS = get_llm_models()
 
-if os.getenv("GOOGLE_API_KEY"):
-    logger.info("Google API key found - Gemini models included when configured")
-else:
-    logger.warning("No Google API key found - Gemini models will not be available")
+def get_available_llm_models() -> List[str]:
+    """Return models for providers that currently have API keys."""
+    has_openai_key = APIKeyManager.is_configured_key(os.getenv("OPENAI_API_KEY"))
+    has_google_key = APIKeyManager.is_configured_key(os.getenv("GOOGLE_API_KEY"))
+
+    available_models = []
+    if has_openai_key:
+        available_models.extend(OPENAI_MODELS)
+    if has_google_key:
+        available_models.extend(GEMINI_MODELS)
+
+    return available_models
+
+
+def has_any_llm_key() -> bool:
+    """Check whether any local LLM provider key is currently configured."""
+    return APIKeyManager.is_configured_key(os.getenv("OPENAI_API_KEY")) or APIKeyManager.is_configured_key(
+        os.getenv("GOOGLE_API_KEY")
+    )
+
+
+def get_api_key_setup_message() -> str:
+    """Tell the user to add an API key when none is configured."""
+    return APIKeyManager.get_key_action_message(None)
+
+
+def reset_report_analyzer() -> None:
+    """Recreate the analyzer after API keys change in Settings."""
+    DocumentAnalyzer.reset_instance()
+    st.session_state.analyzer = ReportAnalyzer()
 
 
 # Load question sets dynamically using the centralized loader
@@ -533,7 +581,10 @@ async def analyze_document_and_display(
 
                 if "error" in result:
                     log_analysis_step(f"Error received from analyzer: {result['error']}", "error")
-                    st.error(f"Analysis error: {result['error']}")
+                    if is_api_key_missing_message(result["error"]):
+                        render_api_key_missing_alert(st, result["error"], "Analysis error:")
+                    else:
+                        st.error(f"Analysis error: {result['error']}")
                     continue
 
                 if "status" in result:
@@ -1271,6 +1322,8 @@ def get_current_settings(st) -> dict:
     """Get all current settings from the UI widgets"""
     # Get first question set as default
     default_set = list(question_sets.keys())[0]
+    available_models = get_available_llm_models()
+    default_model = available_models[0] if available_models else OPENAI_MODELS[0]
 
     # Ensure LLM scoring setting is synced
     if "new_llm_scoring" in st.session_state:
@@ -1280,7 +1333,7 @@ def get_current_settings(st) -> dict:
         "chunk_size": st.session_state.get("new_chunk_size", 500),
         "overlap": st.session_state.get("new_overlap", 20),
         "top_k": st.session_state.get("new_top_k", 5),
-        "llm_model": st.session_state.get("new_llm_model", LLM_MODELS[0]),
+        "llm_model": st.session_state.get("new_llm_model", default_model),
         "use_llm_scoring": st.session_state.get("new_llm_scoring", False),
         "batch_scoring": st.session_state.get("new_batch_scoring", True),
         "selected_set": st.session_state.get("new_question_set", default_set),
@@ -1299,16 +1352,21 @@ def update_analyzer_parameters():
     chunk_overlap = st.session_state.new_overlap
     top_k = st.session_state.new_top_k
     llm_model = st.session_state.new_llm_model
+    available_models = get_available_llm_models()
+
+    if not available_models:
+        render_api_key_missing_alert(st, get_api_key_setup_message(), "")
+        return
 
     # Validate selected model availability
-    if llm_model.startswith("gemini-") and not os.getenv("GOOGLE_API_KEY"):
+    if llm_model.startswith("gemini-") and not APIKeyManager.is_configured_key(os.getenv("GOOGLE_API_KEY")):
         # If somehow a Gemini model was selected but no API key exists
         logger.error(f"Attempt to use Gemini model '{llm_model}' without API key")
         st.error(f"Cannot use {llm_model} - No Google API key is set. Defaulting to {OPENAI_MODELS[0]}.")
         # Reset to default OpenAI model
         llm_model = OPENAI_MODELS[0]
         st.session_state.new_llm_model = llm_model
-    elif llm_model.startswith("gpt-") and not os.getenv("OPENAI_API_KEY"):
+    elif llm_model.startswith("gpt-") and not APIKeyManager.is_configured_key(os.getenv("OPENAI_API_KEY")):
         logger.error(f"Attempt to use OpenAI model '{llm_model}' without API key")
         st.error(f"OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly.")
 
@@ -1407,7 +1465,10 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         ):
             # Handle errors by displaying them but not storing them
             if "error" in result:
-                progress_text.error(f"Error: {result['error']}")
+                if is_api_key_missing_message(result["error"]):
+                    render_api_key_missing_alert(progress_text, result["error"])
+                else:
+                    progress_text.error(f"Error: {result['error']}")
                 continue
 
             # Handle status updates by displaying them but not storing them
@@ -1588,6 +1649,37 @@ def main():
             [data-testid="stNotification"] p::before {
                 content: none !important;
                 display: none !important;
+            }
+
+            .api-key-missing-alert {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                color: #b42318;
+                background-color: #fff4f2;
+                border: 1px solid #fecdca;
+                border-radius: 6px;
+                padding: 12px 16px;
+                margin: 8px 0 16px;
+                line-height: 1.4;
+            }
+
+            .api-key-missing-alert-icon {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 20px;
+                height: 20px;
+                min-width: 20px;
+                border-radius: 50%;
+                background-color: #d92d20;
+                color: #ffffff;
+                font-weight: 700;
+                line-height: 1;
+            }
+
+            .api-key-missing-alert-message {
+                display: block;
             }
             
             /* Settings expander icon in sidebar */
@@ -2811,6 +2903,9 @@ def main():
             nav_page = st.sidebar.radio("", nav_options, key="nav_page", label_visibility="collapsed")
 
         # Show page-specific content based on navigation
+        if not has_any_llm_key() and nav_page != "Settings":
+            render_api_key_missing_alert(st, get_api_key_setup_message(), "")
+
         if nav_page == "Settings":
             st.title("Settings")
             st.caption("Configure application settings and integrations")
@@ -2822,10 +2917,16 @@ def main():
             # API Keys Configuration
             st.subheader("API Keys")
             st.caption("Enter your API keys to enable LLM features. Keys are stored in session state only and not persisted.")
+            if not has_any_llm_key():
+                render_api_key_missing_alert(st, get_api_key_setup_message(), "")
 
             # Check if keys exist in environment but not in session state
             env_openai_key = os.getenv("OPENAI_API_KEY")
             env_google_key = os.getenv("GOOGLE_API_KEY")
+            if not APIKeyManager.is_configured_key(env_openai_key):
+                env_openai_key = None
+            if not APIKeyManager.is_configured_key(env_google_key):
+                env_google_key = None
             session_openai_key = st.session_state.get("api_key_openai_api_key")
             session_google_key = st.session_state.get("api_key_google_api_key")
 
@@ -2835,6 +2936,10 @@ def main():
             # Get current values (from session state or environment)
             current_openai_key = APIKeyManager.get_api_key("OPENAI_API_KEY", st.session_state)
             current_google_key = APIKeyManager.get_api_key("GOOGLE_API_KEY", st.session_state)
+            if not APIKeyManager.is_configured_key(current_openai_key):
+                current_openai_key = None
+            if not APIKeyManager.is_configured_key(current_google_key):
+                current_google_key = None
 
             # OpenAI API Key section
             with st.expander(
@@ -2879,6 +2984,7 @@ def main():
                     # Update API key if user entered a new value (different from current)
                     if openai_key_input and openai_key_input != current_openai_key:
                         APIKeyManager.set_api_key("OPENAI_API_KEY", openai_key_input, st.session_state)
+                        reset_report_analyzer()
                         st.session_state.prev_openai_key = openai_key_input
                         st.session_state.override_openai_key = False  # Reset override state
                         st.success("OpenAI API key updated")
@@ -2931,6 +3037,7 @@ def main():
                     # Update API key if user entered a new value (different from current)
                     if google_key_input and google_key_input != current_google_key:
                         APIKeyManager.set_api_key("GOOGLE_API_KEY", google_key_input, st.session_state)
+                        reset_report_analyzer()
                         st.session_state.prev_google_key = google_key_input
                         st.session_state.override_google_key = False  # Reset override state
                         st.success("Google API key updated")
@@ -2950,12 +3057,14 @@ def main():
                 if current_google_key and not has_env_google:
                     if st.button("Clear Google Key", key="clear_google_key"):
                         APIKeyManager.set_api_key("GOOGLE_API_KEY", None, st.session_state)
+                        reset_report_analyzer()
                         st.rerun()
 
             # Show clear button for OpenAI if key exists (only for session state keys, not env)
             if current_openai_key and not has_env_openai:
                 if st.button("Clear OpenAI Key", key="clear_openai_key"):
                     APIKeyManager.set_api_key("OPENAI_API_KEY", None, st.session_state)
+                    reset_report_analyzer()
                     st.rerun()
 
             st.divider()
@@ -3545,13 +3654,26 @@ def main():
                         )
 
                     with adv_col2:
-                        new_llm_model = st.selectbox(
-                            "LLM Model",
-                            options=LLM_MODELS,
-                            index=llm_model_index(LLM_MODELS, DEFAULT_LLM_MODEL),
-                            key="new_llm_model",
-                            on_change=update_analyzer_parameters,
-                        )
+                        available_llm_models = get_available_llm_models()
+                        if available_llm_models:
+                            current_model = st.session_state.get("new_llm_model")
+                            selected_index = (
+                                available_llm_models.index(current_model) if current_model in available_llm_models else 0
+                            )
+                            new_llm_model = st.selectbox(
+                                "LLM Model",
+                                options=available_llm_models,
+                                index=selected_index,
+                                key="new_llm_model",
+                                on_change=update_analyzer_parameters,
+                            )
+                        else:
+                            st.selectbox(
+                                "LLM Model",
+                                options=["Add an API key in Settings"],
+                                index=0,
+                                disabled=True,
+                            )
 
                         new_llm_scoring = st.checkbox(
                             "LLM Scoring",

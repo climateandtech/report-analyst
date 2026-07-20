@@ -83,9 +83,10 @@ def test_model_selection_display():
     for sb in at.selectbox:
         if "model" in str(sb.label).lower() or "llm_model" in str(sb.key).lower():
             has_model_selection = True
-            # Check that it has model options
             options = [str(opt).lower() for opt in sb.options]
-            assert any("gpt" in opt for opt in options), "No GPT models found in options"
+            has_gpt_models = any("gpt" in opt for opt in options)
+            has_key_prompt = any("add an api key" in opt for opt in options)
+            assert has_gpt_models or has_key_prompt, "Model selection should show models or the API key prompt"
             break
 
     assert has_model_selection, "Model selection not found"
