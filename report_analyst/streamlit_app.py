@@ -103,7 +103,6 @@ from report_analyst.core.dataframe_manager import (
 from report_analyst.core.llm_models import (
     get_default_llm_model,
     get_gemini_models,
-    get_llm_models,
     get_openai_models,
 )
 from report_analyst.core.prompt_manager import PromptManager
@@ -116,11 +115,11 @@ logger.info("Loaded environment variables")
 # Initialize question loader
 question_loader = get_question_loader()
 
-# Model lists — defaults include GPT-5.4 + Gemini 3.x; override via OPENAI_MODELS / GEMINI_MODELS / LLM_MODELS
+# Model lists — defaults include GPT-5.4 + Gemini 3.x; override via OPENAI_MODELS / GEMINI_MODELS
 OPENAI_MODELS = get_openai_models()
 GEMINI_MODELS = get_gemini_models()
 DEFAULT_LLM_MODEL = get_default_llm_model()
-LLM_MODELS = get_llm_models()
+
 
 def get_available_llm_models() -> List[str]:
     """Return models for providers that currently have API keys."""
