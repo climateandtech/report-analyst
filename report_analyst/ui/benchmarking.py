@@ -399,7 +399,7 @@ class BenchmarkingUI:
                 "and one or more numeric prediction/score columns."
             )
             # Reuse the classification calibration panel so you can configure and run it here
-            self._render_classification_calibration_panel()
+            self._render_classification_calibration_panel("evaluate")
 
     def render_results_dashboard(self):
         """Render evaluation results dashboard"""
@@ -476,7 +476,7 @@ class BenchmarkingUI:
             # Model comparison from stored classification calibration runs
             self._render_classification_model_comparison()
             # Classification calibration for datasets with labels/scores
-            self._render_classification_calibration_panel()
+            self._render_classification_calibration_panel("result")
 
         # Detailed evaluation view
         if filtered_evals:
@@ -618,7 +618,7 @@ class BenchmarkingUI:
         )
         st.dataframe(metrics_df, use_container_width=True)
 
-    def _render_classification_calibration_panel(self):
+    def _render_classification_calibration_panel(self, key_prefix: str):
         """Render classification calibration metrics for datasets with relevance/usefulness scores."""
         uploaded_datasets = st.session_state.get("uploaded_datasets", {})
         if not uploaded_datasets:
@@ -653,7 +653,7 @@ class BenchmarkingUI:
         selected_label = st.selectbox(
             "Select dataset for calibration analysis:",
             options=labels,
-            key="calibration_dataset_select",
+            key=f"{key_prefix}_calibration_dataset_select",
         )
         idx = labels.index(selected_label)
         selected_key, selected_dataset = candidates[idx]
@@ -700,7 +700,7 @@ class BenchmarkingUI:
             "Ground-truth label column (e.g. relevance or usefulness):",
             options=label_candidates,
             index=default_label_index,
-            key="calibration_label_select",
+            key=f"{key_prefix}calibration_label_select",
         )
 
         # Prediction / score columns: show **all** columns and let the user decide.
@@ -716,7 +716,7 @@ class BenchmarkingUI:
             "Prediction / score columns (models):",
             options=score_candidates,
             default=default_score_selection,
-            key="calibration_score_multiselect",
+            key=f"{key_prefix}calibration_score_multiselect",
         )
         if not selected_score_cols:
             st.info("Select at least one prediction/score column to compute metrics.")
@@ -728,10 +728,12 @@ class BenchmarkingUI:
             max_value=200,
             value=100,
             step=10,
-            key="calibration_ece_bins",
+            key=f"{key_prefix}calibration_ece_bins",
         )
 
-        if st.button("Compute classification calibration", key="calibration_compute"):
+        if st.button(
+            "Compute classification calibration", key=f"{key_prefix}calibration_compute"
+        ):
             with st.spinner("Computing calibration metrics..."):
                 try:
                     metrics_df = compute_calibration_metrics(
