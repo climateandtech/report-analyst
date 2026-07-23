@@ -1346,8 +1346,6 @@ def update_analyzer_parameters():
     chunk_overlap = st.session_state.new_overlap
     top_k = st.session_state.new_top_k
     llm_model = st.session_state.new_llm_model
-    st.session_state.new_llm_scoring = st.session_state.get("llm_scoring_widget", st.session_state.new_llm_scoring)
-    st.session_state.new_batch_scoring = st.session_state.get("batch_scoring_widget", st.session_state.new_batch_scoring)
     available_models = get_available_llm_models()
 
     if not available_models:
@@ -1555,19 +1553,6 @@ def main():
 
         # Sync API keys from session state to environment at startup
         APIKeyManager.sync_api_keys_to_env(st.session_state)
-
-        # These keys are normally created by the analysis configuration widgets,
-        # but upload/cache code can read them before the widgets render.
-        available_models = get_available_llm_models()
-        default_model = available_models[0] if available_models else OPENAI_MODELS[0]
-        default_question_set = list(question_sets.keys())[0] if question_sets else "tcfd"
-        st.session_state.setdefault("new_chunk_size", 500)
-        st.session_state.setdefault("new_overlap", 20)
-        st.session_state.setdefault("new_top_k", 5)
-        st.session_state.setdefault("new_llm_model", default_model)
-        st.session_state.setdefault("new_llm_scoring", False)
-        st.session_state.setdefault("new_batch_scoring", True)
-        st.session_state.setdefault("new_question_set", default_question_set)
 
         st.set_page_config(page_title="Report Analyst", layout="wide")
 
@@ -3355,6 +3340,7 @@ def main():
                         options=list(question_sets.keys()),
                         format_func=lambda x: question_sets[x]["name"],
                         key="new_question_set",
+                        index=0,  # Ensure a default is selected
                         on_change=update_analyzer_parameters,
                     )
 
@@ -3638,6 +3624,7 @@ def main():
                             "Top K",
                             min_value=1,
                             max_value=20,
+                            value=5,  # Default value
                             key="new_top_k",
                             on_change=update_analyzer_parameters,
                         )
@@ -3646,6 +3633,7 @@ def main():
                             "Chunk Size",
                             min_value=100,
                             max_value=2000,
+                            value=500,  # Default value
                             key="new_chunk_size",
                             on_change=update_analyzer_parameters,
                         )
@@ -3654,6 +3642,7 @@ def main():
                             "Overlap",
                             min_value=0,
                             max_value=100,
+                            value=20,  # Default value
                             key="new_overlap",
                             on_change=update_analyzer_parameters,
                         )
@@ -3662,11 +3651,13 @@ def main():
                         available_llm_models = get_available_llm_models()
                         if available_llm_models:
                             current_model = st.session_state.get("new_llm_model")
-                            if current_model not in available_llm_models:
-                                st.session_state.new_llm_model = available_llm_models[0]
+                            selected_index = (
+                                available_llm_models.index(current_model) if current_model in available_llm_models else 0
+                            )
                             new_llm_model = st.selectbox(
                                 "LLM Model",
                                 options=available_llm_models,
+                                index=selected_index,
                                 key="new_llm_model",
                                 on_change=update_analyzer_parameters,
                             )
@@ -3680,20 +3671,18 @@ def main():
 
                         new_llm_scoring = st.checkbox(
                             "LLM Scoring",
-                            value=st.session_state.get("new_llm_scoring", False),
-                            key="llm_scoring_widget",
+                            value=False,
+                            key="new_llm_scoring",
                             on_change=update_analyzer_parameters,
                         )
 
-                        if new_llm_scoring:
-                            new_batch_scoring = st.checkbox(
-                                "Batch Scoring",
-                                value=st.session_state.get("new_batch_scoring", True),
-                                key="batch_scoring_widget",
-                                on_change=update_analyzer_parameters,
-                            )
-                        else:
-                            new_batch_scoring = st.session_state.get("new_batch_scoring", True)
+                        new_batch_scoring = st.checkbox(
+                            "Batch Scoring",
+                            value=True,
+                            key="new_batch_scoring",
+                            disabled=not st.session_state.get("new_llm_scoring", False),
+                            help="Batch scoring only applies when LLM scoring is enabled.",
+                        )
 
                 # Update analyzer's question set
                 analyzer.analyzer.update_question_set(selected_set)
