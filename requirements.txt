@@ -87,7 +87,6 @@ langchain-text-splitters==0.3.6
 langsmith==0.3.13
 llama-cloud==0.1.11
 llama-cloud-services==0.6.0
-llama-index-cli==0.5.1
 llama-index-core==0.13.6
 llama-index-embeddings-openai==0.5.2
 llama-index-llms-gemini==0.6.0
