@@ -202,7 +202,7 @@ sqlite-vec==0.1.6
 sqlite-vss==0.1.2
 starlette==0.46.1
 strawberry-graphql==0.262.1
-streamlit==1.52.0
+streamlit==1.53.1
 streamlit-card==1.0.2
 streamlit-option-menu==0.4.0
 striprtf==0.0.26
