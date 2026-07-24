@@ -190,7 +190,7 @@ safehttpx==0.1.6
 scikit-learn==1.6.1
 scipy==1.15.2
 semantic-version==2.10.0
-setuptools==78.1.1
+setuptools==83.0.0
 shellingham==1.5.4
 six==1.17.0
 smmap==5.0.2
