@@ -46,7 +46,7 @@ qg_collect_changed() {
         report-analyst/*) echo "$p" ;;
         report_analyst/*|tests/*|scripts/*) qg_normalize_path "$p" ;;
       esac
-    done < <(git -C "$git_root" diff --name-only "${base_ref}...HEAD" 2>/dev/null || true)
+    done < <(git -C "$git_root" diff --name-only --diff-filter=ACMR "${base_ref}...HEAD" 2>/dev/null || true)
   else
     while IFS= read -r p; do
       [[ -z "$p" ]] && continue
@@ -56,8 +56,8 @@ qg_collect_changed() {
       esac
     done < <(
       {
-        git -C "$git_root" diff --name-only HEAD 2>/dev/null || true
-        git -C "$git_root" diff --cached --name-only 2>/dev/null || true
+        git -C "$git_root" diff --name-only --diff-filter=ACMR HEAD 2>/dev/null || true
+        git -C "$git_root" diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true
         git -C "$git_root" ls-files --others --exclude-standard 2>/dev/null || true
       } | sort -u
     )
