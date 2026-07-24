@@ -8,13 +8,9 @@ Comprehensive test suite for external service integration flow:
 - Analysis request and result delivery
 """
 
-import json
-import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from aioresponses import aioresponses
 
 from report_analyst_search_backend.external_service_client import (
     ExternalServiceClient,
@@ -204,10 +200,21 @@ class TestExternalServiceHandler:
 class TestExternalServiceClient:
     """Tests for ExternalServiceClient"""
 
+    def _mock_http_response(self, status=200, payload=None, text=""):
+        response = AsyncMock()
+        response.status = status
+        response.json = AsyncMock(return_value=payload or {})
+        response.text = AsyncMock(return_value=text)
+
+        context = AsyncMock()
+        context.__aenter__.return_value = response
+        context.__aexit__.return_value = None
+        return context, response
+
     @pytest.mark.asyncio
     async def test_notify_ready_nats(self, external_client):
         """Test notifying via NATS"""
-        with patch.object(external_client, "connect_nats") as mock_connect:
+        with patch.object(external_client, "connect_nats"):
             with patch.object(external_client, "js") as mock_js:
                 mock_js.publish = AsyncMock()
                 external_client.nc = Mock()
@@ -227,11 +234,14 @@ class TestExternalServiceClient:
     @pytest.mark.asyncio
     async def test_notify_ready_http(self, external_client):
         """Test notifying via HTTP"""
-        with aioresponses() as m:
-            m.post(
-                "http://localhost:8000/external/services/service-x/notify",
-                status=200,
-            )
+        response_context, _ = self._mock_http_response(status=200)
+        session = Mock()
+        session.post.return_value = response_context
+        session_context = AsyncMock()
+        session_context.__aenter__.return_value = session
+        session_context.__aexit__.return_value = None
+
+        with patch("aiohttp.ClientSession", return_value=session_context):
             result = await external_client.notify_ready(
                 service_id="service-x",
                 request_id="req-123",
@@ -240,16 +250,19 @@ class TestExternalServiceClient:
                 method="http",
             )
             assert result is True
+            session.post.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_request_analysis_http(self, external_client):
         """Test requesting analysis via HTTP"""
-        with aioresponses() as m:
-            m.post(
-                "http://localhost:8000/external/services/service-x/analyze",
-                status=200,
-                payload={"request_id": "analysis-123"},
-            )
+        response_context, _ = self._mock_http_response(status=200, payload={"request_id": "analysis-123"})
+        session = Mock()
+        session.post.return_value = response_context
+        session_context = AsyncMock()
+        session_context.__aenter__.return_value = session
+        session_context.__aexit__.return_value = None
+
+        with patch("aiohttp.ClientSession", return_value=session_context):
             request_id = await external_client.request_analysis(
                 service_id="service-x",
                 external_request_id="req-123",
@@ -259,25 +272,32 @@ class TestExternalServiceClient:
                 method="http",
             )
             assert request_id == "analysis-123"
+            session.post.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_results(self, external_client):
         """Test polling for results"""
-        with aioresponses() as m:
-            m.get(
-                "http://localhost:8000/external/services/service-x/results/analysis-123",
-                status=200,
-                payload={
-                    "request_id": "analysis-123",
-                    "status": "completed",
-                    "answers": [],
-                    "top_chunks": [],
-                },
-            )
+        response_context, _ = self._mock_http_response(
+            status=200,
+            payload={
+                "request_id": "analysis-123",
+                "status": "completed",
+                "answers": [],
+                "top_chunks": [],
+            },
+        )
+        session = Mock()
+        session.get.return_value = response_context
+        session_context = AsyncMock()
+        session_context.__aenter__.return_value = session
+        session_context.__aexit__.return_value = None
+
+        with patch("aiohttp.ClientSession", return_value=session_context):
             results = await external_client.get_results("service-x", "analysis-123")
 
             assert results is not None
             assert results["status"] == "completed"
+            session.get.assert_called_once()
 
 
 class TestExternalServiceDelivery:
@@ -286,7 +306,7 @@ class TestExternalServiceDelivery:
     @pytest.mark.asyncio
     async def test_deliver_results_nats(self, external_delivery):
         """Test delivering results via NATS"""
-        with patch.object(external_delivery, "connect_nats") as mock_connect:
+        with patch.object(external_delivery, "connect_nats"):
             with patch.object(external_delivery, "js") as mock_js:
                 mock_js.publish = AsyncMock()
                 external_delivery.nc = Mock()
