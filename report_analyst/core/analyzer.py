@@ -343,7 +343,7 @@ class DocumentAnalyzer:
 
             logger.info("[ANALYSIS] Cache MISS: No cached vector store found")
             return None
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to load vector store cache: {e}")
             logger.debug(f"Full vector store cache error: {e!s}", exc_info=True)
             return None
