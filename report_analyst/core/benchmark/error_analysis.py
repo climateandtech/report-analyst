@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Dict, List
 
@@ -42,11 +41,11 @@ def build_error_analysis_dataframe(
 
     for q in ground_truth.questions:
         question_id = q.question_id
-        question_text_by_id[question_id] = q.text
+        question_text_by_id[question_id] = getattr(q, "question_text", None) or getattr(q, "text", "") or ""
         # Use first report_id in metadata if available
         report_name = ""
         if q.ground_truth_chunks:
-            meta = q.ground_truth_chunks[0].metadata or {}
+            meta = getattr(q.ground_truth_chunks[0], "metadata", None) or {}
             report_name = meta.get("document") or meta.get("report") or ""
         report_by_question[question_id] = report_name
 
@@ -54,7 +53,7 @@ def build_error_analysis_dataframe(
         text_by_chunk: Dict[str, str] = {}
         for chunk in q.ground_truth_chunks:
             by_chunk[chunk.chunk_id] = chunk.relevance_score
-            text_by_chunk[chunk.chunk_id] = chunk.text
+            text_by_chunk[chunk.chunk_id] = getattr(chunk, "text", None) or getattr(chunk, "annotation_notes", None) or ""
         gt_by_question[question_id] = by_chunk
         gt_text_by_question[question_id] = text_by_chunk
 
@@ -311,7 +310,7 @@ def build_error_analysis_dataframe_from_flexible(
                 original_position = r.get_position() or 0
 
                 # Get similarity score (used for ranking)
-                similarity_score = get_similarity_score(r)
+                get_similarity_score(r)
 
                 # Get model score from benchmark dataset - should be relevant_text_sim for this chunk
                 model_score = data.get("relevant_text_sim") or 0.0
@@ -392,29 +391,6 @@ def build_error_analysis_dataframe_from_flexible(
                         "chunk_id": retrieved_chunk_id,  # Store the retrieved paragraph ID
                     }
                 )
-
-    # #region agent log
-    try:
-        bmq_count = len(benchmark_by_query)
-        qq_pairs = sum(len(v) for v in queries_by_report_and_question.values())
-        log_entry2 = {
-            "sessionId": "f7bf10",
-            "runId": "pre-fix",
-            "hypothesisId": "H1",
-            "location": "core/benchmark/error_analysis.py:benchmark_index",
-            "message": "EA flexible benchmark index summary",
-            "data": {
-                "benchmark_query_count": bmq_count,
-                "report_outer_keys": len(queries_by_report_and_question),
-                "report_question_pairs": qq_pairs,
-            },
-            "timestamp": int(pd.Timestamp.now().timestamp() * 1000),
-        }
-        with open("/home/yauheni/Documents/my_main/.cursor/debug-f7bf10.log", "a") as _f:
-            _f.write(json.dumps(log_entry2) + "\n")
-    except Exception:
-        pass
-    # #endregion agent log
 
     # If we didn't produce any rows using the (report, question) grouping path,
     # fall back to a simpler query-centric path that only relies on query_id and chunk_id.

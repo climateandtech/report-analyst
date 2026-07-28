@@ -5,7 +5,6 @@ Tests for the QuestionSetLoader functionality
 import os
 import tempfile
 
-import pytest
 import yaml
 
 from report_analyst.core.question_loader import (
@@ -129,7 +128,7 @@ class TestQuestionSetLoader:
         """Test get_question_set_options method returns list of question set IDs"""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create multiple test question set files
-            for i, name in enumerate(["test1", "test2", "test3"]):
+            for _i, name in enumerate(["test1", "test2", "test3"]):
                 test_questions = {
                     "name": f"{name.title()} Questions",
                     "shortcut": name,
@@ -309,7 +308,7 @@ class TestQuestionSetLoader:
             from report_analyst.core.question_loader import get_question_loader
 
             question_loader = get_question_loader()
-            question_set_options = question_loader.get_question_set_options() + ["custom"]
+            question_set_options = [*question_loader.get_question_set_options(), "custom"]
         else:
             # Fallback: use a generic approach without hardcoded names
             question_set_options = ["custom"]  # Only custom when core functionality unavailable
@@ -327,7 +326,7 @@ class TestQuestionSetLoader:
             from report_analyst.core.question_loader import get_question_loader
 
             question_loader = get_question_loader()
-            question_set_options = question_loader.get_question_set_options() + ["custom"]
+            question_set_options = [*question_loader.get_question_set_options(), "custom"]
         else:
             # Fallback: use a generic approach without hardcoded names
             question_set_options = ["custom"]  # Only custom when core functionality unavailable

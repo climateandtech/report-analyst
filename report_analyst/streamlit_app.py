@@ -8,7 +8,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -31,19 +31,14 @@ if str(parent_dir) not in sys.path:
 # Try to import backend integration features
 try:
     from report_analyst_search_backend.config import (
-        BackendConfig,
         configure_backend_integration,
-        display_config_status,
     )
     from report_analyst_search_backend.flow_orchestrator import (
-        AnalysisResult,
-        ProcessingResult,
         create_flow_orchestrator,
-        needs_local_analysis,
     )
 
     BACKEND_INTEGRATION_AVAILABLE = True
-except ImportError as e:
+except ImportError:
     BACKEND_INTEGRATION_AVAILABLE = False
 
 # Configure logging
@@ -94,14 +89,13 @@ if str(current_dir) not in sys.path:
 logger.info(f"Added {current_dir} to Python path")
 
 # Keep relative imports
-from report_analyst.core.analyzer import DocumentAnalyzer
-from report_analyst.core.api_key_manager import APIKeyManager
-from report_analyst.core.dataframe_manager import (
+from report_analyst.core.analyzer import DocumentAnalyzer  # noqa: E402
+from report_analyst.core.api_key_manager import APIKeyManager  # noqa: E402
+from report_analyst.core.dataframe_manager import (  # noqa: E402
     create_analysis_dataframes,
-    create_combined_dataframe,
 )
-from report_analyst.core.prompt_manager import PromptManager
-from report_analyst.core.question_loader import get_question_loader
+from report_analyst.core.prompt_manager import PromptManager  # noqa: E402
+from report_analyst.core.question_loader import get_question_loader  # noqa: E402
 
 # Load environment variables
 load_dotenv()
@@ -170,7 +164,7 @@ def get_question_sets() -> Dict[str, Dict[str, str]]:
             ordered_sets["everest"] = everest_data
 
         return ordered_sets
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Error loading question sets: {e}")
         return {}
 
@@ -216,8 +210,8 @@ class ReportAnalyzer:
                 "description": question_set_obj.description,
             }
 
-        except Exception as e:
-            logger.error(f"Failed to load questions for {question_set}: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to load questions for {question_set}: {e!s}")
             return {"questions": {}, "name": "", "description": ""}
 
     async def analyze_document(
@@ -296,14 +290,14 @@ class ReportAnalyzer:
                     # If no question_number, just pass through the result
                     yield result
 
-        except Exception as e:
-            log_analysis_step(f"Critical error during analysis: {str(e)}", "error")
-            yield {"error": f"Error analyzing document: {str(e)}"}
+        except Exception as e:  # noqa: BLE001
+            log_analysis_step(f"Critical error during analysis: {e!s}", "error")
+            yield {"error": f"Error analyzing document: {e!s}"}
 
     def process_document(
         self,
         file_path: str,
-        selected_questions: List[int] = None,
+        selected_questions: List[int] | None = None,
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
@@ -382,8 +376,8 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
                         logger.warning("Failed to save file from PostgreSQL to temp, falling back to local")
                 else:
                     logger.warning("PostgreSQL file storage not available, falling back to local")
-            except Exception as e:
-                logger.warning(f"PostgreSQL file storage failed: {str(e)}, falling back to local")
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"PostgreSQL file storage failed: {e!s}, falling back to local")
 
         # Fallback to local file storage
         file_path = Path("temp") / uploaded_file.name
@@ -397,9 +391,9 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
         # Reset file processing flag when a new file is saved
         st.session_state.file_processed = False
         return str(file_path)
-    except Exception as e:
-        logger.error(f"Error saving file: {str(e)}")
-        st.error(f"Error saving file: {str(e)}")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Error saving file: {e!s}")
+        st.error(f"Error saving file: {e!s}")
         return None
 
 
@@ -542,7 +536,12 @@ async def analyze_document_and_display(
             # Update display with cached results
             logger.info(f"Creating dataframes with cached results for file_key: {file_key}")
             logger.info(
-                f"Current session state settings: chunk_size={st.session_state.get('new_chunk_size')}, overlap={st.session_state.get('new_overlap')}, top_k={st.session_state.get('new_top_k')}, llm_model={st.session_state.get('new_llm_model')}, use_llm_scoring={st.session_state.get('new_llm_scoring')}"
+                "Current session state settings: "
+                f"chunk_size={st.session_state.get('new_chunk_size')}, "
+                f"overlap={st.session_state.get('new_overlap')}, "
+                f"top_k={st.session_state.get('new_top_k')}, "
+                f"llm_model={st.session_state.get('new_llm_model')}, "
+                f"use_llm_scoring={st.session_state.get('new_llm_scoring')}"
             )
             analysis_df, chunks_df = create_analysis_dataframes(st.session_state.results["answers"], file_key)
             st.session_state.analysis_df = analysis_df
@@ -596,7 +595,12 @@ async def analyze_document_and_display(
                 # Update display
                 logger.info(f"Creating dataframes with updated results for file_key: {file_key}")
                 logger.info(
-                    f"Current session state settings: chunk_size={st.session_state.get('new_chunk_size')}, overlap={st.session_state.get('new_overlap')}, top_k={st.session_state.get('new_top_k')}, llm_model={st.session_state.get('new_llm_model')}, use_llm_scoring={st.session_state.get('new_llm_scoring')}"
+                    "Current session state settings: "
+                    f"chunk_size={st.session_state.get('new_chunk_size')}, "
+                    f"overlap={st.session_state.get('new_overlap')}, "
+                    f"top_k={st.session_state.get('new_top_k')}, "
+                    f"llm_model={st.session_state.get('new_llm_model')}, "
+                    f"use_llm_scoring={st.session_state.get('new_llm_scoring')}"
                 )
                 analysis_df, chunks_df = create_analysis_dataframes(st.session_state.results["answers"], file_key)
 
@@ -619,10 +623,10 @@ async def analyze_document_and_display(
         status_placeholder.empty()
         st.session_state.analysis_complete = True
 
-    except Exception as e:
-        log_analysis_step(f"Critical error during analysis: {str(e)}", "error")
+    except Exception as e:  # noqa: BLE001
+        log_analysis_step(f"Critical error during analysis: {e!s}", "error")
         log_analysis_step(traceback.format_exc(), "error")
-        st.error(f"Error during analysis: {str(e)}")
+        st.error(f"Error during analysis: {e!s}")
 
 
 def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -646,7 +650,7 @@ def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         if is_object_dtype(df[col]):
             try:
                 df[col] = pd.to_datetime(df[col])
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         if is_datetime64_any_dtype(df[col]):
@@ -768,7 +772,7 @@ def load_question_sets() -> Dict[str, str]:
     """Load all available question sets and their descriptions using centralized loader"""
     try:
         return question_loader.get_question_set_info()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Error loading question sets: {e}")
         return {}
 
@@ -812,7 +816,7 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
     return result
 
 
-def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str = None) -> None:
+def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str | None = None) -> None:
     """Display analysis results in a consistent format for both individual and consolidated views"""
     try:
         if analysis_df.empty:
@@ -909,8 +913,8 @@ def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame,
                 )
 
     except Exception as e:
-        logger.error(f"Error displaying analysis results: {str(e)}", exc_info=True)
-        st.error(f"Error displaying results: {str(e)}")
+        logger.error(f"Error displaying analysis results: {e!s}", exc_info=True)
+        st.error(f"Error displaying results: {e!s}")
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
@@ -980,7 +984,10 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
             configs = file_configs[file_path]
             config_options = []
             for config in configs:
-                label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
+                label = (
+                    f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, "
+                    f"Top-K: {config['top_k']}, Model: {config['model']}"
+                )
                 config_options.append({"label": label, "config": config})
 
             selected_config = st.selectbox(
@@ -1054,7 +1061,8 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                                 # Check if embeddings are available
                                 if not analyzer.analyzer.embeddings or analyzer.analyzer.use_backend_llm:
                                     st.warning(
-                                        "Embeddings not available for similarity search. Using backend mode or embeddings not initialized."
+                                        "Embeddings not available for similarity search. "
+                                        "Using backend mode or embeddings not initialized."
                                     )
                                     query_text = None
                                 else:
@@ -1076,7 +1084,7 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                                             similarities.append(0.0)
 
                                     # Sort chunks by similarity
-                                    chunk_similarity_pairs = list(zip(raw_chunks, similarities))
+                                    chunk_similarity_pairs = list(zip(raw_chunks, similarities, strict=False))
                                     chunk_similarity_pairs.sort(key=lambda x: x[1], reverse=True)
 
                                     # Create rows with similarity scores
@@ -1094,9 +1102,9 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                                     st.success(f"✓ Sorted {len(chunks_rows)} chunks by similarity to query")
 
                             except Exception as e:
-                                st.error(f"Error computing similarity: {str(e)}")
+                                st.error(f"Error computing similarity: {e!s}")
                                 logger.error(
-                                    f"Error computing similarity: {str(e)}",
+                                    f"Error computing similarity: {e!s}",
                                     exc_info=True,
                                 )
                                 # Fall back to original display
@@ -1193,8 +1201,8 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                         else:
                             st.warning("No chunks found. Run Step 1 to generate document chunks first.")
 
-                except Exception as e:
-                    logger.warning(f"Error displaying document chunks with similarity search: {str(e)}")
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f"Error displaying document chunks with similarity search: {e!s}")
                     # Continue to show analysis results even if chunk display fails
 
                 # Get cached results
@@ -1241,7 +1249,7 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
 
                         except Exception as e:
                             logger.error(
-                                f"Error processing result for question {question_id}: {str(e)}",
+                                f"Error processing result for question {question_id}: {e!s}",
                                 exc_info=True,
                             )
                             continue
@@ -1260,8 +1268,8 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                     st.warning("No stored results found for this configuration")
 
     except Exception as e:
-        logger.error(f"Error displaying consolidated results: {str(e)}", exc_info=True)
-        st.error(f"Error displaying consolidated results: {str(e)}")
+        logger.error(f"Error displaying consolidated results: {e!s}", exc_info=True)
+        st.error(f"Error displaying consolidated results: {e!s}")
 
 
 def display_cache_selector(file_path: str):
@@ -1294,7 +1302,7 @@ def display_cache_selector(file_path: str):
                     if st.button("Clear Stored Data for File"):
                         try:
                             st.session_state.analyzer.analyzer.cache_manager.clear_cache(file_path)
-                            st.success(f"Stored data cleared for file.")
+                            st.success("Stored data cleared for file.")
                             # Clear results from session state
                             if "results" in st.session_state:
                                 del st.session_state.results
@@ -1304,18 +1312,18 @@ def display_cache_selector(file_path: str):
                                 del st.session_state.chunks_df
                             st.session_state.analysis_complete = False
                             st.rerun()
-                        except Exception as e:
-                            st.error(f"Error clearing stored data: {str(e)}")
+                        except Exception as e:  # noqa: BLE001
+                            st.error(f"Error clearing stored data: {e!s}")
             else:
                 st.info("No stored analyses available for this file")
-        except Exception as e:
-            st.error(f"Error checking stored data status: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            st.error(f"Error checking stored data status: {e!s}")
 
 
 def get_current_settings(st) -> dict:
     """Get all current settings from the UI widgets"""
     # Get first question set as default
-    default_set = list(question_sets.keys())[0]
+    default_set = next(iter(question_sets.keys()))
     available_models = get_available_llm_models()
     default_model = available_models[0] if available_models else OPENAI_MODELS[0]
 
@@ -1362,7 +1370,7 @@ def update_analyzer_parameters():
         st.session_state.new_llm_model = llm_model
     elif llm_model.startswith("gpt-") and not APIKeyManager.is_configured_key(os.getenv("OPENAI_API_KEY")):
         logger.error(f"Attempt to use OpenAI model '{llm_model}' without API key")
-        st.error(f"OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly.")
+        st.error("OPENAI_API_KEY environment variable is not set. OpenAI models will not work correctly.")
 
     # Update the analyzer with the new parameters
     try:
@@ -1383,8 +1391,8 @@ def update_analyzer_parameters():
             st.session_state.use_llm_scoring = st.session_state.new_llm_scoring
             logger.info(f"Updated use_llm_scoring to: {st.session_state.use_llm_scoring}")
 
-    except Exception as e:
-        st.error(f"Error updating parameters: {str(e)}")
+    except Exception as e:  # noqa: BLE001
+        st.error(f"Error updating parameters: {e!s}")
 
 
 async def run_analysis(analyzer, file_path, selected_questions, progress_text):
@@ -1401,9 +1409,10 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         logger.info(f"[ANALYSIS] User triggered analysis for file: {file_path}")
         logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
         if "questions" in st.session_state:
-            logger.info(
-                f"[ANALYSIS] Selected question texts: {[st.session_state.questions[q]['text'] for q in selected_questions if q in st.session_state.questions]}"
-            )
+            selected_question_texts = [
+                st.session_state.questions[q]["text"] for q in selected_questions if q in st.session_state.questions
+            ]
+            logger.info(f"[ANALYSIS] Selected question texts: {selected_question_texts}")
         logger.info(
             f"[CACHE] Looking up cache for file: {file_path} with config: {config} and questions: {selected_questions}"
         )
@@ -1503,8 +1512,8 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         progress_text.success("Analysis complete!")
 
     except Exception as e:
-        progress_text.error(f"Error during analysis: {str(e)}")
-        logger.error(f"Error during analysis: {str(e)}", exc_info=True)
+        progress_text.error(f"Error during analysis: {e!s}")
+        logger.error(f"Error during analysis: {e!s}", exc_info=True)
 
 
 def main():
@@ -1572,7 +1581,7 @@ def main():
             @import url('https://fonts.googleapis.com/css2?family=Afacad:wght@400;500;600;700&display=swap');
             @import url('https://fonts.googleapis.com/css2?family=Cousine:wght@400;700&display=swap');
             @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
-            
+
             /* Material Icons base styles */
             .material-icons,
             i.material-icons {
@@ -1592,7 +1601,7 @@ def main():
                 vertical-align: middle;
                 margin-right: 8px;
             }
-            
+
             /* Fix Material Icons rendering issues for Streamlit's stIconMaterial component */
             [data-testid="stIconMaterial"] {
                 font-family: 'Material Icons' !important;
@@ -1603,7 +1612,7 @@ def main():
                 text-transform: none !important;
                 letter-spacing: normal !important;
             }
-            
+
             /* @font-face fallback for Material Icons */
             @font-face {
                 font-family: 'Material Icons';
@@ -1611,7 +1620,7 @@ def main():
                 font-weight: 400;
                 src: url(https://fonts.gstatic.com/s/materialicons/v142/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2) format('woff2');
             }
-            
+
             /* Add Material Icon to stAlert elements - only ONE icon per alert */
             /* Add icon only to the markdown container, NOT to paragraphs to avoid duplicates */
             [data-testid="stAlert"] [data-testid="stMarkdownContainer"]::before {
@@ -1622,13 +1631,13 @@ def main():
                 margin-right: 8px;
                 display: inline-block;
             }
-            
+
             /* Remove icons from paragraphs inside stAlert to prevent double icons */
             [data-testid="stAlert"] p::before {
                 content: none !important;
                 display: none !important;
             }
-            
+
             /* Add icons to custom notifications */
             [data-testid="stNotification"] [data-testid="stMarkdownContainer"]::before {
                 content: 'info';
@@ -1638,7 +1647,7 @@ def main():
                 margin-right: 8px;
                 display: inline-block;
             }
-            
+
             /* Remove icons from paragraphs in custom notifications too */
             [data-testid="stNotification"] p::before {
                 content: none !important;
@@ -1675,7 +1684,7 @@ def main():
             .api-key-missing-alert-message {
                 display: block;
             }
-            
+
             /* Settings expander icon in sidebar */
             [data-testid="stSidebar"] [data-testid="stExpander"] summary::before {
                 content: 'settings';
@@ -1685,48 +1694,48 @@ def main():
                 margin-right: 8px;
                 display: inline-block;
             }
-            
+
             /* Active navigation item - light purple background with dark purple text */
             [data-testid="stSidebar"] .nav-link-selected {
                 background-color: rgba(67, 19, 200, 0.15) !important;
                 color: #4313C8 !important;
                 font-weight: 700 !important;
             }
-            
+
             /* Active navigation item icon - dark purple */
             [data-testid="stSidebar"] .nav-link-selected i {
                 color: #4313C8 !important;
             }
-            
+
             /* Inactive navigation items - gray text and icons */
             [data-testid="stSidebar"] .nav-link:not(.nav-link-selected) {
                 color: #7872A7 !important;
             }
-            
+
             [data-testid="stSidebar"] .nav-link:not(.nav-link-selected) i {
                 color: #7872A7 !important;
             }
-            
+
             /* Designer Colors - Exact specifications from Daniela */
-            
+
             /* ========== LIGHT MODE ========== */
-            
+
             /* Main app background - #F5F7FF */
             .stApp {
                 background-color: #F5F7FF !important;
                 font-family: 'Afacad', sans-serif !important;
             }
-            
+
             /* Primary font - Afacad for titles and body text */
             body, .main, p, span, div, label {
                 font-family: 'Afacad', sans-serif !important;
             }
-            
+
             /* Titles use Afacad */
             h1, h2, h3, h4, h5, h6 {
                 font-family: 'Afacad', sans-serif !important;
             }
-            
+
             /* Secondary font - Cousine for UI elements */
             button, .stButton > button,
             input, textarea, select,
@@ -1739,12 +1748,12 @@ def main():
             code, pre {
                 font-family: 'Cousine', monospace !important;
             }
-            
+
             /* Main container - #FFFFFF */
             .main .block-container {
                 background-color: #FFFFFF !important;
             }
-            
+
             /* Secondary containers - C0C4FA 10% opacity */
             [data-testid="stExpander"],
             .stAlert,
@@ -1752,70 +1761,72 @@ def main():
             .stInfo {
                 background-color: rgba(192, 196, 250, 0.1) !important;
             }
-            
+
             /* Fix text layout - prevent vertical stacking */
             .stInfo {
                 word-break: normal !important;
                 white-space: normal !important;
             }
-            
+
             .stInfo p,
             .stInfo span {
                 writing-mode: horizontal-tb !important;
                 text-orientation: mixed !important;
             }
-            
+
             /* Ensure columns don't cause vertical text */
             [data-testid="column"] {
                 min-width: 0 !important;
             }
-            
+
             [data-testid="column"] * {
                 word-break: normal !important;
                 white-space: normal !important;
             }
-            
+
             /* Titles - #4313C8 */
             h1, h2, [data-testid="stMarkdownContainer"] h1, [data-testid="stMarkdownContainer"] h2 {
                 color: #4313C8 !important;
             }
-            
+
             /* Subtitles - #979DF6 */
             h3, h4, [data-testid="stMarkdownContainer"] h3, [data-testid="stMarkdownContainer"] h4 {
                 color: #979DF6 !important;
             }
-            
+
             /* Body text - #170843 */
             p, span, label {
                 color: #170843 !important;
             }
-            
+
             /* Don't force color on all divs - let them inherit to prevent layout issues */
             div:not([data-testid="stSidebar"] div):not(.stCheckbox):not([data-testid="stMarkdownContainer"]) {
                 color: #170843 !important;
             }
-            
+
             /* Caption text - #718096 */
             .stCaption, small, [data-testid="stCaptionContainer"] {
                 color: #718096 !important;
             }
-            
+
             /* Sidebar - white background */
             [data-testid="stSidebar"] {
                 background-color: #FFFFFF !important;
             }
-            
+
             /* Sidebar text - #7872A7 (exclude option-menu navigation) */
-            [data-testid="stSidebar"] *:not([data-testid="stSidebarNav"] [aria-current="page"] *):not(.nav-link):not(.nav-link-selected):not(.nav-link *):not([class*="nav-link"]) {
+            [data-testid="stSidebar"] *:not([data-testid="stSidebarNav"] [aria-current="page"] *):not(
+                .nav-link
+            ):not(.nav-link-selected):not(.nav-link *):not([class*="nav-link"]) {
                 color: #7872A7 !important;
             }
-            
+
             /* Ensure option-menu navigation styles are not overridden */
             [data-testid="stSidebar"] .nav-link,
             [data-testid="stSidebar"] .nav-link-selected {
                 color: inherit !important;
             }
-            
+
             /* File Display Panel - Unique class for green panel styling */
             /* The key="file-display-panel" creates the class st-key-file-display-panel */
             /* Target the container element which has the st-key- class */
@@ -1826,7 +1837,7 @@ def main():
                 padding: 1rem 1.5rem !important;
                 margin: 1rem 0 1.5rem 0 !important;
             }
-            
+
             /* Target the horizontal block inside the container (for columns) */
             .st-key-file-display-panel [data-testid="stHorizontalBlock"] {
                 background-color: transparent !important;
@@ -1836,12 +1847,12 @@ def main():
             .st-key-file-display-panel [data-testid="column"] {
                 background-color: transparent !important;
             }
-            
+
             /* Keep upload date gray */
             .st-key-file-display-panel .pdf-upload-date {
                 color: #718096 !important;
             }
-            
+
             .pdf-icon-box {
                 background-color: #C8E6C9;
                 border-radius: 12px;
@@ -1852,53 +1863,53 @@ def main():
                 justify-content: center;
                 flex-shrink: 0;
             }
-            
+
             .pdf-icon-box .material-icons,
             .pdf-icon-box i.material-icons {
                 font-size: 28px !important;
                 color: #2E7D32 !important;
                 display: inline-block !important;
             }
-            
+
             .pdf-info-section {
                 flex-grow: 1;
             }
-            
+
             .pdf-upload-date {
                 font-size: 13px;
                 color: #718096;
                 display: block;
                 margin-top: 4px;
             }
-            
+
             /* Style ONLY the PDF selectbox - target it specifically within the file display panel */
             /* Make the selectbox container bigger */
             .st-key-file-display-panel [data-baseweb="select"] {
                 min-width: 300px !important;
                 max-width: 500px !important;
             }
-            
+
             /* Target the main selectbox wrapper */
             .st-key-file-display-panel [data-baseweb="select"] > div {
                 background-color: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
             }
-            
+
             /* Target the div with value attribute (the displayed text) - make it bigger, bolder, and green */
             .st-key-file-display-panel [data-baseweb="select"] div[value] {
                 font-size: 22px !important;
                 font-weight: 800 !important;
                 color: #1B9E6B !important;
             }
-            
+
             /* Also target by the specific class pattern for the value div */
             .st-key-file-display-panel [data-baseweb="select"] [class*="st-dn"] {
                 font-size: 22px !important;
                 font-weight: 800 !important;
                 color: #1B9E6B !important;
             }
-            
+
             /* Target nested divs that contain the text */
             .st-key-file-display-panel [data-baseweb="select"] > div > div > div[value],
             .st-key-file-display-panel [data-baseweb="select"] > div > div > div[class*="st-dn"] {
@@ -1906,21 +1917,21 @@ def main():
                 font-weight: 800 !important;
                 color: #1B9E6B !important;
             }
-            
+
             /* Make the dropdown arrow bigger, bold, and green */
             .st-key-file-display-panel [data-baseweb="select"] svg {
                 color: #1B9E6B !important;
                 width: 28px !important;
                 height: 28px !important;
             }
-            
+
             .st-key-file-display-panel [data-baseweb="select"] svg path,
             .st-key-file-display-panel [data-baseweb="select"] svg polygon {
                 stroke-width: 4 !important;
                 stroke: #1B9E6B !important;
                 fill: #1B9E6B !important;
             }
-            
+
             /* Question Set Display Panel - same styling as file display panel */
             [data-testid="stVerticalBlock"].st-key-question-set-display-panel,
             .st-key-question-set-display-panel[data-testid="stVerticalBlock"] {
@@ -1929,26 +1940,26 @@ def main():
                 padding: 1rem 1.5rem !important;
                 margin: 1rem 0 0.5rem 0 !important;
             }
-            
+
             .st-key-question-set-display-panel [data-testid="stHorizontalBlock"] {
                 background-color: transparent !important;
             }
-            
+
             .st-key-question-set-display-panel [data-testid="column"] {
                 background-color: transparent !important;
             }
-            
+
             .st-key-question-set-display-panel [data-baseweb="select"] {
                 min-width: 300px !important;
                 max-width: 500px !important;
             }
-            
+
             .st-key-question-set-display-panel [data-baseweb="select"] > div {
                 background-color: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
             }
-            
+
             .st-key-question-set-display-panel [data-baseweb="select"] div[value],
             .st-key-question-set-display-panel [data-baseweb="select"] [class*="st-dn"],
             .st-key-question-set-display-panel [data-baseweb="select"] > div > div > div[value],
@@ -1957,20 +1968,20 @@ def main():
                 font-weight: 800 !important;
                 color: #1B9E6B !important;
             }
-            
+
             .st-key-question-set-display-panel [data-baseweb="select"] svg {
                 color: #1B9E6B !important;
                 width: 28px !important;
                 height: 28px !important;
             }
-            
+
             .st-key-question-set-display-panel [data-baseweb="select"] svg path,
             .st-key-question-set-display-panel [data-baseweb="select"] svg polygon {
                 stroke-width: 4 !important;
                 stroke: #1B9E6B !important;
                 fill: #1B9E6B !important;
             }
-            
+
             /* Styled Selectboxes - White background, thin border */
             /* Only target selectboxes that are NOT in the PDF container */
             /* Target selectboxes inside expanders or other sections, but NOT in PDF container */
@@ -1980,12 +1991,12 @@ def main():
                 border: 1px solid #E2E8F0 !important;
                 border-radius: 4px !important;
             }
-            
+
             /* Ensure selectboxes in expanders have normal text color (NOT green) */
             [data-testid="stExpander"] [data-baseweb="select"] > div > div > div {
                 color: #170843 !important;
             }
-            
+
             /* Ensure selectbox arrows in expanders are NOT green */
             [data-testid="stExpander"] [data-baseweb="select"] svg path,
             [data-testid="stExpander"] [data-baseweb="select"] svg polygon {
@@ -1993,12 +2004,12 @@ def main():
                 fill: #170843 !important;
                 stroke-width: 1 !important;
             }
-            
+
             [data-testid="stExpander"] [data-baseweb="select"]:hover > div,
             [data-testid="stExpander"] [data-baseweb="select"]:hover > div > div {
                 border-color: #4313C8 !important;
             }
-            
+
             /* Styled Questions Table */
             .questions-table-container {
                 background-color: #FFFFFF;
@@ -2007,7 +2018,7 @@ def main():
                 padding: 1rem;
                 margin: 1rem 0;
             }
-            
+
             /* Sidebar accent (active item) - #4313C8 with white text */
             [data-testid="stSidebarNav"] li[aria-selected="true"],
             [data-testid="stSidebarNav"] a[aria-selected="true"],
@@ -2016,21 +2027,21 @@ def main():
                 background-color: #4313C8 !important;
                 border-radius: 4px !important;
             }
-            
+
             /* Active sidebar item text and icons - white */
             [data-testid="stSidebarNav"] li[aria-current="page"] *,
             [data-testid="stSidebarNav"] a[aria-current="page"] * {
                 color: #ffffff !important;
                 fill: #ffffff !important;
             }
-            
+
             /* Sidebar navigation radio buttons - styled like screen design */
             [data-testid="stSidebar"] [data-baseweb="radio"] {
                 display: flex !important;
                 flex-direction: column !important;
                 gap: 4px !important;
             }
-            
+
             /* Hide radio button input circles completely */
             [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"] {
                 display: none !important;
@@ -2042,14 +2053,14 @@ def main():
                 margin: 0 !important;
                 padding: 0 !important;
             }
-            
+
             /* Hide the radio button circle indicators */
             [data-testid="stSidebar"] [data-baseweb="radio"] > div > div:first-child,
             [data-testid="stSidebar"] [data-baseweb="radio"] label::before,
             [data-testid="stSidebar"] [data-baseweb="radio"] label > div:first-child:not(span) {
                 display: none !important;
             }
-            
+
             [data-testid="stSidebar"] [data-baseweb="radio"] > label {
                 padding: 10px 15px !important;
                 border-radius: 6px !important;
@@ -2062,22 +2073,22 @@ def main():
                 align-items: center !important;
                 gap: 8px !important;
             }
-            
+
             [data-testid="stSidebar"] [data-baseweb="radio"] > label:hover {
                 background-color: rgba(67, 19, 200, 0.1) !important;
             }
-            
+
             /* Inactive sidebar items - purple text */
             [data-testid="stSidebar"] [data-baseweb="radio"] label {
                 color: #4313C8 !important;
             }
-            
+
             [data-testid="stSidebar"] [data-baseweb="radio"] label span {
                 color: #4313C8 !important;
                 font-family: 'Cousine', monospace !important;
                 font-weight: 400 !important;
             }
-            
+
             /* Active/selected sidebar item - purple background with white text */
             /* Streamlit uses a div wrapper with data-checked attribute */
             [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label,
@@ -2090,13 +2101,13 @@ def main():
                 border-radius: 6px !important;
                 font-weight: 700 !important;
             }
-            
+
             /* Also target the parent div when checked */
             [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] {
                 background-color: #4313C8 !important;
                 border-radius: 6px !important;
             }
-            
+
             /* Active sidebar item text - white and bold */
             [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked ~ label span,
             [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked + label span,
@@ -2108,7 +2119,7 @@ def main():
                 color: #ffffff !important;
                 font-weight: 700 !important;
             }
-            
+
             /* Active sidebar item - also target the parent container */
             [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label,
             [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label {
@@ -2116,13 +2127,13 @@ def main():
                 color: #ffffff !important;
                 font-weight: 700 !important;
             }
-            
+
             [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label span,
             [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label span {
                 color: #ffffff !important;
                 font-weight: 700 !important;
             }
-            
+
             /* Sidebar Material Icons - match text color */
             [data-testid="stSidebar"] [data-baseweb="radio"] label .nav-material-icon,
             [data-testid="stSidebar"] [data-baseweb="radio"] label .material-icons {
@@ -2131,7 +2142,7 @@ def main():
                 margin-right: 8px !important;
                 vertical-align: middle !important;
             }
-            
+
             /* Active sidebar item Material Icons - white */
             [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label .nav-material-icon,
             [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label .nav-material-icon,
@@ -2140,7 +2151,7 @@ def main():
             [data-testid="stSidebar"] [data-baseweb="radio"] input[type="radio"]:checked + label .nav-material-icon {
                 color: #ffffff !important;
             }
-            
+
             /* Keep tooltip icons (help icons) visible and styled */
             [data-testid="stSidebar"] [data-baseweb="radio"] label [data-testid="stTooltipIcon"] svg,
             [data-testid="stSidebar"] [data-baseweb="radio"] label [data-testid="stTooltipHoverTarget"] svg {
@@ -2148,29 +2159,31 @@ def main():
                 color: #4313C8 !important;
                 stroke: #4313C8 !important;
             }
-            
-            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label [data-testid="stTooltipIcon"] svg,
-            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label [data-testid="stTooltipIcon"] svg {
+
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label
+                [data-testid="stTooltipIcon"] svg,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label
+                [data-testid="stTooltipIcon"] svg {
                 color: #ffffff !important;
                 stroke: #ffffff !important;
             }
-            
+
             /* Green accent - #2E9D6F */
             .stSuccess {
                 background-color: rgba(46, 157, 111, 0.3) !important;
                 border-color: #2E9D6F !important;
                 color: #2E9D6F !important;
             }
-            
+
             /* Green cards - 30% and 10% opacity */
             [data-testid="stNotification"][data-status="success"] {
                 background-color: rgba(46, 157, 111, 0.1) !important;
             }
-            
+
             /* ========== UNIFIED BUTTON STYLES ========== */
-            
+
             /* Help icon button - styled as icon only, no background */
-            div[data-testid="stButton"] button:has-text("ℹ️") {
+            div[data-testid="stButton"] button:has-text("i") {
                 background-color: transparent !important;
                 color: #4313C8 !important;
                 border: none !important;
@@ -2183,14 +2196,14 @@ def main():
                 box-shadow: none !important;
                 line-height: 1 !important;
             }
-            
-            div[data-testid="stButton"] button:has-text("ℹ️"):hover {
+
+            div[data-testid="stButton"] button:has-text("i"):hover {
                 background-color: transparent !important;
                 color: #4313C8 !important;
                 opacity: 0.7 !important;
                 transform: none !important;
             }
-            
+
             /* Select All button - small light purple button like processing steps */
             /* Target primary buttons that appear after "Select Questions" heading */
             h3:has-text("Select Questions") + div[data-testid="stButton"] button[kind="primary"],
@@ -2208,14 +2221,14 @@ def main():
                 width: auto !important;
                 max-width: fit-content !important;
             }
-            
+
             /* Hover state for Select All button */
             h3:has-text("Select Questions") + div[data-testid="stButton"] button[kind="primary"]:hover,
             div[data-testid="stButton"] button[kind="primary"]:hover {
                 background-color: rgba(192, 196, 250, 0.2) !important;
                 border-color: #4313C8 !important;
             }
-            
+
             /* Override for larger primary buttons (like Analyze Selected Questions, Reanalyze) */
             /* These buttons have more text, so we can target them by their longer text content */
             div[data-testid="stButton"]:has(button:contains("Analyze")) button,
@@ -2227,7 +2240,7 @@ def main():
                 width: 100% !important;
                 max-width: 100% !important;
             }
-            
+
             /* Default: All buttons in main content - white background with purple text (like Browse File) */
             /* Style all buttons first, then override for sidebar and special buttons */
             .stButton > button,
@@ -2249,7 +2262,7 @@ def main():
                 width: auto !important;
                 min-width: auto !important;
             }
-            
+
             .stButton > button:hover,
             .stDownloadButton > button:hover,
             [data-testid="stDownloadButton"] button:hover,
@@ -2260,7 +2273,7 @@ def main():
                 border: 1px solid #4313C8 !important;
                 box-shadow: 0 2px 6px rgba(67, 19, 200, 0.25), 0 1px 3px rgba(67, 19, 200, 0.15) !important;
             }
-            
+
             .stButton > button:active,
             .stButton > button:focus,
             .stDownloadButton > button:active,
@@ -2277,7 +2290,7 @@ def main():
                 outline: none !important;
                 box-shadow: 0 1px 3px rgba(67, 19, 200, 0.3) !important;
             }
-            
+
             /* Sidebar buttons - override with purple background (higher specificity) */
             [data-testid="stSidebar"] .stButton > button {
                 background-color: #4313C8 !important;
@@ -2290,14 +2303,14 @@ def main():
                 font-weight: 400 !important;
                 padding: 0.5rem 1rem !important;
             }
-            
+
             [data-testid="stSidebar"] .stButton > button:hover {
                 background-color: #979DF6 !important;
                 color: #ffffff !important;
                 border: 2px solid #979DF6 !important;
                 box-shadow: none !important;
             }
-            
+
             [data-testid="stSidebar"] .stButton > button:active,
             [data-testid="stSidebar"] .stButton > button:focus {
                 background-color: #4313C8 !important;
@@ -2306,17 +2319,19 @@ def main():
                 outline: none !important;
                 box-shadow: none !important;
             }
-            
+
             /* Remove all orange/red borders and states from buttons */
             /* Note: Main button styles are defined above, this just ensures border color */
             /* Exclude sidebar and file uploader buttons, but include download buttons */
             button:not([data-testid="stSidebar"] button):not([data-testid*="FileUploader"] button),
             .stButton > button:not([data-testid="stSidebar"] .stButton > button):not([data-testid*="FileUploader"] button),
-            [data-baseweb="button"]:not([data-testid="stSidebar"] [data-baseweb="button"]):not([data-testid*="FileUploader"] [data-baseweb="button"]) {
+            [data-baseweb="button"]:not([data-testid="stSidebar"] [data-baseweb="button"]):not(
+                [data-testid*="FileUploader"] [data-baseweb="button"]
+            ) {
                 border-color: #4313C8 !important;
                 outline: none !important;
             }
-            
+
             /* File uploader buttons - purple with white text (keep special styling) */
             [data-testid="stFileUploader"] button,
             [data-testid="stFileUploader"] [data-baseweb="button"],
@@ -2330,7 +2345,7 @@ def main():
                 font-weight: 400 !important;
                 padding: 0.5rem 1rem !important;
             }
-            
+
             [data-testid="stFileUploader"] button:hover,
             [data-testid="stFileUploader"] [data-baseweb="button"]:hover,
             .stFileUploader button:hover {
@@ -2338,7 +2353,7 @@ def main():
                 color: #ffffff !important;
                 border: 2px solid #979DF6 !important;
             }
-            
+
             [data-testid="stFileUploader"] button:active,
             [data-testid="stFileUploader"] button:focus,
             [data-testid="stFileUploader"] [data-baseweb="button"]:active,
@@ -2349,10 +2364,10 @@ def main():
                 border: 2px solid #4313C8 !important;
                 outline: none !important;
             }
-            
+
             /* Download buttons - use main content button style (white background, purple text) */
             /* They inherit from .stButton > button above, no special override needed */
-            
+
             /* Secondary buttons - transparent with purple border */
             button[data-baseweb="button"][kind="secondary"],
             [data-baseweb="button"][kind="secondary"],
@@ -2363,14 +2378,14 @@ def main():
                 border-radius: 6px !important;
                 font-family: 'Cousine', monospace !important;
             }
-            
+
             button[data-baseweb="button"][kind="secondary"]:hover,
             [data-baseweb="button"][kind="secondary"]:hover,
             button.kind-secondary:hover {
                 background-color: #4313C8 !important;
                 color: #ffffff !important;
             }
-            
+
             /* Checkboxes - purple accent, remove ALL orange, make checkmark visible */
             .stCheckbox > label > span[data-baseweb="checkbox"],
             span[data-baseweb="checkbox"],
@@ -2382,7 +2397,7 @@ def main():
                 width: 18px !important;
                 height: 18px !important;
             }
-            
+
             .stCheckbox > label > span[data-baseweb="checkbox"][aria-checked="true"],
             span[data-baseweb="checkbox"][aria-checked="true"],
             [data-baseweb="checkbox"][aria-checked="true"],
@@ -2390,7 +2405,7 @@ def main():
                 background-color: #4313C8 !important;
                 border-color: #4313C8 !important;
             }
-            
+
             /* Make checkmark visible - white checkmark on purple background */
             .stCheckbox > label > span[data-baseweb="checkbox"][aria-checked="true"] svg,
             span[data-baseweb="checkbox"][aria-checked="true"] svg,
@@ -2402,7 +2417,7 @@ def main():
                 visibility: visible !important;
                 opacity: 1 !important;
             }
-            
+
             /* Alternative checkmark using CSS if SVG doesn't work */
             .stCheckbox > label > span[data-baseweb="checkbox"][aria-checked="true"]::after,
             span[data-baseweb="checkbox"][aria-checked="true"]::after {
@@ -2417,7 +2432,7 @@ def main():
                 transform: translate(-50%, -50%) !important;
                 line-height: 1 !important;
             }
-            
+
             /* Make checkmark visible in Streamlit's internal checkboxes */
             span.st-bi[aria-checked="true"] svg,
             span[class*="st-bi"][aria-checked="true"] svg {
@@ -2427,19 +2442,19 @@ def main():
                 visibility: visible !important;
                 opacity: 1 !important;
             }
-            
+
             /* Question checkboxes - make them visible like in screen design */
             .stCheckbox {
                 margin-bottom: 12px !important;
                 width: 100% !important;
                 max-width: 100% !important;
             }
-            
+
             .stCheckbox > div {
                 width: 100% !important;
                 max-width: 100% !important;
             }
-            
+
             .stCheckbox label {
                 display: flex !important;
                 flex-direction: row !important;
@@ -2450,7 +2465,7 @@ def main():
                 font-family: 'Cousine', monospace !important;
                 box-sizing: border-box !important;
             }
-            
+
             .stCheckbox label > span[data-baseweb="checkbox"] {
                 min-width: 18px !important;
                 width: 18px !important;
@@ -2463,7 +2478,7 @@ def main():
                 opacity: 1 !important;
                 margin-top: 2px !important;
             }
-            
+
             /* Fix markdown container - ensure horizontal text and proper responsive layout */
             .stCheckbox label [data-testid="stMarkdownContainer"] {
                 writing-mode: horizontal-tb !important;
@@ -2478,7 +2493,7 @@ def main():
                 overflow: visible !important;
                 box-sizing: border-box !important;
             }
-            
+
             .stCheckbox label [data-testid="stMarkdownContainer"] p {
                 writing-mode: horizontal-tb !important;
                 text-orientation: mixed !important;
@@ -2498,7 +2513,7 @@ def main():
                 word-wrap: break-word !important;
                 box-sizing: border-box !important;
             }
-            
+
             /* Remove any background or border from checkbox label elements */
             .stCheckbox label,
             .stCheckbox label *,
@@ -2512,7 +2527,7 @@ def main():
                 outline: none !important;
                 box-shadow: none !important;
             }
-            
+
             /* Remove borders from markdown container specifically */
             .stCheckbox label [data-testid="stMarkdownContainer"],
             .stCheckbox label [data-testid="stMarkdownContainer"] *,
@@ -2523,7 +2538,7 @@ def main():
                 box-shadow: none !important;
                 background-color: transparent !important;
             }
-            
+
             /* Prevent text fragmentation in checkbox labels */
             .stCheckbox label [data-testid="stMarkdownContainer"] * {
                 word-break: normal !important;
@@ -2532,7 +2547,7 @@ def main():
                 background-color: transparent !important;
                 border: none !important;
             }
-            
+
             /* Ensure checkbox container doesn't break text */
             .stCheckbox > div,
             .stCheckbox > div > div {
@@ -2541,17 +2556,17 @@ def main():
                 background-color: transparent !important;
                 border: none !important;
             }
-            
+
             /* Remove borders from all checkbox-related elements */
             .stCheckbox * {
                 border: none !important;
             }
-            
+
             /* But keep the checkbox itself visible */
             .stCheckbox label > span[data-baseweb="checkbox"] {
                 border: 2px solid #4313C8 !important;
             }
-            
+
             /* Ensure all checkboxes are visible */
             input[type="checkbox"] {
                 width: 18px !important;
@@ -2560,7 +2575,7 @@ def main():
                 opacity: 1 !important;
                 display: block !important;
             }
-            
+
             /* Remove orange from Streamlit's internal checkbox elements */
             span.st-bi,
             span[class*="st-bi"],
@@ -2578,13 +2593,13 @@ def main():
                 background-color: transparent !important;
                 border: 2px solid #4313C8 !important;
             }
-            
+
             span.st-bi[aria-checked="true"],
             span[class*="st-bi"][aria-checked="true"] {
                 background-color: #4313C8 !important;
                 border-color: #4313C8 !important;
             }
-            
+
             /* Make checkmark visible in Streamlit's internal checkboxes */
             span.st-bi[aria-checked="true"]::after,
             span[class*="st-bi"][aria-checked="true"]::after {
@@ -2594,12 +2609,12 @@ def main():
                 font-weight: bold !important;
                 display: block !important;
             }
-            
+
             /* Force remove #FF4B4B (Streamlit's default orange) from ALL elements */
             * {
                 --primary-color: #4313C8 !important;
             }
-            
+
             /* Remove orange from ALL elements with #FF4B4B */
             div[style*="#FF4B4B"],
             span[style*="#FF4B4B"],
@@ -2613,7 +2628,7 @@ def main():
                 border-color: #4313C8 !important;
                 color: #4313C8 !important;
             }
-            
+
             /* Remove orange from Streamlit's internal div classes */
             div[class*="st-cu"],
             div[class*="st-cl"],
@@ -2629,51 +2644,51 @@ def main():
                 background-color: transparent !important;
                 border-color: transparent !important;
             }
-            
+
             /* Specifically hide the orange line element */
             div.st-cu.st-cl.st-f6.st-f7.st-f8.st-f9.st-fo.st-fp.st-b0.st-fq.st-fr {
                 display: none !important;
                 background-color: transparent !important;
                 border-color: transparent !important;
             }
-            
+
             /* Radio buttons - purple accent */
             .stRadio > label > div[data-baseweb="radio"] > div {
                 background-color: transparent !important;
                 border-color: #4313C8 !important;
             }
-            
+
             .stRadio > label > div[data-baseweb="radio"][aria-checked="true"] > div:first-child {
                 background-color: #4313C8 !important;
             }
-            
+
             /* Number input buttons */
             .stNumberInput button {
                 color: #4313C8 !important;
                 background-color: transparent !important;
             }
-            
+
             .stNumberInput button:hover {
                 background-color: rgba(67, 19, 200, 0.1) !important;
             }
-            
+
             /* Tabs - remove orange/red underline completely */
             .stTabs [data-baseweb="tab"] {
                 color: #170843 !important;
             }
-            
+
             .stTabs [aria-selected="true"],
             .stTabs [aria-selected="true"] [data-baseweb="tab"] {
                 color: #4313C8 !important;
                 border-bottom-color: #4313C8 !important;
             }
-            
+
             /* Remove all orange/red Streamlit defaults from tabs */
             [data-baseweb="tab"][aria-selected="true"],
             [data-baseweb="tab-list"] [aria-selected="true"] {
                 border-bottom: 2px solid #4313C8 !important;
             }
-            
+
             /* Remove orange from tab indicators and underlines */
             .stTabs [aria-selected="true"]::after,
             .stTabs [aria-selected="true"]::before,
@@ -2682,57 +2697,57 @@ def main():
                 background-color: #4313C8 !important;
                 border-color: #4313C8 !important;
             }
-            
+
             /* Target Streamlit's internal tab styling */
             div[class*="stTabs"] [aria-selected="true"],
             div[class*="stTabs"] [aria-selected="true"] > div {
                 border-bottom-color: #4313C8 !important;
             }
-            
+
             /* Remove any orange borders/lines from tabs */
             .stTabs * {
                 border-color: transparent !important;
             }
-            
+
             .stTabs [aria-selected="true"] * {
                 border-bottom-color: #4313C8 !important;
             }
-            
+
             /* Progress bars */
             .stProgress > div > div > div {
                 background-color: #4313C8 !important;
             }
-            
+
             /* Sliders */
             [data-baseweb="slider"] [data-baseweb="slider-track"] {
                 background-color: #4313C8 !important;
             }
-            
+
             [data-baseweb="slider"] [data-baseweb="slider-handle"] {
                 background-color: #4313C8 !important;
                 border-color: #4313C8 !important;
             }
-            
+
             /* File uploader */
             [data-testid="stFileUploader"] button {
                 background-color: #4313C8 !important;
                 color: #ffffff !important;
             }
-            
+
             /* Remove any orange from links */
             a:link, a:visited {
                 color: #4313C8 !important;
             }
-            
+
             a:hover {
                 color: #979DF6 !important;
             }
-            
+
             /* Expander icons */
             .streamlit-expanderHeader {
                 color: #4313C8 !important;
             }
-            
+
             /* Header - remove orange/red bar at top */
             [data-testid="stHeader"],
             [data-testid="stHeader"] > div,
@@ -2740,14 +2755,14 @@ def main():
                 background-color: transparent !important;
                 border-bottom: none !important;
             }
-            
+
             /* Remove orange from progress bars */
             [data-baseweb="progressbar"],
             [data-baseweb="progressbar"] > div,
             [data-baseweb="progressbar"] > div > div {
                 background-color: #4313C8 !important;
             }
-            
+
             /* Remove orange from any remaining Streamlit elements */
             [style*="rgb(255, 75, 75)"],
             [style*="rgb(255, 107, 107)"],
@@ -2761,7 +2776,7 @@ def main():
                 background-color: #4313C8 !important;
                 border-color: #4313C8 !important;
             }
-            
+
             /* Force remove orange backgrounds */
             div[style*="background"][style*="255, 75"],
             div[style*="background"][style*="255, 107"],
@@ -2769,12 +2784,12 @@ def main():
             div[style*="background"][style*="#ff6b"] {
                 background-color: transparent !important;
             }
-            
+
             /* Links */
             a {
                 color: #4313C8 !important;
             }
-            
+
             /* Footer styling - in sidebar at bottom */
             [data-testid="stSidebar"] .footer {
                 text-align: center;
@@ -2783,11 +2798,11 @@ def main():
                 border-top: 1px solid rgba(67, 19, 200, 0.1);
                 margin-top: 20px;
             }
-            
+
             [data-testid="stSidebar"] .footer a {
                 color: #4313C8 !important;
             }
-            
+
             [data-testid="stSidebar"] .footer img {
                 height: 25px;
                 max-width: 100%;
@@ -2796,25 +2811,25 @@ def main():
                 margin-right: 8px;
                 object-fit: contain;
             }
-            
+
             [data-testid="stSidebar"] .footer {
                 overflow: visible;
                 word-wrap: break-word;
             }
-            
+
             [data-testid="stSidebar"] .footer p {
                 margin: 4px 0;
                 color: #7872A7;
                 font-size: 11px;
             }
-            
+
             </style>
             """
 
             st.markdown(custom_css, unsafe_allow_html=True)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Fallback if theme detection fails
-            logger.warning(f"Could not apply custom theme: {str(e)}")
+            logger.warning(f"Could not apply custom theme: {e!s}")
 
         # Initialize analyzer with default question set
         try:
@@ -2823,8 +2838,8 @@ def main():
                 st.session_state.analyzer = ReportAnalyzer()
             analyzer = st.session_state.analyzer  # Use the stored analyzer
 
-        except Exception as e:
-            st.error(f"Error initializing analyzer: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            st.error(f"Error initializing analyzer: {e!s}")
             st.exception(e)
             return
 
@@ -2837,15 +2852,15 @@ def main():
                     st.sidebar.markdown(
                         f"""
                         <div style="text-align: center; padding: 10px 20px 30px 20px; margin-bottom: 20px;">
-                            <img src="data:image/svg+xml;base64,{logo_data}" 
-                                 alt="Open Sustainability Analyst" 
+                            <img src="data:image/svg+xml;base64,{logo_data}"
+                                 alt="Open Sustainability Analyst"
                                  style="width: 90%; max-width: 200px; height: auto;" />
                         </div>
                         """,
                         unsafe_allow_html=True,
                     )
-        except Exception as e:
-            logger.warning(f"Could not load sidebar logo: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Could not load sidebar logo: {e!s}")
 
         # Create sidebar navigation using streamlit-option-menu
         st.sidebar.markdown("---")
@@ -2964,7 +2979,7 @@ def main():
 
                 if not has_env_openai or override_openai:
                     # Track previous values to detect changes
-                    prev_openai_key = st.session_state.get("prev_openai_key", current_openai_key)
+                    st.session_state.get("prev_openai_key", current_openai_key)
 
                     # OpenAI API Key input
                     openai_key_input = st.text_input(
@@ -3017,7 +3032,7 @@ def main():
 
                 if not has_env_google or override_google:
                     # Track previous values to detect changes
-                    prev_google_key = st.session_state.get("prev_google_key", current_google_key)
+                    st.session_state.get("prev_google_key", current_google_key)
 
                     # Google/Gemini API Key input
                     google_key_input = st.text_input(
@@ -3025,7 +3040,10 @@ def main():
                         value="",  # Never show the actual key in the input
                         type="password",
                         key="google_api_key_input",
-                        help="Enter your Google API key to use Gemini models. Leave empty to use existing key from environment.",
+                        help=(
+                            "Enter your Google API key to use Gemini models. "
+                            "Leave empty to use existing key from environment."
+                        ),
                         placeholder=("Enter your Google API key" if not current_google_key else "Enter new key to update"),
                     )
 
@@ -3076,7 +3094,9 @@ def main():
                 database_url = f"sqlite:///{db_path}"
                 database_type = "SQLite"
                 st.info(
-                    f"**Type:** {database_type}\n\n**Path:** `{db_path}`\n\n*Configure via `STORAGE_PATH` environment variable*"
+                    f"**Type:** {database_type}\n\n"
+                    f"**Path:** `{db_path}`\n\n"
+                    "*Configure via `STORAGE_PATH` environment variable*"
                 )
             else:
                 # Parse PostgreSQL URL to show connection details (masked)
@@ -3120,19 +3140,30 @@ def main():
                                     db = "?"
 
                             st.info(
-                                f"**Type:** {database_type}\n\n**Host:** `{host}`\n**Port:** `{port}`\n**Database:** `{db}`\n**User:** `{user}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                                f"**Type:** {database_type}\n\n"
+                                f"**Host:** `{host}`\n"
+                                f"**Port:** `{port}`\n"
+                                f"**Database:** `{db}`\n"
+                                f"**User:** `{user}`\n\n"
+                                "*Configure via `DATABASE_URL` environment variable*"
                             )
                         else:
                             st.info(
-                                f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                                f"**Type:** {database_type}\n\n"
+                                f"**Connection:** `{masked_url}`\n\n"
+                                "*Configure via `DATABASE_URL` environment variable*"
                             )
                     else:
                         st.info(
-                            f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                            f"**Type:** {database_type}\n\n"
+                            f"**Connection:** `{masked_url}`\n\n"
+                            "*Configure via `DATABASE_URL` environment variable*"
                         )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     st.info(
-                        f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                        f"**Type:** {database_type}\n\n"
+                        f"**Connection:** `{masked_url}`\n\n"
+                        "*Configure via `DATABASE_URL` environment variable*"
                     )
 
             # Store in session state for use by DocumentAnalyzer
@@ -3222,7 +3253,10 @@ def main():
                     "Store files in PostgreSQL",
                     value=st.session_state.get("postgres_file_storage_enabled", False),
                     key="use_postgres_file_storage",
-                    help="Store uploaded files in PostgreSQL database (useful for Heroku deployments). Files are stored as BYTEA/BLOB. This is an enterprise feature.",
+                    help=(
+                        "Store uploaded files in PostgreSQL database (useful for Heroku deployments). "
+                        "Files are stored as BYTEA/BLOB. This is an enterprise feature."
+                    ),
                 )
                 # Store in a separate key that persists across page navigation
                 st.session_state.postgres_file_storage_enabled = use_postgres_storage
@@ -3421,7 +3455,10 @@ def main():
                         <strong>Processing Steps</strong>
                         <i class="material-icons help-icon">help_outline</i>
                         <div class="help-tooltip">
-                            You can choose if you want to first only cut the report in pieces (Chunking), make it searchable (Embedding), map text to questions (Question Mapping), or answer the questions (Question Answering). Note: Answering questions incurs LLM API costs.
+                            You can choose if you want to first only cut the report in pieces (Chunking),
+                            make it searchable (Embedding), map text to questions (Question Mapping),
+                            or answer the questions (Question Answering). Note: Answering questions
+                            incurs LLM API costs.
                         </div>
                     </div>
                     """,
@@ -3456,17 +3493,17 @@ def main():
                                     # For backend resources, use URN for step status check
                                     try:
                                         step_status = analyzer.analyzer.check_step_completion(selected_uri)
-                                    except Exception as e:
-                                        logger.warning(f"Error checking step completion: {str(e)}")
+                                    except Exception as e:  # noqa: BLE001
+                                        logger.warning(f"Error checking step completion: {e!s}")
                                 else:
                                     file_path_for_status = Path(selected_file_obj["path"])
                                     if file_path_for_status.exists():
                                         try:
                                             step_status = analyzer.analyzer.check_step_completion(str(file_path_for_status))
-                                        except Exception as e:
-                                            logger.warning(f"Error checking step completion: {str(e)}")
-                        except Exception as e:
-                            logger.warning(f"Error getting step status: {str(e)}")
+                                        except Exception as e:  # noqa: BLE001
+                                            logger.warning(f"Error checking step completion: {e!s}")
+                        except Exception as e:  # noqa: BLE001
+                            logger.warning(f"Error getting step status: {e!s}")
 
                     # Define processing steps with shorter labels
                     step_options = ["Chunk", "Embed", "Map", "Answer"]
@@ -3495,7 +3532,7 @@ def main():
                         font-size: 14px !important;
                         font-family: 'Afacad', sans-serif !important;
                     }
-                    
+
                     /* Make all slider tick labels visible */
                     [data-baseweb="slider"] [role="slider"] ~ div,
                     [data-baseweb="slider"] div[role="slider"] ~ div,
@@ -3576,8 +3613,8 @@ def main():
                                 )
                                 # check_cache_status returns a list of tuples, so check if it has any entries
                                 has_stored_data = bool(cache_entries) and len(cache_entries) > 0
-                        except Exception as e:
-                            logger.debug(f"Error checking stored data: {str(e)}")
+                        except Exception as e:  # noqa: BLE001
+                            logger.debug(f"Error checking stored data: {e!s}")
                             has_stored_data = False
 
                     for idx, step_short in enumerate(step_options):
@@ -3595,18 +3632,29 @@ def main():
                                     "background-color: rgba(192, 196, 250, 0.1); border: 1px solid #4313C8; color: #4313C8;"
                                 )
                             else:
-                                highlight_style = "background-color: rgba(192, 196, 250, 0.05); border: 1px solid rgba(67, 19, 200, 0.3); color: #718096;"
+                                highlight_style = (
+                                    "background-color: rgba(192, 196, 250, 0.05); "
+                                    "border: 1px solid rgba(67, 19, 200, 0.3); "
+                                    "color: #718096;"
+                                )
 
                             # Add status badge next to Chunking step - always show
                             status_badge = ""
                             if step_short == "Chunk":
                                 badge_text = "Stored" if has_stored_data else "New"
                                 badge_bg = "rgba(192, 196, 250, 0.3)" if has_stored_data else "rgba(192, 196, 250, 0.15)"
-                                status_badge = f"<span style=\"background-color: {badge_bg}; color: #4313C8; border: 1px solid #4313C8; border-radius: 12px; padding: 2px 8px; font-size: 9px; margin-left: 6px; font-family: 'Cousine', monospace; display: inline-block;\">{badge_text}</span>"
+                                status_badge = (
+                                    f'<span style="background-color: {badge_bg}; '
+                                    "color: #4313C8; border: 1px solid #4313C8; "
+                                    "border-radius: 12px; padding: 2px 8px; font-size: 9px; "
+                                    "margin-left: 6px; font-family: 'Cousine', monospace; "
+                                    f'display: inline-block;">{badge_text}</span>'
+                                )
 
                             st.markdown(
                                 f"""
-                            <div style="{highlight_style} border-radius: 8px; padding: 0.5rem; text-align: center; font-size: 11px; font-family: 'Afacad', sans-serif;">
+                            <div style="{highlight_style} border-radius: 8px; padding: 0.5rem; text-align: center;
+                                font-size: 11px; font-family: 'Afacad', sans-serif;">
                                 <span>{indicator} {step_full}</span>{status_badge}
                             </div>
                             """,
@@ -3621,7 +3669,7 @@ def main():
                     adv_col1, adv_col2 = st.columns(2)
 
                     with adv_col1:
-                        new_top_k = st.number_input(
+                        st.number_input(
                             "Top K",
                             min_value=1,
                             max_value=20,
@@ -3630,7 +3678,7 @@ def main():
                             on_change=update_analyzer_parameters,
                         )
 
-                        new_chunk_size = st.number_input(
+                        st.number_input(
                             "Chunk Size",
                             min_value=100,
                             max_value=2000,
@@ -3639,7 +3687,7 @@ def main():
                             on_change=update_analyzer_parameters,
                         )
 
-                        new_overlap = st.number_input(
+                        st.number_input(
                             "Overlap",
                             min_value=0,
                             max_value=100,
@@ -3655,7 +3703,7 @@ def main():
                             selected_index = (
                                 available_llm_models.index(current_model) if current_model in available_llm_models else 0
                             )
-                            new_llm_model = st.selectbox(
+                            st.selectbox(
                                 "LLM Model",
                                 options=available_llm_models,
                                 index=selected_index,
@@ -3670,14 +3718,14 @@ def main():
                                 disabled=True,
                             )
 
-                        new_llm_scoring = st.checkbox(
+                        st.checkbox(
                             "LLM Scoring",
                             value=False,
                             key="new_llm_scoring",
                             on_change=update_analyzer_parameters,
                         )
 
-                        new_batch_scoring = st.checkbox(
+                        st.checkbox(
                             "Batch Scoring",
                             value=True,
                             key="new_batch_scoring",
@@ -3873,7 +3921,7 @@ def main():
                     if analyze_clicked or reanalyze_clicked:
                         # NOW sync the selection state from the widget
                         # Get selected questions from the edited dataframe
-                        selected_questions = edited_df[edited_df["Select"] == True]["QID"].tolist()
+                        selected_questions = edited_df[edited_df["Select"] is True]["QID"].tolist()
 
                         # Update session state for individual question checkboxes (for backward compatibility)
                         for q_id in questions.keys():
@@ -3968,8 +4016,8 @@ def main():
 
                                             progress_text.success("Analysis complete!")
 
-                                        except Exception as e:
-                                            st.error(f"Error during analysis: {str(e)}")
+                                        except Exception as e:  # noqa: BLE001
+                                            st.error(f"Error during analysis: {e!s}")
                                             st.exception(e)
 
                                     # Get final results
@@ -3990,10 +4038,10 @@ def main():
 
                             except Exception as e:
                                 logger.error(
-                                    f"Error during analysis: {str(e)}",
+                                    f"Error during analysis: {e!s}",
                                     exc_info=True,
                                 )
-                                st.error(f"Error during analysis: {str(e)}")
+                                st.error(f"Error during analysis: {e!s}")
                 else:
                     # Show helpful error message
                     if file_path is None:
@@ -4068,8 +4116,19 @@ def main():
                 <div class="upload-icon-box">
                     <i class="material-icons">cloud_upload</i>
                 </div>
-                <h1 style="color: #4313C8; font-family: 'Afacad', sans-serif; font-weight: 700; margin: 0 0 20px 0; font-size: 32px;">Upload your Sustainability Report</h1>
-                <p style="color: #718096; font-family: 'Cousine', monospace; font-size: 14px; margin: 0 0 40px 0; line-height: 1.5;">Drag and drop your file here, or click to browse.<br>PDF only, limited to 200MB</p>
+                <h1
+                    style="color: #4313C8; font-family: 'Afacad', sans-serif; font-weight: 700;
+                    margin: 0 0 20px 0; font-size: 32px;"
+                >
+                    Upload your Sustainability Report
+                </h1>
+                <p
+                    style="color: #718096; font-family: 'Cousine', monospace; font-size: 14px;
+                    margin: 0 0 40px 0; line-height: 1.5;"
+                >
+                    Drag and drop your file here, or click to browse.<br>
+                    PDF only, limited to 200MB
+                </p>
             </div>
             """,
                 unsafe_allow_html=True,
@@ -4266,7 +4325,7 @@ def main():
                                 f"[ENTERPRISE] Error in S3+NATS upload: {e}",
                                 exc_info=True,
                             )
-                            st.error(f"Error uploading via S3+NATS: {str(e)}")
+                            st.error(f"Error uploading via S3+NATS: {e!s}")
                             st.info("Falling back to local processing...")
                             # Fall through to local processing
                             use_s3_upload = False
@@ -4297,7 +4356,7 @@ def main():
 
             # Initialize selected_set from session state if available
             if "consolidated_set" not in st.session_state:
-                st.session_state.consolidated_set = list(question_sets.keys())[0] if question_sets else None
+                st.session_state.consolidated_set = next(iter(question_sets.keys())) if question_sets else None
 
             # 1. Question set and report selectors side by side (green containers)
             col1, col2 = st.columns([1, 1])
@@ -4456,7 +4515,10 @@ def main():
                                 # Create clickable card
                                 clicked = card(
                                     title=model_display,
-                                    text=f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · Top-K: {config['top_k']}",
+                                    text=(
+                                        f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · "
+                                        f"Top-K: {config['top_k']}"
+                                    ),
                                     key=f"config_card_{idx}",
                                     styles={
                                         "card": {
@@ -4551,7 +4613,7 @@ def main():
             except ImportError as e:
                 st.error(f"Benchmarking functionality not available: {e}")
                 st.exception(e)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 st.error(f"Error loading benchmarking interface: {e}")
 
         # Add Climate+Tech footer at the bottom of sidebar
@@ -4572,22 +4634,31 @@ def main():
             else:
                 # Fallback if logo file doesn't exist
                 logo_src = ""
-        except Exception as e:
-            logger.warning(f"Could not load logo: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Could not load logo: {e!s}")
             logo_src = ""
 
         # Add footer to sidebar
         st.sidebar.markdown("---")
         footer = f"""
         <div class="footer">
-            {f'<img src="{logo_src}" alt="Climate+Tech Logo" style="height: 25px; max-width: 100%; width: auto; vertical-align: middle; margin-right: 8px; object-fit: contain;">' if logo_src else ''}
+            {(
+                f'<img src="{logo_src}" alt="Climate+Tech Logo" '
+                'style="height: 25px; max-width: 100%; width: auto; '
+                'vertical-align: middle; margin-right: 8px; object-fit: contain;">'
+                if logo_src
+                else ""
+            )}
             <p>Climate+Tech Sustainability Report Analysis Tool</p>
-            <p>For custom tool development contact us at <a href="https://www.climateandtech.com" target="_blank">www.climateandtech.com</a></p>
+            <p>
+                For custom tool development contact us at
+                <a href="https://www.climateandtech.com" target="_blank">www.climateandtech.com</a>
+            </p>
         </div>
         """
         st.sidebar.markdown(footer, unsafe_allow_html=True)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         st.error("Error during analysis:")
         st.exception(e)
 

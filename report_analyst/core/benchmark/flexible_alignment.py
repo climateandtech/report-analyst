@@ -1,10 +1,9 @@
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 import pandas as pd
 
-from .dataset_mapper import generate_chunk_id, generate_query_id
 from .dataset_normalizer import (
     make_chunk_id_from_text,
     make_query_id_from_columns,
@@ -100,7 +99,7 @@ def align_ground_truth_flexible(df: pd.DataFrame, config: GroundTruthAlignConfig
         def _parse_score(val: Any) -> float:
             try:
                 return float(str(val).strip())
-            except Exception:
+            except (TypeError, ValueError):
                 return 0.0
 
         out["score"] = out[primary_label].apply(_parse_score)
@@ -234,8 +233,8 @@ def align_benchmark_flexible(df: pd.DataFrame, config: BenchmarkAlignConfig) -> 
 
 
 __all__ = [
-    "GroundTruthAlignConfig",
     "BenchmarkAlignConfig",
-    "align_ground_truth_flexible",
+    "GroundTruthAlignConfig",
     "align_benchmark_flexible",
+    "align_ground_truth_flexible",
 ]

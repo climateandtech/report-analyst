@@ -3,7 +3,7 @@ import json
 import logging
 import sqlite3
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from ...models.benchmark import (
     BenchmarkDataset,
@@ -111,7 +111,7 @@ class BenchmarkStore:
             # Insert dataset metadata
             cursor = conn.execute(
                 """
-                INSERT OR REPLACE INTO benchmark_datasets 
+                INSERT OR REPLACE INTO benchmark_datasets
                 (dataset_id, name, description, version, question_set, file_path, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
@@ -136,7 +136,7 @@ class BenchmarkStore:
                 for chunk in question.ground_truth_chunks:
                     conn.execute(
                         """
-                        INSERT INTO ground_truth_chunks 
+                        INSERT INTO ground_truth_chunks
                         (dataset_id, question_id, chunk_id, relevance_score, is_evidence, evidence_order, annotation_notes)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
@@ -216,8 +216,8 @@ class BenchmarkStore:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT question_id, chunk_id, relevance_score 
-                FROM ground_truth_chunks 
+                SELECT question_id, chunk_id, relevance_score
+                FROM ground_truth_chunks
                 WHERE dataset_id = ?
             """,
                 (dataset_id,),
@@ -241,7 +241,7 @@ class BenchmarkStore:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO benchmark_evaluations 
+                INSERT INTO benchmark_evaluations
                 (dataset_id, evaluation_name, config_hash, retrieval_config, evaluation_metrics)
                 VALUES (?, ?, ?, ?, ?)
             """,
@@ -295,8 +295,8 @@ class BenchmarkStore:
             if dataset_id:
                 cursor = conn.execute(
                     """
-                    SELECT * FROM benchmark_evaluations 
-                    WHERE dataset_id = ? 
+                    SELECT * FROM benchmark_evaluations
+                    WHERE dataset_id = ?
                     ORDER BY created_at DESC
                 """,
                     (dataset_id,),
@@ -304,7 +304,7 @@ class BenchmarkStore:
             else:
                 cursor = conn.execute(
                     """
-                    SELECT * FROM benchmark_evaluations 
+                    SELECT * FROM benchmark_evaluations
                     ORDER BY created_at DESC
                 """
                 )
@@ -333,8 +333,8 @@ class BenchmarkStore:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 """
-                INSERT OR REPLACE INTO human_annotations 
-                (evaluation_id, question_id, chunk_id, human_relevance_score, 
+                INSERT OR REPLACE INTO human_annotations
+                (evaluation_id, question_id, chunk_id, human_relevance_score,
                  human_is_evidence, human_evidence_order, annotation_notes, annotator_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -359,8 +359,8 @@ class BenchmarkStore:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT * FROM human_annotations 
-                WHERE evaluation_id = ? 
+                SELECT * FROM human_annotations
+                WHERE evaluation_id = ?
                 ORDER BY created_at DESC
             """,
                 (evaluation_id,),
@@ -390,7 +390,8 @@ class BenchmarkStore:
         with sqlite3.connect(self.db_path) as conn:
             # Delete in order due to foreign key constraints
             conn.execute(
-                "DELETE FROM human_annotations WHERE evaluation_id IN (SELECT id FROM benchmark_evaluations WHERE dataset_id = ?)",
+                "DELETE FROM human_annotations WHERE evaluation_id IN "
+                "(SELECT id FROM benchmark_evaluations WHERE dataset_id = ?)",
                 (dataset_id,),
             )
             conn.execute("DELETE FROM benchmark_evaluations WHERE dataset_id = ?", (dataset_id,))

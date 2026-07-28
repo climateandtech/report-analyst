@@ -1,13 +1,11 @@
 import logging
-from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 
 from ...models.benchmark import (
     BenchmarkDataset,
     BenchmarkDatasetContent,
-    BenchmarkEvaluation,
     DatasetType,
     EvaluationMetrics,
     RetrievalConfig,
@@ -510,7 +508,8 @@ class EvaluationEngine:
             metrics.mean_reciprocal_rank = exact_match_rate if exact_matches > 0 else 0.0
 
         logger.info(
-            f"IE comparison complete. Exact match rate: {exact_matches}/{total_queries} = {metrics.precision_at_k.get(1, 0.0):.3f}"
+            "IE comparison complete. Exact match rate: "
+            f"{exact_matches}/{total_queries} = {metrics.precision_at_k.get(1, 0.0):.3f}"
         )
 
         return metrics

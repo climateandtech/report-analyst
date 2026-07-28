@@ -132,6 +132,8 @@ class GroundTruthChunk(BaseModel):
     is_evidence: bool = Field(..., description="Whether this chunk is evidence")
     evidence_order: Optional[int] = Field(None, description="Order of evidence if applicable")
     annotation_notes: Optional[str] = Field(None, description="Notes about this annotation")
+    text: Optional[str] = Field(None, description="Optional chunk text for error analysis")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional chunk metadata")
 
 
 class BenchmarkQuestion(BaseModel):

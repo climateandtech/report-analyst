@@ -8,10 +8,7 @@ Comprehensive test suite for external service integration flow:
 - Analysis request and result delivery
 """
 
-import json
-import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from aioresponses import aioresponses
@@ -205,7 +202,7 @@ class TestExternalServiceClient:
     @pytest.mark.asyncio
     async def test_notify_ready_nats(self, external_client):
         """Test notifying via NATS"""
-        with patch.object(external_client, "connect_nats") as mock_connect:
+        with patch.object(external_client, "connect_nats"):
             with patch.object(external_client, "js") as mock_js:
                 mock_js.publish = AsyncMock()
                 external_client.nc = Mock()
@@ -284,7 +281,7 @@ class TestExternalServiceDelivery:
     @pytest.mark.asyncio
     async def test_deliver_results_nats(self, external_delivery):
         """Test delivering results via NATS"""
-        with patch.object(external_delivery, "connect_nats") as mock_connect:
+        with patch.object(external_delivery, "connect_nats"):
             with patch.object(external_delivery, "js") as mock_js:
                 mock_js.publish = AsyncMock()
                 external_delivery.nc = Mock()

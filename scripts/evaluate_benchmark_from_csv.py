@@ -32,12 +32,12 @@ project_root = script_dir.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-import argparse
-import json
-from typing import List, Optional
+import argparse  # noqa: E402
+import json  # noqa: E402
+from typing import List, Optional  # noqa: E402
 
-from report_analyst.core.benchmark.evaluation_engine import EvaluationEngine
-from report_analyst.core.benchmark.retrieval_results_loader import (
+from report_analyst.core.benchmark.evaluation_engine import EvaluationEngine  # noqa: E402
+from report_analyst.core.benchmark.retrieval_results_loader import (  # noqa: E402
     load_flexible_dataset_from_csv,
 )
 
@@ -67,7 +67,7 @@ def parse_args() -> argparse.Namespace:
         nargs="*",
         type=int,
         default=None,
-        help=("Optional list of K values for metrics (e.g. -k 1 3 5 10). " "Defaults to EvaluationEngine.default_k_values."),
+        help=("Optional list of K values for metrics (e.g. -k 1 3 5 10). Defaults to EvaluationEngine.default_k_values."),
     )
     parser.add_argument(
         "--output",
@@ -98,7 +98,7 @@ def print_metrics(metrics, k_values: Optional[List[int]] = None) -> None:
     print("\n================ Benchmark Evaluation Metrics ================")
 
     # MAP and MRR
-    print(f"\nOverall metrics:")
+    print("\nOverall metrics:")
     print(f"  MAP (mean_average_precision): {metrics.mean_average_precision:.4f}")
     print(f"  MRR (mean_reciprocal_rank):  {metrics.mean_reciprocal_rank:.4f}")
 

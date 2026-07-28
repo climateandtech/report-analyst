@@ -39,7 +39,7 @@ def test_init_db(temp_db):
     with sqlite3.connect(temp_db.db_path) as conn:
         cursor = conn.execute(
             """
-            SELECT name FROM sqlite_master 
+            SELECT name FROM sqlite_master
             WHERE type='table' AND (name='analysis_cache' OR name='document_chunks')
         """
         )
@@ -171,8 +171,8 @@ def test_multiple_questions(temp_db):
 
 def test_error_handling(temp_db):
     """Test error handling"""
-    # Test invalid JSON
-    with pytest.raises(Exception):
+    # Test invalid JSON / non-dict result (AttributeError on .get / json.dumps TypeError)
+    with pytest.raises(Exception):  # noqa: B017
         temp_db.save_analysis(
             "test.pdf",
             "tcfd_1",
@@ -181,7 +181,7 @@ def test_error_handling(temp_db):
         )
 
     # Test missing required config params
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         temp_db.get_analysis("test.pdf", {"chunk_size": 500})  # Missing required params
 
 
@@ -211,7 +211,6 @@ def test_cache_status(temp_db):
 def test_get_chunks_without_embeddings(temp_db):
     """Test get_chunks_without_embeddings method"""
     import sqlite3
-    from datetime import datetime
 
     import numpy as np
 
@@ -288,7 +287,6 @@ def test_get_chunks_without_embeddings(temp_db):
 def test_has_chunk_scoring(temp_db):
     """Test has_chunk_scoring method"""
     import sqlite3
-    from datetime import datetime
 
     import numpy as np
 
@@ -442,7 +440,7 @@ async def test_vector_store_reloads_on_chunk_size_change(temp_db):
     temp_db.save_vectors(file_path, chunks_diff_overlap)
 
     # Get similar chunks with different chunk_overlap
-    similar_chunks_diff_overlap = await temp_db.get_similar_chunks(
+    await temp_db.get_similar_chunks(
         query_embedding=query_embedding,
         file_path=file_path,
         top_k=2,

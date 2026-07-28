@@ -9,7 +9,6 @@ Downloads:
 Then compares them using the flexible benchmark evaluation system.
 """
 
-import os
 import sys
 import tempfile
 from pathlib import Path
@@ -25,7 +24,6 @@ from report_analyst.core.benchmark.evaluation_engine import EvaluationEngine
 from report_analyst.core.benchmark.retrieval_results_loader import (
     load_flexible_dataset_from_csv,
 )
-from report_analyst.models.benchmark import BenchmarkDataset, DatasetType
 
 
 def download_file_from_github(repo: str, file_path: str, output_path: Optional[str] = None, branch: str = "main") -> str:
@@ -89,7 +87,7 @@ def list_github_directory(repo: str, directory_path: str, branch: str = "main") 
             contents = [contents]
 
         return [item["name"] for item in contents if item["type"] == "file"]
-    except Exception as e:
+    except requests.RequestException as e:
         print(f"Warning: Could not list directory via API: {e}")
         return []
 
@@ -98,7 +96,7 @@ def find_data_files_in_directory(
     repo: str,
     directory_path: str,
     branch: str = "main",
-    extensions: list = [".csv", ".xlsx", ".xls"],
+    extensions: list | None = None,
 ) -> list:
     """
     Find data files (CSV, Excel) in a GitHub directory.
@@ -106,6 +104,8 @@ def find_data_files_in_directory(
     Returns:
         List of data file paths
     """
+    if extensions is None:
+        extensions = [".csv", ".xlsx", ".xls"]
     files = list_github_directory(repo, directory_path, branch)
     data_files = [f for f in files if any(f.endswith(ext) for ext in extensions)]
     return data_files
@@ -193,16 +193,16 @@ def download_climretrieve_datasets(data_dir: Path, repo: str = "tobischimanski/C
 
 def inspect_dataset_columns(csv_path: str) -> None:
     """Inspect and display dataset columns and sample rows"""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Inspecting dataset: {csv_path}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     df = pd.read_csv(csv_path, nrows=5)
     print(f"\nColumns: {list(df.columns)}")
     print(f"\nShape: {df.shape}")
-    print(f"\nFirst few rows:")
+    print("\nFirst few rows:")
     print(df.head())
-    print(f"\nData types:")
+    print("\nData types:")
     print(df.dtypes)
 
 
@@ -215,18 +215,18 @@ def run_climretrieve_benchmark(reference_path: str, input_path: str, k_values: O
         input_path: Path to input dataset CSV
         k_values: List of K values for evaluation
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Loading Datasets")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Inspect datasets first
     inspect_dataset_columns(reference_path)
     inspect_dataset_columns(input_path)
 
     # Load datasets
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Loading Reference Dataset (Expert-Annotated)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Check if we need to preprocess the CSV for ClimRetrieve format
     df_ref = pd.read_csv(reference_path, nrows=1)
@@ -245,7 +245,7 @@ def run_climretrieve_benchmark(reference_path: str, input_path: str, k_values: O
             # Use hash of Context text as chunk_id for better matching
             df_ref_full["chunk_id"] = df_ref_full["Context"].apply(
                 lambda x: (
-                    hashlib.md5(str(x).strip().encode()).hexdigest()[:16]
+                    hashlib.md5(str(x).strip().encode(), usedforsecurity=False).hexdigest()[:16]
                     if pd.notna(x) and str(x).strip()
                     else f"context_{hash(str(x)) % 10000}"
                 )
@@ -279,9 +279,9 @@ def run_climretrieve_benchmark(reference_path: str, input_path: str, k_values: O
     print(f"Dataset type: {reference_dataset.dataset_type}")
     print(f"Unique queries: {len(reference_dataset.get_unique_queries())}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Loading Input Dataset (Report-Level)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Check if we need to preprocess the CSV for ClimRetrieve format
     df_input = pd.read_csv(input_path, nrows=1)
@@ -308,7 +308,7 @@ def run_climretrieve_benchmark(reference_path: str, input_path: str, k_values: O
 
             df_input_full["chunk_id"] = content_col.apply(
                 lambda x: (
-                    hashlib.md5(str(x).strip().encode()).hexdigest()[:16]
+                    hashlib.md5(str(x).strip().encode(), usedforsecurity=False).hexdigest()[:16]
                     if pd.notna(x) and str(x).strip()
                     else f"para_{hash(str(x)) % 10000}"
                 )
@@ -341,9 +341,9 @@ def run_climretrieve_benchmark(reference_path: str, input_path: str, k_values: O
     print(f"Unique queries: {len(input_dataset.get_unique_queries())}")
 
     # Compare datasets
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Running Evaluation")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     engine = EvaluationEngine()
     metrics = engine.compare_flexible_datasets(
@@ -353,25 +353,25 @@ def run_climretrieve_benchmark(reference_path: str, input_path: str, k_values: O
     )
 
     # Display results
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Evaluation Results")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"\nMean Average Precision (MAP): {metrics.mean_average_precision:.4f}")
     print(f"Mean Reciprocal Rank (MRR): {metrics.mean_reciprocal_rank:.4f}")
 
-    print(f"\nPrecision@K:")
+    print("\nPrecision@K:")
     for k, score in sorted(metrics.precision_at_k.items()):
         print(f"  P@{k}: {score:.4f}")
 
-    print(f"\nRecall@K:")
+    print("\nRecall@K:")
     for k, score in sorted(metrics.recall_at_k.items()):
         print(f"  R@{k}: {score:.4f}")
 
-    print(f"\nF1@K:")
+    print("\nF1@K:")
     for k, score in sorted(metrics.f1_at_k.items()):
         print(f"  F1@{k}: {score:.4f}")
 
-    print(f"\nNDCG@K:")
+    print("\nNDCG@K:")
     for k, score in sorted(metrics.ndcg_at_k.items()):
         print(f"  NDCG@{k}: {score:.4f}")
 
@@ -427,7 +427,7 @@ def main():
         if args.reference_path and args.input_path:
             reference_path = args.reference_path
             input_path = args.input_path
-            print(f"Using provided datasets:")
+            print("Using provided datasets:")
             print(f"  Reference: {reference_path}")
             print(f"  Input: {input_path}")
         elif args.skip_download:
@@ -440,7 +440,7 @@ def main():
 
             reference_path = str(reference_files[0])
             input_path = str(input_files[0])
-            print(f"Using existing datasets:")
+            print("Using existing datasets:")
             print(f"  Reference: {reference_path}")
             print(f"  Input: {input_path}")
         else:
@@ -448,15 +448,15 @@ def main():
             reference_path, input_path = download_climretrieve_datasets(data_dir, args.repo)
 
         # Run benchmark
-        metrics = run_climretrieve_benchmark(reference_path, input_path, k_values=args.k_values)
+        run_climretrieve_benchmark(reference_path, input_path, k_values=args.k_values)
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Benchmark Test Complete!")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         return 0
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"\nError: {e}", file=sys.stderr)
         import traceback
 

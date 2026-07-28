@@ -97,8 +97,7 @@ def test_env(clean_db):
                     {
                         "id": "tcfd_2",
                         "text": (
-                            "What is the role of management in assessing and managing "
-                            "climate-related risks and opportunities?"
+                            "What is the role of management in assessing and managing climate-related risks and opportunities?"
                         ),
                         "guidelines": "Test guidelines 2",
                     },
@@ -607,7 +606,8 @@ def test_chunk_size_creation(analyzer, test_env):
     sample_text = (
         "Climate change is one of the most pressing challenges of our time. "
         "Organizations worldwide are recognizing the need to address climate-related risks and opportunities. "
-        "The Task Force on Climate-related Financial Disclosures (TCFD) provides a framework for companies to report on climate risks. "
+        "The Task Force on Climate-related Financial Disclosures (TCFD) provides "
+        "a framework for companies to report on climate risks. "
         "Scope 1 emissions are direct emissions from owned or controlled sources. "
         "Scope 2 emissions are indirect emissions from the generation of purchased energy. "
         "Scope 3 emissions include all other indirect emissions in a company's value chain. "
@@ -824,4 +824,4 @@ def test_chunk_size_creation(analyzer, test_env):
                 # depending on how SentenceSplitter handles boundaries
                 if not overlap_found:
                     # Log warning but don't fail - overlap detection is tricky
-                    print(f"Warning: Could not detect clear overlap between consecutive chunks")
+                    print("Warning: Could not detect clear overlap between consecutive chunks")

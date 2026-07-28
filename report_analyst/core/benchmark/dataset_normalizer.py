@@ -39,11 +39,11 @@ def _parse_score(val: Any) -> float:
 def _stable_query_id_from_text(text: str, max_len: int = 64) -> str:
     """Produce a stable query_id from a single text (e.g. description) when no document column."""
     if pd.isna(text) or not str(text).strip():
-        return hashlib.md5(b"empty").hexdigest()[:16]
+        return hashlib.md5(b"empty", usedforsecurity=False).hexdigest()[:16]
     s = str(text).strip()
     if len(s) <= max_len:
         return s
-    return hashlib.md5(s.encode()).hexdigest()[:16]
+    return hashlib.md5(s.encode(), usedforsecurity=False).hexdigest()[:16]
 
 
 def make_query_id_from_columns(document: Optional[Any], question: Any, max_len: int = 64) -> str:

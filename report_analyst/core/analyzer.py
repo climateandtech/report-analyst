@@ -2,25 +2,17 @@ import hashlib
 import json
 import logging
 import os
-import pickle
 import re
-import shutil
-import sqlite3
-import sys
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 import yaml
 from dotenv import load_dotenv
-from langchain.chains import RetrievalQA
-from langchain.chains.summarize import load_summarize_chain
-from langchain.prompts import PromptTemplate
-from langchain_openai import ChatOpenAI
 from llama_index.core import Document, Settings
 from llama_index.core.ingestion import IngestionCache
-from llama_index.core.llms import ChatMessage, MessageRole
+from llama_index.core.llms import ChatMessage
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.file import PyMuPDFReader
@@ -50,7 +42,10 @@ default_model = os.getenv("OPENAI_API_MODEL", "gpt-3.5-turbo-1106")
 # Log available model keys
 logger.info(f"API Keys available - OpenAI: {bool(openai_key)}, Gemini: {bool(gemini_key)}")
 logger.info(
-    f"Backend mode - USE_BACKEND: {use_backend}, USE_CENTRALIZED_LLM: {use_centralized_llm}, USE_FULL_BACKEND_ANALYSIS: {use_full_backend_analysis}"
+    "Backend mode - USE_BACKEND: %s, USE_CENTRALIZED_LLM: %s, USE_FULL_BACKEND_ANALYSIS: %s",
+    use_backend,
+    use_centralized_llm,
+    use_full_backend_analysis,
 )
 
 # If using backend for LLM, don't require local API keys
@@ -222,11 +217,11 @@ class DocumentAnalyzer:
             else:
                 logger.warning("No OpenAI API key - embedding functionality will be limited")
         except ValueError as e:
-            log_analysis_step(f"LLM initialization deferred: {str(e)}", "warning")
+            log_analysis_step(f"LLM initialization deferred: {e!s}", "warning")
             self.llm = None
             self.embeddings = None
         except Exception as e:
-            log_analysis_step(f"Error initializing local LLM clients: {str(e)}", "error")
+            log_analysis_step(f"Error initializing local LLM clients: {e!s}", "error")
             raise
 
     def _get_cache_key(self, file_path: str) -> str:
@@ -267,7 +262,7 @@ class DocumentAnalyzer:
             else:
                 # Local file path (existing behavior - maintain backwards compatibility)
                 return f"{Path(file_path).stem}_{params_str}"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to generate cache key: {e}")
             # Fallback: try to extract identifier safely
             if file_path.startswith("urn:report-analyst:backend:"):
@@ -276,8 +271,8 @@ class DocumentAnalyzer:
             else:
                 try:
                     return f"{Path(file_path).stem}_fallback"
-                except:
-                    return f"unknown_fallback"
+                except Exception:  # noqa: BLE001
+                    return "unknown_fallback"
 
     def _get_vector_store_collection_name(self, cache_key: str) -> str:
         """Generate a valid collection name from cache key."""
@@ -304,7 +299,7 @@ class DocumentAnalyzer:
                 return chunks
             logger.info("[ANALYSIS] Cache MISS: No cached chunks found")
             return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to load chunks cache: {e}")
             return None
 
@@ -323,7 +318,7 @@ class DocumentAnalyzer:
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(serializable_chunks, f)
             logger.info(f"[ANALYSIS] ✓ Cache SAVE: Saved {len(chunks)} chunks to cache")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to save chunks cache: {e}")
 
     def _load_vector_store(self, cache_key: str, chunks: List) -> Optional[LlamaVectorStore]:
@@ -338,7 +333,7 @@ class DocumentAnalyzer:
                     vector_store = LlamaVectorStore(store_dir)
                     # Try to load the store - this will verify if it's valid
                     if vector_store.load():
-                        logger.info(f"[ANALYSIS] ✓ Cache HIT: Loaded vector store from cache")
+                        logger.info("[ANALYSIS] ✓ Cache HIT: Loaded vector store from cache")
                         return vector_store
                 except Exception as inner_e:
                     logger.error(
@@ -348,9 +343,9 @@ class DocumentAnalyzer:
 
             logger.info("[ANALYSIS] Cache MISS: No cached vector store found")
             return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to load vector store cache: {e}")
-            logger.debug(f"Full vector store cache error: {str(e)}", exc_info=True)
+            logger.debug(f"Full vector store cache error: {e!s}", exc_info=True)
             return None
 
     async def score_chunk_relevance(self, question: str, chunk_text: str) -> float:
@@ -360,46 +355,40 @@ class DocumentAnalyzer:
 
         try:
             response = await self.llm.achat(
-                prompt=f"""As a senior equity analyst with expertise in climate science evaluating a company's sustainability report, you are tasked with evaluating text fragments for their usefulness in answering specific TCFD questions.
-
-Your task is to score the relevance and quality of evidence in each text fragment. Consider:
-
-1. Specificity and Concreteness:
-   - Quantitative data and specific metrics (highest value)
-   - Concrete policies and procedures
-   - Specific commitments with timelines
-   - General statements or vague claims (lowest value)
-
-2. Evidence Quality:
-   - Verifiable data and third-party verification
-   - Clear methodologies and frameworks
-   - Specific examples and case studies
-   - Unsubstantiated claims (lowest value)
-
-3. Direct Relevance:
-   - Direct answers to the question components
-   - Related but indirect information
-   - Contextual background
-   - Unrelated information (lowest value)
-
-4. Disclosure Quality:
-   - Comprehensive and transparent disclosure
-   - Balanced reporting (both positive and negative)
-   - Clear acknowledgment of limitations
-   - Potential greenwashing or selective disclosure (lowest value)
-
-Score from 0.0 to 1.0 where:
-0.0 = Not useful (generic statements, unrelated content)
-0.3 = Contains relevant context but no specific evidence
-0.6 = Contains useful specific information but requires additional context
-1.0 = Contains critical evidence or specific details that directly answer the question
-
-Question: {question}
-
-Text to evaluate:
-{chunk_text}
-
-Output only the numeric score (0.0-1.0):"""
+                prompt=(
+                    "As a senior equity analyst with expertise in climate science evaluating a company's "
+                    "sustainability report, you are tasked with evaluating text fragments for their "
+                    "usefulness in answering specific TCFD questions.\n\n"
+                    "Your task is to score the relevance and quality of evidence in each text fragment. Consider:\n\n"
+                    "1. Specificity and Concreteness:\n"
+                    "   - Quantitative data and specific metrics (highest value)\n"
+                    "   - Concrete policies and procedures\n"
+                    "   - Specific commitments with timelines\n"
+                    "   - General statements or vague claims (lowest value)\n\n"
+                    "2. Evidence Quality:\n"
+                    "   - Verifiable data and third-party verification\n"
+                    "   - Clear methodologies and frameworks\n"
+                    "   - Specific examples and case studies\n"
+                    "   - Unsubstantiated claims (lowest value)\n\n"
+                    "3. Direct Relevance:\n"
+                    "   - Direct answers to the question components\n"
+                    "   - Related but indirect information\n"
+                    "   - Contextual background\n"
+                    "   - Unrelated information (lowest value)\n\n"
+                    "4. Disclosure Quality:\n"
+                    "   - Comprehensive and transparent disclosure\n"
+                    "   - Balanced reporting (both positive and negative)\n"
+                    "   - Clear acknowledgment of limitations\n"
+                    "   - Potential greenwashing or selective disclosure (lowest value)\n\n"
+                    "Score from 0.0 to 1.0 where:\n"
+                    "0.0 = Not useful (generic statements, unrelated content)\n"
+                    "0.3 = Contains relevant context but no specific evidence\n"
+                    "0.6 = Contains useful specific information but requires additional context\n"
+                    "1.0 = Contains critical evidence or specific details that directly answer the question\n\n"
+                    f"Question: {question}\n\n"
+                    f"Text to evaluate:\n{chunk_text}\n\n"
+                    "Output only the numeric score (0.0-1.0):"
+                )
             )
 
             score = float(response.message.content.strip())
@@ -407,8 +396,8 @@ Output only the numeric score (0.0-1.0):"""
             logger.debug(f"[ANALYSIS] Computed relevance score: {score:.4f}")
             return score
 
-        except Exception as e:
-            logger.error(f"[ANALYSIS] Error scoring chunk relevance: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[ANALYSIS] Error scoring chunk relevance: {e!s}")
             return 0.0
 
     async def score_chunk_relevance_batch(self, question: str, chunks: List[Dict], single_call: bool = True) -> List[float]:
@@ -422,49 +411,44 @@ Output only the numeric score (0.0-1.0):"""
         try:
             if single_call:
                 # Batch scoring - all chunks in one call
-                chunks_text = "\n\n".join([f"[CHUNK {i+1}]\n{chunk['text']}" for i, chunk in enumerate(chunks)])
+                chunks_text = "\n\n".join([f"[CHUNK {i + 1}]\n{chunk['text']}" for i, chunk in enumerate(chunks)])
 
                 response = await self.llm.achat(
-                    prompt=f"""As a senior equity analyst with expertise in climate science evaluating a company's sustainability report, you are tasked with evaluating text fragments for their usefulness in answering specific TCFD questions.
-
-Your task is to score the relevance and quality of evidence in each text fragment marked as [CHUNK X]. Consider:
-
-1. Specificity and Concreteness:
-   - Quantitative data and specific metrics (highest value)
-   - Concrete policies and procedures
-   - Specific commitments with timelines
-   - General statements or vague claims (lowest value)
-
-2. Evidence Quality:
-   - Verifiable data and third-party verification
-   - Clear methodologies and frameworks
-   - Specific examples and case studies
-   - Unsubstantiated claims (lowest value)
-
-3. Direct Relevance:
-   - Direct answers to the question components
-   - Related but indirect information
-   - Contextual background
-   - Unrelated information (lowest value)
-
-4. Disclosure Quality:
-   - Comprehensive and transparent disclosure
-   - Balanced reporting (both positive and negative)
-   - Clear acknowledgment of limitations
-   - Potential greenwashing or selective disclosure (lowest value)
-
-For each chunk marked [CHUNK X], provide a score from 0.0 to 1.0 where:
-0.0 = Not useful (generic statements, unrelated content)
-0.3 = Contains relevant context but no specific evidence
-0.6 = Contains useful specific information but requires additional context
-1.0 = Contains critical evidence or specific details that directly answer the question
-
-Question: {question}
-
-Text fragments to evaluate:
-{chunks_text}
-
-Output only the scores, one per line, in order:"""
+                    prompt=(
+                        "As a senior equity analyst with expertise in climate science evaluating a company's "
+                        "sustainability report, you are tasked with evaluating text fragments for their "
+                        "usefulness in answering specific TCFD questions.\n\n"
+                        "Your task is to score the relevance and quality of evidence in each text fragment "
+                        "marked as [CHUNK X]. Consider:\n\n"
+                        "1. Specificity and Concreteness:\n"
+                        "   - Quantitative data and specific metrics (highest value)\n"
+                        "   - Concrete policies and procedures\n"
+                        "   - Specific commitments with timelines\n"
+                        "   - General statements or vague claims (lowest value)\n\n"
+                        "2. Evidence Quality:\n"
+                        "   - Verifiable data and third-party verification\n"
+                        "   - Clear methodologies and frameworks\n"
+                        "   - Specific examples and case studies\n"
+                        "   - Unsubstantiated claims (lowest value)\n\n"
+                        "3. Direct Relevance:\n"
+                        "   - Direct answers to the question components\n"
+                        "   - Related but indirect information\n"
+                        "   - Contextual background\n"
+                        "   - Unrelated information (lowest value)\n\n"
+                        "4. Disclosure Quality:\n"
+                        "   - Comprehensive and transparent disclosure\n"
+                        "   - Balanced reporting (both positive and negative)\n"
+                        "   - Clear acknowledgment of limitations\n"
+                        "   - Potential greenwashing or selective disclosure (lowest value)\n\n"
+                        "For each chunk marked [CHUNK X], provide a score from 0.0 to 1.0 where:\n"
+                        "0.0 = Not useful (generic statements, unrelated content)\n"
+                        "0.3 = Contains relevant context but no specific evidence\n"
+                        "0.6 = Contains useful specific information but requires additional context\n"
+                        "1.0 = Contains critical evidence or specific details that directly answer the question\n\n"
+                        f"Question: {question}\n\n"
+                        f"Text fragments to evaluate:\n{chunks_text}\n\n"
+                        "Output only the scores, one per line, in order:"
+                    )
                 )
 
                 # Parse scores from response
@@ -473,8 +457,8 @@ Output only the scores, one per line, in order:"""
                     if len(scores) != len(chunks):
                         raise ValueError(f"Got {len(scores)} scores for {len(chunks)} chunks")
                     return scores
-                except Exception as e:
-                    logger.error(f"[ANALYSIS] Error parsing batch scores: {str(e)}")
+                except Exception as e:  # noqa: BLE001
+                    logger.error(f"[ANALYSIS] Error parsing batch scores: {e!s}")
                     return [0.0] * len(chunks)
 
             else:
@@ -483,18 +467,18 @@ Output only the scores, one per line, in order:"""
                 for i, chunk in enumerate(chunks):
                     score = await self.score_chunk_relevance(question, chunk["text"])
                     scores.append(score)
-                    logger.debug(f"[ANALYSIS] Scored chunk {i+1}/{len(chunks)}: {score:.2f}")
+                    logger.debug(f"[ANALYSIS] Scored chunk {i + 1}/{len(chunks)}: {score:.2f}")
                 return scores
 
-        except Exception as e:
-            logger.error(f"[ANALYSIS] Error in batch scoring: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[ANALYSIS] Error in batch scoring: {e!s}")
             return [0.0] * len(chunks)
 
     def _load_cached_answers(self, file_path: str) -> Dict:
         """Load cached answers for a file with exact configuration match"""
         try:
             # Log current configuration
-            logger.info(f"Current configuration:")
+            logger.info("Current configuration:")
             logger.info(f"- Chunk size: {self.chunk_params['chunk_size']}")
             logger.info(f"- Overlap: {self.chunk_params['chunk_overlap']}")
             logger.info(f"- Top K: {self.chunk_params['top_k']}")
@@ -511,24 +495,31 @@ Output only the scores, one per line, in order:"""
                 logger.info(f"- {cf.name}")
 
             # Generate cache key for current configuration
-            cache_key = f"cs{self.chunk_params['chunk_size']}_ov{self.chunk_params['chunk_overlap']}_tk{self.chunk_params['top_k']}_m{model_name}_qs{self.question_set}"
+            cache_key = (
+                f"cs{self.chunk_params['chunk_size']}"
+                f"_ov{self.chunk_params['chunk_overlap']}"
+                f"_tk{self.chunk_params['top_k']}"
+                f"_m{model_name}"
+                f"_qs{self.question_set}"
+            )
             file_stem = Path(file_path).stem
             cache_file = Path(self.cache_path) / f"{file_stem}_{cache_key}.json"
 
             logger.info(f"Looking for cache file: {cache_file}")
 
             if not cache_file.exists():
-                logger.info(f"No cache file found for current configuration")
+                logger.info("No cache file found for current configuration")
                 return {}
 
             with open(cache_file, "r") as f:
                 cached_data = json.load(f)
                 logger.info(f"Loaded cache data with keys: {list(cached_data.keys())}")
-                logger.info(f"Cache data structure: {json.dumps(cached_data, indent=2)[:500]}...")  # Show first 500 chars
+                cache_preview = json.dumps(cached_data, indent=2)[:500]
+                logger.info("Cache data structure: %s...", cache_preview)  # Show first 500 chars
                 return cached_data
 
-        except Exception as e:
-            logger.error(f"Error loading cache: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Error loading cache: {e!s}")
             return {}
 
     def _validate_cache_filename(self, filename: str) -> bool:
@@ -550,7 +541,7 @@ Output only the scores, one per line, in order:"""
             self._answers_cache[cache_key] = answers
             logger.info(f"[ANALYSIS] ✓ Cache SAVE: Saved answers to {cache_path}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"[ANALYSIS] Cache ERROR: Failed to save answers: {e}")
 
     async def process_document(
@@ -577,10 +568,16 @@ Output only the scores, one per line, in order:"""
             logger.info(f"[ANALYSIS] Starting document processing for {file_path}")
             logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
             logger.info(
-                f"[ANALYSIS] LLM scoring: {use_llm_scoring}, Single call: {single_call}, Force recompute: {force_recompute}"
+                "[ANALYSIS] LLM scoring: %s, Single call: %s, Force recompute: %s",
+                use_llm_scoring,
+                single_call,
+                force_recompute,
             )
             logger.info(
-                f"[ANALYSIS] Current chunk parameters: size={self.chunk_params['chunk_size']}, overlap={self.chunk_params['chunk_overlap']}, top_k={self.chunk_params['top_k']}"
+                "[ANALYSIS] Current chunk parameters: size=%s, overlap=%s, top_k=%s",
+                self.chunk_params["chunk_size"],
+                self.chunk_params["chunk_overlap"],
+                self.chunk_params["top_k"],
             )
 
             if not self.use_backend_llm and self.llm is None:
@@ -621,7 +618,10 @@ Output only the scores, one per line, in order:"""
                 logger.info(f"[ANALYSIS] Saved {len(chunks)} pre-retrieved chunks to cache")
             else:
                 logger.info(
-                    f"[ANALYSIS] Getting document chunks from cache for {file_path} with size={self.chunk_params['chunk_size']}, overlap={self.chunk_params['chunk_overlap']}"
+                    "[ANALYSIS] Getting document chunks from cache for %s with size=%s, overlap=%s",
+                    file_path,
+                    self.chunk_params["chunk_size"],
+                    self.chunk_params["chunk_overlap"],
                 )
                 chunks = self.cache_manager.get_document_chunks(
                     file_path=file_path,
@@ -631,15 +631,19 @@ Output only the scores, one per line, in order:"""
                 logger.info(f"[ANALYSIS] Retrieved {len(chunks)} chunks from cache")
 
                 if not chunks:
-                    logger.info(f"[ANALYSIS] No chunks found in cache with current parameters, creating new chunks")
+                    logger.info("[ANALYSIS] No chunks found in cache with current parameters, creating new chunks")
                     # If no chunks in cache with current parameters, create them
                     # Check if file_path is a URN (backend resource)
                     if file_path.startswith("urn:report-analyst:backend:"):
                         logger.warning(
-                            f"[ANALYSIS] URN detected but no pre-retrieved chunks provided. Cannot process backend resource without chunks."
+                            "[ANALYSIS] URN detected but no pre-retrieved chunks provided. "
+                            "Cannot process backend resource without chunks."
                         )
                         yield {
-                            "error": "Backend resource requires pre-retrieved chunks. Please ensure chunks are retrieved from backend first."
+                            "error": (
+                                "Backend resource requires pre-retrieved chunks. "
+                                "Please ensure chunks are retrieved from backend first."
+                            )
                         }
                         return
                     chunks = self._create_chunks(file_path)
@@ -709,16 +713,16 @@ Output only the scores, one per line, in order:"""
                             for i, chunk in enumerate(similar_chunks):
                                 if i < len(llm_scores):
                                     chunk["llm_score"] = llm_scores[i]
-                                    logger.debug(f"Applied LLM score {llm_scores[i]:.3f} to chunk {i+1}")
+                                    logger.debug(f"Applied LLM score {llm_scores[i]:.3f} to chunk {i + 1}")
                                 else:
                                     chunk["llm_score"] = 0.0
-                                    logger.warning(f"No LLM score available for chunk {i+1}")
+                                    logger.warning(f"No LLM score available for chunk {i + 1}")
 
                             logger.info(f"[ANALYSIS] Applied LLM scores to {len(similar_chunks)} chunks")
 
                         except Exception as e:
                             logger.error(
-                                f"[ANALYSIS] Error applying LLM scores: {str(e)}",
+                                f"[ANALYSIS] Error applying LLM scores: {e!s}",
                                 exc_info=True,
                             )
                             # Set default scores if LLM scoring fails
@@ -766,8 +770,12 @@ Output only the scores, one per line, in order:"""
                                                 "metadata": similar_chunks[chunk_idx]["metadata"],
                                             }
                                         )
+                                        evidence_preview = evidence.get("text", "")[:100]
                                         logger.info(
-                                            f"Added evidence {evidence_idx + 1} from chunk {chunk_num}: {evidence.get('text', '')[:100]}..."
+                                            "Added evidence %s from chunk %s: %s...",
+                                            evidence_idx + 1,
+                                            chunk_num,
+                                            evidence_preview,
                                         )
 
                         # Replace evidence array with processed items
@@ -809,14 +817,14 @@ Output only the scores, one per line, in order:"""
 
                 except Exception as e:
                     logger.error(
-                        f"[ANALYSIS] Error processing question {question_number}: {str(e)}",
+                        f"[ANALYSIS] Error processing question {question_number}: {e!s}",
                         exc_info=True,
                     )
-                    yield {"error": f"Error processing question {question_number}: {str(e)}"}
+                    yield {"error": f"Error processing question {question_number}: {e!s}"}
 
         except Exception as e:
-            logger.error(f"[ANALYSIS] Error processing document: {str(e)}", exc_info=True)
-            yield {"error": f"Error processing document: {str(e)}"}
+            logger.error(f"[ANALYSIS] Error processing document: {e!s}", exc_info=True)
+            yield {"error": f"Error processing document: {e!s}"}
 
     def _create_chunks(self, file_path: str) -> List[Dict[str, Any]]:
         """Create document chunks with embeddings"""
@@ -852,7 +860,7 @@ Output only the scores, one per line, in order:"""
 
             for i in range(0, len(text_chunks), BATCH_SIZE):
                 batch = text_chunks[i : i + BATCH_SIZE]
-                logger.info(f"Computing embeddings for batch {i//BATCH_SIZE + 1}/{(len(text_chunks)-1)//BATCH_SIZE + 1}")
+                logger.info(f"Computing embeddings for batch {i // BATCH_SIZE + 1}/{(len(text_chunks) - 1) // BATCH_SIZE + 1}")
 
                 # Get text from batch and clean it
                 batch_texts = []
@@ -864,7 +872,7 @@ Output only the scores, one per line, in order:"""
                         text = " ".join(text.replace("\x00", "").split())
                         batch_texts.append(text)
                     else:
-                        logger.warning(f"Skipping empty or invalid chunk")
+                        logger.warning("Skipping empty or invalid chunk")
                         continue
 
                 try:
@@ -875,7 +883,7 @@ Output only the scores, one per line, in order:"""
                         logger.info(f"Successfully computed {len(batch_embeddings)} embeddings")
 
                         # Create chunk dictionaries with embeddings
-                        for chunk, embedding in zip(batch, batch_embeddings):
+                        for chunk, embedding in zip(batch, batch_embeddings, strict=False):
                             if embedding is not None:  # Only add chunks with valid embeddings
                                 chunk_dict = {
                                     "text": chunk.text,
@@ -887,10 +895,10 @@ Output only the scores, one per line, in order:"""
                                 chunks_data.append(chunk_dict)
                                 logger.debug(f"Added chunk with text length {len(chunk.text)}")
                             else:
-                                logger.warning(f"Skipping chunk - embedding is None")
+                                logger.warning("Skipping chunk - embedding is None")
 
                 except Exception as e:
-                    logger.error(f"Error computing embeddings for batch: {str(e)}", exc_info=True)
+                    logger.error(f"Error computing embeddings for batch: {e!s}", exc_info=True)
                     # Continue with next batch, storing chunks without embeddings
                     for chunk in batch:
                         chunk_dict = {
@@ -901,7 +909,7 @@ Output only the scores, one per line, in order:"""
                             "computed_score": 0.0,
                         }
                         chunks_data.append(chunk_dict)
-                        logger.warning(f"Added chunk without embedding due to error")
+                        logger.warning("Added chunk without embedding due to error")
 
             # Log embedding statistics
             chunks_with_embeddings = sum(1 for c in chunks_data if c["embedding"] is not None)
@@ -913,16 +921,16 @@ Output only the scores, one per line, in order:"""
                 logger.info(f"Saving {len(valid_chunks)} valid chunks to cache")
                 try:
                     self.cache_manager.save_vectors(file_path, valid_chunks)
-                    logger.info(f"Successfully saved chunks and vectors to cache")
+                    logger.info("Successfully saved chunks and vectors to cache")
                 except Exception as e:
-                    logger.error(f"Failed to save vectors to cache: {str(e)}", exc_info=True)
+                    logger.error(f"Failed to save vectors to cache: {e!s}", exc_info=True)
             else:
                 logger.warning("No valid chunks to save to cache")
 
             return chunks_data
 
         except Exception as e:
-            logger.error(f"Error creating chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error creating chunks: {e!s}", exc_info=True)
             raise
 
     async def _analyze_chunks(
@@ -938,7 +946,7 @@ Output only the scores, one per line, in order:"""
             # Process chunks first
             processed_chunks = []
             for i, chunk in enumerate(chunks):
-                logger.debug(f"Processing chunk {i+1}/{len(chunks)}")
+                logger.debug(f"Processing chunk {i + 1}/{len(chunks)}")
                 # Get similarity score from either 'score' (from vector store) or 'similarity_score' (from cache)
                 similarity_score = chunk.get("score", chunk.get("similarity_score", 0.0))
 
@@ -992,7 +1000,7 @@ Output only the scores, one per line, in order:"""
                 logger.info(response_text)
                 logger.info("=== End LLM Response ===")
             except Exception as e:
-                logger.error(f"Error getting LLM response: {str(e)}")
+                logger.error(f"Error getting LLM response: {e!s}")
                 raise
 
             # Parse the response
@@ -1063,8 +1071,12 @@ Output only the scores, one per line, in order:"""
                                         "metadata": processed_chunks[chunk_idx]["metadata"],
                                     }
                                 )
+                                evidence_preview = evidence.get("text", "")[:100]
                                 logger.info(
-                                    f"Added evidence {evidence_idx + 1} from chunk {chunk_num}: {evidence.get('text', '')[:100]}..."
+                                    "Added evidence %s from chunk %s: %s...",
+                                    evidence_idx + 1,
+                                    chunk_num,
+                                    evidence_preview,
                                 )
 
                 # Replace evidence array with processed items
@@ -1079,9 +1091,9 @@ Output only the scores, one per line, in order:"""
             return result
 
         except Exception as e:
-            logger.error(f"Error analyzing chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error analyzing chunks: {e!s}", exc_info=True)
             return {
-                "ANSWER": f"Error analyzing document: {str(e)}",
+                "ANSWER": f"Error analyzing document: {e!s}",
                 "SCORE": 0,
                 "EVIDENCE": [],
                 "GAPS": ["Error during analysis"],
@@ -1132,7 +1144,7 @@ Output only the scores, one per line, in order:"""
                 log_analysis_step(f"Available question IDs: {list(questions.keys())}")
                 return questions
         except Exception as e:
-            logger.error(f"Error loading questions: {str(e)}")
+            logger.error(f"Error loading questions: {e!s}")
             logger.exception("Full error:")  # This will log the full traceback
             return {}
 
@@ -1169,7 +1181,7 @@ Output only the scores, one per line, in order:"""
 
             return self.questions.get(question_key)
         except Exception as e:
-            logger.error(f"Error getting question {number}: {str(e)}")
+            logger.error(f"Error getting question {number}: {e!s}")
             logger.exception("Full error:")
             return None
 
@@ -1186,7 +1198,7 @@ Output only the scores, one per line, in order:"""
         # Recreate text splitter with new parameters
         self.text_splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
-        logger.info(f"Updated parameters and recreated text splitter")
+        logger.info("Updated parameters and recreated text splitter")
 
     def update_llm_model(self, model_name: str):
         """Update the LLM model."""
@@ -1255,8 +1267,8 @@ Output only the scores, one per line, in order:"""
                 "analysis": step4_complete,
             }
 
-        except Exception as e:
-            logger.error(f"Error checking step completion: {str(e)}")
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Error checking step completion: {e!s}")
             return {
                 "chunks": False,
                 "embeddings": False,
@@ -1299,7 +1311,7 @@ Output only the scores, one per line, in order:"""
 
             return config
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error parsing config from filename {filename}: {e}")
             return config
 
@@ -1337,7 +1349,7 @@ Output only the scores, one per line, in order:"""
             return similar_chunks
 
         except Exception as e:
-            logger.error(f"Error getting similar chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error getting similar chunks: {e!s}", exc_info=True)
             return []
 
     def _parse_analysis_response(self, response_text: str) -> Dict[str, Any]:
@@ -1478,9 +1490,9 @@ Output only the scores, one per line, in order:"""
                 return result
 
         except Exception as e:
-            logger.error(f"Error parsing analysis response: {str(e)}", exc_info=True)
+            logger.error(f"Error parsing analysis response: {e!s}", exc_info=True)
             return {
-                "ANSWER": f"Error parsing analysis: {str(e)}",
+                "ANSWER": f"Error parsing analysis: {e!s}",
                 "SCORE": 0,
                 "EVIDENCE": [],
                 "GAPS": ["Error during analysis"],

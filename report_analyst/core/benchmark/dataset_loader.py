@@ -2,12 +2,11 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 import yaml
 
 from ...models.benchmark import (
-    BenchmarkDataset,
     BenchmarkDatasetContent,
     BenchmarkQuestion,
     GroundTruthChunk,
@@ -56,7 +55,7 @@ class DatasetLoader:
                 else:
                     return json.load(f)
         except Exception as e:
-            raise DatasetValidationError(f"Failed to load file {path}: {e}")
+            raise DatasetValidationError(f"Failed to load file {path}: {e}") from e
 
     def _validate_and_parse(self, raw_data: Dict) -> BenchmarkDatasetContent:
         """Validate raw data and parse into structured format"""
@@ -91,7 +90,7 @@ class DatasetLoader:
             )
 
         except Exception as e:
-            raise DatasetValidationError(f"Dataset validation failed: {e}")
+            raise DatasetValidationError(f"Dataset validation failed: {e}") from e
 
     def _parse_question(self, q_data: Dict) -> BenchmarkQuestion:
         """Parse a single question from raw data"""

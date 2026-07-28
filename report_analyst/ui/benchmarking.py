@@ -1,4 +1,3 @@
-import json
 import logging
 import sqlite3
 import tempfile
@@ -7,7 +6,6 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 from ..core.benchmark.classification_calibration import (
@@ -15,18 +13,7 @@ from ..core.benchmark.classification_calibration import (
     compute_classification_report,
 )
 from ..core.benchmark.dataset_loader import DatasetLoader, DatasetValidationError
-from ..core.benchmark.dataset_mapper import (
-    DatasetMapperFactory,
-    list_available_dataset_ids,
-)
-from ..core.benchmark.dataset_normalizer import (
-    POSITION_MODE_COLUMN,
-    POSITION_MODE_ROW_ORDER,
-    POSITION_MODE_SORT_BY_SCORE,
-    normalize_dataframe_for_benchmark,
-)
 from ..core.benchmark.error_analysis import (
-    build_error_analysis_dataframe,
     build_error_analysis_dataframe_from_flexible,
 )
 from ..core.benchmark.evaluation_engine import EvaluationEngine
@@ -38,8 +25,6 @@ from ..core.benchmark.flexible_alignment import (
 )
 from ..core.benchmark.retrieval_results_loader import (
     load_flexible_dataset_from_csv,
-    load_flexible_dataset_from_normalized_df,
-    load_retrieval_results_from_csv,
 )
 from ..core.storage.benchmark_store import BenchmarkStore
 from ..models.benchmark import (
@@ -47,7 +32,6 @@ from ..models.benchmark import (
     BenchmarkEvaluation,
     DatasetType,
     FlexibleDatasetRow,
-    HumanAnnotation,
     RetrievalConfig,
 )
 
@@ -332,7 +316,7 @@ class BenchmarkingUI:
             st.subheader("Ranking configuration")
             col1, col2 = st.columns(2)
             with col1:
-                top_k = st.number_input(
+                st.number_input(
                     "Top K",
                     min_value=1,
                     max_value=50,
@@ -528,8 +512,8 @@ class BenchmarkingUI:
                     mime="text/csv",
                     key="download_error_analysis_csv",
                 )
-            except Exception as e:
-                st.error(f"Failed to build error-analysis CSV: {str(e)}")
+            except Exception as e:  # noqa: BLE001
+                st.error(f"Failed to build error-analysis CSV: {e!s}")
 
     def render_annotation_interface(self):
         """Render human annotation interface"""
@@ -735,7 +719,7 @@ class BenchmarkingUI:
                         report_df = pd.DataFrame(report_dict).T
                         st.dataframe(report_df, use_container_width=True)
                     else:
-                        st.info(f"Not enough non-missing data to compute a classification report " f"for `{score_col}`.")
+                        st.info(f"Not enough non-missing data to compute a classification report for `{score_col}`.")
 
     def _run_csv_evaluation_from_datasets(self, ref_source, ref_id, bench_source, bench_id, k_values, evaluation_name):
         """Run evaluation using selected datasets from database or uploaded files"""
@@ -783,7 +767,7 @@ class BenchmarkingUI:
             if "csv_evaluations" not in st.session_state:
                 st.session_state.csv_evaluations = []
 
-            from ..models.benchmark import BenchmarkEvaluation, RetrievalConfig
+            from ..models.benchmark import RetrievalConfig
 
             # Use the maximum k value for error analysis export (to show all top-K chunks)
             max_k = max(k_values) if k_values else 10
@@ -804,10 +788,10 @@ class BenchmarkingUI:
             st.session_state.csv_evaluations.append(eval_obj)
 
         except ValueError as e:
-            st.error(f"Error loading datasets: {str(e)}")
+            st.error(f"Error loading datasets: {e!s}")
             logger.exception("Dataset loading error")
         except Exception as e:
-            st.error(f"Error during evaluation: {str(e)}")
+            st.error(f"Error during evaluation: {e!s}")
             logger.exception("Evaluation error")
 
     def _render_confirmation_ui(self, dataset, temp_key: str, dataset_type: str, file_name: str):
@@ -858,7 +842,7 @@ class BenchmarkingUI:
         if dataset.results:
             st.write("**Sample data (first 5 rows):**")
             sample_data = []
-            for i, result in enumerate(dataset.results[:5]):
+            for _i, result in enumerate(dataset.results[:5]):
                 row_data = result.data.copy()
                 sample_data.append(row_data)
             if sample_data:
@@ -931,7 +915,7 @@ class BenchmarkingUI:
                             dataset_name=f"{dataset_type}_{uploaded_file.name}",
                             **csv_kwargs,
                         )
-                    except Exception as exc:  # pragma: no cover - UI fallback
+                    except Exception as exc:  # noqa: BLE001  # pragma: no cover - UI fallback
                         load_error = exc
 
                     if dataset is not None:
@@ -998,7 +982,7 @@ class BenchmarkingUI:
                         if dataset.results:
                             st.write("**Sample data (first 5 rows):**")
                             sample_data = []
-                            for i, result in enumerate(dataset.results[:5]):
+                            for _i, result in enumerate(dataset.results[:5]):
                                 row_data = result.data.copy()
                                 sample_data.append(row_data)
                             if sample_data:
@@ -1011,261 +995,16 @@ class BenchmarkingUI:
                         # Dataset is not in the expected benchmark schema.
                         # Offer alignment using DatasetMapper.
                         # ------------------------------------------------------------------
-                        st.warning(
-                            "This file does not match the expected benchmark CSV schema " "used by the evaluation engine."
-                        )
+                        st.warning("This file does not match the expected benchmark CSV schema used by the evaluation engine.")
                         st.caption(
-                            "For new or custom CSV/Excel files, please use the **Flexible Dataset Alignment (Wizard)** section below "
-                            "to map your columns to the internal schema. The older preset/manual alignment UI has been removed."
+                            "For new or custom CSV/Excel files, please use the "
+                            "**Flexible Dataset Alignment (Wizard)** section below to "
+                            "map your columns to the internal schema. The older "
+                            "preset/manual alignment UI has been removed."
                         )
                         if load_error is not None:
                             st.caption(f"Details: {load_error}")
                         return
-
-                        available_ids = list_available_dataset_ids()
-                        if not available_ids:
-                            st.info(
-                                "No dataset mapping configurations were found. "
-                                "Add YAML configs under "
-                                "`report_analyst/config/datasets/` to enable alignment."
-                            )
-                        else:
-                            st.write("**Use a preset mapping:**")
-                            selected_mapping_id = st.selectbox(
-                                "Select mapping configuration to align this dataset:",
-                                options=available_ids,
-                                index=(available_ids.index("climretrieve") if "climretrieve" in available_ids else 0),
-                                key=f"align_cfg_{dataset_type}_{uploaded_file.name}",
-                            )
-
-                            # If we just aligned for download, show the download button
-                            download_key = f"aligned_csv_download_{dataset_type}_{uploaded_file.name}"
-                            if st.session_state.get(download_key) is not None:
-                                csv_bytes = st.session_state[download_key]
-                                st.success("Aligned file is ready. Download it below.")
-                                st.download_button(
-                                    label="Download aligned CSV",
-                                    data=csv_bytes,
-                                    file_name=(
-                                        "ground_truth_aligned.csv"
-                                        if dataset_type == "ground_truth"
-                                        else "benchmark_aligned.csv"
-                                    ),
-                                    mime="text/csv",
-                                    key=f"dl_aligned_{dataset_type}_{uploaded_file.name}",
-                                )
-                                st.caption(
-                                    "You can also 'Align and use for evaluation' to use " "this dataset for evaluation."
-                                )
-
-                            col_align_use, col_align_dl = st.columns(2)
-                            with col_align_use:
-                                if st.button(
-                                    "Align dataset and use for evaluation",
-                                    key=f"align_and_use_{dataset_type}_{uploaded_file.name}",
-                                ):
-                                    mapper = DatasetMapperFactory.get_mapper(selected_mapping_id)
-                                    if dataset_type == "ground_truth":
-                                        df_aligned = mapper.align_ground_truth(df_raw)
-                                    else:
-                                        df_aligned = mapper.align_benchmark(df_raw)
-
-                                    csv_aligned = df_aligned.to_csv(index=False)
-                                    csv_bytes = csv_aligned.encode("utf-8")
-                                    aligned_dataset = load_flexible_dataset_from_csv(
-                                        csv_content=csv_aligned,
-                                        dataset_name=(f"{dataset_type}_aligned_{uploaded_file.name}"),
-                                    )
-
-                                    temp_key = f"temp_{dataset_type}_aligned_{uploaded_file.name}"
-                                    if "uploaded_datasets" not in st.session_state:
-                                        st.session_state.uploaded_datasets = {}
-                                    st.session_state.uploaded_datasets[temp_key] = aligned_dataset
-
-                                    dataset_key = f"{dataset_type}_current"
-                                    st.session_state.uploaded_datasets[dataset_key] = aligned_dataset
-
-                                    if temp_key in st.session_state.uploaded_datasets:
-                                        del st.session_state.uploaded_datasets[temp_key]
-
-                                    aligned_flag_key = f"aligned_{dataset_type}_{uploaded_file.name}"
-                                    st.session_state[aligned_flag_key] = True
-
-                                    # Store aligned CSV so user can download it later
-                                    st.session_state[f"aligned_csv_current_{dataset_type}"] = (uploaded_file.name, csv_bytes)
-
-                                    st.success(
-                                        "Dataset was aligned to the expected structure and " "is now ready for evaluation."
-                                    )
-                                    st.rerun()
-
-                            with col_align_dl:
-                                if st.button(
-                                    "Align and download CSV",
-                                    key=f"align_and_download_{dataset_type}_{uploaded_file.name}",
-                                ):
-                                    mapper = DatasetMapperFactory.get_mapper(selected_mapping_id)
-                                    if dataset_type == "ground_truth":
-                                        df_aligned = mapper.align_ground_truth(df_raw)
-                                    else:
-                                        df_aligned = mapper.align_benchmark(df_raw)
-                                    csv_bytes = df_aligned.to_csv(index=False).encode("utf-8")
-                                    st.session_state[download_key] = csv_bytes
-                                    st.rerun()
-
-                        # Configure columns manually (for any CSV/Excel that didn't load)
-                        st.divider()
-                        st.subheader("Or configure columns manually")
-                        st.caption(
-                            "Map your file's columns to query, chunk text, and score "
-                            "(label for ground truth, prediction for benchmark)."
-                        )
-                        cols = list(df_raw.columns)
-                        cols_lower = {c.lower(): c for c in cols}
-                        # Defaults for dropdowns
-                        query_candidates = [
-                            "description",
-                            "question",
-                            "query_id",
-                            "question_id",
-                            "qid",
-                            "query",
-                        ]
-                        chunk_candidates = [
-                            "chunk_text",
-                            "paragraph",
-                            "context",
-                            "relevant",
-                        ]
-                        score_candidates = [
-                            "score",
-                            "relevance_score",
-                            "relevance",
-                            "usefulness",
-                            "label",
-                            "relevance_label",
-                        ]
-                        default_query = cols[0]
-                        for c in query_candidates:
-                            if c in cols_lower:
-                                default_query = cols_lower[c]
-                                break
-                        default_chunk = cols[0]
-                        for c in chunk_candidates:
-                            if c in cols_lower:
-                                default_chunk = cols_lower[c]
-                                break
-                        default_score = cols[0]
-                        for c in score_candidates:
-                            if c in cols_lower:
-                                default_score = cols_lower[c]
-                                break
-                        if default_score == cols[0]:
-                            for c in cols:
-                                cl = c.lower()
-                                if "relevance" in cl or "usefulness" in cl or "gpt" in cl:
-                                    default_score = c
-                                    break
-                        position_col_candidates = ["position", "rank", "order", "pos"]
-                        has_position_col = any(p in cols_lower for p in position_col_candidates)
-                        default_position_col = None
-                        if has_position_col:
-                            for p in position_col_candidates:
-                                if p in cols_lower:
-                                    default_position_col = cols_lower[p]
-                                    break
-                        query_col = st.selectbox(
-                            "Query / criteria column",
-                            options=cols,
-                            index=(cols.index(default_query) if default_query in cols else 0),
-                            key=f"cfg_query_{dataset_type}_{uploaded_file.name}",
-                        )
-                        chunk_text_col = st.selectbox(
-                            "Chunk text column",
-                            options=cols,
-                            index=(cols.index(default_chunk) if default_chunk in cols else 0),
-                            key=f"cfg_chunk_{dataset_type}_{uploaded_file.name}",
-                        )
-                        score_label = (
-                            "Label column (ground truth)"
-                            if dataset_type == "ground_truth"
-                            else "Prediction / score column (benchmark)"
-                        )
-                        score_col = st.selectbox(
-                            score_label,
-                            options=cols,
-                            index=(cols.index(default_score) if default_score in cols else 0),
-                            key=f"cfg_score_{dataset_type}_{uploaded_file.name}",
-                        )
-                        position_options = [
-                            "Infer from row order",
-                            "Infer by sorting by score per query",
-                        ]
-                        if has_position_col and default_position_col:
-                            position_options.append("Use column")
-                        position_choice = st.radio(
-                            "Position / rank",
-                            options=position_options,
-                            index=0,
-                            key=f"cfg_position_mode_{dataset_type}_{uploaded_file.name}",
-                        )
-                        position_column = None
-                        position_mode = POSITION_MODE_ROW_ORDER
-                        if position_choice == "Infer by sorting by score per query":
-                            position_mode = POSITION_MODE_SORT_BY_SCORE
-                        elif position_choice == "Use column" and has_position_col:
-                            position_mode = POSITION_MODE_COLUMN
-                            position_column = st.selectbox(
-                                "Position column",
-                                options=[cols_lower[p] for p in position_col_candidates if p in cols_lower],
-                                key=f"cfg_position_col_{dataset_type}_{uploaded_file.name}",
-                            )
-                        document_options = ["None"] + cols
-                        default_doc_idx = 0
-                        for d in ["document", "report", "report_id", "doc_id"]:
-                            if d in cols_lower:
-                                default_doc_idx = document_options.index(cols_lower[d])
-                                break
-                        document_col_sel = st.selectbox(
-                            "Document / report column (optional, for query ID)",
-                            options=document_options,
-                            index=default_doc_idx,
-                            key=f"cfg_document_{dataset_type}_{uploaded_file.name}",
-                        )
-                        document_col = None if document_col_sel == "None" else document_col_sel
-                        if st.button(
-                            "Apply column config and use for evaluation",
-                            key=f"apply_cfg_{dataset_type}_{uploaded_file.name}",
-                            type="primary",
-                        ):
-                            try:
-                                norm_df = normalize_dataframe_for_benchmark(
-                                    df_raw,
-                                    query_column=query_col,
-                                    chunk_text_column=chunk_text_col,
-                                    score_column=score_col,
-                                    position_column=position_column,
-                                    document_column=document_col,
-                                    position_mode=position_mode,
-                                )
-                                aligned_dataset = load_flexible_dataset_from_normalized_df(
-                                    norm_df,
-                                    dataset_name=f"{dataset_type}_{uploaded_file.name}",
-                                )
-                                dataset_key = f"{dataset_type}_current"
-                                if "uploaded_datasets" not in st.session_state:
-                                    st.session_state.uploaded_datasets = {}
-                                if dataset_key in st.session_state.uploaded_datasets:
-                                    old = st.session_state.uploaded_datasets[dataset_key]
-                                    st.info(f"Replacing previous {dataset_type} dataset: {old.name}")
-                                st.session_state.uploaded_datasets[dataset_key] = aligned_dataset
-                                st.session_state[f"aligned_{dataset_type}_{uploaded_file.name}"] = True
-                                st.success("Column mapping applied. Dataset is ready for evaluation.")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Column config failed: {e}")
-                                logger.exception("Column config failed")
-
                 else:
                     # Use traditional YAML/JSON loader
                     dataset = self.dataset_loader.load_dataset(tmp_path)
@@ -1291,10 +1030,10 @@ class BenchmarkingUI:
                         st.rerun()
 
         except (DatasetValidationError, ValueError) as e:
-            st.error(f"Failed to load dataset: {str(e)}")
+            st.error(f"Failed to load dataset: {e!s}")
             logger.exception("Dataset loading error")
         except Exception as e:
-            st.error(f"Unexpected error: {str(e)}")
+            st.error(f"Unexpected error: {e!s}")
             logger.exception("Unexpected error during dataset upload")
 
         finally:
@@ -1302,13 +1041,13 @@ class BenchmarkingUI:
             if tmp_path:
                 try:
                     Path(tmp_path).unlink()
-                except:
-                    pass
+                except OSError as exc:
+                    logger.debug("Temp file cleanup failed: %s", exc)
 
     def _handle_classification_upload(self, df_raw: pd.DataFrame, uploaded_file, dataset_type: str):
         """Handle upload of a classification-style dataset (single file with labels and predictions).
 
-        In this simplified path we do **no special alignment** – we just wrap the
+        In this simplified path we do **no special alignment** - we just wrap the
         raw DataFrame rows as `FlexibleDatasetRow` objects so that the calibration
         panel can let the user pick any label and prediction columns manually.
         """
@@ -1382,8 +1121,8 @@ class BenchmarkingUI:
         cols_lower = {c.lower(): c for c in cols}
 
         # Query definition
-        st.markdown("**Step 1 – Identify the query (report + question)**")
-        doc_options = ["<none>"] + cols
+        st.markdown("**Step 1 - Identify the query (report + question)**")
+        doc_options = ["<none>", *cols]
         default_doc_idx = 0
         for cand in ("document", "report", "report_name", "doc_id"):
             if cand in cols_lower:
@@ -1416,7 +1155,7 @@ class BenchmarkingUI:
                 default_chunk = cols_lower[cand]
                 break
         # Chunk & relevant part
-        st.markdown("**Step 2 – Ground-truth text: full chunk vs. relevant part**")
+        st.markdown("**Step 2 - Ground-truth text: full chunk vs. relevant part**")
         chunk_text_col = st.selectbox(
             "Column with the full chunk / paragraph text (or the expert relevant text if no full chunk is stored):",
             options=cols,
@@ -1424,14 +1163,18 @@ class BenchmarkingUI:
             key="flex_gt_chunk_col",
         )
 
-        rel_options = ["<none>"] + cols
+        rel_options = ["<none>", *cols]
         default_rel_idx = 0
         for cand in ("relevant_part_text", "relevant", "relevant_text"):
             if cand in cols_lower:
                 default_rel_idx = rel_options.index(cols_lower[cand])
                 break
         rel_sel = st.selectbox(
-            "Column with the expert‑labeled relevant span inside the chunk (optional – if you only have relevant text, you can reuse the same column as above):",
+            (
+                "Column with the expert-labeled relevant span inside the chunk "
+                "(optional - if you only have relevant text, you can reuse the "
+                "same column as above):"
+            ),
             options=rel_options,
             index=default_rel_idx,
             key="flex_gt_relevant_col",
@@ -1439,7 +1182,7 @@ class BenchmarkingUI:
         relevant_part_col = None if rel_sel == "<none>" else rel_sel
 
         # Label columns
-        st.markdown("**Step 3 – Ground-truth relevance labels**")
+        st.markdown("**Step 3 - Ground-truth relevance labels**")
         # Suggest numeric or name-based label columns
         df_sample = df_raw.head(50)
         numeric_cols = df_sample.select_dtypes(include=["number"]).columns.tolist()
@@ -1474,7 +1217,7 @@ class BenchmarkingUI:
                 df_aligned = align_ground_truth_flexible(df_raw, gt_config)
 
                 st.success(
-                    f"Aligned flexible ground truth: {len(df_aligned)} rows, " f"{df_aligned['query_id'].nunique()} queries."
+                    f"Aligned flexible ground truth: {len(df_aligned)} rows, {df_aligned['query_id'].nunique()} queries."
                 )
                 st.dataframe(df_aligned.head(), use_container_width=True)
 
@@ -1513,7 +1256,7 @@ class BenchmarkingUI:
                 )
 
                 st.success("Flexible ground truth dataset is now registered for evaluation.")
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 st.error(f"Flexible GT alignment failed: {exc}")
 
     def _render_flexible_bm_wizard(self):
@@ -1549,8 +1292,8 @@ class BenchmarkingUI:
             # Classification mode: query_id is not used for metrics, but we still
             # let the user label report and criteria columns for context and
             # for potential grouping in future analyses.
-            st.markdown("**Step 1 – Report and criteria (optional context)**")
-            doc_options = ["<none>"] + cols
+            st.markdown("**Step 1 - Report and criteria (optional context)**")
+            doc_options = ["<none>", *cols]
             default_doc_idx = 0
             for cand in ("document", "report", "report_name", "doc_id", "company"):
                 if cand in cols_lower:
@@ -1579,8 +1322,8 @@ class BenchmarkingUI:
             # derive query_id from document/question as needed.
             qid_col = None
         else:
-            st.markdown("**Step 1 – Match this file to the ground-truth queries**")
-            query_id_options = ["<compute from document/question>"] + cols
+            st.markdown("**Step 1 - Match this file to the ground-truth queries**")
+            query_id_options = ["<compute from document/question>", *cols]
             default_qid_idx = 0
             if has_query_id_col:
                 default_qid_idx = query_id_options.index(next(c for c in cols if c.lower() == "query_id"))
@@ -1593,7 +1336,7 @@ class BenchmarkingUI:
             if query_id_sel == "<compute from document/question>":
                 qid_col = None
                 # Need document and question/description columns
-                doc_options = ["<none>"] + cols
+                doc_options = ["<none>", *cols]
                 default_doc_idx = 0
                 for cand in ("document", "report", "report_name", "doc_id"):
                     if cand in cols_lower:
@@ -1624,7 +1367,7 @@ class BenchmarkingUI:
                 question_col = None
 
         # Chunk & optional relevant part
-        st.markdown("**Step 2 – Retrieved chunk and (optional) relevant span**")
+        st.markdown("**Step 2 - Retrieved chunk and (optional) relevant span**")
         default_chunk = cols[0]
         for cand in ("chunk_text", "paragraph", "context", "text"):
             if cand in cols_lower:
@@ -1637,14 +1380,19 @@ class BenchmarkingUI:
             key="flex_bm_chunk_col",
         )
 
-        rel_options = ["<none>"] + cols
+        rel_options = ["<none>", *cols]
         default_rel_idx = 0
         for cand in ("relevant_part_text_pred", "relevant_text_pred", "relevant_text"):
             if cand in cols_lower:
                 default_rel_idx = rel_options.index(cols_lower[cand])
                 break
         rel_sel = st.selectbox(
-            "Column with the text span that should match the ground-truth relevant part (for datasets with expert spans like ClimRetrieve this is strongly recommended; leave as <none> only if your ground truth is chunk-level only):",
+            (
+                "Column with the text span that should match the ground-truth "
+                "relevant part (for datasets with expert spans like ClimRetrieve "
+                "this is strongly recommended; leave as <none> only if your "
+                "ground truth is chunk-level only):"
+            ),
             options=rel_options,
             index=default_rel_idx,
             key="flex_bm_relevant_col",
@@ -1658,7 +1406,7 @@ class BenchmarkingUI:
         is_classification_mode = st.session_state.get("evaluation_mode") == "Classification"
 
         # Prediction & similarity columns
-        st.markdown("**Step 3 – Model scores and ranking signal**")
+        st.markdown("**Step 3 - Model scores and ranking signal**")
         df_sample = df_raw.head(50)
         numeric_cols = df_sample.select_dtypes(include=["number"]).columns.tolist()
         pred_suggestions = set()
@@ -1680,11 +1428,11 @@ class BenchmarkingUI:
         if not pred_suggestions:
             pred_suggestions.update(numeric_cols)
 
-        default_preds = sorted(pred_suggestions)
+        sorted(pred_suggestions)
 
         classification_label_col = None
         if is_classification_mode:
-            st.markdown("**Step 3a – Ground-truth label used for classification metrics**")
+            st.markdown("**Step 3a - Ground-truth label used for classification metrics**")
             # Heuristic: prefer 'relevance' or 'usefulness' as label.
             default_label = cols[0]
             for cand in ("relevance", "usefulness", "label", "class"):
@@ -1702,7 +1450,7 @@ class BenchmarkingUI:
                 key="flex_bm_classification_label_col",
             )
 
-        st.markdown("**Step 3b – Prediction / score columns from your models**")
+        st.markdown("**Step 3b - Prediction / score columns from your models**")
         prediction_cols = st.multiselect(
             "Select model prediction / score column(s) (e.g. similarity, relevance_score_*):",
             options=cols,
@@ -1713,7 +1461,7 @@ class BenchmarkingUI:
         ranking_score_col = None
         if prediction_cols:
             ranking_score_col = st.selectbox(
-                "Which score should be used to rank chunks and decide top‑K relevance?",
+                "Which score should be used to rank chunks and decide top-K relevance?",
                 options=prediction_cols,
                 index=0,
                 key="flex_bm_ranking_score_col",
@@ -1742,9 +1490,7 @@ class BenchmarkingUI:
                     if classification_label_col in df_raw.columns:
                         df_aligned[classification_label_col] = df_raw[classification_label_col].values
 
-                st.success(
-                    f"Aligned flexible benchmark: {len(df_aligned)} rows, " f"{df_aligned['query_id'].nunique()} queries."
-                )
+                st.success(f"Aligned flexible benchmark: {len(df_aligned)} rows, {df_aligned['query_id'].nunique()} queries.")
                 st.dataframe(df_aligned.head(), use_container_width=True)
 
                 results: List[FlexibleDatasetRow] = []
@@ -1788,7 +1534,7 @@ class BenchmarkingUI:
                 )
 
                 st.success("Flexible benchmark dataset is now registered for evaluation.")
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 st.error(f"Flexible benchmark alignment failed: {exc}")
 
     def _render_config_form(self) -> RetrievalConfig:
@@ -2024,7 +1770,7 @@ class BenchmarkingUI:
         st.info("Annotation interface would show retrieved chunks here for human evaluation.")
 
         # Placeholder annotation form
-        annotator_id = st.text_input("Annotator ID", value="annotator_1")
+        st.text_input("Annotator ID", value="annotator_1")
 
         if st.button("Save Annotations"):
             st.success("Annotations saved! (This is a placeholder)")

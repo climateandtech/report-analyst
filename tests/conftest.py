@@ -8,9 +8,8 @@ Provides test environment configuration and common fixtures.
 import json
 import os
 import sys
-import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 import pytest
 import yaml
@@ -31,12 +30,12 @@ for path in [str(project_root), str(parent_dir)]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
-# Make report_analyst_jobs import optional
+# Make report_analyst_jobs import optional (ImportError or transitive env/deps failures)
 try:
     from report_analyst_jobs.event_router import IGNORE_ACTION, EventRouter
 
     REPORT_ANALYST_JOBS_AVAILABLE = True
-except ImportError:
+except Exception:  # noqa: BLE001
     REPORT_ANALYST_JOBS_AVAILABLE = False
     # Create dummy objects to avoid NameError
     IGNORE_ACTION = None
@@ -114,7 +113,7 @@ def _test_database_connection(url):
             conn.execute(text("SELECT 1"))
         engine.dispose()
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 

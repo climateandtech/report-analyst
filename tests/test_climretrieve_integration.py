@@ -4,8 +4,8 @@ Integration test for ClimRetrieve benchmark datasets.
 This test downloads datasets from GitHub and runs the benchmark evaluation.
 """
 
+import logging
 import sys
-import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -19,6 +19,8 @@ from report_analyst.core.benchmark.evaluation_engine import EvaluationEngine
 from report_analyst.core.benchmark.retrieval_results_loader import (
     load_flexible_dataset_from_csv,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -61,8 +63,8 @@ def find_csv_in_directory(repo: str, directory: str) -> Optional[str]:
 
         if csv_files:
             return csv_files[0]
-    except:
-        pass
+    except requests.RequestException as exc:
+        logger.debug("GitHub API directory listing failed: %s", exc)
 
     # Fallback: try common names
     common_names = ["dataset.csv", "data.csv", "results.csv", "benchmark.csv"]
@@ -72,7 +74,8 @@ def find_csv_in_directory(repo: str, directory: str) -> Optional[str]:
             response = requests.head(test_url, timeout=10)
             if response.status_code == 200:
                 return name
-        except:
+        except requests.RequestException as exc:
+            logger.debug("GitHub HEAD check failed for %s: %s", test_url, exc)
             continue
 
     return None

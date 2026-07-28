@@ -226,8 +226,8 @@ def compute_classification_report(
 
 
 __all__ = [
-    "minmax_normalize",
-    "expected_calibration_error",
     "compute_calibration_metrics",
     "compute_classification_report",
+    "expected_calibration_error",
+    "minmax_normalize",
 ]

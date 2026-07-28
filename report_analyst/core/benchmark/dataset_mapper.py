@@ -47,12 +47,12 @@ def generate_chunk_id(text: str, prefix: str = "") -> str:
     if pd.isna(text) or not str(text).strip():
         # Generate a hash from the string representation for empty/NaN
         text_str = str(text) if pd.notna(text) else "empty"
-        hash_val = hashlib.md5(text_str.encode()).hexdigest()[:16]
+        hash_val = hashlib.md5(text_str.encode(), usedforsecurity=False).hexdigest()[:16]
         return f"{prefix}{hash_val}" if prefix else hash_val
 
     # Normalize text: strip whitespace, lowercase for consistency
     normalized = str(text).strip()
-    hash_val = hashlib.md5(normalized.encode()).hexdigest()[:16]
+    hash_val = hashlib.md5(normalized.encode(), usedforsecurity=False).hexdigest()[:16]
     return f"{prefix}{hash_val}" if prefix else hash_val
 
 
@@ -109,16 +109,16 @@ def transform_ground_truth(
         raise ValueError(f"Could not find context or relevant column. Available: {list(df.columns)}")
     if not label_col:
         logger.warning(
-            "Could not find relevance label column. Will default to score=1.0. " "Available: %s",
+            "Could not find relevance label column. Will default to score=1.0. Available: %s",
             list(df.columns),
         )
 
     # Use relevant column first (preferred), then context as fallback for chunk_id
     text_col = rel_col or ctx_col
     if text_col == rel_col:
-        logger.info("Using 'relevant' column for chunk_id generation " "(preferred for matching with benchmark relevant_text)")
+        logger.info("Using 'relevant' column for chunk_id generation (preferred for matching with benchmark relevant_text)")
     elif text_col == ctx_col:
-        logger.info("Using 'context' column for chunk_id generation " "(fallback, 'relevant' column not found)")
+        logger.info("Using 'context' column for chunk_id generation (fallback, 'relevant' column not found)")
 
     # Generate query_id
     df = df.copy()
@@ -430,7 +430,7 @@ class DatasetMapperFactory:
                 module = import_module(module_path)
                 cls: Type[DatasetMapper] = getattr(module, class_name)
                 return cls(dataset_id, cfg)
-            except Exception as exc:  # pragma: no cover - defensive
+            except Exception as exc:  # noqa: BLE001  # pragma: no cover - defensive
                 logger.error(
                     "Failed to import custom mapper '%s' for dataset '%s': %s",
                     mapper_class_path,
@@ -451,12 +451,12 @@ def list_available_dataset_ids() -> List[str]:
 
 
 __all__ = [
-    "generate_query_id",
-    "generate_chunk_id",
-    "transform_ground_truth",
-    "transform_benchmark_results",
     "DatasetMapper",
-    "DefaultDatasetMapper",
     "DatasetMapperFactory",
+    "DefaultDatasetMapper",
+    "generate_chunk_id",
+    "generate_query_id",
     "list_available_dataset_ids",
+    "transform_benchmark_results",
+    "transform_ground_truth",
 ]

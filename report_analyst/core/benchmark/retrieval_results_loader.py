@@ -6,12 +6,11 @@ which can be used for benchmarking. The functions are designed to be
 webhook-ready and can be used in API endpoints.
 """
 
-import csv
 import logging
 import sqlite3
-from io import BytesIO, StringIO
+from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 
@@ -130,7 +129,7 @@ def load_retrieval_results_from_csv(
     return RetrievalResultsDataset(
         dataset_id=dataset_id,
         name=source_name,
-        description=f"Retrieval results loaded from CSV",
+        description="Retrieval results loaded from CSV",
         source="csv",
         source_path=source_path,
         results=results,
@@ -178,7 +177,7 @@ def load_retrieval_results_from_sqlite(
     dataset_name = dataset_name or Path(db_path).stem
 
     # Build query
-    base_query = f"SELECT * FROM {table_name}"
+    base_query = f"SELECT * FROM {table_name}"  # noqa: S608
     if query_filter:
         base_query += f" WHERE {query_filter}"
     base_query += " ORDER BY query_id, position"
@@ -236,7 +235,7 @@ def load_retrieval_results_from_sqlite(
     return RetrievalResultsDataset(
         dataset_id=dataset_id,
         name=dataset_name,
-        description=f"Retrieval results loaded from SQLite database",
+        description="Retrieval results loaded from SQLite database",
         source="sqlite",
         source_path=db_path,
         results=results,
@@ -539,7 +538,7 @@ def load_flexible_dataset_from_sqlite(
     dataset_name = dataset_name or Path(db_path).stem
 
     # Build query
-    base_query = f"SELECT * FROM {table_name}"
+    base_query = f"SELECT * FROM {table_name}"  # noqa: S608
     if query_filter:
         base_query += f" WHERE {query_filter}"
 

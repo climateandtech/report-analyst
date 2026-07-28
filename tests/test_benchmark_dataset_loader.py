@@ -1,19 +1,12 @@
 import json
-import sqlite3
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
 
 from report_analyst.core.benchmark.dataset_loader import (
     DatasetLoader,
     DatasetValidationError,
-)
-from report_analyst.models.benchmark import (
-    BenchmarkDatasetContent,
-    BenchmarkQuestion,
-    GroundTruthChunk,
 )
 
 
