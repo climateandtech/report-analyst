@@ -131,11 +131,17 @@ class CacheManager:
                 )
                 return
 
-            # Create vector store index with pre-computed embeddings
+            # Create vector store index with pre-computed embeddings.
+            # MockEmbedding avoids requiring OPENAI_API_KEY when every document
+            # already carries an embedding (tests and offline cache reload).
+            from llama_index.core.embeddings import MockEmbedding
             from llama_index.core.indices.vector_store.base import VectorStoreIndex
 
+            first_embedding = documents[0].embedding
+            embed_dim = len(first_embedding)
             self.vector_store = VectorStoreIndex.from_documents(
                 documents,
+                embed_model=MockEmbedding(embed_dim=embed_dim),
                 store_nodes_override=True,  # Keep nodes in memory
                 use_async=False,  # Synchronous operation since we have embeddings
                 show_progress=True,  # Show progress during index creation
