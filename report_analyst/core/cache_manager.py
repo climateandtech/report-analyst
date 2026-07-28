@@ -326,10 +326,18 @@ class CacheManager:
                             text(
                                 """
                                 SELECT id FROM document_chunks 
-                                WHERE file_path = :file_path AND chunk_text = :chunk_text
+                                WHERE file_path = :file_path 
+                                AND chunk_text = :chunk_text
+                                AND chunk_size = :chunk_size
+                                AND chunk_overlap = :chunk_overlap
                             """
                             ),
-                            {"file_path": str(file_path), "chunk_text": chunk["text"]},
+                            {
+                                "file_path": str(file_path),
+                                "chunk_text": chunk["text"],
+                                "chunk_size": config["chunk_size"],
+                                "chunk_overlap": config["chunk_overlap"],
+                            },
                         )
                         row = result_obj.fetchone()
                         if row:
@@ -392,7 +400,129 @@ class CacheManager:
                                 f"Saving raw values to DB - similarity_score: {chunk.get('similarity_score')}, llm_score: {chunk.get('llm_score')}, is_evidence: {chunk.get('is_evidence')}"
                             )
                         else:
-                            logger.warning(f"Could not find chunk in document_chunks table")
+                            # Chunk doesn't exist in document_chunks - create it first (even without embedding)
+                            logger.info(
+                                f"Chunk not found in document_chunks, creating it for file_path={file_path}, chunk_size={config['chunk_size']}, chunk_overlap={config['chunk_overlap']}"
+                            )
+                            
+                            chunk_metadata = chunk.get("metadata", {})
+                            timestamp = datetime.now().isoformat()
+                            
+                            # Insert chunk into document_chunks (embedding can be NULL)
+                            if self.db_manager.is_postgres():
+                                insert_result = conn.execute(
+                                    text("""
+                                        INSERT INTO document_chunks
+                                        (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                                        VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
+                                        ON CONFLICT (file_path, chunk_text, chunk_size, chunk_overlap) DO UPDATE
+                                        SET metadata = EXCLUDED.metadata
+                                        RETURNING id
+                                    """),
+                                    {
+                                        "file_path": str(file_path),
+                                        "chunk_text": chunk["text"],
+                                        "chunk_size": config["chunk_size"],
+                                        "chunk_overlap": config["chunk_overlap"],
+                                        "embedding": None,  # No embedding available, but we still need the chunk
+                                        "metadata": json.dumps(chunk_metadata),
+                                        "created_at": timestamp,
+                                    },
+                                )
+                                chunk_id = insert_result.fetchone()[0]
+                            else:
+                                conn.execute(
+                                    text("""
+                                        INSERT OR IGNORE INTO document_chunks
+                                        (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
+                                        VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, :embedding, :metadata, :created_at)
+                                    """),
+                                    {
+                                        "file_path": str(file_path),
+                                        "chunk_text": chunk["text"],
+                                        "chunk_size": config["chunk_size"],
+                                        "chunk_overlap": config["chunk_overlap"],
+                                        "embedding": None,  # No embedding available, but we still need the chunk
+                                        "metadata": json.dumps(chunk_metadata),
+                                        "created_at": timestamp,
+                                    },
+                                )
+                                # Get the ID after insert
+                                result_obj = conn.execute(
+                                    text("""
+                                        SELECT id FROM document_chunks 
+                                        WHERE file_path = :file_path 
+                                        AND chunk_text = :chunk_text
+                                        AND chunk_size = :chunk_size
+                                        AND chunk_overlap = :chunk_overlap
+                                    """),
+                                    {
+                                        "file_path": str(file_path), 
+                                        "chunk_text": chunk["text"],
+                                        "chunk_size": config["chunk_size"],
+                                        "chunk_overlap": config["chunk_overlap"],
+                                    },
+                                )
+                                row = result_obj.fetchone()
+                                if row:
+                                    chunk_id = row[0]
+                                else:
+                                    logger.error(f"Failed to retrieve chunk ID after insert")
+                                    continue
+                            
+                            logger.info(f"Created chunk in document_chunks with ID: {chunk_id}, now saving chunk_relevance")
+                            
+                            # Now save chunk_relevance with the newly created chunk_id
+                            if self.db_manager.is_postgres():
+                                conn.execute(
+                                    text("""
+                                        INSERT INTO chunk_relevance
+                                        (question_analysis_id, document_chunk_id, chunk_order,
+                                         similarity_score, llm_score, is_evidence, evidence_order, metadata)
+                                        VALUES (:question_analysis_id, :document_chunk_id, :chunk_order,
+                                                :similarity_score, :llm_score, :is_evidence, :evidence_order, :metadata)
+                                        ON CONFLICT (question_analysis_id, document_chunk_id) DO UPDATE
+                                        SET chunk_order = EXCLUDED.chunk_order,
+                                            similarity_score = EXCLUDED.similarity_score,
+                                            llm_score = EXCLUDED.llm_score,
+                                            is_evidence = EXCLUDED.is_evidence,
+                                            evidence_order = EXCLUDED.evidence_order,
+                                            metadata = EXCLUDED.metadata
+                                    """),
+                                    {
+                                        "question_analysis_id": analysis_id,
+                                        "document_chunk_id": chunk_id,
+                                        "chunk_order": chunk.get("chunk_order", 0),
+                                        "similarity_score": chunk.get("similarity_score", 0.0),
+                                        "llm_score": chunk.get("llm_score"),
+                                        "is_evidence": chunk.get("is_evidence", False),
+                                        "evidence_order": chunk.get("evidence_order"),
+                                        "metadata": json.dumps(chunk.get("metadata", {})),
+                                    },
+                                )
+                            else:
+                                conn.execute(
+                                    text("""
+                                        INSERT OR REPLACE INTO chunk_relevance
+                                        (question_analysis_id, document_chunk_id, chunk_order,
+                                         similarity_score, llm_score, is_evidence, evidence_order, metadata)
+                                        VALUES (:question_analysis_id, :document_chunk_id, :chunk_order,
+                                                :similarity_score, :llm_score, :is_evidence, :evidence_order, :metadata)
+                                    """),
+                                    {
+                                        "question_analysis_id": analysis_id,
+                                        "document_chunk_id": chunk_id,
+                                        "chunk_order": chunk.get("chunk_order", 0),
+                                        "similarity_score": chunk.get("similarity_score", 0.0),
+                                        "llm_score": chunk.get("llm_score"),
+                                        "is_evidence": chunk.get("is_evidence", False),
+                                        "evidence_order": chunk.get("evidence_order"),
+                                        "metadata": json.dumps(chunk.get("metadata", {})),
+                                    },
+                                )
+                            logger.info(
+                                f"Saved chunk_relevance - similarity_score: {chunk.get('similarity_score')}, llm_score: {chunk.get('llm_score')}, is_evidence: {chunk.get('is_evidence')}"
+                            )
 
                 # Save to analysis cache
                 logger.info("Saving to analysis cache")
@@ -515,6 +645,14 @@ class CacheManager:
                 for row in rows:
                     question_id, result_json = row
                     result = json.loads(result_json)
+
+                    # Ensure SCORE is a number, not a string (fix for JSON deserialization)
+                    if "SCORE" in result:
+                        try:
+                            result["SCORE"] = float(result["SCORE"]) if result["SCORE"] is not None else 0
+                        except (ValueError, TypeError):
+                            result["SCORE"] = 0
+
                     results[question_id] = {
                         "result": result,
                         "chunks": [],  # Will be populated from chunk_relevance
@@ -537,7 +675,10 @@ class CacheManager:
                             cr.metadata as relevance_metadata
                         FROM analysis_cache ac
                         JOIN questions q ON q.question_id = ac.question_id
-                        JOIN question_analysis qa ON qa.question_id = q.id AND qa.file_path = ac.file_path
+                        JOIN question_analysis qa ON qa.question_id = q.id 
+                            AND qa.file_path = ac.file_path
+                            AND qa.model = ac.model
+                            AND qa.top_k = ac.top_k
                         JOIN chunk_relevance cr ON cr.question_analysis_id = qa.id
                         JOIN document_chunks dc ON cr.document_chunk_id = dc.id
                         WHERE ac.file_path = :file_path

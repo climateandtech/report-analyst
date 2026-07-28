@@ -808,12 +808,28 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
     return result
 
 
-def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str | None = None) -> None:
+def display_analysis_results(
+    analysis_df: pd.DataFrame,
+    chunks_df: pd.DataFrame,
+    file_key: str | None = None,
+    file_path: str | None = None,
+    question_set: str | None = None,
+) -> None:
     """Display analysis results in a consistent format for both individual and consolidated views"""
     try:
         if analysis_df.empty:
             st.warning("No analysis results to display")
             return
+
+
+        # Try to import and use PDF viewer component if available
+        pdf_viewer_available = False
+        try:
+            from report_analyst_enterprise.components.streamlit_component.backend import pdf_viewer
+
+            pdf_viewer_available = True
+        except ImportError:
+            pass
 
         # Analysis Results Table
         st.subheader("Analysis Results")
@@ -848,6 +864,82 @@ def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame,
                 ),
             },
         )
+
+        if pdf_viewer_available and file_path and not chunks_df.empty:
+            try:
+                if not question_set:
+                    question_set = st.session_state.get("question_set", "tcfd")
+
+                question_set_obj = question_loader.get_question_set(question_set)
+                questions_data = {}
+                if question_set_obj:
+                    for q_id, q_data in question_set_obj.questions.items():
+                        questions_data[q_id] = q_data.get("text", q_id)
+
+                chunks_by_question: dict = {}
+                try:
+                    from report_analyst.core.analyzer import DocumentAnalyzer
+
+                    doc_analyzer = DocumentAnalyzer()
+                    config = {
+                        "chunk_size": st.session_state.get("chunk_size", 500),
+                        "chunk_overlap": st.session_state.get("chunk_overlap", 0),
+                        "top_k": st.session_state.get("top_k", 10),
+                        "model": st.session_state.get("llm_model", "gpt-4o-mini"),
+                        "question_set": question_set,
+                    }
+                    cached_results = doc_analyzer.cache_manager.get_analysis(
+                        file_path=file_path,
+                        config=config,
+                    )
+                    if cached_results:
+                        for q_id, data in cached_results.items():
+                            if q_id not in chunks_by_question:
+                                chunks_by_question[q_id] = []
+                            chunks = data.get("chunks", [])
+                            for chunk in chunks:
+                                metadata = chunk.get("metadata") or {}
+                                if "page_number" not in metadata and "source" in metadata:
+                                    try:
+                                        metadata["page_number"] = int(metadata["source"])
+                                    except (ValueError, TypeError):
+                                        metadata["page_number"] = 1
+                                elif "page_number" in metadata:
+                                    try:
+                                        metadata["page_number"] = int(metadata["page_number"])
+                                    except (ValueError, TypeError):
+                                        metadata["page_number"] = 1
+                                else:
+                                    metadata["page_number"] = 1
+                                chunk["metadata"] = metadata
+                            chunks_by_question[q_id].extend(chunks)
+                except Exception as cache_error:
+                    logger.debug(f"Could not get chunks from cache: {cache_error}")
+                    for _, row in chunks_df.iterrows():
+                        q_id = row.get("Question ID", "")
+                        if q_id not in chunks_by_question:
+                            chunks_by_question[q_id] = []
+                        chunks_by_question[q_id].append(
+                            {
+                                "text": row.get("Chunk Text", ""),
+                                "metadata": {},
+                                "is_evidence": row.get("Is Evidence", False),
+                                "similarity_score": row.get("Vector Similarity", 0.0),
+                                "llm_score": row.get("LLM Score"),
+                                "chunk_order": row.get("Position", 0),
+                            }
+                        )
+
+                with st.expander("PDF Viewer with Chunks", expanded=False):
+                    pdf_viewer(
+                        pdf_path=file_path,
+                        chunks_data=chunks_by_question,
+                        questions_data=questions_data,
+                        height=800,
+                        key=f"pdf_viewer_{file_key}" if file_key else "pdf_viewer",
+                    )
+            except Exception as e:
+                logger.warning(f"Could not display PDF viewer: {e}", exc_info=True)
 
         # Document Chunks Table
         if not chunks_df.empty:
@@ -1249,7 +1341,13 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
 
                         # Display results using the existing display function
                         file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
-                        display_analysis_results(analysis_df, chunks_df, file_key)
+                        display_analysis_results(
+                            analysis_df,
+                            chunks_df,
+                            file_key,
+                            file_path=file_path,
+                            question_set=question_set,
+                        )
                     else:
                         st.warning("No results found in stored for this configuration")
                 else:
@@ -2856,10 +2954,11 @@ def main():
                     options=[
                         "Upload Report",
                         "Report Analyst",
+                        "View Report",
                         "All Results",
                         "Settings",
                     ],
-                    icons=["house", "file-text", "bar-chart", "gear"],
+                    icons=["house", "file-text", "file-pdf", "bar-chart", "gear"],
                     menu_icon=None,
                     default_index=0,
                     orientation="vertical",
@@ -2889,7 +2988,7 @@ def main():
                 )
         except ImportError:
             # Fallback to regular radio if package not installed
-            nav_options = ["Upload Report", "Report Analyst", "All Results", "Settings"]
+            nav_options = ["Upload Report", "Report Analyst", "View Report", "All Results", "Settings"]
             nav_page = st.sidebar.radio("", nav_options, key="nav_page", label_visibility="collapsed")
 
         # Show page-specific content based on navigation
@@ -3978,7 +4077,13 @@ def main():
                                     if all_results:
                                         analysis_df, chunks_df = create_analysis_dataframes(all_results)
                                         file_key = Path(file_path).stem
-                                        display_analysis_results(analysis_df, chunks_df, file_key)
+                                        display_analysis_results(
+                                            analysis_df,
+                                            chunks_df,
+                                            file_key,
+                                            file_path=str(file_path),
+                                            question_set=config.get("question_set", st.session_state.get("question_set", "tcfd")),
+                                        )
                                         progress_text.success(f"✓ Analysis complete for {len(selected_questions)} questions")
                                     else:
                                         progress_text.error("No results found after analysis")
@@ -4284,6 +4389,9 @@ def main():
                         if not st.session_state.get("file_processed"):
                             st.session_state.file_processed = True
                             st.rerun()
+
+        elif nav_page == "View Report":
+            render_view_report_page(analyzer, question_sets, get_uploaded_files_history)
 
         # All Results page
         elif nav_page == "All Results":
