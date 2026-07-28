@@ -39,9 +39,7 @@ class LocalJobExecutor(JobExecutor):
         """Submit a job for local execution"""
 
         # Create initial job result
-        job_result = JobResult(
-            job_id=job.job_id, status=JobStatus.PENDING, started_at=datetime.utcnow()
-        )
+        job_result = JobResult(job_id=job.job_id, status=JobStatus.PENDING, started_at=datetime.utcnow())
         self.job_storage[job.job_id] = job_result
 
         # Start job execution task

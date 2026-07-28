@@ -36,15 +36,11 @@ def test_question_sets_loaded_dynamically():
         if "Question Set" in str(sb.label) or "new_question_set" in str(sb.key):
             options = [str(opt) for opt in sb.options]
             # Should have multiple question sets
-            assert (
-                len(options) >= 4
-            ), f"Expected at least 4 question sets, got {len(options)}"
+            assert len(options) >= 4, f"Expected at least 4 question sets, got {len(options)}"
             # Verify key question sets present
             options_lower = [opt.lower() for opt in options]
             assert any("tcfd" in opt for opt in options_lower), "TCFD not in options"
-            assert any(
-                "everest" in opt for opt in options_lower
-            ), "Everest not in options"
+            assert any("everest" in opt for opt in options_lower), "Everest not in options"
             break
 
     assert not at.exception
@@ -74,17 +70,9 @@ def test_question_set_selectbox_has_options():
     options_lower = [opt.lower() for opt in options]
 
     # Should have the key question sets
-    assert any(
-        "tcfd" in opt for opt in options_lower
-    ), f"TCFD not found in options: {options}"
-    assert any(
-        "everest" in opt for opt in options_lower
-    ), f"Everest not found in options: {options}"
-    assert any(
-        "denali" in opt for opt in options_lower
-    ), f"Denali not found in options: {options}"
-    assert any(
-        "kilimanjaro" in opt for opt in options_lower
-    ), f"Kilimanjaro not found in options: {options}"
+    assert any("tcfd" in opt for opt in options_lower), f"TCFD not found in options: {options}"
+    assert any("everest" in opt for opt in options_lower), f"Everest not found in options: {options}"
+    assert any("denali" in opt for opt in options_lower), f"Denali not found in options: {options}"
+    assert any("kilimanjaro" in opt for opt in options_lower), f"Kilimanjaro not found in options: {options}"
 
     assert not at.exception

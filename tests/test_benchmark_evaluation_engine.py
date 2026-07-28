@@ -36,9 +36,7 @@ class TestEvaluationEngine:
                 is_evidence=True,
                 evidence_order=2,
             ),
-            GroundTruthChunk(
-                chunk_id="chunk_3", relevance_score=0.0, is_evidence=False
-            ),
+            GroundTruthChunk(chunk_id="chunk_3", relevance_score=0.0, is_evidence=False),
         ]
 
         chunks_q2 = [
@@ -48,9 +46,7 @@ class TestEvaluationEngine:
                 is_evidence=True,
                 evidence_order=1,
             ),
-            GroundTruthChunk(
-                chunk_id="chunk_5", relevance_score=0.0, is_evidence=False
-            ),
+            GroundTruthChunk(chunk_id="chunk_5", relevance_score=0.0, is_evidence=False),
         ]
 
         questions = [
@@ -182,9 +178,7 @@ class TestEvaluationEngine:
             "chunk_3": 0.8,  # Relevant
         }
 
-        result = engine._evaluate_single_question(
-            retrieved_chunks, ground_truth, [1, 2, 3]
-        )
+        result = engine._evaluate_single_question(retrieved_chunks, ground_truth, [1, 2, 3])
 
         # Check binary relevance
         expected_binary = [
@@ -202,15 +196,11 @@ class TestEvaluationEngine:
         # Check reciprocal rank (first relevant at position 1)
         assert result["reciprocal_rank"] == 1.0
 
-    def test_evaluate_retrieval_full(
-        self, engine, sample_dataset, sample_retrieval_results
-    ):
+    def test_evaluate_retrieval_full(self, engine, sample_dataset, sample_retrieval_results):
         """Test full retrieval evaluation"""
         config = RetrievalConfig(top_k=5)
 
-        metrics = engine.evaluate_retrieval(
-            sample_dataset, sample_retrieval_results, config, k_values=[1, 2, 3]
-        )
+        metrics = engine.evaluate_retrieval(sample_dataset, sample_retrieval_results, config, k_values=[1, 2, 3])
 
         # Verify metrics structure
         assert isinstance(metrics, EvaluationMetrics)

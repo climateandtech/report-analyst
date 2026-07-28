@@ -85,14 +85,8 @@ def transform_ground_truth(
     # Map expected columns
     doc_col = df_cols_lower.get(document_col.lower()) or df_cols_lower.get("document")
     q_col = df_cols_lower.get(question_col.lower()) or df_cols_lower.get("question")
-    ctx_col = (
-        df_cols_lower.get(context_col.lower())
-        or df_cols_lower.get("context")
-        or df_cols_lower.get("relevant")
-    )
-    rel_col = (
-        df_cols_lower.get(relevant_col.lower()) if relevant_col else None
-    ) or df_cols_lower.get("relevant")
+    ctx_col = df_cols_lower.get(context_col.lower()) or df_cols_lower.get("context") or df_cols_lower.get("relevant")
+    rel_col = (df_cols_lower.get(relevant_col.lower()) if relevant_col else None) or df_cols_lower.get("relevant")
     page_num_col = (
         (df_cols_lower.get(page_col.lower()) if page_col else None)
         or df_cols_lower.get("page_number")
@@ -108,42 +102,27 @@ def transform_ground_truth(
 
     # Validate required columns
     if not doc_col:
-        raise ValueError(
-            f"Could not find document column. Available: {list(df.columns)}"
-        )
+        raise ValueError(f"Could not find document column. Available: {list(df.columns)}")
     if not q_col:
-        raise ValueError(
-            f"Could not find question column. Available: {list(df.columns)}"
-        )
+        raise ValueError(f"Could not find question column. Available: {list(df.columns)}")
     if not ctx_col and not rel_col:
-        raise ValueError(
-            f"Could not find context or relevant column. Available: {list(df.columns)}"
-        )
+        raise ValueError(f"Could not find context or relevant column. Available: {list(df.columns)}")
     if not label_col:
         logger.warning(
-            "Could not find relevance label column. Will default to score=1.0. "
-            "Available: %s",
+            "Could not find relevance label column. Will default to score=1.0. " "Available: %s",
             list(df.columns),
         )
 
     # Use relevant column first (preferred), then context as fallback for chunk_id
     text_col = rel_col or ctx_col
     if text_col == rel_col:
-        logger.info(
-            "Using 'relevant' column for chunk_id generation "
-            "(preferred for matching with benchmark relevant_text)"
-        )
+        logger.info("Using 'relevant' column for chunk_id generation " "(preferred for matching with benchmark relevant_text)")
     elif text_col == ctx_col:
-        logger.info(
-            "Using 'context' column for chunk_id generation "
-            "(fallback, 'relevant' column not found)"
-        )
+        logger.info("Using 'context' column for chunk_id generation " "(fallback, 'relevant' column not found)")
 
     # Generate query_id
     df = df.copy()
-    df["query_id"] = df.apply(
-        lambda row: generate_query_id(row[doc_col], row[q_col]), axis=1
-    )
+    df["query_id"] = df.apply(lambda row: generate_query_id(row[doc_col], row[q_col]), axis=1)
 
     # Generate chunk_id from relevant text (or context if relevant not available)
     df["chunk_id"] = df[text_col].apply(lambda x: generate_chunk_id(x))
@@ -244,28 +223,14 @@ def transform_benchmark_results(
     df_cols_lower = {col.lower(): col for col in df.columns}
 
     # Map expected columns
-    report_col_actual = (
-        df_cols_lower.get(report_col.lower())
-        or df_cols_lower.get("report")
-        or df_cols_lower.get("document")
-    )
+    report_col_actual = df_cols_lower.get(report_col.lower()) or df_cols_lower.get("report") or df_cols_lower.get("document")
     q_col = df_cols_lower.get(question_col.lower()) or df_cols_lower.get("question")
-    para_col = (
-        df_cols_lower.get(paragraph_col.lower())
-        or df_cols_lower.get("paragraph")
-        or df_cols_lower.get("chunk")
-    )
+    para_col = df_cols_lower.get(paragraph_col.lower()) or df_cols_lower.get("paragraph") or df_cols_lower.get("chunk")
     rel_text_col = (
-        df_cols_lower.get(relevant_text_col.lower())
-        or df_cols_lower.get("relevant_text")
-        or df_cols_lower.get("relevant")
+        df_cols_lower.get(relevant_text_col.lower()) or df_cols_lower.get("relevant_text") or df_cols_lower.get("relevant")
     )
     rel_score_col = (
-        (
-            df_cols_lower.get(relevance_score_col.lower())
-            if relevance_score_col
-            else None
-        )
+        (df_cols_lower.get(relevance_score_col.lower()) if relevance_score_col else None)
         or df_cols_lower.get("relevance_score")
         or df_cols_lower.get("sim_text_relevance")
     )
@@ -284,42 +249,30 @@ def transform_benchmark_results(
     if not report_col_actual:
         raise ValueError(f"Could not find report column. Available: {list(df.columns)}")
     if not q_col:
-        raise ValueError(
-            f"Could not find question column. Available: {list(df.columns)}"
-        )
+        raise ValueError(f"Could not find question column. Available: {list(df.columns)}")
     if not para_col:
-        raise ValueError(
-            f"Could not find paragraph column. Available: {list(df.columns)}"
-        )
+        raise ValueError(f"Could not find paragraph column. Available: {list(df.columns)}")
 
     df = df.copy()
 
     # Generate query_id
-    df["query_id"] = df.apply(
-        lambda row: generate_query_id(row[report_col_actual], row[q_col]), axis=1
-    )
+    df["query_id"] = df.apply(lambda row: generate_query_id(row[report_col_actual], row[q_col]), axis=1)
 
     # Generate chunk_id from paragraph (unique identifier for each retrieved paragraph)
     df["chunk_id"] = df[para_col].apply(lambda x: generate_chunk_id(x))
-    logger.info(
-        "Using paragraph for chunk_id generation (unique per retrieved paragraph)"
-    )
+    logger.info("Using paragraph for chunk_id generation (unique per retrieved paragraph)")
 
     # Generate relevant_part_id from relevant_text (for matching to ground truth relevant parts)
     if rel_text_col and rel_text_col in df.columns:
         df["relevant_part_id"] = df[rel_text_col].apply(lambda x: generate_chunk_id(x))
-        logger.info(
-            "Using relevant_text for relevant_part_id generation (for ground truth matching)"
-        )
+        logger.info("Using relevant_text for relevant_part_id generation (for ground truth matching)")
     else:
         df["relevant_part_id"] = df["chunk_id"]
         logger.info("No relevant_text found, using chunk_id as relevant_part_id")
 
     # Generate position
     if num_col and num_col in df.columns:
-        df["position"] = (
-            pd.to_numeric(df[num_col], errors="coerce").fillna(0).astype(int)
-        )
+        df["position"] = pd.to_numeric(df[num_col], errors="coerce").fillna(0).astype(int)
         df["position"] = df["position"].apply(lambda x: max(1, x))
         logger.info("Using number column for position")
     else:
@@ -350,9 +303,7 @@ def transform_benchmark_results(
         df["score"] = pd.to_numeric(df[rel_score_col], errors="coerce").fillna(0.0)
         logger.info("Using numeric relevance score column for score")
     else:
-        logger.info(
-            "No score column found - evaluation will rely on ground truth scores only"
-        )
+        logger.info("No score column found - evaluation will rely on ground truth scores only")
 
     # Detect similarity score columns from report level dataset
     relevant_text_sim_col = df_cols_lower.get("relevant_text_sim")
@@ -455,9 +406,7 @@ def _load_yaml_config(dataset_id: str) -> Dict[str, Any]:
     cfg_path = base_dir / "config" / "datasets" / f"{dataset_id}.yaml"
 
     if not cfg_path.exists():
-        logger.warning(
-            "No dataset mapping config found for '%s' at %s", dataset_id, cfg_path
-        )
+        logger.warning("No dataset mapping config found for '%s' at %s", dataset_id, cfg_path)
         return {"id": dataset_id}
 
     with cfg_path.open("r", encoding="utf-8") as f:

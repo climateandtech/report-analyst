@@ -22,9 +22,7 @@ def test_app_title_and_layout():
 
     # Check title
     assert len(at.title) > 0, "Title not found"
-    assert "Report Analyst" in str(
-        at.title[0].value
-    ), f"Title should contain 'Report Analyst', got: {at.title[0].value}"
+    assert "Report Analyst" in str(at.title[0].value), f"Title should contain 'Report Analyst', got: {at.title[0].value}"
 
     # Check expanders exist
     assert len(at.expander) > 0, "No expanders found"

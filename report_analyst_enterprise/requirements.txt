@@ -1,0 +1,14 @@
+# Report Analyst Enterprise Module Dependencies
+# This module provides PostgreSQL support with pgvector
+
+# Core dependency - SQLAlchemy (should match core version)
+sqlalchemy>=2.0.0
+
+# PostgreSQL driver
+psycopg2-binary>=2.9.0
+
+# pgvector support (Python client)
+# Note: pgvector extension must be installed on PostgreSQL server
+# For Heroku: heroku-postgresql may include pgvector
+# For Vercel: May need to enable pgvector separately
+

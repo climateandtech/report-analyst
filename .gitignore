@@ -62,3 +62,7 @@ reports/
 report_analyst_enterprise/components/web/node_modules/
 report_analyst_enterprise/components/web/dist/
 report_analyst_enterprise/components/streamlit_component/frontend/build/
+node_modules
+Agents.md
+report-analyst.code-workspace
+.vscode/launch.json

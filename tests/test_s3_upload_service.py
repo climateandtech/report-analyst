@@ -78,9 +78,7 @@ class TestS3UploadService:
                 s3_service.s3_client = mock_s3_client
                 s3_service.s3_bucket = "test-bucket"
 
-                s3_url = await s3_service._upload_to_s3(
-                    sample_pdf_bytes, "test-key", "test.pdf"
-                )
+                s3_url = await s3_service._upload_to_s3(sample_pdf_bytes, "test-key", "test.pdf")
 
                 assert s3_url is not None
                 assert "s3.example.com" in s3_url
@@ -112,9 +110,7 @@ class TestS3UploadService:
                             mock_nc.jetstream.return_value = mock_js
                             mock_nats_connect.return_value = mock_nc
 
-                            result = await s3_service.upload_pdf_via_s3_nats(
-                                sample_pdf_bytes, "test.pdf"
-                            )
+                            result = await s3_service.upload_pdf_via_s3_nats(sample_pdf_bytes, "test.pdf")
 
                             assert result is not None
                             assert isinstance(result, str)  # request_id
@@ -148,9 +144,7 @@ class TestS3UploadService:
 
                 await s3_service._cleanup_s3_object("test-key")
 
-                mock_s3_client.delete_object.assert_called_once_with(
-                    Bucket="test-bucket", Key="test-key"
-                )
+                mock_s3_client.delete_object.assert_called_once_with(Bucket="test-bucket", Key="test-key")
 
     def test_is_available(self):
         """Test availability check"""

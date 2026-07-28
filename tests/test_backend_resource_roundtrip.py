@@ -76,9 +76,7 @@ def mock_backend_chunks():
     ]
 
 
-def test_full_roundtrip_list_and_select_backend_resource(
-    backend_config, mock_backend_resources
-):
+def test_full_roundtrip_list_and_select_backend_resource(backend_config, mock_backend_resources):
     """Test Step 1 & 2: List backend resources and verify URN format"""
     with patch("requests.get") as mock_get:
         mock_response = Mock()
@@ -122,9 +120,7 @@ def test_full_roundtrip_retrieve_chunks(backend_config, mock_backend_chunks):
                             "chunk": {
                                 "id": "chunk-1",
                                 "chunk_text": mock_backend_chunks[0]["chunk_text"],
-                                "chunk_metadata": mock_backend_chunks[0][
-                                    "chunk_metadata"
-                                ],
+                                "chunk_metadata": mock_backend_chunks[0]["chunk_metadata"],
                             },
                             "similarity": mock_backend_chunks[0]["similarity_score"],
                         },
@@ -132,9 +128,7 @@ def test_full_roundtrip_retrieve_chunks(backend_config, mock_backend_chunks):
                             "chunk": {
                                 "id": "chunk-2",
                                 "chunk_text": mock_backend_chunks[1]["chunk_text"],
-                                "chunk_metadata": mock_backend_chunks[1][
-                                    "chunk_metadata"
-                                ],
+                                "chunk_metadata": mock_backend_chunks[1]["chunk_metadata"],
                             },
                             "similarity": mock_backend_chunks[1]["similarity_score"],
                         },
@@ -155,9 +149,7 @@ def test_full_roundtrip_retrieve_chunks(backend_config, mock_backend_chunks):
         assert chunks[1]["chunk_text"] == mock_backend_chunks[1]["chunk_text"]
 
 
-def test_full_roundtrip_analyzer_with_backend_chunks(
-    temp_dir, backend_config, mock_backend_chunks
-):
+def test_full_roundtrip_analyzer_with_backend_chunks(temp_dir, backend_config, mock_backend_chunks):
     """Test Step 4: Use backend chunks in analyzer"""
     # Create cache manager
     cache_path = temp_dir / "cache"
@@ -288,9 +280,7 @@ def test_full_roundtrip_cache_compatibility(temp_dir, backend_config):
     assert urn_cached[0]["text"] == test_chunks[0]["text"]
 
 
-def test_full_roundtrip_combined_local_and_backend(
-    temp_dir, backend_config, mock_backend_resources
-):
+def test_full_roundtrip_combined_local_and_backend(temp_dir, backend_config, mock_backend_resources):
     """Test combined listing of local and backend resources"""
     # Create local PDF
     test_pdf = temp_dir / "local_report.pdf"

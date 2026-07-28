@@ -127,9 +127,7 @@ def test_similarity_search_ordering(temp_db, sample_chunks):
         mock_node3.embedding = sample_chunks[2]["embedding"]
 
         # Nodes should be returned in descending order by score
-        mock_retriever.aretrieve = AsyncMock(
-            return_value=[mock_node1, mock_node2, mock_node3]
-        )
+        mock_retriever.aretrieve = AsyncMock(return_value=[mock_node1, mock_node2, mock_node3])
 
         temp_db.vector_store = Mock()
         temp_db.vector_store.as_retriever.return_value = mock_retriever

@@ -1,83 +1,84 @@
-import json
 import os
 import shutil
-import sqlite3
 import tempfile
-from datetime import datetime
+import uuid
 from pathlib import Path
-from typing import Dict, List
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import yaml
 
-from report_analyst.core.analyzer import DocumentAnalyzer, log_analysis_step
+from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.cache_manager import CacheManager
 
 
+def test_document_analyzer_starts_without_api_keys(monkeypatch):
+    """DocumentAnalyzer should not fail before users can enter BYOK settings."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_MODEL", "gpt-4o-mini")
+
+    DocumentAnalyzer.reset_instance()
+    analyzer = DocumentAnalyzer()
+
+    assert analyzer.llm is None
+
+    DocumentAnalyzer.reset_instance()
+
+
 @pytest.fixture(scope="session")
-def test_db():
-    """Create a test database that persists for the entire test session"""
+def test_db_template():
+    """Create a template test database that persists for the entire test session"""
     temp_dir = tempfile.mkdtemp()
-    db_path = Path(temp_dir) / "analysis.db"
-    print(f"\nCreating test database at: {db_path}")  # Debug print
+    db_path = Path(temp_dir) / "analysis_template.db"
+    print(f"\nCreating template test database at: {db_path}")
 
     try:
-        # Use CacheManager to create the database with all required tables
-        from report_analyst.core.cache_manager import CacheManager
+        CacheManager(str(db_path))
+        print(f"Template database created successfully at {db_path}")
 
-        cache_manager = CacheManager(str(db_path))
-        print(f"Database created successfully at {db_path}")  # Debug print
-
-        # Verify database exists and is accessible
         if not db_path.exists():
             raise Exception(f"Database file not created at {db_path}")
 
         yield db_path
 
     except Exception as e:
-        print(f"Error setting up test database: {e}")  # Debug print
+        print(f"Error setting up template test database: {e}")
         raise
     finally:
-        print(f"Cleaning up test database at {temp_dir}")  # Debug print
+        print(f"Cleaning up template test database at {temp_dir}")
         shutil.rmtree(temp_dir)
 
 
 @pytest.fixture(scope="function")
-def clean_db(test_db):
-    """Provide a clean database for each test function"""
-    print(f"\nCleaning database at: {test_db}")  # Debug print
-    conn = sqlite3.connect(str(test_db))
-    conn.execute("DELETE FROM analysis_cache")
-    conn.commit()
-    conn.close()
-    return test_db
+def clean_db(test_db_template):
+    """Provide a clean, unique database copy for each test function"""
+    temp_dir = tempfile.mkdtemp()
+    unique_db_path = Path(temp_dir) / f"analysis_{uuid.uuid4().hex}.db"
+    shutil.copy2(test_db_template, unique_db_path)
+    print(f"\nCreating unique database copy at: {unique_db_path}")
+
+    yield unique_db_path
+
+    print(f"Cleaning up unique database at {temp_dir}")
+    shutil.rmtree(temp_dir)
 
 
 @pytest.fixture
 def test_env(clean_db):
     """Setup test environment with all necessary files and mocks"""
     temp_dir = tempfile.mkdtemp()
-    print(f"\nSetting up test environment in: {temp_dir}")  # Debug print
+    print(f"\nSetting up test environment in: {temp_dir}")
 
     # Create storage structure
     storage_path = Path(temp_dir) / "storage"
     (storage_path / "cache").mkdir(parents=True)
     (storage_path / "llm_cache").mkdir(parents=True)
 
-    # Create symlink to test database
+    # Copy the unique database to the expected location
     db_link = storage_path / "cache" / "analysis.db"
-    print(f"Creating symlink: {db_link} -> {clean_db}")  # Debug print
-    try:
-        if db_link.exists() or db_link.is_symlink():
-            db_link.unlink()
-        db_link.symlink_to(clean_db)
-        print(f"Symlink created successfully")  # Debug print
-    except Exception as e:
-        print(f"Error creating symlink: {e}")  # Debug print
-        # Fallback to copy if symlink fails
-        print(f"Falling back to copy")  # Debug print
-        shutil.copy2(clean_db, db_link)
+    shutil.copy2(clean_db, db_link)
+    print(f"Copied database to: {db_link}")
 
     # Create test questions
     questions_dir = Path(temp_dir) / "questionsets"
@@ -95,22 +96,34 @@ def test_env(clean_db):
                     },
                     {
                         "id": "tcfd_2",
-                        "text": "What is the role of management in assessing and managing climate-related risks and opportunities?",
+                        "text": (
+                            "What is the role of management in assessing and managing "
+                            "climate-related risks and opportunities?"
+                        ),
                         "guidelines": "Test guidelines 2",
                     },
                     {
                         "id": "tcfd_3",
-                        "text": "What are the most relevant climate-related risks and opportunities identified by the organisation?",
+                        "text": (
+                            "What are the most relevant climate-related risks and opportunities "
+                            "identified by the organisation?"
+                        ),
                         "guidelines": "Test guidelines 3",
                     },
                     {
                         "id": "tcfd_4",
-                        "text": "How do climate-related risks and opportunities impact the organisation's business, strategy and financial planning?",
+                        "text": (
+                            "How do climate-related risks and opportunities impact the organisation's "
+                            "business, strategy and financial planning?"
+                        ),
                         "guidelines": "Test guidelines 4",
                     },
                     {
                         "id": "tcfd_5",
-                        "text": "How resilient is the organisation's strategy when considering different climate-related scenarios?",
+                        "text": (
+                            "How resilient is the organisation's strategy when considering "
+                            "different climate-related scenarios?"
+                        ),
                         "guidelines": "Test guidelines 5",
                     },
                     {
@@ -125,7 +138,10 @@ def test_env(clean_db):
                     },
                     {
                         "id": "tcfd_8",
-                        "text": "How are the processes for identifying, assessing, and managing climate-related risks integrated into overall risk management?",
+                        "text": (
+                            "How are the processes for identifying, assessing, and managing "
+                            "climate-related risks integrated into overall risk management?"
+                        ),
                         "guidelines": "Test guidelines 8",
                     },
                     {
@@ -140,7 +156,10 @@ def test_env(clean_db):
                     },
                     {
                         "id": "tcfd_11",
-                        "text": "What targets does the organisation use to understand and manage climate-related risks and opportunities?",
+                        "text": (
+                            "What targets does the organisation use to understand and manage "
+                            "climate-related risks and opportunities?"
+                        ),
                         "guidelines": "Test guidelines 11",
                     },
                 ],
@@ -154,7 +173,7 @@ def test_env(clean_db):
     os.environ["STORAGE_PATH"] = str(storage_path)
     os.environ["QUESTIONSETS_PATH"] = str(questions_dir)
 
-    print(f"Test environment setup complete")  # Debug print
+    print("Test environment setup complete")  # Debug print
 
     yield {
         "temp_dir": temp_dir,
@@ -164,16 +183,18 @@ def test_env(clean_db):
         "db_path": clean_db,
     }
 
-    print(f"Cleaning up test environment")  # Debug print
+    print("Cleaning up test environment")  # Debug print
     shutil.rmtree(temp_dir)
 
 
 @pytest.fixture(scope="function")
 def analyzer(test_env, clean_db):
     """Create a DocumentAnalyzer instance with mocked LLM"""
-    with patch("langchain_openai.ChatOpenAI") as mock_llm, patch(
-        "llama_index.embeddings.openai.OpenAIEmbedding"
-    ) as mock_embedding, patch("llama_index.core.Settings") as mock_settings:
+    with (
+        patch("langchain_openai.ChatOpenAI") as mock_llm,
+        patch("llama_index.embeddings.openai.OpenAIEmbedding") as mock_embedding,
+        patch("llama_index.core.Settings"),
+    ):
         # Configure mock LLM
         mock_llm_instance = Mock(
             model="gpt-3.5-turbo-test",
@@ -193,11 +214,12 @@ def analyzer(test_env, clean_db):
         analyzer.cache_path = analyzer.storage_path / "cache"
         analyzer.llm_cache_path = analyzer.storage_path / "llm_cache"
 
-        # Explicitly set the database path for the cache manager
-        analyzer.cache_manager.db_path = Path(clean_db)  # Use clean_db directly
+        # Reinitialize CacheManager with the unique database copy
+        analyzer.cache_manager = CacheManager(db_path=str(clean_db))
         # Set the mocked LLM instance
         analyzer.llm = mock_llm_instance
-        # Force reload questions from test file
+        # Force reload questions from test file (reset singleton state from other tests)
+        analyzer.question_set = "tcfd"
         analyzer.questions = analyzer._load_questions()
 
         # Add mock for _analyze_single_question
@@ -230,10 +252,7 @@ def test_load_questions(analyzer):
     questions = analyzer._load_questions()
     assert len(questions) == 11  # TCFD has 11 questions
     assert "tcfd_1" in questions
-    assert (
-        questions["tcfd_1"]["text"]
-        == "How does the company's board oversee climate-related risks and opportunities?"
-    )
+    assert questions["tcfd_1"]["text"] == "How does the company's board oversee climate-related risks and opportunities?"
     assert "guidelines" in questions["tcfd_1"]
 
 
@@ -241,10 +260,7 @@ def test_get_question_by_number(analyzer):
     """Test getting question by number"""
     question = analyzer.get_question_by_number(1)
     assert question is not None
-    assert (
-        question["text"]
-        == "How does the company's board oversee climate-related risks and opportunities?"
-    )
+    assert question["text"] == "How does the company's board oversee climate-related risks and opportunities?"
     assert "guidelines" in question
 
 
@@ -305,9 +321,7 @@ async def test_process_document_with_cache(analyzer):
     }
 
     # Add to cache
-    analyzer.cache_manager.save_analysis(
-        file_path="test.pdf", question_id="tcfd_1", result=test_answer, config=config
-    )
+    analyzer.cache_manager.save_analysis(file_path="test.pdf", question_id="tcfd_1", result=test_answer, config=config)
 
     # Process document
     results = []
@@ -317,9 +331,7 @@ async def test_process_document_with_cache(analyzer):
             assert result["status"] in ["processing", "complete", "cached"]
 
     # Verify we got the cached result
-    cached_result = analyzer.cache_manager.get_analysis(
-        file_path="test.pdf", config=config, question_ids=["tcfd_1"]
-    )
+    cached_result = analyzer.cache_manager.get_analysis(file_path="test.pdf", config=config, question_ids=["tcfd_1"])
     assert cached_result is not None
     assert cached_result["tcfd_1"]["result"]["ANSWER"] == test_answer["ANSWER"]
 
@@ -388,9 +400,7 @@ def test_process_document_config_with_none_llm(analyzer, test_env):
             results = []
 
             async def collect_results():
-                async for result in analyzer.process_document(
-                    str(test_file), [1], force_recompute=True
-                ):
+                async for result in analyzer.process_document(str(test_file), [1], force_recompute=True):
                     results.append(result)
                     # Stop after we see the first error or status
                     if "error" in result or "status" in result:
@@ -407,9 +417,7 @@ def test_process_document_config_with_none_llm(analyzer, test_env):
 
         except AttributeError as e:
             if "'NoneType' object has no attribute 'model'" in str(e):
-                pytest.fail(
-                    "Config creation failed with None llm - this should be fixed!"
-                )
+                pytest.fail("Config creation failed with None llm - this should be fixed!")
             raise
 
 
@@ -453,9 +461,7 @@ async def test_process_document_pre_retrieved_chunks(analyzer, test_env):
         # Check that chunks were used (status message should indicate chunks loaded)
         status_messages = [r for r in results if "status" in r]
         if status_messages:
-            assert any(
-                "chunk" in str(r.get("status", "")).lower() for r in status_messages
-            )
+            assert any("chunk" in str(r.get("status", "")).lower() for r in status_messages)
 
 
 @pytest.mark.asyncio
@@ -526,9 +532,7 @@ def test_get_all_cached_answers(analyzer):
 
     # Save answers to database
     for qid, answer in test_answers.items():
-        analyzer.cache_manager.save_analysis(
-            file_path=f"test_{qid}.pdf", question_id=qid, result=answer, config=config
-        )
+        analyzer.cache_manager.save_analysis(file_path=f"test_{qid}.pdf", question_id=qid, result=answer, config=config)
 
     # Get all cached answers and verify
     answers = analyzer.get_all_cached_answers("tcfd")
@@ -541,9 +545,11 @@ def test_get_all_cached_answers(analyzer):
 @pytest.mark.asyncio
 async def test_document_analysis_workflow(test_env):
     """Test the main document analysis workflow"""
-    with patch("langchain_openai.ChatOpenAI") as mock_llm, patch(
-        "llama_index.embeddings.openai.OpenAIEmbedding"
-    ) as mock_embedding, patch("llama_index.core.Settings") as mock_settings:
+    with (
+        patch("langchain_openai.ChatOpenAI") as mock_llm,
+        patch("llama_index.embeddings.openai.OpenAIEmbedding") as mock_embedding,
+        patch("llama_index.core.Settings"),
+    ):
         # Configure mock LLM responses
         mock_llm.return_value = Mock(
             model="gpt-3.5-turbo-test",
@@ -568,9 +574,7 @@ async def test_document_analysis_workflow(test_env):
 
         # 2. Process document
         results = []
-        async for result in analyzer.process_document(
-            str(test_env["test_file"]), ["tcfd_1", "tcfd_2"]
-        ):
+        async for result in analyzer.process_document(str(test_env["test_file"]), ["tcfd_1", "tcfd_2"]):
             results.append(result)
             # Handle both status and error results
             if "status" in result:
@@ -589,9 +593,7 @@ async def test_document_analysis_workflow(test_env):
             assert all("question_id" in r for r in complete_results)
 
 
-@pytest.mark.skip(
-    reason="Chunk size creation behavior is not critical for current functionality"
-)
+@pytest.mark.skip(reason="Chunk size creation behavior is not critical for current functionality")
 def test_chunk_size_creation(analyzer, test_env):
     """Test that chunks are created with the requested chunk_size parameter"""
     import fitz  # PyMuPDF
@@ -640,9 +642,7 @@ def test_chunk_size_creation(analyzer, test_env):
         # Check if line would exceed page width (approximately 500 points)
         if len(test_line) > 80:  # Rough character limit per line
             if line:
-                page.insert_text(
-                    (50, y_position), line.strip(), fontsize=11, fontname="helv"
-                )
+                page.insert_text((50, y_position), line.strip(), fontsize=11, fontname="helv")
                 y_position += 15
                 if y_position > 750:  # Start new page if needed
                     page = doc.new_page()
@@ -665,15 +665,11 @@ def test_chunk_size_creation(analyzer, test_env):
     assert len(extracted_text) > 100, "PDF should contain substantial text content"
 
     # Mock embeddings to avoid API calls
-    mock_embedding = np.random.rand(1536).astype(
-        np.float32
-    )  # Standard embedding dimension
+    mock_embedding = np.random.rand(1536).astype(np.float32)  # Standard embedding dimension
 
     with patch.object(analyzer, "embeddings") as mock_embeddings:
         # Mock get_text_embedding_batch which is used by _create_chunks
-        mock_embeddings.get_text_embedding_batch = Mock(
-            return_value=[mock_embedding.tolist()] * 1000
-        )
+        mock_embeddings.get_text_embedding_batch = Mock(return_value=[mock_embedding.tolist()] * 1000)
         mock_embeddings.embed_query = Mock(return_value=mock_embedding.tolist())
 
         # Test with different chunk sizes
@@ -704,19 +700,13 @@ def test_chunk_size_creation(analyzer, test_env):
 
             # Verify chunk metadata
             for chunk in chunks:
-                assert (
-                    "chunk_size" in chunk.get("metadata", {}) or "chunk_size" in chunk
-                )
-                chunk_size_meta = chunk.get("metadata", {}).get(
-                    "chunk_size"
-                ) or chunk.get("chunk_size")
+                assert "chunk_size" in chunk.get("metadata", {}) or "chunk_size" in chunk
+                chunk_size_meta = chunk.get("metadata", {}).get("chunk_size") or chunk.get("chunk_size")
                 assert (
                     chunk_size_meta == chunk_size
                 ), f"Chunk metadata chunk_size={chunk_size_meta} doesn't match requested {chunk_size}"
 
-                chunk_overlap_meta = chunk.get("metadata", {}).get(
-                    "chunk_overlap"
-                ) or chunk.get("chunk_overlap")
+                chunk_overlap_meta = chunk.get("metadata", {}).get("chunk_overlap") or chunk.get("chunk_overlap")
                 assert (
                     chunk_overlap_meta == chunk_overlap
                 ), f"Chunk metadata chunk_overlap={chunk_overlap_meta} doesn't match requested {chunk_overlap}"
@@ -735,9 +725,7 @@ def test_chunk_size_creation(analyzer, test_env):
             results[chunk_size]["max_length"] = max_length
 
             # Verify that chunks are being created (not empty)
-            assert (
-                avg_length > 0
-            ), f"Chunks have zero average length for chunk_size={chunk_size}"
+            assert avg_length > 0, f"Chunks have zero average length for chunk_size={chunk_size}"
 
             # Note: Due to sentence boundary splitting, chunks may be larger than chunk_size
             # The important thing is that different chunk sizes produce different results
@@ -748,18 +736,12 @@ def test_chunk_size_creation(analyzer, test_env):
 
         # Verify different chunk sizes produce different numbers of chunks
         # Smaller chunk sizes should produce more chunks (or at least different chunking)
-        assert (
-            results[250]["count"] != results[500]["count"]
-            or results[250]["avg_length"] != results[500]["avg_length"]
-        ), (
+        assert results[250]["count"] != results[500]["count"] or results[250]["avg_length"] != results[500]["avg_length"], (
             f"Chunk sizes 250 and 500 produced identical results: "
             f"count={results[250]['count']} vs {results[500]['count']}, "
             f"avg_length={results[250]['avg_length']:.1f} vs {results[500]['avg_length']:.1f}"
         )
-        assert (
-            results[500]["count"] != results[1000]["count"]
-            or results[500]["avg_length"] != results[1000]["avg_length"]
-        ), (
+        assert results[500]["count"] != results[1000]["count"] or results[500]["avg_length"] != results[1000]["avg_length"], (
             f"Chunk sizes 500 and 1000 produced identical results: "
             f"count={results[500]['count']} vs {results[1000]['count']}, "
             f"avg_length={results[500]['avg_length']:.1f} vs {results[1000]['avg_length']:.1f}"
@@ -810,9 +792,7 @@ def test_chunk_size_creation(analyzer, test_env):
         # This is the key assertion: NOT all 250-size chunks should be subsets
         # At least some should span across boundaries
         # Allow some tolerance (maybe 20% can be subsets due to alignment), but not all
-        subset_percentage = (
-            chunks_that_are_subset / len(chunks_250) if chunks_250 else 0
-        )
+        subset_percentage = chunks_that_are_subset / len(chunks_250) if chunks_250 else 0
         assert subset_percentage < 0.9, (
             f"Too many 250-size chunks ({chunks_that_are_subset}/{len(chunks_250)} = {subset_percentage:.1%}) "
             f"are complete subsets of 1000-size chunks. "
@@ -844,6 +824,4 @@ def test_chunk_size_creation(analyzer, test_env):
                 # depending on how SentenceSplitter handles boundaries
                 if not overlap_found:
                     # Log warning but don't fail - overlap detection is tricky
-                    print(
-                        f"Warning: Could not detect clear overlap between consecutive chunks"
-                    )
+                    print(f"Warning: Could not detect clear overlap between consecutive chunks")

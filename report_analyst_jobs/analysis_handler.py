@@ -94,9 +94,7 @@ class DocumentAnalysisHandler(JobHandler):
             source = source_class()
 
         # Get chunks
-        chunks = await source.get_chunks(
-            job.document_id, job.parameters.get("configuration", {})
-        )
+        chunks = await source.get_chunks(job.document_id, job.parameters.get("configuration", {}))
 
         logger.info(f"Retrieved {len(chunks)} chunks for document {job.document_id}")
         return chunks
@@ -113,9 +111,7 @@ class DocumentAnalysisHandler(JobHandler):
             if question_id in question_set.questions:
                 filtered_questions[question_id] = question_set.questions[question_id]
 
-        logger.info(
-            f"Using {len(filtered_questions)} questions from set {job.question_set_id}"
-        )
+        logger.info(f"Using {len(filtered_questions)} questions from set {job.question_set_id}")
         return filtered_questions
 
     async def _analyze_document(self, job: AnalysisJobDefinition, chunks, questions):
@@ -130,14 +126,10 @@ class DocumentAnalysisHandler(JobHandler):
                 logger.info(f"Analyzing question {question_id}")
 
                 # Find relevant chunks for this question
-                relevant_chunks = await self._find_relevant_chunks(
-                    chunks, question_data["text"]
-                )
+                relevant_chunks = await self._find_relevant_chunks(chunks, question_data["text"])
 
                 # Perform LLM analysis
-                analysis_result = await self._analyze_question(
-                    question_data, relevant_chunks, job
-                )
+                analysis_result = await self._analyze_question(question_data, relevant_chunks, job)
 
                 results.append(
                     {
@@ -195,12 +187,7 @@ class DocumentAnalysisHandler(JobHandler):
 
             # Combine chunks into context
             context = "\n\n".join(
-                [
-                    f"Chunk {i+1}: {chunk['text']}"
-                    for i, chunk in enumerate(
-                        chunks[:10]
-                    )  # Limit to avoid token limits
-                ]
+                [f"Chunk {i+1}: {chunk['text']}" for i, chunk in enumerate(chunks[:10])]  # Limit to avoid token limits
             )
 
             # Create prompt
@@ -299,9 +286,7 @@ class ProgressReportingAnalysisHandler(DocumentAnalysisHandler):
 
         except Exception as e:
             if self.progress_callback:
-                await self.progress_callback(
-                    job.job_id, 0.0, f"Analysis failed: {str(e)}"
-                )
+                await self.progress_callback(job.job_id, 0.0, f"Analysis failed: {str(e)}")
 
             return JobResult(job_id=job.job_id, status=JobStatus.FAILED, error=str(e))
 
@@ -320,12 +305,8 @@ class ProgressReportingAnalysisHandler(DocumentAnalysisHandler):
                 )
 
             # Analyze question
-            relevant_chunks = await self._find_relevant_chunks(
-                chunks, question_data["text"]
-            )
-            analysis_result = await self._analyze_question(
-                question_data, relevant_chunks, job
-            )
+            relevant_chunks = await self._find_relevant_chunks(chunks, question_data["text"])
+            analysis_result = await self._analyze_question(question_data, relevant_chunks, job)
 
             results.append(
                 {

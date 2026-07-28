@@ -97,18 +97,10 @@ class BenchmarkStore:
             )
 
             # Create indices for better performance
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_ground_truth_dataset ON ground_truth_chunks(dataset_id)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_ground_truth_question ON ground_truth_chunks(question_id)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_evaluations_dataset ON benchmark_evaluations(dataset_id)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_annotations_evaluation ON human_annotations(evaluation_id)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ground_truth_dataset ON ground_truth_chunks(dataset_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ground_truth_question ON ground_truth_chunks(question_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_evaluations_dataset ON benchmark_evaluations(dataset_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_annotations_evaluation ON human_annotations(evaluation_id)")
 
             conn.commit()
             logger.info("Benchmark database schema initialized")
@@ -160,9 +152,7 @@ class BenchmarkStore:
                     )
 
             conn.commit()
-            logger.info(
-                f"Saved dataset {dataset.dataset_id} with {len(dataset.questions)} questions"
-            )
+            logger.info(f"Saved dataset {dataset.dataset_id} with {len(dataset.questions)} questions")
             return cursor.lastrowid
 
     def get_dataset(self, dataset_id: str) -> Optional[BenchmarkDataset]:
@@ -187,16 +177,8 @@ class BenchmarkStore:
                 version=row["version"] or None,
                 question_set=row["question_set"] or None,
                 file_path=row["file_path"] or None,
-                created_at=(
-                    datetime.fromisoformat(row["created_at"])
-                    if row["created_at"]
-                    else None
-                ),
-                updated_at=(
-                    datetime.fromisoformat(row["updated_at"])
-                    if row["updated_at"]
-                    else None
-                ),
+                created_at=(datetime.fromisoformat(row["created_at"]) if row["created_at"] else None),
+                updated_at=(datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None),
                 source="database",
             )
 
@@ -221,16 +203,8 @@ class BenchmarkStore:
                         question_set=row["question_set"] or None,
                         source="database",
                         file_path=row["file_path"],
-                        created_at=(
-                            datetime.fromisoformat(row["created_at"])
-                            if row["created_at"]
-                            else None
-                        ),
-                        updated_at=(
-                            datetime.fromisoformat(row["updated_at"])
-                            if row["updated_at"]
-                            else None
-                        ),
+                        created_at=(datetime.fromisoformat(row["created_at"]) if row["created_at"] else None),
+                        updated_at=(datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None),
                     )
                 )
 
@@ -282,9 +256,7 @@ class BenchmarkStore:
 
             conn.commit()
             evaluation_id = cursor.lastrowid
-            logger.info(
-                f"Saved evaluation {evaluation.evaluation_name} with ID {evaluation_id}"
-            )
+            logger.info(f"Saved evaluation {evaluation.evaluation_name} with ID {evaluation_id}")
             return evaluation_id
 
     def get_evaluation(self, evaluation_id: int) -> Optional[BenchmarkEvaluation]:
@@ -312,16 +284,10 @@ class BenchmarkStore:
                 config_hash=row["config_hash"],
                 retrieval_config=RetrievalConfig(**config_dict),
                 evaluation_metrics=EvaluationMetrics(**metrics_dict),
-                created_at=(
-                    datetime.fromisoformat(row["created_at"])
-                    if row["created_at"]
-                    else None
-                ),
+                created_at=(datetime.fromisoformat(row["created_at"]) if row["created_at"] else None),
             )
 
-    def list_evaluations(
-        self, dataset_id: Optional[str] = None
-    ) -> List[BenchmarkEvaluation]:
+    def list_evaluations(self, dataset_id: Optional[str] = None) -> List[BenchmarkEvaluation]:
         """List evaluations, optionally filtered by dataset"""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -356,11 +322,7 @@ class BenchmarkStore:
                         config_hash=row["config_hash"],
                         retrieval_config=RetrievalConfig(**config_dict),
                         evaluation_metrics=EvaluationMetrics(**metrics_dict),
-                        created_at=(
-                            datetime.fromisoformat(row["created_at"])
-                            if row["created_at"]
-                            else None
-                        ),
+                        created_at=(datetime.fromisoformat(row["created_at"]) if row["created_at"] else None),
                     )
                 )
 
@@ -417,11 +379,7 @@ class BenchmarkStore:
                         human_evidence_order=row["human_evidence_order"],
                         annotation_notes=row["annotation_notes"],
                         annotator_id=row["annotator_id"],
-                        created_at=(
-                            datetime.fromisoformat(row["created_at"])
-                            if row["created_at"]
-                            else None
-                        ),
+                        created_at=(datetime.fromisoformat(row["created_at"]) if row["created_at"] else None),
                     )
                 )
 
@@ -435,15 +393,9 @@ class BenchmarkStore:
                 "DELETE FROM human_annotations WHERE evaluation_id IN (SELECT id FROM benchmark_evaluations WHERE dataset_id = ?)",
                 (dataset_id,),
             )
-            conn.execute(
-                "DELETE FROM benchmark_evaluations WHERE dataset_id = ?", (dataset_id,)
-            )
-            conn.execute(
-                "DELETE FROM ground_truth_chunks WHERE dataset_id = ?", (dataset_id,)
-            )
-            cursor = conn.execute(
-                "DELETE FROM benchmark_datasets WHERE dataset_id = ?", (dataset_id,)
-            )
+            conn.execute("DELETE FROM benchmark_evaluations WHERE dataset_id = ?", (dataset_id,))
+            conn.execute("DELETE FROM ground_truth_chunks WHERE dataset_id = ?", (dataset_id,))
+            cursor = conn.execute("DELETE FROM benchmark_datasets WHERE dataset_id = ?", (dataset_id,))
 
             conn.commit()
             return cursor.rowcount > 0

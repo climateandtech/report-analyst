@@ -121,9 +121,7 @@ def build_error_analysis_dataframe_from_flexible(
       - chunk_id
     """
     # Index ground truth by query_id and chunk_id
-    gt_by_query: Dict[str, Dict[str, Dict]] = (
-        {}
-    )  # query_id -> chunk_id -> {score, text, report, question}
+    gt_by_query: Dict[str, Dict[str, Dict]] = {}  # query_id -> chunk_id -> {score, text, report, question}
     # Also create an index by (report, question) pair for fallback lookup
     gt_by_report_question: Dict[str, Dict[str, Dict[str, Dict]]] = (
         {}
@@ -143,12 +141,7 @@ def build_error_analysis_dataframe_from_flexible(
 
         # Extract data from flexible row
         data = result.data
-        score = (
-            result.get_score()
-            or data.get("relevance_label")
-            or data.get("relevance_score")
-            or 0.0
-        )
+        score = result.get_score() or data.get("relevance_label") or data.get("relevance_score") or 0.0
         # Try to get relevant part text - check for "Relevant" column (case-insensitive) first
         # as user mentioned it should retrieve from "Relevant" column
         text = None
@@ -159,12 +152,8 @@ def build_error_analysis_dataframe_from_flexible(
                 break
         # Fallback to other common column names
         if not text:
-            text = (
-                data.get("context") or data.get("chunk_text") or data.get("text") or ""
-            )
-        report = (
-            data.get("document") or data.get("report") or data.get("report_name") or ""
-        )
+            text = data.get("context") or data.get("chunk_text") or data.get("text") or ""
+        report = data.get("document") or data.get("report") or data.get("report_name") or ""
         question = data.get("question") or ""
 
         gt_entry = {
@@ -185,9 +174,7 @@ def build_error_analysis_dataframe_from_flexible(
                 gt_by_report_question[normalized_report] = {}
             if normalized_question not in gt_by_report_question[normalized_report]:
                 gt_by_report_question[normalized_report][normalized_question] = {}
-            gt_by_report_question[normalized_report][normalized_question][
-                chunk_id
-            ] = gt_entry
+            gt_by_report_question[normalized_report][normalized_question][chunk_id] = gt_entry
 
     rows: List[Dict] = []
 
@@ -205,21 +192,13 @@ def build_error_analysis_dataframe_from_flexible(
         data = r.data
         # Use relevant_text_sim as priority for ranking (similarity between retrieved chunk and relevant part)
         # Note: sim_text_relevance is NOT used here - it's an expert-annotated label, not a ranking score
-        sim_score = (
-            data.get("relevant_text_sim")
-            or r.get_score()
-            or data.get("score")
-            or data.get("relevance_score")
-            or 0.0
-        )
+        sim_score = data.get("relevant_text_sim") or r.get_score() or data.get("score") or data.get("relevance_score") or 0.0
         return float(sim_score) if sim_score else 0.0
 
     # Group queries by report_name, then by question
     # Structure: report_name -> question -> [query_ids for that (report, question) pair]
     # query_id is typically in format "report|||question" or similar
-    queries_by_report_and_question: Dict[str, Dict[str, List[str]]] = (
-        {}
-    )  # report -> question -> [query_ids]
+    queries_by_report_and_question: Dict[str, Dict[str, List[str]]] = {}  # report -> question -> [query_ids]
 
     for query_id, benchmark_results in benchmark_by_query.items():
         # Try to extract report/question from query_id first (common format: "report|||question")
@@ -243,12 +222,7 @@ def build_error_analysis_dataframe_from_flexible(
             if sample_result:
                 data = sample_result.data
                 if not report_name:
-                    report_name = (
-                        data.get("report")
-                        or data.get("document")
-                        or data.get("report_name")
-                        or ""
-                    )
+                    report_name = data.get("report") or data.get("document") or data.get("report_name") or ""
                 if not question_text:
                     question_text = data.get("question") or ""
 
@@ -319,17 +293,13 @@ def build_error_analysis_dataframe_from_flexible(
                     chunk_and_part_to_best_result[dedup_key] = result
                 else:
                     # Keep the one with higher similarity score
-                    existing_score = get_similarity_score(
-                        chunk_and_part_to_best_result[dedup_key]
-                    )
+                    existing_score = get_similarity_score(chunk_and_part_to_best_result[dedup_key])
                     if sim_score > existing_score:
                         chunk_and_part_to_best_result[dedup_key] = result
 
             # Sort by similarity score (descending) and take top-K
             deduplicated_results = list(chunk_and_part_to_best_result.values())
-            sorted_results = sorted(
-                deduplicated_results, key=get_similarity_score, reverse=True
-            )[:top_k]
+            sorted_results = sorted(deduplicated_results, key=get_similarity_score, reverse=True)[:top_k]
 
             # Get a representative query_id for this pair (for display purposes)
             query_id = query_ids[0]
@@ -337,9 +307,7 @@ def build_error_analysis_dataframe_from_flexible(
             # Output all top-K chunks for this (report, question) pair
             for local_rank, r in enumerate(sorted_results, start=1):
                 data = r.data
-                retrieved_chunk_id = (
-                    r.get_chunk_id() or ""
-                )  # This is the retrieved paragraph ID
+                retrieved_chunk_id = r.get_chunk_id() or ""  # This is the retrieved paragraph ID
                 original_position = r.get_position() or 0
 
                 # Get similarity score (used for ranking)
@@ -349,12 +317,7 @@ def build_error_analysis_dataframe_from_flexible(
                 model_score = data.get("relevant_text_sim") or 0.0
                 model_score = float(model_score) if model_score else 0.0
 
-                chunk_text = (
-                    data.get("paragraph")
-                    or data.get("chunk_text")
-                    or data.get("text")
-                    or ""
-                )
+                chunk_text = data.get("paragraph") or data.get("chunk_text") or data.get("text") or ""
 
                 # Get relevant_part_id to look up ground truth
                 relevant_part_id_from_data = data.get("relevant_part_id")
@@ -400,12 +363,7 @@ def build_error_analysis_dataframe_from_flexible(
 
                 # Get relevance from benchmarking dataset (not ground truth)
                 # Check for relevance_label or relevance column in benchmark data
-                benchmark_relevance = (
-                    data.get("relevance_label")
-                    or data.get("relevance")
-                    or data.get("label")
-                    or 0.0
-                )
+                benchmark_relevance = data.get("relevance_label") or data.get("relevance") or data.get("label") or 0.0
                 # Convert to numeric if it's a string
                 if isinstance(benchmark_relevance, str):
                     try:
@@ -413,9 +371,7 @@ def build_error_analysis_dataframe_from_flexible(
                     except (ValueError, TypeError):
                         benchmark_relevance = 0.0
                 else:
-                    benchmark_relevance = (
-                        float(benchmark_relevance) if benchmark_relevance else 0.0
-                    )
+                    benchmark_relevance = float(benchmark_relevance) if benchmark_relevance else 0.0
 
                 # is_really_relevant should be true only if benchmark relevance > 0
                 is_really_relevant = benchmark_relevance > 0
@@ -454,9 +410,7 @@ def build_error_analysis_dataframe_from_flexible(
             },
             "timestamp": int(pd.Timestamp.now().timestamp() * 1000),
         }
-        with open(
-            "/home/yauheni/Documents/my_main/.cursor/debug-f7bf10.log", "a"
-        ) as _f:
+        with open("/home/yauheni/Documents/my_main/.cursor/debug-f7bf10.log", "a") as _f:
             _f.write(json.dumps(log_entry2) + "\n")
     except Exception:
         pass
@@ -472,9 +426,7 @@ def build_error_analysis_dataframe_from_flexible(
                 continue
 
             # Sort benchmark results by similarity score and take top-K
-            sorted_results = sorted(
-                benchmark_results, key=get_similarity_score, reverse=True
-            )[:top_k]
+            sorted_results = sorted(benchmark_results, key=get_similarity_score, reverse=True)[:top_k]
 
             for local_rank, r in enumerate(sorted_results, start=1):
                 data = r.data
@@ -486,21 +438,13 @@ def build_error_analysis_dataframe_from_flexible(
                 expert_score = float(gt_entry.get("score", 0.0))
                 relevant_part_text = gt_entry.get("text", "")
                 report_name = (
-                    gt_entry.get("report")
-                    or data.get("document")
-                    or data.get("report")
-                    or data.get("report_name")
-                    or ""
+                    gt_entry.get("report") or data.get("document") or data.get("report") or data.get("report_name") or ""
                 )
                 question_text = gt_entry.get("question") or data.get("question") or ""
 
                 # Model score: keep same priority as main path
                 model_score = (
-                    data.get("relevant_text_sim")
-                    or r.get_score()
-                    or data.get("score")
-                    or data.get("relevance_score")
-                    or 0.0
+                    data.get("relevant_text_sim") or r.get_score() or data.get("score") or data.get("relevance_score") or 0.0
                 )
                 try:
                     model_score = float(model_score) if model_score else 0.0
@@ -516,12 +460,7 @@ def build_error_analysis_dataframe_from_flexible(
                         "question_id": query_id,
                         "question": str(question_text),
                         "relevant_part_text": str(relevant_part_text),
-                        "retrieved_chunk_text": str(
-                            data.get("paragraph")
-                            or data.get("chunk_text")
-                            or data.get("text")
-                            or ""
-                        ),
+                        "retrieved_chunk_text": str(data.get("paragraph") or data.get("chunk_text") or data.get("text") or ""),
                         "position_in_top_k": local_rank,
                         "retrieval_rank": original_position,
                         "model_score": model_score,
@@ -534,7 +473,5 @@ def build_error_analysis_dataframe_from_flexible(
     # No need to sort - rows are already in the correct order:
     # report (outer loop) -> question (middle loop) -> position_in_top_k (inner loop)
 
-    logger.info(
-        f"Built error-analysis dataframe from flexible datasets with {len(df)} rows"
-    )
+    logger.info(f"Built error-analysis dataframe from flexible datasets with {len(df)} rows")
     return df

@@ -76,9 +76,7 @@ tcfd_2,"Strategy includes...","strategy",0.88"""
 
         assert dataset.dataset_type == DatasetType.INFORMATION_EXTRACTION
         assert len(dataset.results) == 2
-        assert (
-            dataset.results[0].get_answer() == "The company identifies climate risks..."
-        )
+        assert dataset.results[0].get_answer() == "The company identifies climate risks..."
         assert dataset.results[0].get_category() == "risk_identification"
 
     def test_load_csv_from_file_path(self):
@@ -207,9 +205,7 @@ tcfd_1,chunk_001,1,0.95"""
             conn.commit()
             conn.close()
 
-            dataset = load_flexible_dataset_from_sqlite(
-                db_path, table_name="benchmark_results"
-            )
+            dataset = load_flexible_dataset_from_sqlite(db_path, table_name="benchmark_results")
 
             assert len(dataset.results) == 2
             assert dataset.source == "sqlite"
@@ -284,9 +280,7 @@ tcfd_1,chunk_015,2,0.89"""
 
     def test_flexible_row_get_method(self):
         """Test FlexibleDatasetRow get method with case-insensitive matching"""
-        row = FlexibleDatasetRow(
-            data={"Query_ID": "tcfd_1", "Chunk_ID": "chunk_001", "Score": 0.95}
-        )
+        row = FlexibleDatasetRow(data={"Query_ID": "tcfd_1", "Chunk_ID": "chunk_001", "Score": 0.95})
 
         assert row.get("query_id") == "tcfd_1"
         assert row.get("QUERY_ID") == "tcfd_1"

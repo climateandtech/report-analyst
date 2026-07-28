@@ -97,9 +97,7 @@ class BenchmarkingUI:
                 "`question_text`, `ground_truth_chunks` with `chunk_id`, `relevance_score`, `is_evidence`). "
                 "Alignment is not available for YAML/JSON; use CSV/Excel for alignment."
             )
-            st.caption(
-                "Full details: see EXPECTED_FILE_FORMATS.md in the project root."
-            )
+            st.caption("Full details: see EXPECTED_FILE_FORMATS.md in the project root.")
 
         # Initialize session state for uploaded datasets if not exists
         if "uploaded_datasets" not in st.session_state:
@@ -136,9 +134,7 @@ class BenchmarkingUI:
         aligned_bm = st.session_state.get("aligned_csv_current_benchmark")
         if aligned_gt or aligned_bm:
             st.subheader("Download aligned datasets")
-            st.caption(
-                "You have aligned dataset(s) in use. Download the aligned CSV version below."
-            )
+            st.caption("You have aligned dataset(s) in use. Download the aligned CSV version below.")
             dl_col1, dl_col2 = st.columns(2)
             if aligned_gt:
                 with dl_col1:
@@ -185,11 +181,7 @@ class BenchmarkingUI:
                         "Name": dataset.name,
                         "Question Set": dataset.question_set,
                         "Version": dataset.version,
-                        "Created": (
-                            dataset.created_at.strftime("%Y-%m-%d %H:%M")
-                            if dataset.created_at
-                            else "Unknown"
-                        ),
+                        "Created": (dataset.created_at.strftime("%Y-%m-%d %H:%M") if dataset.created_at else "Unknown"),
                     }
                 )
 
@@ -200,9 +192,7 @@ class BenchmarkingUI:
             selected_dataset = st.selectbox(
                 "Select dataset for actions:",
                 options=[d.dataset_id for d in datasets],
-                format_func=lambda x: next(
-                    d.name for d in datasets if d.dataset_id == x
-                ),
+                format_func=lambda x: next(d.name for d in datasets if d.dataset_id == x),
             )
 
             col1, col2 = st.columns(2)
@@ -236,9 +226,7 @@ class BenchmarkingUI:
                 "classification evaluation."
             )
 
-            gt_wizard, bm_wizard = st.tabs(
-                ["Align Ground Truth (Wizard)", "Align Benchmark (Wizard)"]
-            )
+            gt_wizard, bm_wizard = st.tabs(["Align Ground Truth (Wizard)", "Align Benchmark (Wizard)"])
 
             with gt_wizard:
                 self._render_flexible_gt_wizard()
@@ -260,14 +248,8 @@ class BenchmarkingUI:
         uploaded_datasets = st.session_state.get("uploaded_datasets", {})
 
         # Check for unconfirmed datasets and show helpful message
-        temp_datasets = {
-            k: v for k, v in uploaded_datasets.items() if k.startswith("temp_")
-        }
-        if (
-            temp_datasets
-            and not db_datasets
-            and not any(not k.startswith("temp_") for k in uploaded_datasets.keys())
-        ):
+        temp_datasets = {k: v for k, v in uploaded_datasets.items() if k.startswith("temp_")}
+        if temp_datasets and not db_datasets and not any(not k.startswith("temp_") for k in uploaded_datasets.keys()):
             st.warning(
                 "⚠️ You have uploaded datasets but haven't confirmed them yet. "
                 "Please go to the 'Datasets' tab and click 'Confirm and Use This Dataset' "
@@ -368,9 +350,7 @@ class BenchmarkingUI:
             k_values = None
             if k_values_input:
                 try:
-                    k_values = [
-                        int(k.strip()) for k in k_values_input.split(",") if k.strip()
-                    ]
+                    k_values = [int(k.strip()) for k in k_values_input.split(",") if k.strip()]
                     if not k_values:
                         k_values = None
                 except ValueError:
@@ -418,21 +398,15 @@ class BenchmarkingUI:
         all_evaluations = evaluations + session_evals
 
         if not all_evaluations:
-            st.info(
-                "No evaluations run yet. Run a benchmark evaluation to see results."
-            )
+            st.info("No evaluations run yet. Run a benchmark evaluation to see results.")
             return
 
         # Filter controls
         col1, col2 = st.columns(2)
         with col1:
-            datasets = list(
-                set(e.dataset_id for e in all_evaluations if hasattr(e, "dataset_id"))
-            )
+            datasets = list(set(e.dataset_id for e in all_evaluations if hasattr(e, "dataset_id")))
             if datasets:
-                selected_datasets = st.multiselect(
-                    "Filter by Dataset:", datasets, default=datasets
-                )
+                selected_datasets = st.multiselect("Filter by Dataset:", datasets, default=datasets)
             else:
                 selected_datasets = []
 
@@ -442,11 +416,7 @@ class BenchmarkingUI:
 
         # Filter evaluations
         if selected_datasets:
-            filtered_evals = [
-                e
-                for e in all_evaluations
-                if hasattr(e, "dataset_id") and e.dataset_id in selected_datasets
-            ]
+            filtered_evals = [e for e in all_evaluations if hasattr(e, "dataset_id") and e.dataset_id in selected_datasets]
         else:
             filtered_evals = all_evaluations
 
@@ -480,10 +450,7 @@ class BenchmarkingUI:
 
         # Detailed evaluation view
         if filtered_evals:
-            eval_options = [
-                f"{e.evaluation_name} ({getattr(e, 'dataset_id', 'N/A')})"
-                for e in filtered_evals
-            ]
+            eval_options = [f"{e.evaluation_name} ({getattr(e, 'dataset_id', 'N/A')})" for e in filtered_evals]
             selected_eval_name = st.selectbox(
                 "Select evaluation for details:",
                 options=eval_options,
@@ -532,9 +499,7 @@ class BenchmarkingUI:
                         ref_id, bench_id = dataset_id.split("_", 1)
 
                 if not ref_id or not bench_id:
-                    st.error(
-                        "Cannot determine datasets for error analysis from evaluation metadata."
-                    )
+                    st.error("Cannot determine datasets for error analysis from evaluation metadata.")
                     return
 
                 uploaded_datasets = st.session_state.get("uploaded_datasets", {})
@@ -542,9 +507,7 @@ class BenchmarkingUI:
                 benchmark_ds = uploaded_datasets.get(bench_id)
 
                 if not ground_truth_ds or not benchmark_ds:
-                    st.error(
-                        "Could not locate the ground truth and benchmark datasets used for this evaluation."
-                    )
+                    st.error("Could not locate the ground truth and benchmark datasets used for this evaluation.")
                     return
 
                 df_error = build_error_analysis_dataframe_from_flexible(
@@ -597,10 +560,7 @@ class BenchmarkingUI:
             return
 
         st.subheader("Classification model comparison")
-        options = [
-            f"{r['evaluation_name']} ({r['created_at'].strftime('%Y-%m-%d %H:%M')})"
-            for r in runs
-        ]
+        options = [f"{r['evaluation_name']} ({r['created_at'].strftime('%Y-%m-%d %H:%M')})" for r in runs]
         selected_idx = st.selectbox(
             "Select calibration run:",
             range(len(runs)),
@@ -613,9 +573,7 @@ class BenchmarkingUI:
             st.warning("No metrics for this run.")
             return
 
-        st.caption(
-            f"Run: **{run['evaluation_name']}** — one row per model (prediction column)."
-        )
+        st.caption(f"Run: **{run['evaluation_name']}** — one row per model (prediction column).")
         st.dataframe(metrics_df, use_container_width=True)
 
     def _render_classification_calibration_panel(self, key_prefix: str):
@@ -674,9 +632,7 @@ class BenchmarkingUI:
         raw_pred_cols = mapping.get("classification_prediction_cols") or ""
         # Stored as a comma-separated string to keep column_mapping values simple.
         default_pred_cols = (
-            [c.strip() for c in raw_pred_cols.split(",") if c.strip()]
-            if isinstance(raw_pred_cols, str)
-            else []
+            [c.strip() for c in raw_pred_cols.split(",") if c.strip()] if isinstance(raw_pred_cols, str) else []
         )
 
         # Ground-truth label: let the user pick from **all** columns.
@@ -707,9 +663,7 @@ class BenchmarkingUI:
         score_candidates = all_cols
 
         # Default predictions: use stored configuration if available; otherwise none.
-        default_score_selection = [
-            c for c in default_pred_cols if c in score_candidates
-        ]
+        default_score_selection = [c for c in default_pred_cols if c in score_candidates]
 
         # Let the user choose one or more prediction columns (models) to analyze.
         selected_score_cols = st.multiselect(
@@ -731,9 +685,7 @@ class BenchmarkingUI:
             key=f"{key_prefix}calibration_ece_bins",
         )
 
-        if st.button(
-            "Compute classification calibration", key=f"{key_prefix}calibration_compute"
-        ):
+        if st.button("Compute classification calibration", key=f"{key_prefix}calibration_compute"):
             with st.spinner("Computing calibration metrics..."):
                 try:
                     metrics_df = compute_calibration_metrics(
@@ -774,36 +726,25 @@ class BenchmarkingUI:
                             score_col=score_col,
                         )
                     except Exception as exc:
-                        st.error(
-                            f"Failed to compute classification report for `{score_col}`: {exc}"
-                        )
+                        st.error(f"Failed to compute classification report for `{score_col}`: {exc}")
                         logger.exception("Classification report error")
                         continue
 
                     if report_dict:
-                        st.markdown(
-                            f"**Classification report for `{score_col}` (labels 0, 1, 2)**"
-                        )
+                        st.markdown(f"**Classification report for `{score_col}` (labels 0, 1, 2)**")
                         report_df = pd.DataFrame(report_dict).T
                         st.dataframe(report_df, use_container_width=True)
                     else:
-                        st.info(
-                            f"Not enough non-missing data to compute a classification report "
-                            f"for `{score_col}`."
-                        )
+                        st.info(f"Not enough non-missing data to compute a classification report " f"for `{score_col}`.")
 
-    def _run_csv_evaluation_from_datasets(
-        self, ref_source, ref_id, bench_source, bench_id, k_values, evaluation_name
-    ):
+    def _run_csv_evaluation_from_datasets(self, ref_source, ref_id, bench_source, bench_id, k_values, evaluation_name):
         """Run evaluation using selected datasets from database or uploaded files"""
         try:
             with st.spinner("Loading datasets and calculating metrics..."):
                 # Load reference dataset
                 if ref_source == "db":
                     # Load from database (would need to convert from BenchmarkDatasetContent)
-                    st.error(
-                        "Database dataset evaluation not yet implemented. Please use uploaded CSV/Excel files."
-                    )
+                    st.error("Database dataset evaluation not yet implemented. Please use uploaded CSV/Excel files.")
                     return
                 else:
                     # Load from session state
@@ -814,9 +755,7 @@ class BenchmarkingUI:
 
                 # Load benchmark dataset
                 if bench_source == "db":
-                    st.error(
-                        "Database dataset evaluation not yet implemented. Please use uploaded CSV/Excel files."
-                    )
+                    st.error("Database dataset evaluation not yet implemented. Please use uploaded CSV/Excel files.")
                     return
                 else:
                     # Load from session state
@@ -871,13 +810,9 @@ class BenchmarkingUI:
             st.error(f"Error during evaluation: {str(e)}")
             logger.exception("Evaluation error")
 
-    def _render_confirmation_ui(
-        self, dataset, temp_key: str, dataset_type: str, file_name: str
-    ):
+    def _render_confirmation_ui(self, dataset, temp_key: str, dataset_type: str, file_name: str):
         """Render confirmation UI for an unconfirmed dataset"""
-        st.info(
-            f"📋 **{dataset.name}** ({len(dataset.results)} rows) - Pending confirmation"
-        )
+        st.info(f"📋 **{dataset.name}** ({len(dataset.results)} rows) - Pending confirmation")
 
         # Show basic info
         st.write(f"**Dataset Name:** {dataset.name}")
@@ -887,17 +822,13 @@ class BenchmarkingUI:
         col1, col2 = st.columns(2)
         with col1:
             button_key = f"confirm_{dataset_type}_{file_name}"
-            if st.button(
-                "Confirm and Use This Dataset", key=button_key, type="primary"
-            ):
+            if st.button("Confirm and Use This Dataset", key=button_key, type="primary"):
                 dataset_key = f"{dataset_type}_current"
 
                 # Remove old dataset of the same type if it exists
                 if dataset_key in st.session_state.uploaded_datasets:
                     old_dataset = st.session_state.uploaded_datasets[dataset_key]
-                    st.info(
-                        f"Replacing previous {dataset_type} dataset: {old_dataset.name}"
-                    )
+                    st.info(f"Replacing previous {dataset_type} dataset: {old_dataset.name}")
 
                 # Save the new dataset
                 st.session_state.uploaded_datasets[dataset_key] = dataset
@@ -906,9 +837,7 @@ class BenchmarkingUI:
                 if temp_key in st.session_state.uploaded_datasets:
                     del st.session_state.uploaded_datasets[temp_key]
 
-                st.success(
-                    f"Dataset '{dataset.name}' confirmed and ready for evaluation!"
-                )
+                st.success(f"Dataset '{dataset.name}' confirmed and ready for evaluation!")
                 st.rerun()
 
         with col2:
@@ -943,9 +872,7 @@ class BenchmarkingUI:
             file_ext = uploaded_file.name.split(".")[-1].lower()
 
             # Save uploaded file temporarily
-            with tempfile.NamedTemporaryFile(
-                delete=False, suffix=f".{file_ext}"
-            ) as tmp_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_ext}") as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
                 tmp_path = tmp_file.name
 
@@ -986,9 +913,7 @@ class BenchmarkingUI:
                         and "uploaded_datasets" in st.session_state
                         and dataset_key in st.session_state.uploaded_datasets
                     ):
-                        aligned_dataset = st.session_state.uploaded_datasets[
-                            dataset_key
-                        ]
+                        aligned_dataset = st.session_state.uploaded_datasets[dataset_key]
                         st.success(
                             f"Using previously aligned dataset '{aligned_dataset.name}' "
                             f"({len(aligned_dataset.results)} rows) for evaluation."
@@ -1010,9 +935,7 @@ class BenchmarkingUI:
                         load_error = exc
 
                     if dataset is not None:
-                        st.success(
-                            f"Dataset loaded successfully from {file_ext.upper()} file!"
-                        )
+                        st.success(f"Dataset loaded successfully from {file_ext.upper()} file!")
 
                         # Store dataset temporarily in session state for preview
                         # Use a temporary key that will be replaced on confirmation
@@ -1039,30 +962,20 @@ class BenchmarkingUI:
 
                                 # Remove old dataset of the same type if it exists
                                 if dataset_key in st.session_state.uploaded_datasets:
-                                    old_dataset = st.session_state.uploaded_datasets[
-                                        dataset_key
-                                    ]
-                                    st.info(
-                                        f"Replacing previous {dataset_type} dataset: {old_dataset.name}"
-                                    )
+                                    old_dataset = st.session_state.uploaded_datasets[dataset_key]
+                                    st.info(f"Replacing previous {dataset_type} dataset: {old_dataset.name}")
 
                                 # Save the new dataset
-                                st.session_state.uploaded_datasets[dataset_key] = (
-                                    dataset
-                                )
+                                st.session_state.uploaded_datasets[dataset_key] = dataset
 
                                 # Remove temporary key
                                 if temp_key in st.session_state.uploaded_datasets:
                                     del st.session_state.uploaded_datasets[temp_key]
 
                                 # Clear any previously stored aligned CSV for this type
-                                st.session_state.pop(
-                                    f"aligned_csv_current_{dataset_type}", None
-                                )
+                                st.session_state.pop(f"aligned_csv_current_{dataset_type}", None)
 
-                                st.success(
-                                    f"Dataset '{dataset.name}' confirmed and ready for evaluation!"
-                                )
+                                st.success(f"Dataset '{dataset.name}' confirmed and ready for evaluation!")
                                 st.rerun()
 
                         with col2:
@@ -1099,8 +1012,7 @@ class BenchmarkingUI:
                         # Offer alignment using DatasetMapper.
                         # ------------------------------------------------------------------
                         st.warning(
-                            "This file does not match the expected benchmark CSV schema "
-                            "used by the evaluation engine."
+                            "This file does not match the expected benchmark CSV schema " "used by the evaluation engine."
                         )
                         st.caption(
                             "For new or custom CSV/Excel files, please use the **Flexible Dataset Alignment (Wizard)** section below "
@@ -1122,11 +1034,7 @@ class BenchmarkingUI:
                             selected_mapping_id = st.selectbox(
                                 "Select mapping configuration to align this dataset:",
                                 options=available_ids,
-                                index=(
-                                    available_ids.index("climretrieve")
-                                    if "climretrieve" in available_ids
-                                    else 0
-                                ),
+                                index=(available_ids.index("climretrieve") if "climretrieve" in available_ids else 0),
                                 key=f"align_cfg_{dataset_type}_{uploaded_file.name}",
                             )
 
@@ -1147,8 +1055,7 @@ class BenchmarkingUI:
                                     key=f"dl_aligned_{dataset_type}_{uploaded_file.name}",
                                 )
                                 st.caption(
-                                    "You can also 'Align and use for evaluation' to use "
-                                    "this dataset for evaluation."
+                                    "You can also 'Align and use for evaluation' to use " "this dataset for evaluation."
                                 )
 
                             col_align_use, col_align_dl = st.columns(2)
@@ -1157,9 +1064,7 @@ class BenchmarkingUI:
                                     "Align dataset and use for evaluation",
                                     key=f"align_and_use_{dataset_type}_{uploaded_file.name}",
                                 ):
-                                    mapper = DatasetMapperFactory.get_mapper(
-                                        selected_mapping_id
-                                    )
+                                    mapper = DatasetMapperFactory.get_mapper(selected_mapping_id)
                                     if dataset_type == "ground_truth":
                                         df_aligned = mapper.align_ground_truth(df_raw)
                                     else:
@@ -1169,39 +1074,28 @@ class BenchmarkingUI:
                                     csv_bytes = csv_aligned.encode("utf-8")
                                     aligned_dataset = load_flexible_dataset_from_csv(
                                         csv_content=csv_aligned,
-                                        dataset_name=(
-                                            f"{dataset_type}_aligned_{uploaded_file.name}"
-                                        ),
+                                        dataset_name=(f"{dataset_type}_aligned_{uploaded_file.name}"),
                                     )
 
                                     temp_key = f"temp_{dataset_type}_aligned_{uploaded_file.name}"
                                     if "uploaded_datasets" not in st.session_state:
                                         st.session_state.uploaded_datasets = {}
-                                    st.session_state.uploaded_datasets[temp_key] = (
-                                        aligned_dataset
-                                    )
+                                    st.session_state.uploaded_datasets[temp_key] = aligned_dataset
 
                                     dataset_key = f"{dataset_type}_current"
-                                    st.session_state.uploaded_datasets[dataset_key] = (
-                                        aligned_dataset
-                                    )
+                                    st.session_state.uploaded_datasets[dataset_key] = aligned_dataset
 
                                     if temp_key in st.session_state.uploaded_datasets:
                                         del st.session_state.uploaded_datasets[temp_key]
 
-                                    aligned_flag_key = (
-                                        f"aligned_{dataset_type}_{uploaded_file.name}"
-                                    )
+                                    aligned_flag_key = f"aligned_{dataset_type}_{uploaded_file.name}"
                                     st.session_state[aligned_flag_key] = True
 
                                     # Store aligned CSV so user can download it later
-                                    st.session_state[
-                                        f"aligned_csv_current_{dataset_type}"
-                                    ] = (uploaded_file.name, csv_bytes)
+                                    st.session_state[f"aligned_csv_current_{dataset_type}"] = (uploaded_file.name, csv_bytes)
 
                                     st.success(
-                                        "Dataset was aligned to the expected structure and "
-                                        "is now ready for evaluation."
+                                        "Dataset was aligned to the expected structure and " "is now ready for evaluation."
                                     )
                                     st.rerun()
 
@@ -1210,16 +1104,12 @@ class BenchmarkingUI:
                                     "Align and download CSV",
                                     key=f"align_and_download_{dataset_type}_{uploaded_file.name}",
                                 ):
-                                    mapper = DatasetMapperFactory.get_mapper(
-                                        selected_mapping_id
-                                    )
+                                    mapper = DatasetMapperFactory.get_mapper(selected_mapping_id)
                                     if dataset_type == "ground_truth":
                                         df_aligned = mapper.align_ground_truth(df_raw)
                                     else:
                                         df_aligned = mapper.align_benchmark(df_raw)
-                                    csv_bytes = df_aligned.to_csv(index=False).encode(
-                                        "utf-8"
-                                    )
+                                    csv_bytes = df_aligned.to_csv(index=False).encode("utf-8")
                                     st.session_state[download_key] = csv_bytes
                                     st.rerun()
 
@@ -1273,17 +1163,11 @@ class BenchmarkingUI:
                         if default_score == cols[0]:
                             for c in cols:
                                 cl = c.lower()
-                                if (
-                                    "relevance" in cl
-                                    or "usefulness" in cl
-                                    or "gpt" in cl
-                                ):
+                                if "relevance" in cl or "usefulness" in cl or "gpt" in cl:
                                     default_score = c
                                     break
                         position_col_candidates = ["position", "rank", "order", "pos"]
-                        has_position_col = any(
-                            p in cols_lower for p in position_col_candidates
-                        )
+                        has_position_col = any(p in cols_lower for p in position_col_candidates)
                         default_position_col = None
                         if has_position_col:
                             for p in position_col_candidates:
@@ -1293,21 +1177,13 @@ class BenchmarkingUI:
                         query_col = st.selectbox(
                             "Query / criteria column",
                             options=cols,
-                            index=(
-                                cols.index(default_query)
-                                if default_query in cols
-                                else 0
-                            ),
+                            index=(cols.index(default_query) if default_query in cols else 0),
                             key=f"cfg_query_{dataset_type}_{uploaded_file.name}",
                         )
                         chunk_text_col = st.selectbox(
                             "Chunk text column",
                             options=cols,
-                            index=(
-                                cols.index(default_chunk)
-                                if default_chunk in cols
-                                else 0
-                            ),
+                            index=(cols.index(default_chunk) if default_chunk in cols else 0),
                             key=f"cfg_chunk_{dataset_type}_{uploaded_file.name}",
                         )
                         score_label = (
@@ -1318,11 +1194,7 @@ class BenchmarkingUI:
                         score_col = st.selectbox(
                             score_label,
                             options=cols,
-                            index=(
-                                cols.index(default_score)
-                                if default_score in cols
-                                else 0
-                            ),
+                            index=(cols.index(default_score) if default_score in cols else 0),
                             key=f"cfg_score_{dataset_type}_{uploaded_file.name}",
                         )
                         position_options = [
@@ -1345,11 +1217,7 @@ class BenchmarkingUI:
                             position_mode = POSITION_MODE_COLUMN
                             position_column = st.selectbox(
                                 "Position column",
-                                options=[
-                                    cols_lower[p]
-                                    for p in position_col_candidates
-                                    if p in cols_lower
-                                ],
+                                options=[cols_lower[p] for p in position_col_candidates if p in cols_lower],
                                 key=f"cfg_position_col_{dataset_type}_{uploaded_file.name}",
                             )
                         document_options = ["None"] + cols
@@ -1364,9 +1232,7 @@ class BenchmarkingUI:
                             index=default_doc_idx,
                             key=f"cfg_document_{dataset_type}_{uploaded_file.name}",
                         )
-                        document_col = (
-                            None if document_col_sel == "None" else document_col_sel
-                        )
+                        document_col = None if document_col_sel == "None" else document_col_sel
                         if st.button(
                             "Apply column config and use for evaluation",
                             key=f"apply_cfg_{dataset_type}_{uploaded_file.name}",
@@ -1390,21 +1256,11 @@ class BenchmarkingUI:
                                 if "uploaded_datasets" not in st.session_state:
                                     st.session_state.uploaded_datasets = {}
                                 if dataset_key in st.session_state.uploaded_datasets:
-                                    old = st.session_state.uploaded_datasets[
-                                        dataset_key
-                                    ]
-                                    st.info(
-                                        f"Replacing previous {dataset_type} dataset: {old.name}"
-                                    )
-                                st.session_state.uploaded_datasets[dataset_key] = (
-                                    aligned_dataset
-                                )
-                                st.session_state[
-                                    f"aligned_{dataset_type}_{uploaded_file.name}"
-                                ] = True
-                                st.success(
-                                    "Column mapping applied. Dataset is ready for evaluation."
-                                )
+                                    old = st.session_state.uploaded_datasets[dataset_key]
+                                    st.info(f"Replacing previous {dataset_type} dataset: {old.name}")
+                                st.session_state.uploaded_datasets[dataset_key] = aligned_dataset
+                                st.session_state[f"aligned_{dataset_type}_{uploaded_file.name}"] = True
+                                st.success("Column mapping applied. Dataset is ready for evaluation.")
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Column config failed: {e}")
@@ -1449,9 +1305,7 @@ class BenchmarkingUI:
                 except:
                     pass
 
-    def _handle_classification_upload(
-        self, df_raw: pd.DataFrame, uploaded_file, dataset_type: str
-    ):
+    def _handle_classification_upload(self, df_raw: pd.DataFrame, uploaded_file, dataset_type: str):
         """Handle upload of a classification-style dataset (single file with labels and predictions).
 
         In this simplified path we do **no special alignment** – we just wrap the
@@ -1620,8 +1474,7 @@ class BenchmarkingUI:
                 df_aligned = align_ground_truth_flexible(df_raw, gt_config)
 
                 st.success(
-                    f"Aligned flexible ground truth: {len(df_aligned)} rows, "
-                    f"{df_aligned['query_id'].nunique()} queries."
+                    f"Aligned flexible ground truth: {len(df_aligned)} rows, " f"{df_aligned['query_id'].nunique()} queries."
                 )
                 st.dataframe(df_aligned.head(), use_container_width=True)
 
@@ -1659,9 +1512,7 @@ class BenchmarkingUI:
                     csv_bytes,
                 )
 
-                st.success(
-                    "Flexible ground truth dataset is now registered for evaluation."
-                )
+                st.success("Flexible ground truth dataset is now registered for evaluation.")
             except Exception as exc:
                 st.error(f"Flexible GT alignment failed: {exc}")
 
@@ -1732,9 +1583,7 @@ class BenchmarkingUI:
             query_id_options = ["<compute from document/question>"] + cols
             default_qid_idx = 0
             if has_query_id_col:
-                default_qid_idx = query_id_options.index(
-                    next(c for c in cols if c.lower() == "query_id")
-                )
+                default_qid_idx = query_id_options.index(next(c for c in cols if c.lower() == "query_id"))
             query_id_sel = st.selectbox(
                 "How should the query ID be obtained for this file?",
                 options=query_id_options,
@@ -1806,9 +1655,7 @@ class BenchmarkingUI:
         # wizard to also capture which column is the ground-truth label and
         # which columns are model predictions so that the evaluation tab can
         # pre-populate the calibration UI.
-        is_classification_mode = (
-            st.session_state.get("evaluation_mode") == "Classification"
-        )
+        is_classification_mode = st.session_state.get("evaluation_mode") == "Classification"
 
         # Prediction & similarity columns
         st.markdown("**Step 3 – Model scores and ranking signal**")
@@ -1837,9 +1684,7 @@ class BenchmarkingUI:
 
         classification_label_col = None
         if is_classification_mode:
-            st.markdown(
-                "**Step 3a – Ground-truth label used for classification metrics**"
-            )
+            st.markdown("**Step 3a – Ground-truth label used for classification metrics**")
             # Heuristic: prefer 'relevance' or 'usefulness' as label.
             default_label = cols[0]
             for cand in ("relevance", "usefulness", "label", "class"):
@@ -1895,13 +1740,10 @@ class BenchmarkingUI:
                 # evaluation tab can see and use it.
                 if is_classification_mode and classification_label_col:
                     if classification_label_col in df_raw.columns:
-                        df_aligned[classification_label_col] = df_raw[
-                            classification_label_col
-                        ].values
+                        df_aligned[classification_label_col] = df_raw[classification_label_col].values
 
                 st.success(
-                    f"Aligned flexible benchmark: {len(df_aligned)} rows, "
-                    f"{df_aligned['query_id'].nunique()} queries."
+                    f"Aligned flexible benchmark: {len(df_aligned)} rows, " f"{df_aligned['query_id'].nunique()} queries."
                 )
                 st.dataframe(df_aligned.head(), use_container_width=True)
 
@@ -1925,14 +1767,10 @@ class BenchmarkingUI:
                         # Remember classification defaults (if any) so that the
                         # calibration panel can pre-populate label/prediction
                         # selections without forcing the user to configure them again.
-                        "classification_label_col": (
-                            classification_label_col if is_classification_mode else ""
-                        ),
+                        "classification_label_col": (classification_label_col if is_classification_mode else ""),
                         # Store prediction columns as a single comma-separated string
                         # to keep column_mapping values as simple scalars.
-                        "classification_prediction_cols": (
-                            ",".join(prediction_cols) if is_classification_mode else ""
-                        ),
+                        "classification_prediction_cols": (",".join(prediction_cols) if is_classification_mode else ""),
                     },
                     results=results,
                 )
@@ -1949,9 +1787,7 @@ class BenchmarkingUI:
                     csv_bytes,
                 )
 
-                st.success(
-                    "Flexible benchmark dataset is now registered for evaluation."
-                )
+                st.success("Flexible benchmark dataset is now registered for evaluation.")
             except Exception as exc:
                 st.error(f"Flexible benchmark alignment failed: {exc}")
 
@@ -1960,28 +1796,20 @@ class BenchmarkingUI:
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            chunk_size = st.number_input(
-                "Chunk Size", min_value=100, max_value=2000, value=1000
-            )
-            chunk_overlap = st.number_input(
-                "Chunk Overlap", min_value=0, max_value=500, value=200
-            )
+            chunk_size = st.number_input("Chunk Size", min_value=100, max_value=2000, value=1000)
+            chunk_overlap = st.number_input("Chunk Overlap", min_value=0, max_value=500, value=200)
 
         with col2:
             top_k = st.number_input("Top K", min_value=1, max_value=20, value=5)
             use_llm_scoring = st.checkbox("Use LLM Scoring", value=False)
 
         with col3:
-            embedding_model = st.selectbox(
-                "Embedding Model", ["default", "openai", "sentence-transformers"]
-            )
+            embedding_model = st.selectbox("Embedding Model", ["default", "openai", "sentence-transformers"])
             similarity_threshold = st.slider("Similarity Threshold", 0.0, 1.0, 0.0, 0.1)
 
         llm_model = None
         if use_llm_scoring:
-            llm_model = st.selectbox(
-                "LLM Model", ["gpt-4o-mini", "gpt-4o", "gemini-1.5-flash"]
-            )
+            llm_model = st.selectbox("LLM Model", ["gpt-4o-mini", "gpt-4o", "gemini-1.5-flash"])
 
         return RetrievalConfig(
             chunk_size=chunk_size,
@@ -1993,14 +1821,10 @@ class BenchmarkingUI:
             llm_model=llm_model,
         )
 
-    def _run_evaluation(
-        self, dataset_id: str, evaluation_name: str, config: RetrievalConfig
-    ):
+    def _run_evaluation(self, dataset_id: str, evaluation_name: str, config: RetrievalConfig):
         """Run benchmark evaluation"""
         # This would integrate with the existing analyzer
-        st.info(
-            "Evaluation functionality would integrate with the existing DocumentAnalyzer here."
-        )
+        st.info("Evaluation functionality would integrate with the existing DocumentAnalyzer here.")
         # For now, create a placeholder evaluation
 
         # Save evaluation (placeholder)
@@ -2024,9 +1848,7 @@ class BenchmarkingUI:
         )
 
         eval_id = self.benchmark_store.save_evaluation(evaluation)
-        st.success(
-            f"Evaluation '{evaluation_name}' completed and saved with ID {eval_id}"
-        )
+        st.success(f"Evaluation '{evaluation_name}' completed and saved with ID {eval_id}")
 
     def _render_results_table(self, evaluations):
         """Render evaluation results table"""
@@ -2109,9 +1931,7 @@ class BenchmarkingUI:
                 title="Precision@K by Model",
                 markers=True,
             )
-            st.plotly_chart(
-                fig, use_container_width=True, key="results_precision_chart"
-            )
+            st.plotly_chart(fig, use_container_width=True, key="results_precision_chart")
 
         with col2:
             fig = px.line(
@@ -2201,9 +2021,7 @@ class BenchmarkingUI:
         st.write(f"Annotating evaluation: **{evaluation.evaluation_name}**")
 
         # This would show the retrieved chunks for annotation
-        st.info(
-            "Annotation interface would show retrieved chunks here for human evaluation."
-        )
+        st.info("Annotation interface would show retrieved chunks here for human evaluation.")
 
         # Placeholder annotation form
         annotator_id = st.text_input("Annotator ID", value="annotator_1")
@@ -2258,9 +2076,7 @@ class BenchmarkingUI:
         st.write("**Metrics at K:**")
         st.dataframe(df_detailed, use_container_width=True, hide_index=True)
 
-    def _render_csv_metrics_charts(
-        self, metrics, k_values: Optional[List[int]], chart_key_prefix: str = "csv"
-    ):
+    def _render_csv_metrics_charts(self, metrics, k_values: Optional[List[int]], chart_key_prefix: str = "csv"):
         """Render Plotly charts for CSV evaluation results"""
         st.subheader("Visualization")
 

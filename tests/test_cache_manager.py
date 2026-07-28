@@ -362,8 +362,7 @@ async def test_vector_store_reloads_on_chunk_size_change(temp_db):
     # Create test chunks with chunk_size=500
     chunks_500 = [
         {
-            "text": "This is a test chunk for chunk size 500. "
-            * 20,  # Make it long enough
+            "text": "This is a test chunk for chunk size 500. " * 20,  # Make it long enough
             "embedding": np.random.rand(embedding_dim).astype(np.float32),
             "metadata": {"page": 1, "chunk_size": 500, "chunk_overlap": 20},
         },
@@ -377,8 +376,7 @@ async def test_vector_store_reloads_on_chunk_size_change(temp_db):
     # Create test chunks with chunk_size=1000 (different chunking)
     chunks_1000 = [
         {
-            "text": "This is a test chunk for chunk size 1000. "
-            * 40,  # Different content
+            "text": "This is a test chunk for chunk size 1000. " * 40,  # Different content
             "embedding": np.random.rand(embedding_dim).astype(np.float32),
             "metadata": {"page": 1, "chunk_size": 1000, "chunk_overlap": 20},
         },

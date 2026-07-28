@@ -30,12 +30,8 @@ class DocumentService:
     def __init__(self):
         self.analyzer = DocumentAnalyzer()
         # Get valid question IDs from the loaded questions
-        self.valid_question_ids = list(
-            range(1, len(self.analyzer.questions["TCFD Analysis"]["questions"]) + 1)
-        )
-        logger.info(
-            f"Initialized with {len(self.valid_question_ids)} valid question IDs"
-        )
+        self.valid_question_ids = list(range(1, len(self.analyzer.questions["TCFD Analysis"]["questions"]) + 1))
+        logger.info(f"Initialized with {len(self.valid_question_ids)} valid question IDs")
 
     def validate_question_ids(self, question_ids: List[int]) -> List[int]:
         """Validate and filter question IDs"""
@@ -49,9 +45,7 @@ class DocumentService:
         logger.info(f"Validated question IDs: {valid_ids}")
         return valid_ids
 
-    async def process_document(
-        self, file_path: str, question_ids: List[int] = None
-    ) -> AsyncGenerator[Dict, None]:
+    async def process_document(self, file_path: str, question_ids: List[int] = None) -> AsyncGenerator[Dict, None]:
         """Process uploaded document and stream analysis results"""
         if not file_path:
             yield {"error": "No file uploaded"}
@@ -70,12 +64,8 @@ class DocumentService:
             temp_file = Path(tempfile.gettempdir()) / f"temp_{uuid.uuid4()}.pdf"
             try:
                 shutil.copy2(file_path, temp_file)
-                async for result in self.analyzer.process_document(
-                    str(temp_file), question_ids
-                ):
-                    logger.info(
-                        f"Processing section: {result.get('section', 'unknown')}"
-                    )
+                async for result in self.analyzer.process_document(str(temp_file), question_ids):
+                    logger.info(f"Processing section: {result.get('section', 'unknown')}")
                     yield result
             finally:
                 if temp_file.exists():
@@ -112,9 +102,7 @@ def create_app():
                 gr.Markdown("Upload a sustainability report for detailed TCFD analysis")
 
                 with gr.Row():
-                    file_input = gr.File(
-                        label="Upload PDF Report", file_types=[".pdf"], type="filepath"
-                    )
+                    file_input = gr.File(label="Upload PDF Report", file_types=[".pdf"], type="filepath")
                     analyze_btn = gr.Button("Start Analysis", variant="primary")
 
                 with gr.Row():
@@ -164,9 +152,7 @@ def create_app():
                 return
 
             try:
-                selected_ids = [
-                    i + 1 for i, selected in enumerate(selected_questions) if selected
-                ]
+                selected_ids = [i + 1 for i, selected in enumerate(selected_questions) if selected]
                 if not selected_ids:
                     yield "Please select at least one question", [], {}
                     return
@@ -198,16 +184,12 @@ def create_app():
 
                         if analysis.get("evidence"):
                             question_html += "<p><strong>Evidence:</strong></p><ul>"
-                            question_html += "".join(
-                                [f"<li>{e}</li>" for e in analysis["evidence"]]
-                            )
+                            question_html += "".join([f"<li>{e}</li>" for e in analysis["evidence"]])
                             question_html += "</ul>"
 
                         if analysis.get("gaps"):
                             question_html += "<p><strong>Gaps:</strong></p><ul>"
-                            question_html += "".join(
-                                [f"<li>{g}</li>" for g in analysis["gaps"]]
-                            )
+                            question_html += "".join([f"<li>{g}</li>" for g in analysis["gaps"]])
                             question_html += "</ul>"
 
                         question_html += "</div>"

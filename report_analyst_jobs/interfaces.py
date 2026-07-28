@@ -85,9 +85,7 @@ class JobResult:
             "error": self.error,
             "progress": self.progress,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": (
-                self.completed_at.isoformat() if self.completed_at else None
-            ),
+            "completed_at": (self.completed_at.isoformat() if self.completed_at else None),
             "metadata": self.metadata or {},
         }
 

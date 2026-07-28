@@ -91,9 +91,7 @@ class ChunkRetrievalStep(WorkflowStep):
                     "id": chunk.get("id"),
                     "text": chunk["text"],
                     "chunk_order": i,
-                    "similarity_score": chunk.get(
-                        "similarity_score", chunk.get("score", 0.0)
-                    ),
+                    "similarity_score": chunk.get("similarity_score", chunk.get("score", 0.0)),
                     "llm_score": None,  # Will be set in LLM scoring step if enabled
                     "is_evidence": False,  # Will be set in evidence assignment step
                     "evidence_order": None,
@@ -103,9 +101,7 @@ class ChunkRetrievalStep(WorkflowStep):
                 clean_chunks.append(clean_chunk)
 
             context.chunks = clean_chunks
-            logger.info(
-                f"[WORKFLOW] Retrieved {len(clean_chunks)} chunks with vector similarity"
-            )
+            logger.info(f"[WORKFLOW] Retrieved {len(clean_chunks)} chunks with vector similarity")
 
             return context
 
@@ -138,9 +134,7 @@ class LLMScoringStep(WorkflowStep):
 
         try:
             # Score chunks with LLM
-            llm_scores = await self.llm_manager.score_chunks(
-                question=context.question_text, chunks=context.chunks
-            )
+            llm_scores = await self.llm_manager.score_chunks(question=context.question_text, chunks=context.chunks)
 
             # Update chunks with LLM scores
             for chunk in context.chunks:
@@ -171,9 +165,7 @@ class QuestionAnalysisStep(WorkflowStep):
         return context.chunks is not None and len(context.chunks) > 0
 
     def validate_output(self, context: WorkflowContext) -> bool:
-        return (
-            context.analysis_result is not None and context.evidence_chunks is not None
-        )
+        return context.analysis_result is not None and context.evidence_chunks is not None
 
     async def execute(self, context: WorkflowContext) -> WorkflowContext:
         """Analyze question and extract evidence"""
@@ -182,9 +174,7 @@ class QuestionAnalysisStep(WorkflowStep):
             use_llm_scoring = context.config.get("use_llm_scoring", False)
             if use_llm_scoring and context.llm_scores:
                 # Sort by LLM score if available
-                sorted_chunks = sorted(
-                    context.chunks, key=lambda x: x.get("llm_score", 0.0), reverse=True
-                )
+                sorted_chunks = sorted(context.chunks, key=lambda x: x.get("llm_score", 0.0), reverse=True)
             else:
                 # Sort by vector similarity
                 sorted_chunks = sorted(
@@ -194,18 +184,14 @@ class QuestionAnalysisStep(WorkflowStep):
                 )
 
             # Analyze question with LLM
-            analysis_result = await self.llm_manager.analyze_question(
-                question=context.question_text, chunks=sorted_chunks
-            )
+            analysis_result = await self.llm_manager.analyze_question(question=context.question_text, chunks=sorted_chunks)
 
             # Extract evidence chunk IDs
             evidence_chunks = analysis_result.get("evidence_chunks", [])
 
             context.analysis_result = analysis_result
             context.evidence_chunks = evidence_chunks
-            logger.info(
-                f"[WORKFLOW] Question analysis complete, found {len(evidence_chunks)} evidence chunks"
-            )
+            logger.info(f"[WORKFLOW] Question analysis complete, found {len(evidence_chunks)} evidence chunks")
 
             return context
 
@@ -221,11 +207,7 @@ class EvidenceAssignmentStep(WorkflowStep):
         super().__init__("evidence_assignment")
 
     def validate_input(self, context: WorkflowContext) -> bool:
-        return (
-            context.chunks is not None
-            and context.evidence_chunks is not None
-            and context.analysis_result is not None
-        )
+        return context.chunks is not None and context.evidence_chunks is not None and context.analysis_result is not None
 
     def validate_output(self, context: WorkflowContext) -> bool:
         return context.chunks is not None
@@ -248,9 +230,7 @@ class EvidenceAssignmentStep(WorkflowStep):
                     chunk["is_evidence"] = False
                     chunk["evidence_order"] = None
 
-            logger.info(
-                f"[WORKFLOW] Assigned evidence flags to {len(evidence_mapping)} chunks"
-            )
+            logger.info(f"[WORKFLOW] Assigned evidence flags to {len(evidence_mapping)} chunks")
 
             return context
 
@@ -284,17 +264,13 @@ class WorkflowEngine:
         logger.info(f"[WORKFLOW] Starting workflow for question: {question_id}")
 
         # For now, just return cached results if available
-        cached_result = self.cache_manager.get_analysis(
-            file_path=file_path, config=config, question_ids=[question_id]
-        )
+        cached_result = self.cache_manager.get_analysis(file_path=file_path, config=config, question_ids=[question_id])
 
         if cached_result and question_id in cached_result:
             logger.info(f"[WORKFLOW] Found cached result for {question_id}")
             return cached_result[question_id]
         else:
-            logger.warning(
-                f"[WORKFLOW] No cached result for {question_id}, full workflow not implemented"
-            )
+            logger.warning(f"[WORKFLOW] No cached result for {question_id}, full workflow not implemented")
             return {
                 "error": "Full workflow not implemented - only cached results available",
                 "question_id": question_id,

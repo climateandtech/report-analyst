@@ -54,9 +54,7 @@ tcfd_1,chunk_015,3,0.87"""
         reference = load_flexible_dataset_from_csv(csv_content=reference_csv)
         input_dataset = load_flexible_dataset_from_csv(csv_content=input_csv)
 
-        metrics = engine.compare_flexible_datasets(
-            reference, input_dataset, k_values=[1, 2, 3]
-        )
+        metrics = engine.compare_flexible_datasets(reference, input_dataset, k_values=[1, 2, 3])
 
         assert metrics.precision_at_k[1] == 1.0
         assert metrics.precision_at_k[2] < 1.0

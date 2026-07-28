@@ -51,20 +51,13 @@ class EvaluationEngine:
         question_results = []
         for question in dataset.questions:
             if question.question_id not in retrieval_results:
-                logger.warning(
-                    f"No retrieval results for question {question.question_id}"
-                )
+                logger.warning(f"No retrieval results for question {question.question_id}")
                 continue
 
             retrieved_chunks = retrieval_results[question.question_id]
-            ground_truth = {
-                chunk.chunk_id: chunk.relevance_score
-                for chunk in question.ground_truth_chunks
-            }
+            ground_truth = {chunk.chunk_id: chunk.relevance_score for chunk in question.ground_truth_chunks}
 
-            result = self._evaluate_single_question(
-                retrieved_chunks, ground_truth, k_values
-            )
+            result = self._evaluate_single_question(retrieved_chunks, ground_truth, k_values)
             question_results.append(result)
 
         # Aggregate metrics
@@ -94,9 +87,7 @@ class EvaluationEngine:
         # Note: "id" field contains relevant_part_id (for matching to ground truth)
         # chunk_id is the unique paragraph identifier (for reference)
         # Multiple retrieved paragraphs can legitimately match the same relevant part
-        retrieved_ids_raw = [
-            chunk.get("id", chunk.get("chunk_id", "")) for chunk in retrieved_chunks
-        ]
+        retrieved_ids_raw = [chunk.get("id", chunk.get("chunk_id", "")) for chunk in retrieved_chunks]
 
         # Deduplicate relevant parts while preserving order (keep first occurrence)
         # This ensures each unique relevant part is counted only once in recall/NDCG
@@ -113,17 +104,11 @@ class EvaluationEngine:
 
         # Get relevance scores for retrieved chunks (after deduplication)
         # For NDCG, we still use ground truth scores if available
-        retrieved_relevance = [
-            ground_truth.get(chunk_id, 0.0) for chunk_id in retrieved_ids
-        ]
+        retrieved_relevance = [ground_truth.get(chunk_id, 0.0) for chunk_id in retrieved_ids]
 
         # Decide whether we have usable relevant_text_sim scores
         use_sim_scores = bool(
-            relevant_text_sim_scores
-            and any(
-                (s is not None and float(str(s) or 0) != 0.0)
-                for s in relevant_text_sim_scores
-            )
+            relevant_text_sim_scores and any((s is not None and float(str(s) or 0) != 0.0) for s in relevant_text_sim_scores)
         )
 
         binary_relevance: List[int] = []
@@ -196,9 +181,7 @@ class EvaluationEngine:
         relevant_at_k = sum(binary_relevance[:k])
         return relevant_at_k / k
 
-    def _recall_at_k(
-        self, binary_relevance: List[int], total_relevant: int, k: int
-    ) -> float:
+    def _recall_at_k(self, binary_relevance: List[int], total_relevant: int, k: int) -> float:
         """Compute recall at K"""
         if total_relevant == 0:
             return 0.0
@@ -211,9 +194,7 @@ class EvaluationEngine:
             return 0.0
         return 2 * (precision * recall) / (precision + recall)
 
-    def _ndcg_at_k(
-        self, retrieved_relevance: List[float], ground_truth: Dict[str, float], k: int
-    ) -> float:
+    def _ndcg_at_k(self, retrieved_relevance: List[float], ground_truth: Dict[str, float], k: int) -> float:
         """Compute Normalized Discounted Cumulative Gain at K"""
         if k == 0:
             return 0.0
@@ -264,9 +245,7 @@ class EvaluationEngine:
         total_relevant = sum(binary_relevance)
         return ap / total_relevant if total_relevant > 0 else 0.0
 
-    def _aggregate_metrics(
-        self, question_results: List[Dict], k_values: List[int]
-    ) -> EvaluationMetrics:
+    def _aggregate_metrics(self, question_results: List[Dict], k_values: List[int]) -> EvaluationMetrics:
         """Aggregate metrics across all questions"""
         if not question_results:
             return EvaluationMetrics()
@@ -292,41 +271,25 @@ class EvaluationEngine:
         metrics.mean_reciprocal_rank = np.mean(reciprocal_ranks)
         metrics.mean_average_precision = np.mean(average_precisions)
 
-        logger.info(
-            f"Evaluation complete. MAP: {metrics.mean_average_precision:.3f}, MRR: {metrics.mean_reciprocal_rank:.3f}"
-        )
+        logger.info(f"Evaluation complete. MAP: {metrics.mean_average_precision:.3f}, MRR: {metrics.mean_reciprocal_rank:.3f}")
 
         return metrics
 
-    def compare_evaluations(
-        self, eval1: EvaluationMetrics, eval2: EvaluationMetrics
-    ) -> Dict[str, float]:
+    def compare_evaluations(self, eval1: EvaluationMetrics, eval2: EvaluationMetrics) -> Dict[str, float]:
         """Compare two evaluations and return improvement metrics"""
         comparison = {}
 
         # Compare MAP and MRR
-        comparison["map_improvement"] = (
-            eval2.mean_average_precision - eval1.mean_average_precision
-        )
-        comparison["mrr_improvement"] = (
-            eval2.mean_reciprocal_rank - eval1.mean_reciprocal_rank
-        )
+        comparison["map_improvement"] = eval2.mean_average_precision - eval1.mean_average_precision
+        comparison["mrr_improvement"] = eval2.mean_reciprocal_rank - eval1.mean_reciprocal_rank
 
         # Compare metrics at K
         for k in eval1.precision_at_k.keys():
             if k in eval2.precision_at_k:
-                comparison[f"precision_at_{k}_improvement"] = (
-                    eval2.precision_at_k[k] - eval1.precision_at_k[k]
-                )
-                comparison[f"recall_at_{k}_improvement"] = (
-                    eval2.recall_at_k[k] - eval1.recall_at_k[k]
-                )
-                comparison[f"f1_at_{k}_improvement"] = (
-                    eval2.f1_at_k[k] - eval1.f1_at_k[k]
-                )
-                comparison[f"ndcg_at_{k}_improvement"] = (
-                    eval2.ndcg_at_k[k] - eval1.ndcg_at_k[k]
-                )
+                comparison[f"precision_at_{k}_improvement"] = eval2.precision_at_k[k] - eval1.precision_at_k[k]
+                comparison[f"recall_at_{k}_improvement"] = eval2.recall_at_k[k] - eval1.recall_at_k[k]
+                comparison[f"f1_at_{k}_improvement"] = eval2.f1_at_k[k] - eval1.f1_at_k[k]
+                comparison[f"ndcg_at_{k}_improvement"] = eval2.ndcg_at_k[k] - eval1.ndcg_at_k[k]
 
         return comparison
 
@@ -364,9 +327,7 @@ class EvaluationEngine:
         elif reference_dataset.dataset_type == DatasetType.INFORMATION_EXTRACTION:
             return self._compare_ie_datasets(reference_dataset, input_dataset)
         else:
-            raise ValueError(
-                f"Unsupported dataset type: {reference_dataset.dataset_type}"
-            )
+            raise ValueError(f"Unsupported dataset type: {reference_dataset.dataset_type}")
 
     def _compare_ir_datasets(
         self,
@@ -384,9 +345,7 @@ class EvaluationEngine:
         common_queries = reference_queries.intersection(input_queries)
 
         if not common_queries:
-            logger.warning(
-                "No common queries found between reference and input datasets"
-            )
+            logger.warning("No common queries found between reference and input datasets")
             return EvaluationMetrics()
 
         logger.info(f"Found {len(common_queries)} common queries for IR comparison")
@@ -396,9 +355,7 @@ class EvaluationEngine:
         for query_id in common_queries:
             # Get reference results (ground truth)
             reference_results = reference_dataset.get_results_by_query(query_id)
-            reference_results = sorted(
-                reference_results, key=lambda x: x.get_position() or 999
-            )
+            reference_results = sorted(reference_results, key=lambda x: x.get_position() or 999)
 
             # Build ground truth mapping: ID used for matching -> relevance_score
             # IMPORTANT: Use the same identifier that will be used for retrieved_ids
@@ -415,16 +372,12 @@ class EvaluationEngine:
                 if match_id:
                     score = ref_result.get_score()
                     # Use score if available, otherwise use inverse position
-                    relevance_score = (
-                        score if score is not None else max(0.0, 1.0 - (i * 0.1))
-                    )
+                    relevance_score = score if score is not None else max(0.0, 1.0 - (i * 0.1))
                     ground_truth[match_id] = relevance_score
 
             # Skip this query if there's no ground truth (can't evaluate without ground truth)
             if not ground_truth:
-                logger.debug(
-                    f"Skipping query with no ground truth: query_id='{query_id}'"
-                )
+                logger.debug(f"Skipping query with no ground truth: query_id='{query_id}'")
                 continue
 
             # Get input results (actual retrieval)
@@ -445,21 +398,15 @@ class EvaluationEngine:
                 return float(sim_score) if sim_score else 0.0
 
             # Sort by similarity score (descending) - this matches the error analysis logic
-            input_results = sorted(
-                input_results, key=get_similarity_score_for_ranking, reverse=True
-            )
+            input_results = sorted(input_results, key=get_similarity_score_for_ranking, reverse=True)
 
             # Convert to format expected by _evaluate_single_question
             # Use relevant_part_id for matching to ground truth (if available), otherwise fallback to chunk_id
             retrieved_chunks = []
-            relevant_text_sim_scores = (
-                []
-            )  # Extract relevant_text_sim from benchmark dataset
+            relevant_text_sim_scores = []  # Extract relevant_text_sim from benchmark dataset
             for result in input_results:
                 chunk_id = result.get_chunk_id()  # Unique paragraph identifier
-                relevant_part_id = result.get(
-                    "relevant_part_id"
-                )  # For matching to ground truth
+                relevant_part_id = result.get("relevant_part_id")  # For matching to ground truth
                 # Fallback: if no relevant_part_id, use chunk_id (backward compatibility)
                 match_id = relevant_part_id if relevant_part_id else chunk_id
                 # Use relevant_text_sim as the score (same priority as ranking)
@@ -483,18 +430,13 @@ class EvaluationEngine:
                     except (ValueError, TypeError):
                         relevant_text_sim = 0.0
                 else:
-                    relevant_text_sim = (
-                        float(relevant_text_sim) if relevant_text_sim else 0.0
-                    )
+                    relevant_text_sim = float(relevant_text_sim) if relevant_text_sim else 0.0
                 relevant_text_sim_scores.append(relevant_text_sim)
 
                 chunk_dict = {
-                    "id": match_id
-                    or f"unknown_{position}",  # Use relevant_part_id for matching
-                    "chunk_id": chunk_id
-                    or f"unknown_{position}",  # Keep original chunk_id for reference
-                    "relevant_part_id": match_id
-                    or f"unknown_{position}",  # Store for logging
+                    "id": match_id or f"unknown_{position}",  # Use relevant_part_id for matching
+                    "chunk_id": chunk_id or f"unknown_{position}",  # Keep original chunk_id for reference
+                    "relevant_part_id": match_id or f"unknown_{position}",  # Store for logging
                     "score": score,
                     "position": position,
                 }
@@ -513,9 +455,7 @@ class EvaluationEngine:
         # Aggregate metrics
         return self._aggregate_metrics(question_results, k_values)
 
-    def _compare_ie_datasets(
-        self, reference_dataset: BenchmarkDataset, input_dataset: BenchmarkDataset
-    ) -> EvaluationMetrics:
+    def _compare_ie_datasets(self, reference_dataset: BenchmarkDataset, input_dataset: BenchmarkDataset) -> EvaluationMetrics:
         """
         Compare two Information Extraction datasets.
 
@@ -528,9 +468,7 @@ class EvaluationEngine:
         common_queries = reference_queries.intersection(input_queries)
 
         if not common_queries:
-            logger.warning(
-                "No common queries found between reference and input datasets"
-            )
+            logger.warning("No common queries found between reference and input datasets")
             return EvaluationMetrics()
 
         logger.info(f"Found {len(common_queries)} common queries for IE comparison")
@@ -569,9 +507,7 @@ class EvaluationEngine:
             # Map to precision@1 for consistency with IR metrics
             metrics.precision_at_k[1] = exact_match_rate
             metrics.mean_average_precision = exact_match_rate
-            metrics.mean_reciprocal_rank = (
-                exact_match_rate if exact_matches > 0 else 0.0
-            )
+            metrics.mean_reciprocal_rank = exact_match_rate if exact_matches > 0 else 0.0
 
         logger.info(
             f"IE comparison complete. Exact match rate: {exact_matches}/{total_queries} = {metrics.precision_at_k.get(1, 0.0):.3f}"
@@ -604,9 +540,7 @@ class EvaluationEngine:
         if k_values is None:
             k_values = self.default_k_values
 
-        logger.info(
-            f"Comparing datasets: reference='{reference_dataset.dataset_id}' vs input='{input_dataset.dataset_id}'"
-        )
+        logger.info(f"Comparing datasets: reference='{reference_dataset.dataset_id}' vs input='{input_dataset.dataset_id}'")
 
         # Get common queries
         reference_queries = set(reference_dataset.get_unique_queries())
@@ -614,9 +548,7 @@ class EvaluationEngine:
         common_queries = reference_queries.intersection(input_queries)
 
         if not common_queries:
-            logger.warning(
-                "No common queries found between reference and input datasets"
-            )
+            logger.warning("No common queries found between reference and input datasets")
             return EvaluationMetrics()
 
         logger.info(f"Found {len(common_queries)} common queries")
@@ -636,18 +568,12 @@ class EvaluationEngine:
             for i, ref_result in enumerate(reference_results):
                 chunk_id = ref_result.chunk_id
                 # Use score if available, otherwise use inverse position (1.0 for position 1, 0.9 for position 2, etc.)
-                relevance_score = (
-                    ref_result.score
-                    if ref_result.score > 0
-                    else max(0.0, 1.0 - (i * 0.1))
-                )
+                relevance_score = ref_result.score if ref_result.score > 0 else max(0.0, 1.0 - (i * 0.1))
                 ground_truth[chunk_id] = relevance_score
 
             # Skip this query if there's no ground truth (can't evaluate without ground truth)
             if not ground_truth:
-                logger.debug(
-                    f"Skipping query with no ground truth: query_id='{query_id}'"
-                )
+                logger.debug(f"Skipping query with no ground truth: query_id='{query_id}'")
                 continue
 
             # Get input results (actual retrieval)
@@ -671,15 +597,11 @@ class EvaluationEngine:
                 return float(result.score) if result.score else 0.0
 
             # Sort by similarity score (descending) - prioritize relevant_text_sim
-            input_results = sorted(
-                input_results, key=get_similarity_score_for_ranking_legacy, reverse=True
-            )
+            input_results = sorted(input_results, key=get_similarity_score_for_ranking_legacy, reverse=True)
 
             # Convert to format expected by _evaluate_single_question
             retrieved_chunks = []
-            relevant_text_sim_scores = (
-                []
-            )  # Extract relevant_text_sim from benchmark dataset
+            relevant_text_sim_scores = []  # Extract relevant_text_sim from benchmark dataset
             for result in input_results:
                 # Use relevant_text_sim as the score if available
                 score = result.score or 0.0
@@ -704,9 +626,7 @@ class EvaluationEngine:
                     except (ValueError, TypeError):
                         relevant_text_sim = 0.0
                 else:
-                    relevant_text_sim = (
-                        float(relevant_text_sim) if relevant_text_sim else 0.0
-                    )
+                    relevant_text_sim = float(relevant_text_sim) if relevant_text_sim else 0.0
                 relevant_text_sim_scores.append(relevant_text_sim)
 
                 chunk_dict = {

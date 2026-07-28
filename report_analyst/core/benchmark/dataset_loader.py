@@ -36,9 +36,7 @@ class DatasetLoader:
             raise FileNotFoundError(f"Dataset file not found: {file_path}")
 
         if path.suffix.lower() not in self.supported_formats:
-            raise ValueError(
-                f"Unsupported file format: {path.suffix}. Supported: {self.supported_formats}"
-            )
+            raise ValueError(f"Unsupported file format: {path.suffix}. Supported: {self.supported_formats}")
 
         # Load raw data
         raw_data = self._load_raw_data(path)
@@ -46,9 +44,7 @@ class DatasetLoader:
         # Validate and parse
         dataset = self._validate_and_parse(raw_data)
 
-        logger.info(
-            f"Successfully loaded dataset '{dataset.name}' with {len(dataset.questions)} questions"
-        )
+        logger.info(f"Successfully loaded dataset '{dataset.name}' with {len(dataset.questions)} questions")
         return dataset
 
     def _load_raw_data(self, path: Path) -> Dict:
@@ -128,9 +124,7 @@ class DatasetLoader:
         # Validate relevance score
         score = chunk_data["relevance_score"]
         if not isinstance(score, (int, float)) or score < 0.0 or score > 1.0:
-            raise DatasetValidationError(
-                f"Invalid relevance_score: {score}. Must be between 0.0 and 1.0"
-            )
+            raise DatasetValidationError(f"Invalid relevance_score: {score}. Must be between 0.0 and 1.0")
 
         return GroundTruthChunk(
             chunk_id=chunk_data["chunk_id"],
@@ -140,9 +134,7 @@ class DatasetLoader:
             annotation_notes=chunk_data.get("annotation_notes"),
         )
 
-    def validate_dataset_consistency(
-        self, dataset: BenchmarkDatasetContent
-    ) -> List[str]:
+    def validate_dataset_consistency(self, dataset: BenchmarkDatasetContent) -> List[str]:
         """Validate dataset consistency and return list of warnings"""
         warnings = []
 
@@ -155,25 +147,15 @@ class DatasetLoader:
         for question in dataset.questions:
             evidence_chunks = [c for c in question.ground_truth_chunks if c.is_evidence]
             if evidence_chunks:
-                orders = [
-                    c.evidence_order
-                    for c in evidence_chunks
-                    if c.evidence_order is not None
-                ]
+                orders = [c.evidence_order for c in evidence_chunks if c.evidence_order is not None]
                 if len(orders) != len(set(orders)):
-                    warnings.append(
-                        f"Duplicate evidence orders in question {question.question_id}"
-                    )
+                    warnings.append(f"Duplicate evidence orders in question {question.question_id}")
 
         # Check for questions without any relevant chunks
         for question in dataset.questions:
-            relevant_chunks = [
-                c for c in question.ground_truth_chunks if c.relevance_score > 0.0
-            ]
+            relevant_chunks = [c for c in question.ground_truth_chunks if c.relevance_score > 0.0]
             if not relevant_chunks:
-                warnings.append(
-                    f"Question {question.question_id} has no relevant chunks"
-                )
+                warnings.append(f"Question {question.question_id} has no relevant chunks")
 
         return warnings
 

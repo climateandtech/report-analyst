@@ -20,9 +20,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Align ground truth and benchmark datasets for consistent evaluation"
-    )
+    parser = argparse.ArgumentParser(description="Align ground truth and benchmark datasets for consistent evaluation")
     parser.add_argument(
         "--dataset-id",
         type=str,
@@ -67,9 +65,9 @@ def main() -> None:
         df_gt = pd.read_csv(gt_path)
 
     # Align ground truth
-    output_gt_path = args.output_ground_truth or str(gt_path).replace(
-        ".csv", "_aligned.csv"
-    ).replace(".xlsx", "_aligned.csv").replace(".xls", "_aligned.csv")
+    output_gt_path = args.output_ground_truth or str(gt_path).replace(".csv", "_aligned.csv").replace(
+        ".xlsx", "_aligned.csv"
+    ).replace(".xls", "_aligned.csv")
     df_gt_aligned = mapper.align_ground_truth(df_gt)
     df_gt_aligned.to_csv(output_gt_path, index=False)
     logger.info("Saved transformed ground truth to: %s", output_gt_path)
@@ -80,9 +78,7 @@ def main() -> None:
     df_benchmark = pd.read_csv(benchmark_path)
 
     # Align benchmark results
-    output_benchmark_path = args.output_benchmark or str(benchmark_path).replace(
-        ".csv", "_aligned.csv"
-    )
+    output_benchmark_path = args.output_benchmark or str(benchmark_path).replace(".csv", "_aligned.csv")
     df_benchmark_aligned = mapper.align_benchmark(df_benchmark)
     df_benchmark_aligned.to_csv(output_benchmark_path, index=False)
     logger.info("Saved transformed benchmark results to: %s", output_benchmark_path)
@@ -93,16 +89,12 @@ def main() -> None:
     logger.info("%s", "=" * 60)
     logger.info("Ground truth queries: %d", df_gt_aligned["query_id"].nunique())
     logger.info("Benchmark queries: %d", df_benchmark_aligned["query_id"].nunique())
-    common_queries = set(df_gt_aligned["query_id"]).intersection(
-        set(df_benchmark_aligned["query_id"])
-    )
+    common_queries = set(df_gt_aligned["query_id"]).intersection(set(df_benchmark_aligned["query_id"]))
     logger.info("Common queries: %d", len(common_queries))
     logger.info("\nTransformed files:")
     logger.info("  Ground truth: %s", output_gt_path)
     logger.info("  Benchmark: %s", output_benchmark_path)
-    logger.info(
-        "\nThese files are ready for evaluation using evaluate_benchmark_from_csv.py"
-    )
+    logger.info("\nThese files are ready for evaluation using evaluate_benchmark_from_csv.py")
 
 
 if __name__ == "__main__":

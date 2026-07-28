@@ -46,9 +46,7 @@ def _stable_query_id_from_text(text: str, max_len: int = 64) -> str:
     return hashlib.md5(s.encode()).hexdigest()[:16]
 
 
-def make_query_id_from_columns(
-    document: Optional[Any], question: Any, max_len: int = 64
-) -> str:
+def make_query_id_from_columns(document: Optional[Any], question: Any, max_len: int = 64) -> str:
     """
     Helper to build a stable query_id from document/question-style fields.
 
@@ -115,27 +113,15 @@ def normalize_dataframe_for_benchmark(
         DataFrame with columns query_id, chunk_id, position, score, paragraph, question [, document].
     """
     if query_column not in df.columns:
-        raise ValueError(
-            f"Query column '{query_column}' not in DataFrame columns: {list(df.columns)}"
-        )
+        raise ValueError(f"Query column '{query_column}' not in DataFrame columns: {list(df.columns)}")
     if chunk_text_column not in df.columns:
-        raise ValueError(
-            f"Chunk text column '{chunk_text_column}' not in DataFrame columns: {list(df.columns)}"
-        )
+        raise ValueError(f"Chunk text column '{chunk_text_column}' not in DataFrame columns: {list(df.columns)}")
     if score_column not in df.columns:
-        raise ValueError(
-            f"Score column '{score_column}' not in DataFrame columns: {list(df.columns)}"
-        )
-    if position_mode == POSITION_MODE_COLUMN and (
-        not position_column or position_column not in df.columns
-    ):
-        raise ValueError(
-            f"Position mode is 'column' but position column '{position_column}' missing or not in DataFrame"
-        )
+        raise ValueError(f"Score column '{score_column}' not in DataFrame columns: {list(df.columns)}")
+    if position_mode == POSITION_MODE_COLUMN and (not position_column or position_column not in df.columns):
+        raise ValueError(f"Position mode is 'column' but position column '{position_column}' missing or not in DataFrame")
     if document_column is not None and document_column not in df.columns:
-        raise ValueError(
-            f"Document column '{document_column}' not in DataFrame columns: {list(df.columns)}"
-        )
+        raise ValueError(f"Document column '{document_column}' not in DataFrame columns: {list(df.columns)}")
 
     out = df.copy()
 
@@ -150,34 +136,24 @@ def normalize_dataframe_for_benchmark(
         )
     else:
         out["query_id"] = out[query_column].apply(
-            lambda x: (
-                _stable_query_id_from_text(x)
-                if pd.notna(x)
-                else _stable_query_id_from_text("")
-            )
+            lambda x: (_stable_query_id_from_text(x) if pd.notna(x) else _stable_query_id_from_text(""))
         )
 
     # chunk_id from chunk text
-    out["chunk_id"] = out[chunk_text_column].apply(
-        lambda x: generate_chunk_id(str(x) if pd.notna(x) else "")
-    )
+    out["chunk_id"] = out[chunk_text_column].apply(lambda x: generate_chunk_id(str(x) if pd.notna(x) else ""))
 
     # score (coerce to float)
     out["score"] = out[score_column].apply(_parse_score)
 
     # paragraph for matching/display
-    out["paragraph"] = (
-        out[chunk_text_column].where(out[chunk_text_column].notna(), "").astype(str)
-    )
+    out["paragraph"] = out[chunk_text_column].where(out[chunk_text_column].notna(), "").astype(str)
 
     # question text for error analysis / display (copy from query/criteria column)
     out["question"] = out[query_column].where(out[query_column].notna(), "").astype(str)
 
     # position
     if position_mode == POSITION_MODE_COLUMN and position_column:
-        out["position"] = out[position_column].apply(
-            lambda x: int(x) if pd.notna(x) and str(x).strip() else 1
-        )
+        out["position"] = out[position_column].apply(lambda x: int(x) if pd.notna(x) and str(x).strip() else 1)
         out["position"] = out["position"].clip(lower=1)
     elif position_mode == POSITION_MODE_SORT_BY_SCORE:
         out = out.sort_values(["query_id", "score"], ascending=[True, False])

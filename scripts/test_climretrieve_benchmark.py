@@ -28,9 +28,7 @@ from report_analyst.core.benchmark.retrieval_results_loader import (
 from report_analyst.models.benchmark import BenchmarkDataset, DatasetType
 
 
-def download_file_from_github(
-    repo: str, file_path: str, output_path: Optional[str] = None, branch: str = "main"
-) -> str:
+def download_file_from_github(repo: str, file_path: str, output_path: Optional[str] = None, branch: str = "main") -> str:
     """
     Download a file from GitHub repository.
 
@@ -113,9 +111,7 @@ def find_data_files_in_directory(
     return data_files
 
 
-def download_climretrieve_datasets(
-    data_dir: Path, repo: str = "tobischimanski/ClimRetrieve"
-) -> tuple[str, str]:
+def download_climretrieve_datasets(data_dir: Path, repo: str = "tobischimanski/ClimRetrieve") -> tuple[str, str]:
     """
     Download ClimRetrieve datasets.
 
@@ -130,31 +126,23 @@ def download_climretrieve_datasets(
 
     # Reference dataset: Expert-Annotated Relevant Sources Dataset
     reference_dir = "Expert-Annotated%20Relevant%20Sources%20Dataset"
-    reference_files = find_data_files_in_directory(
-        repo, reference_dir, extensions=[".csv", ".xlsx", ".xls"]
-    )
+    reference_files = find_data_files_in_directory(repo, reference_dir, extensions=[".csv", ".xlsx", ".xls"])
 
     if not reference_files:
         # Try alternative path format
         reference_dir = "Expert-Annotated Relevant Sources Dataset"
-        reference_files = find_data_files_in_directory(
-            repo, reference_dir, extensions=[".csv", ".xlsx", ".xls"]
-        )
+        reference_files = find_data_files_in_directory(repo, reference_dir, extensions=[".csv", ".xlsx", ".xls"])
 
     if not reference_files:
         raise ValueError(f"Could not find data files in {reference_dir}")
 
     print(f"Found reference dataset files: {reference_files}")
     # Prefer CSV, but use Excel if available
-    reference_file = next(
-        (f for f in reference_files if f.endswith(".csv")), reference_files[0]
-    )
+    reference_file = next((f for f in reference_files if f.endswith(".csv")), reference_files[0])
     reference_path = data_dir / f"climretrieve_reference_{reference_file}"
 
     if not reference_path.exists():
-        download_file_from_github(
-            repo, f"{reference_dir}/{reference_file}", str(reference_path)
-        )
+        download_file_from_github(repo, f"{reference_dir}/{reference_file}", str(reference_path))
     else:
         print(f"Reference dataset already exists: {reference_path}")
 
@@ -170,16 +158,12 @@ def download_climretrieve_datasets(
 
     # Input dataset: Report-Level Dataset
     input_dir = "Report-Level%20Dataset"
-    input_files = find_data_files_in_directory(
-        repo, input_dir, extensions=[".csv", ".xlsx", ".xls"]
-    )
+    input_files = find_data_files_in_directory(repo, input_dir, extensions=[".csv", ".xlsx", ".xls"])
 
     if not input_files:
         # Try alternative path format
         input_dir = "Report-Level Dataset"
-        input_files = find_data_files_in_directory(
-            repo, input_dir, extensions=[".csv", ".xlsx", ".xls"]
-        )
+        input_files = find_data_files_in_directory(repo, input_dir, extensions=[".csv", ".xlsx", ".xls"])
 
     if not input_files:
         raise ValueError(f"Could not find data files in {input_dir}")
@@ -222,9 +206,7 @@ def inspect_dataset_columns(csv_path: str) -> None:
     print(df.dtypes)
 
 
-def run_climretrieve_benchmark(
-    reference_path: str, input_path: str, k_values: Optional[list] = None
-) -> None:
+def run_climretrieve_benchmark(reference_path: str, input_path: str, k_values: Optional[list] = None) -> None:
     """
     Run benchmark comparison between ClimRetrieve datasets.
 
@@ -274,19 +256,15 @@ def run_climretrieve_benchmark(
                 df_ref_full["score"] = df_ref_full["Source Relevance Score"].fillna(0.0)
             elif "Relevant" in df_ref_full.columns:
                 df_ref_full["score"] = df_ref_full["Relevant"].apply(
-                    lambda x: (
-                        1.0 if str(x).lower() in ["yes", "y", "1", "true"] else 0.0
-                    )
+                    lambda x: (1.0 if str(x).lower() in ["yes", "y", "1", "true"] else 0.0)
                 )
             else:
                 df_ref_full["score"] = 1.0
             # Save transformed version
-            df_ref_full[
-                ["query_id", "chunk_id", "position", "score", "Context", "Question"]
-            ].to_csv(transformed_path, index=False)
-            print(
-                f"Transformed reference dataset saved to: {transformed_path} ({len(df_ref_full)} rows)"
+            df_ref_full[["query_id", "chunk_id", "position", "score", "Context", "Question"]].to_csv(
+                transformed_path, index=False
             )
+            print(f"Transformed reference dataset saved to: {transformed_path} ({len(df_ref_full)} rows)")
         else:
             print(f"Using existing transformed reference dataset: {transformed_path}")
         reference_path = transformed_path
@@ -340,18 +318,14 @@ def run_climretrieve_benchmark(
             if "relevance" in df_input_full.columns:
                 df_input_full["score"] = df_input_full["relevance"].fillna(0.0)
             elif "sim_text_relevance" in df_input_full.columns:
-                df_input_full["score"] = (
-                    df_input_full["sim_text_relevance"].fillna(0.0) / 3.0
-                )  # Normalize 0-3 to 0-1
+                df_input_full["score"] = df_input_full["sim_text_relevance"].fillna(0.0) / 3.0  # Normalize 0-3 to 0-1
             else:
                 df_input_full["score"] = 1.0
             # Save transformed version
-            df_input_full[
-                ["query_id", "chunk_id", "position", "score", "paragraph", "question"]
-            ].to_csv(transformed_input_path, index=False)
-            print(
-                f"Transformed input dataset saved to: {transformed_input_path} ({len(df_input_full)} rows)"
+            df_input_full[["query_id", "chunk_id", "position", "score", "paragraph", "question"]].to_csv(
+                transformed_input_path, index=False
             )
+            print(f"Transformed input dataset saved to: {transformed_input_path} ({len(df_input_full)} rows)")
         else:
             print(f"Using existing transformed input dataset: {transformed_input_path}")
         input_path = transformed_input_path
@@ -462,9 +436,7 @@ def main():
             input_files = list(data_dir.glob("climretrieve_input_*.csv"))
 
             if not reference_files or not input_files:
-                raise ValueError(
-                    "No existing datasets found. Remove --skip-download to download."
-                )
+                raise ValueError("No existing datasets found. Remove --skip-download to download.")
 
             reference_path = str(reference_files[0])
             input_path = str(input_files[0])
@@ -473,14 +445,10 @@ def main():
             print(f"  Input: {input_path}")
         else:
             print("Downloading ClimRetrieve datasets from GitHub...")
-            reference_path, input_path = download_climretrieve_datasets(
-                data_dir, args.repo
-            )
+            reference_path, input_path = download_climretrieve_datasets(data_dir, args.repo)
 
         # Run benchmark
-        metrics = run_climretrieve_benchmark(
-            reference_path, input_path, k_values=args.k_values
-        )
+        metrics = run_climretrieve_benchmark(reference_path, input_path, k_values=args.k_values)
 
         print(f"\n{'='*60}")
         print("Benchmark Test Complete!")

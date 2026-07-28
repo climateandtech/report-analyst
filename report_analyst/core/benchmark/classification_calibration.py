@@ -30,9 +30,7 @@ def minmax_normalize(series: pd.Series) -> np.ndarray:
     return (arr - min_val) / (max_val - min_val)
 
 
-def expected_calibration_error(
-    y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 100
-) -> float:
+def expected_calibration_error(y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 100) -> float:
     """Compute Expected Calibration Error (ECE) for binary labels and probabilities."""
     if y_true.size == 0:
         return 0.0
@@ -64,9 +62,7 @@ def _compute_metrics_for_pair(
 ) -> Dict[str, float]:
     """Compute calibration and F1 metrics for a single (ground_truth, score) pair."""
     if ground_truth_col not in df.columns or score_col not in df.columns:
-        raise ValueError(
-            f"Columns '{ground_truth_col}' and/or '{score_col}' not found in DataFrame"
-        )
+        raise ValueError(f"Columns '{ground_truth_col}' and/or '{score_col}' not found in DataFrame")
 
     mask = df[ground_truth_col].notna() & df[score_col].notna()
     if not mask.any():
@@ -197,19 +193,13 @@ def compute_classification_report(
     Uses the same 2/1/0 thresholding on the score column as in the notebook.
     """
     if ground_truth_col not in df.columns or score_col not in df.columns:
-        raise ValueError(
-            f"Columns '{ground_truth_col}' and/or '{score_col}' not found in DataFrame"
-        )
+        raise ValueError(f"Columns '{ground_truth_col}' and/or '{score_col}' not found in DataFrame")
 
     mask = df[ground_truth_col].notna() & df[score_col].notna()
     if not mask.any():
         return {}
 
-    y_true = (
-        pd.to_numeric(df.loc[mask, ground_truth_col], errors="coerce")
-        .astype(int)
-        .to_numpy()
-    )
+    y_true = pd.to_numeric(df.loc[mask, ground_truth_col], errors="coerce").astype(int).to_numpy()
     y_score = pd.to_numeric(df.loc[mask, score_col], errors="coerce")
     y_pred = np.where(
         y_score > 1,

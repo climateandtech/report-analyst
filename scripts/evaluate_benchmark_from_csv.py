@@ -67,10 +67,7 @@ def parse_args() -> argparse.Namespace:
         nargs="*",
         type=int,
         default=None,
-        help=(
-            "Optional list of K values for metrics (e.g. -k 1 3 5 10). "
-            "Defaults to EvaluationEngine.default_k_values."
-        ),
+        help=("Optional list of K values for metrics (e.g. -k 1 3 5 10). " "Defaults to EvaluationEngine.default_k_values."),
     )
     parser.add_argument(
         "--output",
@@ -83,17 +80,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def evaluate_from_csv(
-    reference_csv: str, input_csv: str, k_values: Optional[List[int]] = None
-):
+def evaluate_from_csv(reference_csv: str, input_csv: str, k_values: Optional[List[int]] = None):
     """Load datasets from CSV and run EvaluationEngine comparison."""
     reference = load_flexible_dataset_from_csv(csv_path=reference_csv)
     input_dataset = load_flexible_dataset_from_csv(csv_path=input_csv)
 
     engine = EvaluationEngine()
-    metrics = engine.compare_flexible_datasets(
-        reference, input_dataset, k_values=k_values
-    )
+    metrics = engine.compare_flexible_datasets(reference, input_dataset, k_values=k_values)
     return metrics
 
 

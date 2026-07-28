@@ -48,9 +48,7 @@ class JobCoordinator:
                 nats_executor = NATSJobExecutor(
                     nats_url=nats_config.get("url", "nats://localhost:4222"),
                     stream_name=nats_config.get("stream", "JOBS"),
-                    consumer_name=nats_config.get(
-                        "consumer", "report-analyst-consumer"
-                    ),
+                    consumer_name=nats_config.get("consumer", "report-analyst-consumer"),
                 )
                 self.executors[ExecutionBackend.NATS] = nats_executor
                 self.default_backend = ExecutionBackend.NATS
@@ -82,9 +80,7 @@ class JobCoordinator:
             if hasattr(executor, "register_handler"):
                 executor.register_handler(job_type, handler)
 
-    async def submit_job(
-        self, job: JobDefinition, backend: Optional[ExecutionBackend] = None
-    ) -> str:
+    async def submit_job(self, job: JobDefinition, backend: Optional[ExecutionBackend] = None) -> str:
         """Submit a job for execution"""
 
         # Determine backend
@@ -114,9 +110,7 @@ class JobCoordinator:
                 logger.debug(f"Failed to get job status from {backend}: {e}")
 
         # Job not found in any backend
-        return JobResult(
-            job_id=job_id, status=JobStatus.FAILED, error="Job not found in any backend"
-        )
+        return JobResult(job_id=job_id, status=JobStatus.FAILED, error="Job not found in any backend")
 
     async def cancel_job(self, job_id: str) -> bool:
         """Cancel a job in any backend"""

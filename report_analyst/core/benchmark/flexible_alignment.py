@@ -34,9 +34,7 @@ class BenchmarkAlignConfig:
     ranking_score_col: Optional[str]
 
 
-def align_ground_truth_flexible(
-    df: pd.DataFrame, config: GroundTruthAlignConfig
-) -> pd.DataFrame:
+def align_ground_truth_flexible(df: pd.DataFrame, config: GroundTruthAlignConfig) -> pd.DataFrame:
     """
     Align a raw ground truth DataFrame to the unified flexible schema.
 
@@ -52,13 +50,9 @@ def align_ground_truth_flexible(
         - score (numeric) for ranking, derived from the first label column when present
     """
     if config.question_col not in df.columns:
-        raise ValueError(
-            f"Question/description column '{config.question_col}' not in DataFrame."
-        )
+        raise ValueError(f"Question/description column '{config.question_col}' not in DataFrame.")
     if config.chunk_text_col not in df.columns:
-        raise ValueError(
-            f"Chunk text column '{config.chunk_text_col}' not in DataFrame."
-        )
+        raise ValueError(f"Chunk text column '{config.chunk_text_col}' not in DataFrame.")
 
     for col in config.label_cols:
         if col not in df.columns:
@@ -67,17 +61,13 @@ def align_ground_truth_flexible(
     if config.document_col and config.document_col not in df.columns:
         raise ValueError(f"Document column '{config.document_col}' not in DataFrame.")
     if config.relevant_part_col and config.relevant_part_col not in df.columns:
-        raise ValueError(
-            f"Relevant part column '{config.relevant_part_col}' not in DataFrame."
-        )
+        raise ValueError(f"Relevant part column '{config.relevant_part_col}' not in DataFrame.")
 
     out = df.copy()
 
     # Core ID fields
     def _mk_qid(row):
-        doc_val = (
-            row[config.document_col] if config.document_col else None  # type: ignore[index]
-        )
+        doc_val = row[config.document_col] if config.document_col else None  # type: ignore[index]
         return make_query_id_from_columns(doc_val, row[config.question_col])
 
     out["query_id"] = out.apply(_mk_qid, axis=1)
@@ -85,9 +75,7 @@ def align_ground_truth_flexible(
 
     if config.relevant_part_col:
         out["relevant_part_text"] = out[config.relevant_part_col]
-        out["relevant_part_id"] = out[config.relevant_part_col].apply(
-            make_relevant_part_id_from_text
-        )
+        out["relevant_part_id"] = out[config.relevant_part_col].apply(make_relevant_part_id_from_text)
     else:
         out["relevant_part_text"] = ""
         # Fallback: use chunk_id when no explicit relevant part is provided
@@ -142,9 +130,7 @@ def align_ground_truth_flexible(
     return out_aligned
 
 
-def align_benchmark_flexible(
-    df: pd.DataFrame, config: BenchmarkAlignConfig
-) -> pd.DataFrame:
+def align_benchmark_flexible(df: pd.DataFrame, config: BenchmarkAlignConfig) -> pd.DataFrame:
     """
     Align a raw benchmark results DataFrame to the unified flexible schema.
 
@@ -159,20 +145,14 @@ def align_benchmark_flexible(
     """
     if config.query_id_col:
         if config.query_id_col not in df.columns:
-            raise ValueError(
-                f"query_id column '{config.query_id_col}' not in DataFrame."
-            )
+            raise ValueError(f"query_id column '{config.query_id_col}' not in DataFrame.")
     else:
         # If no explicit query_id column, require at least a question/description column
         if not config.question_col or config.question_col not in df.columns:
-            raise ValueError(
-                "Either an explicit query_id_col or a question/description column must be provided."
-            )
+            raise ValueError("Either an explicit query_id_col or a question/description column must be provided.")
 
     if config.chunk_text_col not in df.columns:
-        raise ValueError(
-            f"Chunk text column '{config.chunk_text_col}' not in DataFrame."
-        )
+        raise ValueError(f"Chunk text column '{config.chunk_text_col}' not in DataFrame.")
 
     for col in config.prediction_cols:
         if col not in df.columns:
@@ -181,13 +161,9 @@ def align_benchmark_flexible(
     if config.document_col and config.document_col not in df.columns:
         raise ValueError(f"Document column '{config.document_col}' not in DataFrame.")
     if config.relevant_part_col and config.relevant_part_col not in df.columns:
-        raise ValueError(
-            f"Relevant part column '{config.relevant_part_col}' not in DataFrame."
-        )
+        raise ValueError(f"Relevant part column '{config.relevant_part_col}' not in DataFrame.")
     if config.ranking_score_col and config.ranking_score_col not in df.columns:
-        raise ValueError(
-            f"Ranking score column '{config.ranking_score_col}' not in DataFrame."
-        )
+        raise ValueError(f"Ranking score column '{config.ranking_score_col}' not in DataFrame.")
 
     out = df.copy()
 
@@ -197,9 +173,7 @@ def align_benchmark_flexible(
     else:
 
         def _mk_qid(row):
-            doc_val = (
-                row[config.document_col] if config.document_col else None  # type: ignore[index]
-            )
+            doc_val = row[config.document_col] if config.document_col else None  # type: ignore[index]
             return make_query_id_from_columns(doc_val, row[config.question_col])  # type: ignore[index]
 
         out["query_id"] = out.apply(_mk_qid, axis=1)
@@ -211,9 +185,7 @@ def align_benchmark_flexible(
     # Optional predicted relevant part
     if config.relevant_part_col:
         out["relevant_part_text_pred"] = out[config.relevant_part_col].astype(str)
-        out["relevant_part_id"] = out[config.relevant_part_col].apply(
-            make_relevant_part_id_from_text
-        )
+        out["relevant_part_id"] = out[config.relevant_part_col].apply(make_relevant_part_id_from_text)
     else:
         out["relevant_part_text_pred"] = ""
         out["relevant_part_id"] = out["chunk_id"]

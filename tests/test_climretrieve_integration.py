@@ -57,11 +57,7 @@ def find_csv_in_directory(repo: str, directory: str) -> Optional[str]:
         if isinstance(contents, dict):
             contents = [contents]
 
-        csv_files = [
-            item["name"]
-            for item in contents
-            if item.get("type") == "file" and item["name"].endswith(".csv")
-        ]
+        csv_files = [item["name"] for item in contents if item.get("type") == "file" and item["name"].endswith(".csv")]
 
         if csv_files:
             return csv_files[0]

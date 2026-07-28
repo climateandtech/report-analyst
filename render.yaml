@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: report-analyst
+    runtime: python
+    plan: free
+
+    buildCommand: pip install -r requirements.txt
+    startCommand: |
+      python -m alembic upgrade head || true
+      exec streamlit run report_analyst/streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
+
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: report-analyst-db
+          property: connectionString
+      - key: USE_ALEMBIC_MIGRATIONS
+        value: "true"
+      - key: USE_POSTGRES_FILE_STORAGE
+        value: "true"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_API_MODEL
+        value: gpt-4o-mini
+      - key: GOOGLE_API_KEY
+        sync: false
+
+databases:
+  - name: report-analyst-db
+    plan: free

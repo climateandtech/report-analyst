@@ -1,0 +1,3 @@
+# System dependencies for PyMuPDF (PDF processing) on Heroku
+libpoppler-cpp-dev
+pkg-config

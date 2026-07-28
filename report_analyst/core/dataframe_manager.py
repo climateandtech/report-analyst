@@ -40,17 +40,13 @@ def extract_evidence_text(evidence: Any) -> str:
     return str(evidence)
 
 
-def create_analysis_dataframes(
-    cached_results: Dict, file_key: str = None
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def create_analysis_dataframes(cached_results: Dict, file_key: str = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Create analysis and chunks dataframes from database results."""
     try:
         analysis_rows = []
         chunks_rows = []
 
-        logger.info(
-            f"Processing {len(cached_results)} results for file_key: {file_key}"
-        )
+        logger.info(f"Processing {len(cached_results)} results for file_key: {file_key}")
         logger.info(f"Input cached_results keys: {list(cached_results.keys())}")
 
         # Handle each question's results
@@ -58,9 +54,7 @@ def create_analysis_dataframes(
             try:
                 # Get the result data - it might be nested under 'result' key
                 result = data.get("result", data)
-                logger.info(
-                    f"Processing question {question_id} with keys: {list(result.keys())}"
-                )
+                logger.info(f"Processing question {question_id} with keys: {list(result.keys())}")
 
                 # Create analysis row
                 analysis_row = {
@@ -76,18 +70,14 @@ def create_analysis_dataframes(
 
                 # Process chunks - use exactly what's in the database
                 chunks = data.get("chunks", [])
-                logger.info(
-                    f"Processing {len(chunks)} chunks for question {question_id}"
-                )
+                logger.info(f"Processing {len(chunks)} chunks for question {question_id}")
 
                 for chunk in chunks:
                     # Create chunk row with exactly what's in the database
                     chunk_row = {
                         "Question ID": question_id,
                         "Chunk Text": chunk["text"],
-                        "Vector Similarity": chunk[
-                            "similarity_score"
-                        ],  # Raw value from DB
+                        "Vector Similarity": chunk["similarity_score"],  # Raw value from DB
                         "LLM Score": chunk.get("llm_score"),  # Raw value from DB
                         "Is Evidence": chunk.get("is_evidence"),  # Raw value from DB
                         "Position": chunk.get("chunk_order"),  # Raw value from DB
@@ -100,9 +90,7 @@ def create_analysis_dataframes(
                     )
 
             except Exception as e:
-                logger.error(
-                    f"Error processing result for question {question_id}: {str(e)}"
-                )
+                logger.error(f"Error processing result for question {question_id}: {str(e)}")
                 logger.error(f"Result data: {data}")
                 continue
 
@@ -111,18 +99,14 @@ def create_analysis_dataframes(
         chunks_df = pd.DataFrame(chunks_rows) if chunks_rows else pd.DataFrame()
 
         # Log DataFrame information
-        logger.info(
-            f"Created dataframes - Analysis: {len(analysis_df)} rows, Chunks: {len(chunks_df)} rows"
-        )
+        logger.info(f"Created dataframes - Analysis: {len(analysis_df)} rows, Chunks: {len(chunks_df)} rows")
         if not chunks_df.empty:
             logger.info(f"Chunks columns: {chunks_df.columns.tolist()}")
             logger.info(
                 f"Vector similarity range: {chunks_df['Vector Similarity'].min():.4f} - {chunks_df['Vector Similarity'].max():.4f}"
             )
             if "LLM Score" in chunks_df.columns:
-                logger.info(
-                    f"LLM score range: {chunks_df['LLM Score'].min():.4f} - {chunks_df['LLM Score'].max():.4f}"
-                )
+                logger.info(f"LLM score range: {chunks_df['LLM Score'].min():.4f} - {chunks_df['LLM Score'].max():.4f}")
 
         return analysis_df, chunks_df
 
@@ -139,9 +123,7 @@ def is_chunk_referenced(position: int, evidence_list: List[Dict]) -> bool:
     return False
 
 
-def create_combined_dataframe(
-    analysis_df: pd.DataFrame, chunks_df: pd.DataFrame
-) -> pd.DataFrame:
+def create_combined_dataframe(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame) -> pd.DataFrame:
     """
     Create a combined dataframe with analysis results and their chunks.
 

@@ -73,9 +73,7 @@ def load_retrieval_results_from_csv(
         source_path = None
         source_name = dataset_name or "uploaded_dataset"
 
-    dataset_id = (
-        dataset_id or f"{source_name}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
-    )
+    dataset_id = dataset_id or f"{source_name}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
 
     # Load CSV
     if csv_path:
@@ -97,30 +95,17 @@ def load_retrieval_results_from_csv(
     for _, row in df.iterrows():
         result_row = RetrievalResultRow(
             query_id=str(row["query_id"]),
-            report_id=(
-                str(row["report_id"])
-                if "report_id" in df.columns and pd.notna(row.get("report_id"))
-                else None
-            ),
+            report_id=(str(row["report_id"]) if "report_id" in df.columns and pd.notna(row.get("report_id")) else None),
             chunk_id=str(row["chunk_id"]),
-            chunk_text=(
-                str(row["chunk_text"])
-                if "chunk_text" in df.columns and pd.notna(row.get("chunk_text"))
-                else None
-            ),
+            chunk_text=(str(row["chunk_text"]) if "chunk_text" in df.columns and pd.notna(row.get("chunk_text")) else None),
             position=int(row["position"]),
             score=float(row["score"]),
             similarity_score=(
                 float(row["similarity_score"])
-                if "similarity_score" in df.columns
-                and pd.notna(row.get("similarity_score"))
+                if "similarity_score" in df.columns and pd.notna(row.get("similarity_score"))
                 else None
             ),
-            llm_score=(
-                float(row["llm_score"])
-                if "llm_score" in df.columns and pd.notna(row.get("llm_score"))
-                else None
-            ),
+            llm_score=(float(row["llm_score"]) if "llm_score" in df.columns and pd.notna(row.get("llm_score")) else None),
             metadata={
                 k: v
                 for k, v in row.items()
@@ -140,9 +125,7 @@ def load_retrieval_results_from_csv(
         )
         results.append(result_row)
 
-    logger.info(
-        f"Loaded {len(results)} retrieval results from CSV for dataset '{dataset_id}'"
-    )
+    logger.info(f"Loaded {len(results)} retrieval results from CSV for dataset '{dataset_id}'")
 
     return RetrievalResultsDataset(
         dataset_id=dataset_id,
@@ -191,10 +174,7 @@ def load_retrieval_results_from_sqlite(
     if not Path(db_path).exists():
         raise FileNotFoundError(f"Database file not found: {db_path}")
 
-    dataset_id = (
-        dataset_id
-        or f"{Path(db_path).stem}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
-    )
+    dataset_id = dataset_id or f"{Path(db_path).stem}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
     dataset_name = dataset_name or Path(db_path).stem
 
     # Build query
@@ -214,39 +194,24 @@ def load_retrieval_results_from_sqlite(
     required_columns = ["query_id", "chunk_id", "position", "score"]
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
-        raise ValueError(
-            f"Missing required columns in database table: {missing_columns}"
-        )
+        raise ValueError(f"Missing required columns in database table: {missing_columns}")
 
     # Convert to RetrievalResultRow objects
     results = []
     for _, row in df.iterrows():
         result_row = RetrievalResultRow(
             query_id=str(row["query_id"]),
-            report_id=(
-                str(row["report_id"])
-                if "report_id" in df.columns and pd.notna(row.get("report_id"))
-                else None
-            ),
+            report_id=(str(row["report_id"]) if "report_id" in df.columns and pd.notna(row.get("report_id")) else None),
             chunk_id=str(row["chunk_id"]),
-            chunk_text=(
-                str(row["chunk_text"])
-                if "chunk_text" in df.columns and pd.notna(row.get("chunk_text"))
-                else None
-            ),
+            chunk_text=(str(row["chunk_text"]) if "chunk_text" in df.columns and pd.notna(row.get("chunk_text")) else None),
             position=int(row["position"]),
             score=float(row["score"]),
             similarity_score=(
                 float(row["similarity_score"])
-                if "similarity_score" in df.columns
-                and pd.notna(row.get("similarity_score"))
+                if "similarity_score" in df.columns and pd.notna(row.get("similarity_score"))
                 else None
             ),
-            llm_score=(
-                float(row["llm_score"])
-                if "llm_score" in df.columns and pd.notna(row.get("llm_score"))
-                else None
-            ),
+            llm_score=(float(row["llm_score"]) if "llm_score" in df.columns and pd.notna(row.get("llm_score")) else None),
             metadata={
                 k: v
                 for k, v in row.items()
@@ -266,9 +231,7 @@ def load_retrieval_results_from_sqlite(
         )
         results.append(result_row)
 
-    logger.info(
-        f"Loaded {len(results)} retrieval results from SQLite for dataset '{dataset_id}'"
-    )
+    logger.info(f"Loaded {len(results)} retrieval results from SQLite for dataset '{dataset_id}'")
 
     return RetrievalResultsDataset(
         dataset_id=dataset_id,
@@ -409,9 +372,7 @@ def load_flexible_dataset_from_csv(
         source_path = None
         source_name = dataset_name or "uploaded_dataset"
 
-    dataset_id = (
-        dataset_id or f"{source_name}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
-    )
+    dataset_id = dataset_id or f"{source_name}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
 
     # Load CSV
     if csv_path:
@@ -431,9 +392,7 @@ def load_flexible_dataset_from_csv(
     columns_lower = [c.lower() for c in df.columns]
 
     # Check for query/question ID (required for all datasets)
-    has_query_id = any(
-        col in ["query_id", "question_id", "qid", "query"] for col in columns_lower
-    )
+    has_query_id = any(col in ["query_id", "question_id", "qid", "query"] for col in columns_lower)
     if not has_query_id:
         raise ValueError("Missing required columns: query_id or question_id")
 
@@ -441,24 +400,13 @@ def load_flexible_dataset_from_csv(
     if dataset_type == DatasetType.INFORMATION_RETRIEVAL:
         has_chunk_id = any(col in ["chunk_id", "chunk", "cid"] for col in columns_lower)
         if not has_chunk_id:
-            raise ValueError(
-                "Missing required columns: chunk_id (required for IR datasets)"
-            )
-        has_position = any(
-            col in ["position", "rank", "order", "pos"] for col in columns_lower
-        )
+            raise ValueError("Missing required columns: chunk_id (required for IR datasets)")
+        has_position = any(col in ["position", "rank", "order", "pos"] for col in columns_lower)
         if not has_position:
-            raise ValueError(
-                "Missing required columns: position or rank (required for IR datasets)"
-            )
-        has_score = any(
-            col in ["score", "relevance_score", "confidence_score", "similarity_score"]
-            for col in columns_lower
-        )
+            raise ValueError("Missing required columns: position or rank (required for IR datasets)")
+        has_score = any(col in ["score", "relevance_score", "confidence_score", "similarity_score"] for col in columns_lower)
         if not has_score:
-            raise ValueError(
-                "Missing required columns: score (required for IR datasets)"
-            )
+            raise ValueError("Missing required columns: score (required for IR datasets)")
 
     # Build column mapping if not provided
     if column_mapping is None:
@@ -483,9 +431,7 @@ def load_flexible_dataset_from_csv(
         for standard_name, variations in standard_mappings.items():
             for variation in variations:
                 if variation.lower() in columns_lower_dict:
-                    column_mapping[standard_name] = columns_lower_dict[
-                        variation.lower()
-                    ]
+                    column_mapping[standard_name] = columns_lower_dict[variation.lower()]
                     break
 
     # Convert to FlexibleDatasetRow objects
@@ -504,9 +450,7 @@ def load_flexible_dataset_from_csv(
         result_row = FlexibleDatasetRow(data=row_dict)
         results.append(result_row)
 
-    logger.info(
-        f"Loaded {len(results)} rows from CSV for dataset '{dataset_id}' (type: {dataset_type.value})"
-    )
+    logger.info(f"Loaded {len(results)} rows from CSV for dataset '{dataset_id}' (type: {dataset_type.value})")
 
     return BenchmarkDataset(
         dataset_id=dataset_id,
@@ -535,9 +479,7 @@ def load_flexible_dataset_from_normalized_df(
     required = ["query_id", "chunk_id", "position", "score"]
     missing = [c for c in required if c not in normalized_df.columns]
     if missing:
-        raise ValueError(
-            f"Normalized DataFrame must have columns {required}. Missing: {missing}"
-        )
+        raise ValueError(f"Normalized DataFrame must have columns {required}. Missing: {missing}")
     source_name = dataset_name or "normalized_dataset"
     did = dataset_id or f"{source_name}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
     results = []
@@ -593,10 +535,7 @@ def load_flexible_dataset_from_sqlite(
     if not Path(db_path).exists():
         raise FileNotFoundError(f"Database file not found: {db_path}")
 
-    dataset_id = (
-        dataset_id
-        or f"{Path(db_path).stem}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
-    )
+    dataset_id = dataset_id or f"{Path(db_path).stem}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
     dataset_name = dataset_name or Path(db_path).stem
 
     # Build query
@@ -655,9 +594,7 @@ def load_flexible_dataset_from_sqlite(
         result_row = FlexibleDatasetRow(data=row_dict)
         results.append(result_row)
 
-    logger.info(
-        f"Loaded {len(results)} rows from SQLite for dataset '{dataset_id}' (type: {dataset_type.value})"
-    )
+    logger.info(f"Loaded {len(results)} rows from SQLite for dataset '{dataset_id}' (type: {dataset_type.value})")
 
     return BenchmarkDataset(
         dataset_id=dataset_id,

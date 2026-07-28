@@ -121,19 +121,13 @@ async def test_e2e_document_ready_flow_with_router(
 
     # Verify full flow executed:
     # 1. Chunks were retrieved
-    coordinator._get_chunks_for_resource.assert_called_once_with(
-        "test-resource-123", "search", None
-    )
+    coordinator._get_chunks_for_resource.assert_called_once_with("test-resource-123", "search", None)
 
     # 2. Analysis was run
-    coordinator._run_analysis.assert_called_once_with(
-        mock_chunks, "tcfd", {"model": "gpt-4o-mini"}
-    )
+    coordinator._run_analysis.assert_called_once_with(mock_chunks, "tcfd", {"model": "gpt-4o-mini"})
 
     # 3. Results were stored
-    coordinator._store_analysis_to_backend.assert_called_once_with(
-        "test-resource-123", mock_analysis_result, "tcfd"
-    )
+    coordinator._store_analysis_to_backend.assert_called_once_with("test-resource-123", mock_analysis_result, "tcfd")
 
     # 4. Message was acked
     mock_msg.ack.assert_called_once()
@@ -229,9 +223,7 @@ async def test_e2e_document_ready_with_provided_chunks(
     coordinator._get_chunks_for_resource.assert_not_called()
 
     # Verify analysis was run with provided chunks
-    coordinator._run_analysis.assert_called_once_with(
-        provided_chunks, "tcfd", {"model": "gpt-4o-mini"}
-    )
+    coordinator._run_analysis.assert_called_once_with(provided_chunks, "tcfd", {"model": "gpt-4o-mini"})
 
     # Verify results stored
     coordinator._store_analysis_to_backend.assert_called_once()

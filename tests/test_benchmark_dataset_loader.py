@@ -140,9 +140,7 @@ questions:
 
             Path(f.name).unlink()
 
-    def test_validation_missing_required_field(
-        self, loader, invalid_dataset_missing_field
-    ):
+    def test_validation_missing_required_field(self, loader, invalid_dataset_missing_field):
         """Test validation with missing required field"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(invalid_dataset_missing_field)
@@ -153,9 +151,7 @@ questions:
 
             Path(f.name).unlink()
 
-    def test_validation_invalid_relevance_score(
-        self, loader, invalid_dataset_bad_score
-    ):
+    def test_validation_invalid_relevance_score(self, loader, invalid_dataset_bad_score):
         """Test validation with invalid relevance score"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(invalid_dataset_bad_score)

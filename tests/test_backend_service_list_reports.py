@@ -51,21 +51,13 @@ def test_backend_service_list_reports(backend_config, mock_backend_resources):
         reports = service.list_reports()
 
         assert len(reports) == 2
-        assert (
-            reports[0].uri
-            == "urn:report-analyst:backend:localhost:8000:test-resource-1"
-        )
+        assert reports[0].uri == "urn:report-analyst:backend:localhost:8000:test-resource-1"
         assert reports[0].name == "test_report.pdf"
-        assert (
-            reports[1].uri
-            == "urn:report-analyst:backend:localhost:8000:test-resource-2"
-        )
+        assert reports[1].uri == "urn:report-analyst:backend:localhost:8000:test-resource-2"
         assert reports[1].name == "another_report.pdf"
 
 
-def test_backend_service_list_reports_with_https(
-    backend_config, mock_backend_resources
-):
+def test_backend_service_list_reports_with_https(backend_config, mock_backend_resources):
     """Test URN generation with HTTPS backend URL"""
     backend_config.backend_url = "https://api.example.com"
 
@@ -131,9 +123,7 @@ def test_backend_service_list_reports_empty_response(backend_config):
 
 def test_backend_service_normalize_backend_url():
     """Test URL normalization for URN"""
-    backend_config = BackendConfig(
-        use_backend=True, backend_url="https://api.example.com:443"
-    )
+    backend_config = BackendConfig(use_backend=True, backend_url="https://api.example.com:443")
     service = BackendService(backend_config)
 
     normalized = service._normalize_backend_url("https://api.example.com:443")
@@ -147,9 +137,7 @@ def test_backend_service_normalize_backend_url():
 
 def test_backend_service_parse_date():
     """Test date parsing for timestamps"""
-    backend_config = BackendConfig(
-        use_backend=True, backend_url="http://localhost:8000"
-    )
+    backend_config = BackendConfig(use_backend=True, backend_url="http://localhost:8000")
     service = BackendService(backend_config)
 
     # Test ISO format with Z

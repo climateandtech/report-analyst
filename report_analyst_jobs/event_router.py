@@ -143,9 +143,7 @@ class EventRouter:
         self.rules.append(rule)
         # Sort by priority (higher first)
         self.rules.sort(key=lambda r: r.priority, reverse=True)
-        logger.info(
-            f"Added rule: {event_pattern} -> {action if action == IGNORE_ACTION else 'handler'}"
-        )
+        logger.info(f"Added rule: {event_pattern} -> {action if action == IGNORE_ACTION else 'handler'}")
 
     def remove_rule(self, event_pattern: str):
         """Remove a rule by pattern"""
@@ -175,10 +173,7 @@ class EventRouter:
         # Handle wildcards
         if pattern.endswith(".*"):
             prefix = pattern[:-2]
-            return (
-                subject.startswith(prefix + ".")
-                and "." not in subject[len(prefix) + 1 :]
-            )
+            return subject.startswith(prefix + ".") and "." not in subject[len(prefix) + 1 :]
 
         if pattern.endswith(".>"):
             prefix = pattern[:-2]
@@ -210,9 +205,7 @@ class EventRouter:
 
             # Check if action is "ignore"
             if rule.action == IGNORE_ACTION:
-                logger.debug(
-                    f"Ignoring event on subject: {subject} (rule: {rule.event_pattern})"
-                )
+                logger.debug(f"Ignoring event on subject: {subject} (rule: {rule.event_pattern})")
                 await msg.ack()
                 return
 
@@ -241,18 +234,14 @@ class EventRouter:
                     else:
                         rule.action(context)
                 except Exception as e:
-                    logger.error(
-                        f"Error executing handler for {subject}: {e}", exc_info=True
-                    )
+                    logger.error(f"Error executing handler for {subject}: {e}", exc_info=True)
                     # Handler should ack/nak, but if it doesn't, we ack to avoid redelivery loops
                     try:
                         await msg.ack()
                     except:
                         pass
             else:
-                logger.warning(
-                    f"Invalid action for rule {rule.event_pattern}: {rule.action}"
-                )
+                logger.warning(f"Invalid action for rule {rule.event_pattern}: {rule.action}")
                 await msg.ack()
 
         except Exception as e:
@@ -308,9 +297,7 @@ class EventRouter:
             except Exception as e:
                 logger.error(f"Failed to subscribe to {subject}: {e}")
 
-        logger.info(
-            f"Event router started, listening to {len(self._subscribed_subjects)} subjects"
-        )
+        logger.info(f"Event router started, listening to {len(self._subscribed_subjects)} subjects")
 
         # Keep running
         try:
@@ -380,9 +367,7 @@ class EventRouter:
                     handler = cls._load_handler(handler_path)
                     handler_registry[handler_name] = handler
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to load handler {handler_name} from {handler_path}: {e}"
-                    )
+                    logger.warning(f"Failed to load handler {handler_name} from {handler_path}: {e}")
 
         # Load routing rules
         routing_rules = config.get("routing", [])
@@ -403,9 +388,7 @@ class EventRouter:
             elif action_name in handler_registry:
                 action = handler_registry[action_name]
             else:
-                logger.warning(
-                    f"Handler not found for action: {action_name}, ignoring rule"
-                )
+                logger.warning(f"Handler not found for action: {action_name}, ignoring rule")
                 continue
 
             router.add_rule(

@@ -42,16 +42,12 @@ def test_file_selection_with_file_uri():
 
                 if file_selectbox and len(file_selectbox.options) > 0:
                     # Verify files are listed
-                    assert (
-                        len(file_selectbox.options) > 0
-                    ), "Files should be listed in dropdown"
+                    assert len(file_selectbox.options) > 0, "Files should be listed in dropdown"
 
                     # The file path should be correctly resolved
                     # This is verified by the app not showing "File not found" error
                     assert not any(
-                        "File not found" in str(err)
-                        for err in at.error
-                        if hasattr(at, "error")
+                        "File not found" in str(err) for err in at.error if hasattr(at, "error")
                     ), "Should not show 'File not found' error for valid files"
         finally:
             if original_temp:
@@ -94,9 +90,7 @@ def test_file_path_resolution_from_uri():
                 uri = test_file.get("uri", "")
 
                 # Path should not start with file://
-                assert not path.startswith(
-                    "file://"
-                ), "Path should not contain file:// prefix"
+                assert not path.startswith("file://"), "Path should not contain file:// prefix"
 
                 # Path should exist
                 assert Path(path).exists(), f"File path should exist: {path}"
@@ -150,9 +144,7 @@ def test_file_not_found_error_not_shown():
                     # Check that no "File not found" error is shown
                     # This is verified by checking the app doesn't have that error message
                     page_text = str(at)
-                    assert (
-                        "File not found: None" not in page_text
-                    ), "Should not show 'File not found: None' error"
+                    assert "File not found: None" not in page_text, "Should not show 'File not found: None' error"
         finally:
             if original_temp:
                 os.environ["TEMP_DIR"] = original_temp

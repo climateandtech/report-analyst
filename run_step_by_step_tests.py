@@ -58,15 +58,9 @@ def run_tests(verbose=False, specific_test=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Run step-by-step processing tests")
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Run tests with verbose output"
-    )
-    parser.add_argument(
-        "--specific-test", "-k", help="Run only tests matching this pattern"
-    )
-    parser.add_argument(
-        "--list-tests", "-l", action="store_true", help="List all available tests"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Run tests with verbose output")
+    parser.add_argument("--specific-test", "-k", help="Run only tests matching this pattern")
+    parser.add_argument("--list-tests", "-l", action="store_true", help="List all available tests")
 
     args = parser.parse_args()
 

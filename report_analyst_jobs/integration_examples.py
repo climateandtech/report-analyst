@@ -215,9 +215,7 @@ def create_fastapi_endpoints(app):
     from .analysis_toolkit import analyze_document_sync
 
     @app.post("/analyze-document")
-    async def analyze_document_endpoint(
-        analysis_request: dict, background_tasks: BackgroundTasks
-    ):
+    async def analyze_document_endpoint(analysis_request: dict, background_tasks: BackgroundTasks):
         """FastAPI endpoint with background task"""
 
         def run_analysis():

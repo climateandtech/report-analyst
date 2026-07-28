@@ -104,18 +104,14 @@ class NATSLLMClient:
         if self.nc:
             await self.nc.close()
 
-    async def analyze_question(
-        self, question: str, context_chunks: List[str], model: str = "gpt-4o-mini"
-    ) -> str:
+    async def analyze_question(self, question: str, context_chunks: List[str], model: str = "gpt-4o-mini") -> str:
         """
         Analyze a question against context chunks using search backend LLM.
 
         This replaces direct LLM calls in report-analyst.
         """
         # Build prompt for question analysis
-        context = "\n\n".join(
-            [f"Chunk {i+1}: {chunk}" for i, chunk in enumerate(context_chunks)]
-        )
+        context = "\n\n".join([f"Chunk {i+1}: {chunk}" for i, chunk in enumerate(context_chunks)])
 
         prompt = f"""Please analyze the following question based on the provided context:
 
@@ -153,9 +149,7 @@ Answer:"""
     ) -> str:
         """Summarize document chunks using search backend LLM"""
 
-        content = "\n\n".join(
-            [f"Section {i+1}: {chunk}" for i, chunk in enumerate(chunks)]
-        )
+        content = "\n\n".join([f"Section {i+1}: {chunk}" for i, chunk in enumerate(chunks)])
 
         prompt = f"""Please provide a {summary_type} summary of the following document sections:
 
@@ -186,26 +180,18 @@ Summary:"""
         self.pending_requests[request.id] = asyncio.Event()
 
         # Send request
-        await self.js.publish(
-            "llm.request", json.dumps(asdict(request), default=str).encode()
-        )
+        await self.js.publish("llm.request", json.dumps(asdict(request), default=str).encode())
 
         # Wait for response (with timeout)
         try:
-            await asyncio.wait_for(
-                self.pending_requests[request.id].wait(), timeout=60.0
-            )
+            await asyncio.wait_for(self.pending_requests[request.id].wait(), timeout=60.0)
 
             # Get response
             response_data = self.pending_requests.get(f"{request.id}_response")
             if response_data and not response_data.get("error"):
                 return response_data["response"]
             else:
-                error = (
-                    response_data.get("error", "Unknown error")
-                    if response_data
-                    else "No response received"
-                )
+                error = response_data.get("error", "Unknown error") if response_data else "No response received"
                 raise Exception(f"LLM request failed: {error}")
 
         except asyncio.TimeoutError:
@@ -276,9 +262,7 @@ class NATSLLMWorker:
                 processing_time=1.5,  # Could track actual time
             )
 
-            await self.js.publish(
-                "llm.response", json.dumps(asdict(response), default=str).encode()
-            )
+            await self.js.publish("llm.response", json.dumps(asdict(response), default=str).encode())
 
             await msg.ack()
             logger.info(f"LLM request {request.id} completed")
@@ -294,9 +278,7 @@ class NATSLLMWorker:
                 error=str(e),
             )
 
-            await self.js.publish(
-                "llm.response", json.dumps(asdict(error_response), default=str).encode()
-            )
+            await self.js.publish("llm.response", json.dumps(asdict(error_response), default=str).encode())
             await msg.ack()
 
     async def _call_search_backend_llm(self, request: LLMRequest) -> str:

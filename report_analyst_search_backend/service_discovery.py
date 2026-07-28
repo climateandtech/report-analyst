@@ -29,9 +29,7 @@ logger = logging.getLogger(__name__)
 class ValidationResult:
     """Result of service contract validation"""
 
-    def __init__(
-        self, is_valid: bool, errors: List[str] = None, warnings: List[str] = None
-    ):
+    def __init__(self, is_valid: bool, errors: List[str] = None, warnings: List[str] = None):
         self.is_valid = is_valid
         self.errors = errors or []
         self.warnings = warnings or []
@@ -115,9 +113,7 @@ class ServiceValidator:
         try:
             jsonschema.validate(instance=service_manifest, schema=self._contract_schema)
         except jsonschema.ValidationError as e:
-            errors.append(
-                f"Schema validation error: {e.message} (path: {'.'.join(str(p) for p in e.path)})"
-            )
+            errors.append(f"Schema validation error: {e.message} (path: {'.'.join(str(p) for p in e.path)})")
         except jsonschema.SchemaError as e:
             errors.append(f"Schema error: {e.message}")
 
@@ -142,14 +138,11 @@ class ServiceValidator:
         contract_version = manifest.get("contract_version", "1.0.0")
         if contract_version != "1.0.0":
             warnings.append(
-                f"Service uses contract version {contract_version}, "
-                f"validator expects 1.0.0. Compatibility not guaranteed."
+                f"Service uses contract version {contract_version}, " f"validator expects 1.0.0. Compatibility not guaranteed."
             )
 
         # Validate NATS channels exist in AsyncAPI schema
-        if self._asyncapi_schema and manifest.get("protocols", {}).get("nats", {}).get(
-            "enabled"
-        ):
+        if self._asyncapi_schema and manifest.get("protocols", {}).get("nats", {}).get("enabled"):
             nats_channels = manifest.get("nats_channels", {})
             published = [ch["channel"] for ch in nats_channels.get("publishes", [])]
             subscribed = [ch["channel"] for ch in nats_channels.get("subscribes", [])]
@@ -159,15 +152,10 @@ class ServiceValidator:
 
             for channel in all_channels:
                 if channel not in asyncapi_channels:
-                    warnings.append(
-                        f"NATS channel '{channel}' not defined in AsyncAPI schema. "
-                        f"May be a custom extension."
-                    )
+                    warnings.append(f"NATS channel '{channel}' not defined in AsyncAPI schema. " f"May be a custom extension.")
 
         # Validate HTTP endpoints exist in OpenAPI schema
-        if self._openapi_schema and manifest.get("protocols", {}).get("http", {}).get(
-            "enabled"
-        ):
+        if self._openapi_schema and manifest.get("protocols", {}).get("http", {}).get("enabled"):
             http_endpoints = manifest.get("http_endpoints", {})
             required_endpoints = http_endpoints.get("required", [])
 
@@ -180,16 +168,12 @@ class ServiceValidator:
 
                 # Check if path exists in OpenAPI
                 if path not in openapi_paths:
-                    errors.append(
-                        f"Required endpoint {method.upper()} {path} not defined in OpenAPI schema"
-                    )
+                    errors.append(f"Required endpoint {method.upper()} {path} not defined in OpenAPI schema")
                 else:
                     # Check if method exists for this path
                     path_item = openapi_paths[path]
                     if method not in path_item:
-                        errors.append(
-                            f"Method {method.upper()} not defined for endpoint {path} in OpenAPI schema"
-                        )
+                        errors.append(f"Method {method.upper()} not defined for endpoint {path} in OpenAPI schema")
                     else:
                         # Check if operation_id matches
                         operation = path_item[method]
@@ -199,9 +183,7 @@ class ServiceValidator:
                                 f"manifest has '{operation_id}', OpenAPI has '{operation.get('operationId')}'"
                             )
 
-        return ValidationResult(
-            is_valid=len(errors) == 0, errors=errors, warnings=warnings
-        )
+        return ValidationResult(is_valid=len(errors) == 0, errors=errors, warnings=warnings)
 
     def get_required_channels(self) -> Dict[str, List[str]]:
         """

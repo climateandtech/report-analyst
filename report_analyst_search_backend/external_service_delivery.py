@@ -105,8 +105,7 @@ class ExternalServiceDelivery:
             message_data = json.dumps(response_data).encode()
             await self.js.publish("external.service.analysis.response", message_data)
             logger.info(
-                f"Published analysis results via NATS: "
-                f"{response_data['service_id']}/{response_data['request_id']}"
+                f"Published analysis results via NATS: " f"{response_data['service_id']}/{response_data['request_id']}"
             )
             return True
 
@@ -114,9 +113,7 @@ class ExternalServiceDelivery:
             logger.error(f"Failed to deliver results via NATS: {e}")
             return False
 
-    async def _deliver_via_poll(
-        self, request_id: str, response_data: Dict[str, Any]
-    ) -> bool:
+    async def _deliver_via_poll(self, request_id: str, response_data: Dict[str, Any]) -> bool:
         """Store results for HTTP polling"""
         try:
             # Store results in memory (in production, use database)
