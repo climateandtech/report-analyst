@@ -1,3 +1,4 @@
+# ruff: noqa: BLE001, E501, S608
 import json
 import logging
 import os
@@ -6,8 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from llama_index.core import Document, QueryBundle
-from llama_index.core.indices import VectorStoreIndex
+from llama_index.core import Document
 from sqlalchemy import text
 
 from .database_manager import DatabaseManager
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class CacheManager:
-    def __init__(self, db_path: str = None, database_url: str = None):
+    def __init__(self, db_path: str | None = None, database_url: str | None = None):
         """
         Initialize CacheManager.
 
@@ -80,7 +80,7 @@ class CacheManager:
 
             logger.info("Database schema initialized successfully")
         except Exception as e:
-            logger.error(f"Error initializing database schema: {str(e)}", exc_info=True)
+            logger.error(f"Error initializing database schema: {e!s}", exc_info=True)
             raise
 
     def _load_vector_store(self, file_path: str, chunks: List[Dict]) -> None:
@@ -116,7 +116,7 @@ class CacheManager:
             logger.info(f"Loaded {len(documents)} chunks into vector store for {file_path}")
 
         except Exception as e:
-            logger.error(f"Error loading vector store: {str(e)}", exc_info=True)
+            logger.error(f"Error loading vector store: {e!s}", exc_info=True)
             raise
 
     async def get_similar_chunks(
@@ -124,8 +124,8 @@ class CacheManager:
         query_embedding: np.ndarray,
         file_path: str,
         top_k: int = 5,
-        chunk_size: int = None,
-        chunk_overlap: int = None,
+        chunk_size: int | None = None,
+        chunk_overlap: int | None = None,
     ) -> List[Dict]:
         """Get chunks most similar to the query embedding using LlamaIndex vector store."""
         try:
@@ -176,7 +176,7 @@ class CacheManager:
             return chunks
 
         except Exception as e:
-            logger.error(f"Error getting similar chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error getting similar chunks: {e!s}", exc_info=True)
             return []
 
     def save_analysis(self, file_path: str, question_id: str, result: Dict, config: Dict):
@@ -194,7 +194,7 @@ class CacheManager:
                 result_obj = conn.execute(
                     text(
                         """
-                        SELECT id FROM questions 
+                        SELECT id FROM questions
                         WHERE question_id = :question_id AND question_set = :question_set
                     """
                     ),
@@ -325,8 +325,8 @@ class CacheManager:
                         result_obj = conn.execute(
                             text(
                                 """
-                                SELECT id FROM document_chunks 
-                                WHERE file_path = :file_path 
+                                SELECT id FROM document_chunks
+                                WHERE file_path = :file_path
                                 AND chunk_text = :chunk_text
                                 AND chunk_size = :chunk_size
                                 AND chunk_overlap = :chunk_overlap
@@ -404,10 +404,10 @@ class CacheManager:
                             logger.info(
                                 f"Chunk not found in document_chunks, creating it for file_path={file_path}, chunk_size={config['chunk_size']}, chunk_overlap={config['chunk_overlap']}"
                             )
-                            
+
                             chunk_metadata = chunk.get("metadata", {})
                             timestamp = datetime.now().isoformat()
-                            
+
                             # Insert chunk into document_chunks (embedding can be NULL)
                             if self.db_manager.is_postgres():
                                 insert_result = conn.execute(
@@ -450,14 +450,14 @@ class CacheManager:
                                 # Get the ID after insert
                                 result_obj = conn.execute(
                                     text("""
-                                        SELECT id FROM document_chunks 
-                                        WHERE file_path = :file_path 
+                                        SELECT id FROM document_chunks
+                                        WHERE file_path = :file_path
                                         AND chunk_text = :chunk_text
                                         AND chunk_size = :chunk_size
                                         AND chunk_overlap = :chunk_overlap
                                     """),
                                     {
-                                        "file_path": str(file_path), 
+                                        "file_path": str(file_path),
                                         "chunk_text": chunk["text"],
                                         "chunk_size": config["chunk_size"],
                                         "chunk_overlap": config["chunk_overlap"],
@@ -467,11 +467,11 @@ class CacheManager:
                                 if row:
                                     chunk_id = row[0]
                                 else:
-                                    logger.error(f"Failed to retrieve chunk ID after insert")
+                                    logger.error("Failed to retrieve chunk ID after insert")
                                     continue
-                            
+
                             logger.info(f"Created chunk in document_chunks with ID: {chunk_id}, now saving chunk_relevance")
-                            
+
                             # Now save chunk_relevance with the newly created chunk_id
                             if self.db_manager.is_postgres():
                                 conn.execute(
@@ -579,7 +579,7 @@ class CacheManager:
                 logger.info("Successfully saved complete analysis")
 
         except Exception as e:
-            logger.error(f"Error saving analysis: {str(e)}", exc_info=True)
+            logger.error(f"Error saving analysis: {e!s}", exc_info=True)
             raise
 
     def get_analysis(self, file_path: str, config: Dict, question_ids: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -663,7 +663,7 @@ class CacheManager:
                     # Build IN clause for question IDs
                     qid_placeholders = ",".join(f":qid_{i}" for i in range(len(results)))
                     chunk_query = f"""
-                        SELECT 
+                        SELECT
                             ac.question_id,
                             dc.chunk_text,
                             dc.metadata as chunk_metadata,
@@ -675,7 +675,7 @@ class CacheManager:
                             cr.metadata as relevance_metadata
                         FROM analysis_cache ac
                         JOIN questions q ON q.question_id = ac.question_id
-                        JOIN question_analysis qa ON qa.question_id = q.id 
+                        JOIN question_analysis qa ON qa.question_id = q.id
                             AND qa.file_path = ac.file_path
                             AND qa.model = ac.model
                             AND qa.top_k = ac.top_k
@@ -737,7 +737,7 @@ class CacheManager:
                 return results
 
         except Exception as e:
-            logger.error(f"Error retrieving analysis: {str(e)}", exc_info=True)
+            logger.error(f"Error retrieving analysis: {e!s}", exc_info=True)
             raise
 
     def save_vectors(self, file_path: str, chunks: List[Dict[str, Any]]) -> None:
@@ -780,7 +780,7 @@ class CacheManager:
                             }
                         )
                     except Exception as e:
-                        logger.warning(f"Error preparing chunk {i} for storage: {str(e)}")
+                        logger.warning(f"Error preparing chunk {i} for storage: {e!s}")
                         continue
 
                 if chunk_data:
@@ -833,7 +833,7 @@ class CacheManager:
                     logger.warning("No valid chunks to save")
 
         except Exception as e:
-            logger.error(f"Error saving vectors: {str(e)}", exc_info=True)
+            logger.error(f"Error saving vectors: {e!s}", exc_info=True)
             raise
 
     def get_vectors(self, file_path: str) -> List[Dict[str, Any]]:
@@ -886,7 +886,7 @@ class CacheManager:
                 logger.info(f"Retrieved {len(chunks)} vectors for {file_path}")
                 return chunks
         except Exception as e:
-            logger.error(f"Error retrieving vectors: {str(e)}", exc_info=True)
+            logger.error(f"Error retrieving vectors: {e!s}", exc_info=True)
             return []
 
     def clear_cache(self, file_path: Optional[str] = None):
@@ -908,7 +908,7 @@ class CacheManager:
                     conn.execute(text("DELETE FROM document_chunks"))
                     logger.info("Cleared all cache")
         except Exception as e:
-            logger.error(f"Error clearing cache: {str(e)}", exc_info=True)
+            logger.error(f"Error clearing cache: {e!s}", exc_info=True)
 
     def list_analysis_keys(self) -> List[Dict[str, str]]:
         """List distinct (file_path, question_set) pairs that have stored analysis. Used for UI dropdowns driven by stored data."""
@@ -929,7 +929,7 @@ class CacheManager:
             logger.error(f"Error listing analysis keys: {e}", exc_info=True)
             return []
 
-    def check_cache_status(self, file_path: str = None):
+    def check_cache_status(self, file_path: str | None = None):
         """Debug method to check cache contents"""
         try:
             with self.db_manager.get_connection() as conn:
@@ -964,7 +964,7 @@ class CacheManager:
                 return rows
 
         except Exception as e:
-            logger.error(f"Error checking cache status: {str(e)}", exc_info=True)
+            logger.error(f"Error checking cache status: {e!s}", exc_info=True)
             return []
 
     def get_all_answers_by_question_set(self, question_set: str) -> Dict[str, Any]:
@@ -1103,7 +1103,7 @@ class CacheManager:
                 result_obj = conn.execute(
                     text(
                         """
-                        SELECT COUNT(*) FROM document_chunks 
+                        SELECT COUNT(*) FROM document_chunks
                         WHERE file_path = :file_path AND chunk_size = :chunk_size AND chunk_overlap = :chunk_overlap
                     """
                     ),
@@ -1117,10 +1117,10 @@ class CacheManager:
                 logger.info(f"Verification: Found {count} chunks in database for {file_path}")
 
         except Exception as e:
-            logger.error(f"Error saving document chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error saving document chunks: {e!s}", exc_info=True)
             raise
 
-    def get_document_chunks(self, file_path: str, chunk_size: int = None, chunk_overlap: int = None) -> List[Dict]:
+    def get_document_chunks(self, file_path: str, chunk_size: int | None = None, chunk_overlap: int | None = None) -> List[Dict]:
         """
         Get document chunks from cache with improved logging.
         """
@@ -1194,10 +1194,10 @@ class CacheManager:
                 return chunks
 
         except Exception as e:
-            logger.error(f"Error getting document chunks: {str(e)}", exc_info=True)
+            logger.error(f"Error getting document chunks: {e!s}", exc_info=True)
             return []
 
-    def get_chunks_without_embeddings(self, file_path: str, chunk_size: int = None, chunk_overlap: int = None) -> List[Dict]:
+    def get_chunks_without_embeddings(self, file_path: str, chunk_size: int | None = None, chunk_overlap: int | None = None) -> List[Dict]:
         """Get chunks without embeddings (where embedding IS NULL)"""
         try:
             logger.info(f"Retrieving chunks without embeddings for {file_path}")
@@ -1249,7 +1249,7 @@ class CacheManager:
                 return chunks
 
         except Exception as e:
-            logger.error(f"Error getting chunks without embeddings: {str(e)}", exc_info=True)
+            logger.error(f"Error getting chunks without embeddings: {e!s}", exc_info=True)
             return []
 
     def has_chunk_scoring(self, file_path: str, config: Dict) -> bool:
@@ -1277,5 +1277,5 @@ class CacheManager:
                 return count > 0
 
         except Exception as e:
-            logger.error(f"Error checking chunk scoring: {str(e)}")
+            logger.error(f"Error checking chunk scoring: {e!s}")
             return False

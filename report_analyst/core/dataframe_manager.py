@@ -1,6 +1,6 @@
-import json
+# ruff: noqa: BLE001, E501, E722, S307
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
@@ -26,7 +26,7 @@ def format_list_field(field: Any) -> str:
                 chunk = item.get("chunk", "Unknown")
                 formatted_items.append(f"• {text} [Chunk {chunk}]")
             else:
-                formatted_items.append(f"• {str(item)}")
+                formatted_items.append(f"• {item!s}")
         return "\n".join(formatted_items)
     return str(field)
 
@@ -40,7 +40,7 @@ def extract_evidence_text(evidence: Any) -> str:
     return str(evidence)
 
 
-def create_analysis_dataframes(cached_results: Dict, file_key: str = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def create_analysis_dataframes(cached_results: Dict, file_key: str | None = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Create analysis and chunks dataframes from database results."""
     try:
         analysis_rows = []
@@ -96,7 +96,7 @@ def create_analysis_dataframes(cached_results: Dict, file_key: str = None) -> Tu
                     )
 
             except Exception as e:
-                logger.error(f"Error processing result for question {question_id}: {str(e)}")
+                logger.error(f"Error processing result for question {question_id}: {e!s}")
                 logger.error(f"Result data: {data}")
                 continue
 
@@ -117,7 +117,7 @@ def create_analysis_dataframes(cached_results: Dict, file_key: str = None) -> Tu
         return analysis_df, chunks_df
 
     except Exception as e:
-        logger.error(f"Error creating dataframes: {str(e)}")
+        logger.error(f"Error creating dataframes: {e!s}")
         return pd.DataFrame(), pd.DataFrame()
 
 

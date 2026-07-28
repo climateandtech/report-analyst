@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """
 Tests for PDF viewer component with chunk loading verification.
 
@@ -66,7 +67,7 @@ def sample_pdf_file():
 def test_pdf_viewer_chunk_loading(temp_db, sample_pdf_file):
     """
     Test that chunks are correctly loaded from database and passed to PDF viewer.
-    
+
     This test:
     1. Creates chunks in document_chunks table
     2. Saves analysis results with chunk_relevance links
@@ -198,11 +199,10 @@ def test_pdf_viewer_chunk_loading(temp_db, sample_pdf_file):
         if isinstance(chunk["is_evidence"], int):
             assert chunk["is_evidence"] in [0, 1], f"Chunk {i} is_evidence should be 0 or 1 if int"
         # Convert to bool for consistency (SQLite returns 0/1)
-        is_evidence_bool = bool(chunk["is_evidence"])
+        bool(chunk["is_evidence"])
 
     # Step 6: Verify chunks can be formatted for PDF viewer
     chunks_data = {question_id: chunks}
-    questions_data = {question_id: "Test question"}
 
     # This is the format expected by pdf_viewer function
     assert len(chunks_data[question_id]) == 3
@@ -331,7 +331,6 @@ def test_pdf_viewer_chunk_loading_empty_chunks(temp_db, sample_pdf_file):
 
     # Verify PDF viewer format works with empty chunks
     chunks_data = {question_id: chunks}
-    questions_data = {question_id: "Test question"}
 
     assert len(chunks_data[question_id]) == 0
     assert chunks_data[question_id] == []
@@ -421,7 +420,7 @@ def test_pdf_viewer_chunk_loading_multiple_questions(temp_db, sample_pdf_file):
         q_id: retrieved[q_id]["chunks"]
         for q_id in question_ids
     }
-    questions_data = {q_id: f"Question {q_id}" for q_id in question_ids}
+    {q_id: f"Question {q_id}" for q_id in question_ids}
 
     assert len(chunks_data) == 2
     assert all(len(chunks_data[q_id]) == 2 for q_id in question_ids)
@@ -511,7 +510,7 @@ def test_pdf_viewer_chunk_metadata_structure(temp_db, sample_pdf_file):
 def test_pdf_viewer_function_chunk_formatting(temp_db, sample_pdf_file):
     """
     Test that chunks retrieved from database are correctly formatted for PDF viewer function.
-    
+
     This test verifies the integration between cache_manager.get_analysis and pdf_viewer function.
     """
     file_path = sample_pdf_file
@@ -632,7 +631,7 @@ def test_pdf_viewer_function_chunk_formatting(temp_db, sample_pdf_file):
 def test_pdf_viewer_receives_chunks_correctly(temp_db, sample_pdf_file):
     """
     Test that PDF viewer function receives chunks in the correct format.
-    
+
     This test mocks the PDF viewer component and verifies it receives
     the correct chunk data structure.
     """
@@ -654,7 +653,7 @@ def test_pdf_viewer_receives_chunks_correctly(temp_db, sample_pdf_file):
 
     with temp_db.db_manager.get_connection() as conn:
         timestamp = datetime.now().isoformat()
-        for i, chunk_info in enumerate(chunk_data):
+        for _i, chunk_info in enumerate(chunk_data):
             conn.execute(
                 text("""
                     INSERT INTO document_chunks

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """View Report page: PDF viewer with chunk overlays."""
 
 from __future__ import annotations

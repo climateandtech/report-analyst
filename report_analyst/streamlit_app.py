@@ -98,6 +98,7 @@ from report_analyst.core.llm_models import (
 )
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
+from report_analyst.ui.view_report_page import render_view_report_page
 
 # Load environment variables
 load_dotenv()

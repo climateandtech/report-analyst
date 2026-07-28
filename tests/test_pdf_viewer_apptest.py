@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """
 AppTest for PDF viewer screen in Streamlit app.
 
@@ -64,15 +65,15 @@ def sample_pdf_file():
 def test_pdf_viewer_view_report_tab(temp_db, sample_pdf_file):
     """
     Test that the View Report tab displays PDF viewer with chunks.
-    
+
     This test:
     1. Sets up chunks in the database
     2. Navigates to View Report tab
     3. Sets up session state with file and cached results
     4. Verifies PDF viewer is rendered
     """
-    cache_manager, db_temp_dir = temp_db
-    file_path, pdf_temp_dir = sample_pdf_file
+    cache_manager, _db_temp_dir = temp_db
+    file_path, _pdf_temp_dir = sample_pdf_file
 
     question_id = "tcfd_1"
     config = {
@@ -171,8 +172,11 @@ def test_pdf_viewer_view_report_tab(temp_db, sample_pdf_file):
 
     # Note: The PDF viewer component might not be directly testable via AppTest
     # but we can verify the page structure and that chunks are loaded
-    assert has_pdf_viewer_mention or len(at.session_state.get("results", {}).get("answers", {})) > 0, \
+    results = at.session_state["results"] if "results" in at.session_state else {}
+    answers = results["answers"] if isinstance(results, dict) and "answers" in results else {}
+    assert has_pdf_viewer_mention or len(answers) > 0, (
         "PDF viewer section should be present or chunks should be loaded"
+    )
 
     # Step 7: Verify chunks are in session state
     # AppTest session_state doesn't support .get(), so use direct access with try/except
@@ -191,8 +195,8 @@ def test_pdf_viewer_with_no_chunks(temp_db, sample_pdf_file):
     """
     Test that View Report tab handles missing chunks gracefully.
     """
-    cache_manager, db_temp_dir = temp_db
-    file_path, pdf_temp_dir = sample_pdf_file
+    cache_manager, _db_temp_dir = temp_db
+    file_path, _pdf_temp_dir = sample_pdf_file
 
     question_id = "tcfd_2"
     config = {
@@ -240,7 +244,7 @@ def test_pdf_viewer_with_no_chunks(temp_db, sample_pdf_file):
         if question_id in answers:
             # Handle both dict access and .get() if available
             if isinstance(answers[question_id], dict):
-                chunks = answers[question_id].get("chunks", [])
+                answers[question_id].get("chunks", [])
                 # The app should still show the PDF viewer even without chunks
                 # Check for either "answer" or "ANSWER" key, or just that the result exists
                 has_answer = "answer" in answers[question_id] or "ANSWER" in answers[question_id]
@@ -260,8 +264,8 @@ def test_pdf_viewer_multiple_questions(temp_db, sample_pdf_file):
     """
     Test that View Report tab handles multiple questions with chunks.
     """
-    cache_manager, db_temp_dir = temp_db
-    file_path, pdf_temp_dir = sample_pdf_file
+    cache_manager, _db_temp_dir = temp_db
+    file_path, _pdf_temp_dir = sample_pdf_file
 
     question_ids = ["tcfd_1", "tcfd_2"]
     config = {

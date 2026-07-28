@@ -1,3 +1,4 @@
+# ruff: noqa: BLE001, E501, E722, S110
 """
 Streamlit custom component backend for PDF viewer with chunks.
 
@@ -33,7 +34,7 @@ def pdf_viewer(
 ) -> Optional[Dict[str, Any]]:
     """
     Render a PDF viewer with chunk annotations in Streamlit using a custom component.
-    
+
     Args:
         pdf_path: Path to PDF file (local file path or URI)
         chunks_data: Dictionary mapping question_id to list of chunk dictionaries.
@@ -50,7 +51,7 @@ def pdf_viewer(
         highlight_chunk_id: Optional chunk ID to highlight (format: "question_id_chunk_order")
         key: Optional key for Streamlit component (for state management)
         height: Height of the component in pixels
-        
+
     Returns:
         Dictionary with event data if chunk was selected, None otherwise
     """
