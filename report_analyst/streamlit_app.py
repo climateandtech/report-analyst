@@ -1413,11 +1413,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         if "questions" in st.session_state:
             logger.info(
                 "[ANALYSIS] Selected question texts: %s",
-                [
-                    st.session_state.questions[q]["text"]
-                    for q in selected_questions
-                    if q in st.session_state.questions
-                ],
+                [st.session_state.questions[q]["text"] for q in selected_questions if q in st.session_state.questions],
             )
         logger.info(
             f"[CACHE] Looking up cache for file: {file_path} with config: {config} and questions: {selected_questions}"
@@ -3156,12 +3152,12 @@ def main():
                     else:
                         st.info(
                             f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n"
-                                f"*Configure via `DATABASE_URL` environment variable*"
+                            f"*Configure via `DATABASE_URL` environment variable*"
                         )
                 except Exception:
                     st.info(
                         f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n"
-                                f"*Configure via `DATABASE_URL` environment variable*"
+                        f"*Configure via `DATABASE_URL` environment variable*"
                     )
 
             # Store in session state for use by DocumentAnalyzer
@@ -3640,10 +3636,10 @@ def main():
                                 badge_text = "Stored" if has_stored_data else "New"
                                 badge_bg = "rgba(192, 196, 250, 0.3)" if has_stored_data else "rgba(192, 196, 250, 0.15)"
                                 status_badge = (
-                                    f"<span style=\"background-color: {badge_bg}; color: #4313C8; "
+                                    f'<span style="background-color: {badge_bg}; color: #4313C8; '
                                     f"border: 1px solid #4313C8; border-radius: 12px; padding: 2px 8px; "
                                     f"font-size: 9px; margin-left: 6px; font-family: 'Cousine', monospace; "
-                                    f"display: inline-block;\">{badge_text}</span>"
+                                    f'display: inline-block;">{badge_text}</span>'
                                 )
 
                             st.markdown(
@@ -4630,9 +4626,9 @@ def main():
         logo_img = ""
         if logo_src:
             logo_img = (
-                f"<img src=\"{logo_src}\" alt=\"Climate+Tech Logo\" "
-                f"style=\"height: 25px; max-width: 100%; width: auto; vertical-align: middle; "
-                f"margin-right: 8px; object-fit: contain;\">"
+                f'<img src="{logo_src}" alt="Climate+Tech Logo" '
+                f'style="height: 25px; max-width: 100%; width: auto; vertical-align: middle; '
+                f'margin-right: 8px; object-fit: contain;">'
             )
         footer = f"""
         <div class="footer">
