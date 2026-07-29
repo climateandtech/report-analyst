@@ -1,4 +1,4 @@
-# ruff: noqa: BLE001, E402, E501, RUF001
+# ruff: noqa: BLE001, E402, RUF001
 import asyncio
 import base64
 import html
@@ -538,7 +538,12 @@ async def analyze_document_and_display(
             # Update display with cached results
             logger.info(f"Creating dataframes with cached results for file_key: {file_key}")
             logger.info(
-                f"Current session state settings: chunk_size={st.session_state.get('new_chunk_size')}, overlap={st.session_state.get('new_overlap')}, top_k={st.session_state.get('new_top_k')}, llm_model={st.session_state.get('new_llm_model')}, use_llm_scoring={st.session_state.get('new_llm_scoring')}"
+                f"Current session state settings: "
+                f"chunk_size={st.session_state.get('new_chunk_size')}, "
+                f"overlap={st.session_state.get('new_overlap')}, "
+                f"top_k={st.session_state.get('new_top_k')}, "
+                f"llm_model={st.session_state.get('new_llm_model')}, "
+                f"use_llm_scoring={st.session_state.get('new_llm_scoring')}"
             )
             analysis_df, chunks_df = create_analysis_dataframes(st.session_state.results["answers"], file_key)
             st.session_state.analysis_df = analysis_df
@@ -592,7 +597,12 @@ async def analyze_document_and_display(
                 # Update display
                 logger.info(f"Creating dataframes with updated results for file_key: {file_key}")
                 logger.info(
-                    f"Current session state settings: chunk_size={st.session_state.get('new_chunk_size')}, overlap={st.session_state.get('new_overlap')}, top_k={st.session_state.get('new_top_k')}, llm_model={st.session_state.get('new_llm_model')}, use_llm_scoring={st.session_state.get('new_llm_scoring')}"
+                    f"Current session state settings: "
+                    f"chunk_size={st.session_state.get('new_chunk_size')}, "
+                    f"overlap={st.session_state.get('new_overlap')}, "
+                    f"top_k={st.session_state.get('new_top_k')}, "
+                    f"llm_model={st.session_state.get('new_llm_model')}, "
+                    f"use_llm_scoring={st.session_state.get('new_llm_scoring')}"
                 )
                 analysis_df, chunks_df = create_analysis_dataframes(st.session_state.results["answers"], file_key)
 
@@ -976,7 +986,10 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
             configs = file_configs[file_path]
             config_options = []
             for config in configs:
-                label = f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, Top-K: {config['top_k']}, Model: {config['model']}"
+                label = (
+                    f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, "
+                    f"Top-K: {config['top_k']}, Model: {config['model']}"
+                )
                 config_options.append({"label": label, "config": config})
 
             selected_config = st.selectbox(
@@ -1050,7 +1063,8 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                                 # Check if embeddings are available
                                 if not analyzer.analyzer.embeddings or analyzer.analyzer.use_backend_llm:
                                     st.warning(
-                                        "Embeddings not available for similarity search. Using backend mode or embeddings not initialized."
+                                        "Embeddings not available for similarity search. "
+                                        "Using backend mode or embeddings not initialized."
                                     )
                                     query_text = None
                                 else:
@@ -1398,7 +1412,12 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
         if "questions" in st.session_state:
             logger.info(
-                f"[ANALYSIS] Selected question texts: {[st.session_state.questions[q]['text'] for q in selected_questions if q in st.session_state.questions]}"
+                "[ANALYSIS] Selected question texts: %s",
+                [
+                    st.session_state.questions[q]["text"]
+                    for q in selected_questions
+                    if q in st.session_state.questions
+                ],
             )
         logger.info(
             f"[CACHE] Looking up cache for file: {file_path} with config: {config} and questions: {selected_questions}"
@@ -1802,7 +1821,8 @@ def main():
             }
 
             /* Sidebar text - #7872A7 (exclude option-menu navigation) */
-            [data-testid="stSidebar"] *:not([data-testid="stSidebarNav"] [aria-current="page"] *):not(.nav-link):not(.nav-link-selected):not(.nav-link *):not([class*="nav-link"]) {
+            [data-testid="stSidebar"] *:not([data-testid="stSidebarNav"] [aria-current="page"] *)
+:not(.nav-link):not(.nav-link-selected):not(.nav-link *):not([class*="nav-link"]) {
                 color: #7872A7 !important;
             }
 
@@ -2145,8 +2165,10 @@ def main():
                 stroke: #4313C8 !important;
             }
 
-            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label [data-testid="stTooltipIcon"] svg,
-            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label [data-testid="stTooltipIcon"] svg {
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] > label
+            [data-testid="stTooltipIcon"] svg,
+            [data-testid="stSidebar"] [data-baseweb="radio"] > div[data-checked="true"] label
+            [data-testid="stTooltipIcon"] svg {
                 color: #ffffff !important;
                 stroke: #ffffff !important;
             }
@@ -2308,7 +2330,8 @@ def main():
             /* Exclude sidebar and file uploader buttons, but include download buttons */
             button:not([data-testid="stSidebar"] button):not([data-testid*="FileUploader"] button),
             .stButton > button:not([data-testid="stSidebar"] .stButton > button):not([data-testid*="FileUploader"] button),
-            [data-baseweb="button"]:not([data-testid="stSidebar"] [data-baseweb="button"]):not([data-testid*="FileUploader"] [data-baseweb="button"]) {
+            [data-baseweb="button"]:not([data-testid="stSidebar"] [data-baseweb="button"])
+            :not([data-testid*="FileUploader"] [data-baseweb="button"]) {
                 border-color: #4313C8 !important;
                 outline: none !important;
             }
@@ -3021,7 +3044,10 @@ def main():
                         value="",  # Never show the actual key in the input
                         type="password",
                         key="google_api_key_input",
-                        help="Enter your Google API key to use Gemini models. Leave empty to use existing key from environment.",
+                        help=(
+                            "Enter your Google API key to use Gemini models. "
+                            "Leave empty to use existing key from environment."
+                        ),
                         placeholder=("Enter your Google API key" if not current_google_key else "Enter new key to update"),
                     )
 
@@ -3072,7 +3098,8 @@ def main():
                 database_url = f"sqlite:///{db_path}"
                 database_type = "SQLite"
                 st.info(
-                    f"**Type:** {database_type}\n\n**Path:** `{db_path}`\n\n*Configure via `STORAGE_PATH` environment variable*"
+                    f"**Type:** {database_type}\n\n**Path:** `{db_path}`\n\n"
+                    f"*Configure via `STORAGE_PATH` environment variable*"
                 )
             else:
                 # Parse PostgreSQL URL to show connection details (masked)
@@ -3116,19 +3143,25 @@ def main():
                                     db = "?"
 
                             st.info(
-                                f"**Type:** {database_type}\n\n**Host:** `{host}`\n**Port:** `{port}`\n**Database:** `{db}`\n**User:** `{user}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                                f"**Type:** {database_type}\n\n"
+                                f"**Host:** `{host}`\n**Port:** `{port}`\n"
+                                f"**Database:** `{db}`\n**User:** `{user}`\n\n"
+                                f"*Configure via `DATABASE_URL` environment variable*"
                             )
                         else:
                             st.info(
-                                f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                                f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n"
+                                f"*Configure via `DATABASE_URL` environment variable*"
                             )
                     else:
                         st.info(
-                            f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                            f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n"
+                                f"*Configure via `DATABASE_URL` environment variable*"
                         )
                 except Exception:
                     st.info(
-                        f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n*Configure via `DATABASE_URL` environment variable*"
+                        f"**Type:** {database_type}\n\n**Connection:** `{masked_url}`\n\n"
+                                f"*Configure via `DATABASE_URL` environment variable*"
                     )
 
             # Store in session state for use by DocumentAnalyzer
@@ -3218,7 +3251,10 @@ def main():
                     "Store files in PostgreSQL",
                     value=st.session_state.get("postgres_file_storage_enabled", False),
                     key="use_postgres_file_storage",
-                    help="Store uploaded files in PostgreSQL database (useful for Heroku deployments). Files are stored as BYTEA/BLOB. This is an enterprise feature.",
+                    help=(
+                        "Store uploaded files in PostgreSQL database (useful for Heroku deployments). "
+                        "Files are stored as BYTEA/BLOB. This is an enterprise feature."
+                    ),
                 )
                 # Store in a separate key that persists across page navigation
                 st.session_state.postgres_file_storage_enabled = use_postgres_storage
@@ -3417,7 +3453,9 @@ def main():
                         <strong>Processing Steps</strong>
                         <i class="material-icons help-icon">help_outline</i>
                         <div class="help-tooltip">
-                            You can choose if you want to first only cut the report in pieces (Chunking), make it searchable (Embedding), map text to questions (Question Mapping), or answer the questions (Question Answering). Note: Answering questions incurs LLM API costs.
+                            You can choose if you want to first only cut the report in pieces (Chunking),
+                            make it searchable (Embedding), map text to questions (Question Mapping), or answer
+                            the questions (Question Answering). Note: Answering questions incurs LLM API costs.
                         </div>
                     </div>
                     """,
@@ -3591,18 +3629,27 @@ def main():
                                     "background-color: rgba(192, 196, 250, 0.1); border: 1px solid #4313C8; color: #4313C8;"
                                 )
                             else:
-                                highlight_style = "background-color: rgba(192, 196, 250, 0.05); border: 1px solid rgba(67, 19, 200, 0.3); color: #718096;"
+                                highlight_style = (
+                                    "background-color: rgba(192, 196, 250, 0.05); "
+                                    "border: 1px solid rgba(67, 19, 200, 0.3); color: #718096;"
+                                )
 
                             # Add status badge next to Chunking step - always show
                             status_badge = ""
                             if step_short == "Chunk":
                                 badge_text = "Stored" if has_stored_data else "New"
                                 badge_bg = "rgba(192, 196, 250, 0.3)" if has_stored_data else "rgba(192, 196, 250, 0.15)"
-                                status_badge = f"<span style=\"background-color: {badge_bg}; color: #4313C8; border: 1px solid #4313C8; border-radius: 12px; padding: 2px 8px; font-size: 9px; margin-left: 6px; font-family: 'Cousine', monospace; display: inline-block;\">{badge_text}</span>"
+                                status_badge = (
+                                    f"<span style=\"background-color: {badge_bg}; color: #4313C8; "
+                                    f"border: 1px solid #4313C8; border-radius: 12px; padding: 2px 8px; "
+                                    f"font-size: 9px; margin-left: 6px; font-family: 'Cousine', monospace; "
+                                    f"display: inline-block;\">{badge_text}</span>"
+                                )
 
                             st.markdown(
                                 f"""
-                            <div style="{highlight_style} border-radius: 8px; padding: 0.5rem; text-align: center; font-size: 11px; font-family: 'Afacad', sans-serif;">
+                            <div style="{highlight_style} border-radius: 8px; padding: 0.5rem; "
+                            "text-align: center; font-size: 11px; font-family: 'Afacad', sans-serif;">
                                 <span>{indicator} {step_full}</span>{status_badge}
                             </div>
                             """,
@@ -4064,8 +4111,11 @@ def main():
                 <div class="upload-icon-box">
                     <i class="material-icons">cloud_upload</i>
                 </div>
-                <h1 style="color: #4313C8; font-family: 'Afacad', sans-serif; font-weight: 700; margin: 0 0 20px 0; font-size: 32px;">Upload your Sustainability Report</h1>
-                <p style="color: #718096; font-family: 'Cousine', monospace; font-size: 14px; margin: 0 0 40px 0; line-height: 1.5;">Drag and drop your file here, or click to browse.<br>PDF only, limited to 200MB</p>
+                <h1 style="color: #4313C8; font-family: 'Afacad', sans-serif; font-weight: 700;"
+                    margin: 0 0 20px 0; font-size: 32px;">Upload your Sustainability Report</h1>
+                <p style="color: #718096; font-family: 'Cousine', monospace; font-size: 14px;"
+                    margin: 0 0 40px 0; line-height: 1.5;">Drag and drop your file here, or click to browse.
+                    <br>PDF only, limited to 200MB</p>
             </div>
             """,
                 unsafe_allow_html=True,
@@ -4452,7 +4502,10 @@ def main():
                                 # Create clickable card
                                 clicked = card(
                                     title=model_display,
-                                    text=f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · Top-K: {config['top_k']}",
+                                    text=(
+                                        f"Chunk: {config['chunk_size']} · Overlap: {config['chunk_overlap']} · "
+                                        f"Top-K: {config['top_k']}"
+                                    ),
                                     key=f"config_card_{idx}",
                                     styles={
                                         "card": {
@@ -4574,11 +4627,19 @@ def main():
 
         # Add footer to sidebar
         st.sidebar.markdown("---")
+        logo_img = ""
+        if logo_src:
+            logo_img = (
+                f"<img src=\"{logo_src}\" alt=\"Climate+Tech Logo\" "
+                f"style=\"height: 25px; max-width: 100%; width: auto; vertical-align: middle; "
+                f"margin-right: 8px; object-fit: contain;\">"
+            )
         footer = f"""
         <div class="footer">
-            {f'<img src="{logo_src}" alt="Climate+Tech Logo" style="height: 25px; max-width: 100%; width: auto; vertical-align: middle; margin-right: 8px; object-fit: contain;">' if logo_src else ""}
+            {logo_img}
             <p>Climate+Tech Sustainability Report Analysis Tool</p>
-            <p>For custom tool development contact us at <a href="https://www.climateandtech.com" target="_blank">www.climateandtech.com</a></p>
+            <p>For custom tool development contact us at
+            <a href="https://www.climateandtech.com" target="_blank">www.climateandtech.com</a></p>
         </div>
         """
         st.sidebar.markdown(footer, unsafe_allow_html=True)
