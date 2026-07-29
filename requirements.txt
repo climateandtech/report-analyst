@@ -143,7 +143,7 @@ protobuf==5.29.6
 psutil==7.0.0
 pulsar-client==3.6.1
 pyarrow==23.0.1
-pyasn1==0.6.1
+pyasn1==0.6.4
 pyasn1_modules==0.4.1
 pycodestyle==2.12.1
 pycparser==2.22
@@ -190,7 +190,7 @@ safehttpx==0.1.6
 scikit-learn==1.6.1
 scipy==1.15.2
 semantic-version==2.10.0
-setuptools==78.1.1
+setuptools==83.0.0
 shellingham==1.5.4
 six==1.17.0
 smmap==5.0.2
@@ -202,7 +202,7 @@ sqlite-vec==0.1.6
 sqlite-vss==0.1.2
 starlette==0.46.1
 strawberry-graphql==0.262.1
-streamlit==1.52.0
+streamlit==1.53.1
 streamlit-card==1.0.2
 streamlit-option-menu==0.4.0
 striprtf==0.0.26
