@@ -57,7 +57,7 @@ qg_collect_changed() {
     done < <(
       {
         git -C "$git_root" diff --name-only --diff-filter=ACMRTUXB HEAD 2>/dev/null || true
-        git -C "$git_root" diff --cached --name-only 2>/dev/null || true
+        git -C "$git_root" diff --cached --name-only --diff-filter=ACMRTUXB 2>/dev/null || true
         git -C "$git_root" ls-files --others --exclude-standard 2>/dev/null || true
       } | sort -u
     )

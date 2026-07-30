@@ -1,0 +1,19 @@
+id: climretrieve
+
+ground_truth:
+  columns:
+    document: document
+    question: question
+    context: context
+    relevant: relevant
+    page_number: page_number
+    relevance_label: "Source Relevance Score"
+
+benchmark:
+  columns:
+    report_id: report
+    question: question
+    paragraph: paragraph
+    relevant_text: relevant_text
+    relevance_label: label
+

@@ -39,7 +39,7 @@ def test_init_db(temp_db):
     with sqlite3.connect(temp_db.db_path) as conn:
         cursor = conn.execute(
             """
-            SELECT name FROM sqlite_master 
+            SELECT name FROM sqlite_master
             WHERE type='table' AND (name='analysis_cache' OR name='document_chunks')
         """
         )
@@ -171,8 +171,8 @@ def test_multiple_questions(temp_db):
 
 def test_error_handling(temp_db):
     """Test error handling"""
-    # Test invalid JSON
-    with pytest.raises(Exception):
+    # Test invalid JSON / non-dict result (AttributeError on .get / json.dumps TypeError)
+    with pytest.raises(Exception):  # noqa: B017
         temp_db.save_analysis(
             "test.pdf",
             "tcfd_1",
@@ -181,7 +181,7 @@ def test_error_handling(temp_db):
         )
 
     # Test missing required config params
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         temp_db.get_analysis("test.pdf", {"chunk_size": 500})  # Missing required params
 
 
@@ -211,7 +211,6 @@ def test_cache_status(temp_db):
 def test_get_chunks_without_embeddings(temp_db):
     """Test get_chunks_without_embeddings method"""
     import sqlite3
-    from datetime import datetime
 
     import numpy as np
 
@@ -288,7 +287,6 @@ def test_get_chunks_without_embeddings(temp_db):
 def test_has_chunk_scoring(temp_db):
     """Test has_chunk_scoring method"""
     import sqlite3
-    from datetime import datetime
 
     import numpy as np
 
@@ -347,3 +345,109 @@ def test_has_chunk_scoring(temp_db):
 
     # Now should be True
     assert temp_db.has_chunk_scoring(file_path, config) is True
+
+
+@pytest.mark.asyncio
+async def test_vector_store_reloads_on_chunk_size_change(temp_db):
+    """Test that vector store reloads when chunk_size or chunk_overlap changes"""
+    import numpy as np
+
+    file_path = "test_doc.pdf"
+
+    # Use consistent embedding dimension for all chunks and query
+    embedding_dim = 384  # Common embedding dimension (e.g., sentence-transformers)
+
+    # Create test chunks with chunk_size=500
+    chunks_500 = [
+        {
+            "text": "This is a test chunk for chunk size 500. " * 20,  # Make it long enough
+            "embedding": np.random.rand(embedding_dim).astype(np.float32),
+            "metadata": {"page": 1, "chunk_size": 500, "chunk_overlap": 20},
+        },
+        {
+            "text": "Another test chunk for chunk size 500. " * 20,
+            "embedding": np.random.rand(embedding_dim).astype(np.float32),
+            "metadata": {"page": 2, "chunk_size": 500, "chunk_overlap": 20},
+        },
+    ]
+
+    # Create test chunks with chunk_size=1000 (different chunking)
+    chunks_1000 = [
+        {
+            "text": "This is a test chunk for chunk size 1000. " * 40,  # Different content
+            "embedding": np.random.rand(embedding_dim).astype(np.float32),
+            "metadata": {"page": 1, "chunk_size": 1000, "chunk_overlap": 20},
+        },
+        {
+            "text": "Another test chunk for chunk size 1000. " * 40,
+            "embedding": np.random.rand(embedding_dim).astype(np.float32),
+            "metadata": {"page": 2, "chunk_size": 1000, "chunk_overlap": 20},
+        },
+    ]
+
+    # Save chunks with chunk_size=500
+    temp_db.save_vectors(file_path, chunks_500)
+
+    # Get similar chunks with chunk_size=500
+    query_embedding = np.random.rand(embedding_dim).astype(np.float32)
+    similar_chunks_500 = await temp_db.get_similar_chunks(
+        query_embedding=query_embedding,
+        file_path=file_path,
+        top_k=2,
+        chunk_size=500,
+        chunk_overlap=20,
+    )
+
+    # Verify we got chunks with chunk_size=500
+    assert len(similar_chunks_500) > 0
+    assert temp_db.current_chunk_size == 500
+    assert temp_db.current_chunk_overlap == 20
+
+    # Save chunks with chunk_size=1000
+    temp_db.save_vectors(file_path, chunks_1000)
+
+    # Get similar chunks with chunk_size=1000
+    # This should trigger a reload of the vector store
+    similar_chunks_1000 = await temp_db.get_similar_chunks(
+        query_embedding=query_embedding,
+        file_path=file_path,
+        top_k=2,
+        chunk_size=1000,
+        chunk_overlap=20,
+    )
+
+    # Verify the vector store was reloaded with new chunk_size
+    assert temp_db.current_chunk_size == 1000
+    assert temp_db.current_chunk_overlap == 20
+
+    # Verify we got different chunks (or at least that the vector store was reloaded)
+    # The chunks should be different because we saved different chunks for chunk_size=1000
+    assert len(similar_chunks_1000) > 0
+
+    # Test chunk_overlap change
+    chunks_diff_overlap = [
+        {
+            "text": "This is a test chunk with different overlap. " * 20,
+            "embedding": np.random.rand(embedding_dim).astype(np.float32),
+            "metadata": {
+                "page": 1,
+                "chunk_size": 1000,
+                "chunk_overlap": 50,
+            },  # Different overlap
+        },
+    ]
+
+    temp_db.save_vectors(file_path, chunks_diff_overlap)
+
+    # Get similar chunks with different chunk_overlap
+    await temp_db.get_similar_chunks(
+        query_embedding=query_embedding,
+        file_path=file_path,
+        top_k=2,
+        chunk_size=1000,
+        chunk_overlap=50,  # Different overlap
+    )
+
+    # Verify the vector store was reloaded with new chunk_overlap
+    assert temp_db.current_chunk_overlap == 50
+    assert temp_db.current_chunk_size == 1000

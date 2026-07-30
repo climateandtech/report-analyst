@@ -5,7 +5,6 @@ Tests for the QuestionSetLoader functionality
 import os
 import tempfile
 
-import pytest
 import yaml
 
 from report_analyst.core.question_loader import (
@@ -129,7 +128,7 @@ class TestQuestionSetLoader:
         """Test get_question_set_options method returns list of question set IDs"""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create multiple test question set files
-            for i, name in enumerate(["test1", "test2", "test3"]):
+            for _i, name in enumerate(["test1", "test2", "test3"]):
                 test_questions = {
                     "name": f"{name.title()} Questions",
                     "shortcut": name,
@@ -184,7 +183,15 @@ class TestQuestionSetLoader:
         question_sets = loader.get_question_sets()
 
         # Should have at least the main question sets
-        expected_sets = ["everest", "tcfd", "denali", "kilimanjaro"]
+        # "custom" is a UI-only option and not a real question set ID
+        expected_sets = [
+            "everest",
+            "tcfd",
+            "denali",
+            "kilimanjaro",
+            "lucia",
+            "climretrieve",
+        ]
         for expected_set in expected_sets:
             assert expected_set in question_sets, f"Expected {expected_set} in question sets"
 
@@ -301,7 +308,7 @@ class TestQuestionSetLoader:
             from report_analyst.core.question_loader import get_question_loader
 
             question_loader = get_question_loader()
-            question_set_options = question_loader.get_question_set_options() + ["custom"]
+            question_set_options = [*question_loader.get_question_set_options(), "custom"]
         else:
             # Fallback: use a generic approach without hardcoded names
             question_set_options = ["custom"]  # Only custom when core functionality unavailable
@@ -319,15 +326,24 @@ class TestQuestionSetLoader:
             from report_analyst.core.question_loader import get_question_loader
 
             question_loader = get_question_loader()
-            question_set_options = question_loader.get_question_set_options() + ["custom"]
+            question_set_options = [*question_loader.get_question_set_options(), "custom"]
         else:
             # Fallback: use a generic approach without hardcoded names
             question_set_options = ["custom"]  # Only custom when core functionality unavailable
 
         # Should have all question sets plus custom
-        expected_sets = {"everest", "tcfd", "denali", "kilimanjaro", "lucia", "custom"}
+        expected_sets = {
+            "everest",
+            "tcfd",
+            "denali",
+            "kilimanjaro",
+            "lucia",
+            "climretrieve",
+            "custom",
+        }
         assert set(question_set_options) == expected_sets
-        assert len(question_set_options) == 6
+        # 6 real sets + "custom" UI option
+        assert len(question_set_options) == 7
         assert "custom" in question_set_options
         assert "everest" in question_set_options
         assert "tcfd" in question_set_options
@@ -371,8 +387,15 @@ class TestQuestionSetLoader:
         assert options1 == options2 == options3
 
         # Should contain expected question sets
-        expected_sets = ["everest", "tcfd", "denali", "kilimanjaro", "lucia"]
+        expected_sets = [
+            "everest",
+            "tcfd",
+            "denali",
+            "kilimanjaro",
+            "lucia",
+            "climretrieve",
+        ]
         for expected_set in expected_sets:
             assert expected_set in options1, f"Expected question set '{expected_set}' not found in options"
 
-        assert len(options1) == 5
+        assert len(options1) == 6

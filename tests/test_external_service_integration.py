@@ -12,9 +12,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from report_analyst_search_backend.external_service_client import (
-    ExternalServiceClient,
-)
+from report_analyst_search_backend.external_service_client import ExternalServiceClient
 from report_analyst_search_backend.external_service_delivery import (
     ExternalServiceDelivery,
 )

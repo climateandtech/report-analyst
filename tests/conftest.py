@@ -5,30 +5,39 @@ Provides test environment configuration and common fixtures.
 """
 
 # Load .env first so OPENBLAS_NUM_THREADS=1 is set before any NumPy/OpenBLAS import (avoids SIGSEGV on macOS ARM)
-import os
-from pathlib import Path
-
-_conftest_dir = Path(__file__).resolve().parent
-_env = _conftest_dir.parent / ".env"
-if _env.exists():
-    from dotenv import load_dotenv
-
-    load_dotenv(_env)
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-
 import json
 import os
-import tempfile
-from unittest.mock import AsyncMock, Mock
+import sys
+from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 import yaml
 from dotenv import load_dotenv
 
-# Load environment variables from .env file before any other imports
-load_dotenv()
+_conftest_dir = Path(__file__).resolve().parent
+_env = _conftest_dir.parent / ".env"
+if _env.exists():
+    load_dotenv(_env)
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
-from report_analyst_jobs.event_router import IGNORE_ACTION, EventRouter
+# Add project root and parent directory to Python path
+# This allows tests to import report_analyst and report_analyst_jobs
+project_root = Path(__file__).parent.parent
+parent_dir = project_root.parent
+
+for path in [str(project_root), str(parent_dir)]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
+# Make report_analyst_jobs import optional (ImportError or transitive env/deps failures)
+try:
+    from report_analyst_jobs.event_router import EventRouter
+
+    REPORT_ANALYST_JOBS_AVAILABLE = True
+except Exception:  # noqa: BLE001
+    REPORT_ANALYST_JOBS_AVAILABLE = False
+    EventRouter = None
 
 # =============================================================================
 # Test Environment Configuration
@@ -102,7 +111,7 @@ def _test_database_connection(url):
             conn.execute(text("SELECT 1"))
         engine.dispose()
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 
@@ -228,6 +237,9 @@ def mock_nats_connection():
 @pytest.fixture
 def event_router_with_mocks(event_router_yaml_file, mock_nats_connection):
     """Event router with mocked NATS connection"""
+    if not REPORT_ANALYST_JOBS_AVAILABLE:
+        pytest.skip("report_analyst_jobs not available - skipping event router tests")
+
     mock_nc, mock_js = mock_nats_connection
 
     router = EventRouter.from_yaml(yaml_path=event_router_yaml_file)
