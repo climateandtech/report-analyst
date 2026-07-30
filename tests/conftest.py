@@ -32,13 +32,11 @@ for path in [str(project_root), str(parent_dir)]:
 
 # Make report_analyst_jobs import optional (ImportError or transitive env/deps failures)
 try:
-    from report_analyst_jobs.event_router import IGNORE_ACTION, EventRouter
+    from report_analyst_jobs.event_router import EventRouter
 
     REPORT_ANALYST_JOBS_AVAILABLE = True
 except Exception:  # noqa: BLE001
     REPORT_ANALYST_JOBS_AVAILABLE = False
-    # Create dummy objects to avoid NameError
-    IGNORE_ACTION = None
     EventRouter = None
 
 # =============================================================================

@@ -227,7 +227,8 @@ class BenchmarkingUI:
         try:
             db_datasets = self.benchmark_store.list_datasets()
         except sqlite3.OperationalError:
-            pass
+            # DB may not be initialized yet on first Benchmarking visit.
+            db_datasets = []
 
         uploaded_datasets = st.session_state.get("uploaded_datasets", {})
 
@@ -374,7 +375,8 @@ class BenchmarkingUI:
         try:
             evaluations = self.benchmark_store.list_evaluations()
         except sqlite3.OperationalError:
-            pass
+            # DB may not be initialized yet; fall back to session evaluations only.
+            evaluations = []
 
         # Get evaluations from session state (recent CSV evaluations)
         session_evals = st.session_state.get("csv_evaluations", [])

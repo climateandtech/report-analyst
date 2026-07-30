@@ -38,6 +38,7 @@ class TestBenchmarkStore:
             try:
                 Path(db_path).unlink()
             except OSError:
+                # Temp DB may already be gone if setup failed mid-fixture.
                 pass
 
     @pytest.fixture

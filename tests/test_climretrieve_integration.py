@@ -45,6 +45,7 @@ def download_github_file(repo: str, file_path: str, output_path: Path) -> Path:
         return output_path
     except requests.RequestException as e:
         pytest.skip(f"Could not download from GitHub: {e}")
+        return output_path  # pragma: no cover — pytest.skip always raises
 
 
 def find_csv_in_directory(repo: str, directory: str) -> Optional[str]:

@@ -125,7 +125,7 @@ def transform_ground_truth(
     df["query_id"] = df.apply(lambda row: generate_query_id(row[doc_col], row[q_col]), axis=1)
 
     # Generate chunk_id from relevant text (or context if relevant not available)
-    df["chunk_id"] = df[text_col].apply(lambda x: generate_chunk_id(x))
+    df["chunk_id"] = df[text_col].apply(generate_chunk_id)
 
     # Generate position (1-indexed, per query)
     df["position"] = df.groupby("query_id").cumcount() + 1
@@ -259,12 +259,12 @@ def transform_benchmark_results(
     df["query_id"] = df.apply(lambda row: generate_query_id(row[report_col_actual], row[q_col]), axis=1)
 
     # Generate chunk_id from paragraph (unique identifier for each retrieved paragraph)
-    df["chunk_id"] = df[para_col].apply(lambda x: generate_chunk_id(x))
+    df["chunk_id"] = df[para_col].apply(generate_chunk_id)
     logger.info("Using paragraph for chunk_id generation (unique per retrieved paragraph)")
 
     # Generate relevant_part_id from relevant_text (for matching to ground truth relevant parts)
     if rel_text_col and rel_text_col in df.columns:
-        df["relevant_part_id"] = df[rel_text_col].apply(lambda x: generate_chunk_id(x))
+        df["relevant_part_id"] = df[rel_text_col].apply(generate_chunk_id)
         logger.info("Using relevant_text for relevant_part_id generation (for ground truth matching)")
     else:
         df["relevant_part_id"] = df["chunk_id"]
