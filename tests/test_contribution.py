@@ -1,4 +1,4 @@
-"""Unit tests for BYOK contribution publish (analysis.result NATS events)."""
+"""Unit tests for enterprise BYOK contribution publish (analysis.result NATS events)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from report_analyst_jobs.contribution import publish_analysis_result
+from report_analyst_enterprise.contribution import publish_analysis_result
 
 
 @pytest.mark.asyncio
@@ -22,7 +22,7 @@ async def test_publish_analysis_result_uses_analysis_result_subject_and_payload(
 
     monkeypatch.setenv("NATS_URL", "nats://localhost:4222")
     monkeypatch.setenv("NATS_USER", "report-analyst-test")
-    monkeypatch.setattr("report_analyst_jobs.contribution.nats.connect", fake_connect)
+    monkeypatch.setattr("report_analyst_enterprise.contribution.nats.connect", fake_connect)
 
     request_id = await publish_analysis_result(
         resource_id="res-123",
@@ -60,7 +60,7 @@ async def test_publish_analysis_result_falls_back_to_core_publish(monkeypatch):
         return mock_nc
 
     monkeypatch.setenv("NATS_URL", "nats://localhost:4222")
-    monkeypatch.setattr("report_analyst_jobs.contribution.nats.connect", fake_connect)
+    monkeypatch.setattr("report_analyst_enterprise.contribution.nats.connect", fake_connect)
 
     request_id = await publish_analysis_result(
         resource_id="res-456",

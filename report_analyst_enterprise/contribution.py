@@ -1,4 +1,7 @@
-"""Publish analysis results to platform (BYOK contribution mode)."""
+"""Publish analysis results to platform (BYOK contribution / enterprise).
+
+Enterprise-only: open-core callers import this optionally and no-op if absent.
+"""
 
 from __future__ import annotations
 

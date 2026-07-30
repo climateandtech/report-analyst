@@ -268,7 +268,7 @@ class FlowOrchestrator:
             return result
 
         try:
-            from report_analyst_jobs.contribution import publish_analysis_result
+            from report_analyst_enterprise.contribution import publish_analysis_result
 
             resource_id = chunks[0].get("resource_id") if chunks else None
             if resource_id:
@@ -291,6 +291,7 @@ class FlowOrchestrator:
                     )
                 )
         except ImportError:
+            # Enterprise package not installed — contribution publish is optional.
             pass
         except Exception as exc:
             logger.warning("Could not publish analysis result to platform: %s", exc)
