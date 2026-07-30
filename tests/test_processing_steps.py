@@ -94,9 +94,12 @@ def clean_db(_processing_steps_db_template):
 
 @pytest.fixture
 def analyzer(monkeypatch, clean_db):
+    """Fresh DocumentAnalyzer per test — singleton otherwise leaks cache/chunks across cases."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_ORGANIZATION", "test-org")
     monkeypatch.setenv("USE_BACKEND", "false")
+    monkeypatch.setenv("USE_CENTRALIZED_LLM", "false")
+    DocumentAnalyzer.reset_instance()
     with patch("llama_index.embeddings.openai.OpenAIEmbedding"), patch(
         "report_analyst.core.llm_providers.get_llm"
     ) as mock_get_llm:
@@ -104,7 +107,9 @@ def analyzer(monkeypatch, clean_db):
         doc_analyzer = DocumentAnalyzer()
         doc_analyzer.cache_manager = CacheManager(db_path=str(clean_db))
         doc_analyzer.llm = Mock(model="gpt-4o-mini", achat=AsyncMock())
+        doc_analyzer.use_backend_llm = False
         yield doc_analyzer
+        DocumentAnalyzer.reset_instance()
 
 
 async def _collect_process_events(analyzer, **kwargs):
