@@ -87,6 +87,11 @@ logger.info(f"Added {current_dir} to Python path")
 
 # Keep relative imports
 from report_analyst.core.analyzer import DocumentAnalyzer
+from report_analyst.core.analysis_result_utils import (
+    normalize_results_container,
+    session_answers_map,
+    split_analysis_results,
+)
 from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
@@ -245,17 +250,10 @@ class ReportAnalyzer:
             # Update analyzer with the current questions
             self.analyzer.questions = questions
 
-            # Convert selected question IDs to numbers for the analyzer
-            selected_numbers = [questions[q_id]["number"] for q_id in selected_questions]
-
-            # Get the question set prefix from the first selected question
-            question_set = selected_questions[0].split("_")[0] if selected_questions else "tcfd"
-            self.analyzer.question_set = question_set
-
-            # Pass use_llm_scoring to process_document
+            # Pass canonical question ids through to the analyzer
             async for result in self.analyzer.process_document(
                 file_path,
-                selected_numbers,
+                selected_questions,
                 use_llm_scoring,
                 single_call,
                 force_recompute,
@@ -269,7 +267,7 @@ class ReportAnalyzer:
                 # Handle results with question_number
                 if "question_number" in result:
                     question_number = result["question_number"]
-                    question_id = f"{question_set}_{question_number}"
+                    question_id = result.get("question_id") or f"{self.analyzer.question_set}_{question_number}"
 
                     # Create a new result with the question_id
                     new_result = {
@@ -299,7 +297,7 @@ class ReportAnalyzer:
     def process_document(
         self,
         file_path: str,
-        selected_questions: List[int] | None = None,
+        selected_questions: List[str | int] | None = None,
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
@@ -476,6 +474,14 @@ def generate_file_key(file_path: str, st) -> str:
     )
 
 
+def selected_question_ids_from_editor(edited_df: pd.DataFrame) -> list[str]:
+    """Return QID values for rows checked in the question data editor."""
+    if edited_df.empty or "Select" not in edited_df.columns or "QID" not in edited_df.columns:
+        return []
+    selected = edited_df["Select"].fillna(False).astype(bool)
+    return edited_df.loc[selected, "QID"].astype(str).tolist()
+
+
 async def analyze_document_and_display(
     report_analyzer,
     file_path: str,
@@ -535,6 +541,8 @@ async def analyze_document_and_display(
             for q_id, answer in cached_answers.items():
                 st.session_state.results["answers"][q_id] = answer
 
+            st.session_state.results = normalize_results_container(st.session_state.results)
+
             # Update display with cached results
             logger.info(f"Creating dataframes with cached results for file_key: {file_key}")
             logger.info(
@@ -545,7 +553,7 @@ async def analyze_document_and_display(
                 f"llm_model={st.session_state.get('new_llm_model')}, "
                 f"use_llm_scoring={st.session_state.get('new_llm_scoring')}"
             )
-            analysis_df, chunks_df = create_analysis_dataframes(st.session_state.results["answers"], file_key)
+            analysis_df, chunks_df = create_analysis_dataframes(session_answers_map(st.session_state.results), file_key)
             st.session_state.analysis_df = analysis_df
             st.session_state.chunks_df = chunks_df
 
@@ -604,7 +612,7 @@ async def analyze_document_and_display(
                     f"llm_model={st.session_state.get('new_llm_model')}, "
                     f"use_llm_scoring={st.session_state.get('new_llm_scoring')}"
                 )
-                analysis_df, chunks_df = create_analysis_dataframes(st.session_state.results["answers"], file_key)
+                analysis_df, chunks_df = create_analysis_dataframes(session_answers_map(st.session_state.results), file_key)
 
                 st.session_state.analysis_df = analysis_df
                 st.session_state.chunks_df = chunks_df
@@ -1400,6 +1408,8 @@ def update_analyzer_parameters():
 async def run_analysis(analyzer, file_path, selected_questions, progress_text):
     """Run analysis and update the UI with progress"""
     try:
+        APIKeyManager.sync_api_keys_to_env(st.session_state)
+
         # Get current configuration
         config = {
             "chunk_size": st.session_state.chunk_size,
@@ -1418,16 +1428,19 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         logger.info(
             f"[CACHE] Looking up cache for file: {file_path} with config: {config} and questions: {selected_questions}"
         )
+        question_ids = list(selected_questions)
+        if selected_questions and not all("_" in q for q in selected_questions):
+            question_ids = [f"{config['question_set']}_{q}" for q in selected_questions]
         # Check if we have cached results first
         cached_results = analyzer.cache_manager.get_analysis(
             file_path=file_path,
             config=config,
-            question_ids=[f"{config['question_set']}_{q}" for q in selected_questions],
+            question_ids=question_ids,
         )
         if cached_results and not st.session_state.get("force_recompute", False):
             logger.info(f"[CACHE] Cache HIT for config: {config}")
             progress_text.success("Found stored results!")
-            st.session_state.results = cached_results
+            st.session_state.results = normalize_results_container(cached_results)
             logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
             logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
             return
@@ -1444,26 +1457,13 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
         # Track results
         all_results = {}
 
-        # Convert selected_questions from full IDs (e.g., "tcfd_1") to just numbers (e.g., 1)
-        question_numbers = []
-        for q_id in selected_questions:
-            # Extract the number part from the question ID
-            parts = q_id.split("_")
-            if len(parts) > 1:
-                try:
-                    question_numbers.append(int(parts[1]))
-                except ValueError:
-                    progress_text.warning(f"Invalid question ID format: {q_id}")
-            else:
-                progress_text.warning(f"Invalid question ID format: {q_id}")
-
         # Check if we have pre-retrieved chunks (for backend resources)
         pre_retrieved_chunks = st.session_state.get("backend_chunks")
 
         # First update the analyzer's process_document method to use progress_text instead of yielding status
         async for result in analyzer.process_document(
             file_path=file_path,
-            selected_questions=question_numbers,  # Pass just the numbers
+            selected_questions=selected_questions,
             use_llm_scoring=st.session_state.get("new_llm_scoring", False),  # Use the checkbox value directly
             force_recompute=st.session_state.get("force_recompute", False),
             pre_retrieved_chunks=pre_retrieved_chunks,  # Pass backend chunks if available
@@ -1487,7 +1487,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
                 # Try to construct question_id from question_number
                 question_number = result.get("question_number")
                 if question_number:
-                    question_id = f"{st.session_state.question_set}_{question_number}"
+                    question_id = result.get("question_id") or f"{config['question_set']}_{question_number}"
                 else:
                     # Skip results without question_id or question_number
                     continue
@@ -1509,9 +1509,19 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
 
         # When writing results to session state
         logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
-        st.session_state.results = final_results
+        st.session_state.results = normalize_results_container(final_results)
         logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
-        progress_text.success("Analysis complete!")
+
+        successes, failures = split_analysis_results(session_answers_map(st.session_state.results))
+        if failures:
+            for qid, message in failures.items():
+                progress_text.error(f"{qid}: {message}")
+        if successes:
+            progress_text.success(f"Analysis complete for {len(successes)} question(s)!")
+        elif failures:
+            progress_text.warning("Analysis finished with errors — see messages above.")
+        else:
+            progress_text.success("Analysis complete!")
 
     except Exception as e:
         progress_text.error(f"Error during analysis: {e!s}")
@@ -3912,7 +3922,7 @@ def main():
                     if analyze_clicked or reanalyze_clicked:
                         # NOW sync the selection state from the widget
                         # Get selected questions from the edited dataframe
-                        selected_questions = edited_df[edited_df["Select"] is True]["QID"].tolist()
+                        selected_questions = selected_question_ids_from_editor(edited_df)
 
                         # Update session state for individual question checkboxes (for backward compatibility)
                         for q_id in questions.keys():

@@ -26,6 +26,15 @@ from .storage import LlamaVectorStore
 # Setup logging at the top of the file
 logger = logging.getLogger(__name__)
 
+# Legacy: map question_set id → YAML question id prefix (when ids differ from set name)
+QUESTION_SET_ID_PREFIX = {
+    "everest": "ev",
+    "tcfd": "tcfd",
+    "s4m": "s4m",
+    "lucia": "lucia",
+    "climretrieve": "climretr",
+}
+
 # Load environment variables
 load_dotenv()
 
@@ -108,12 +117,20 @@ class DocumentAnalyzer:
     _initialized = False
 
     @classmethod
+    def _reset_singleton_if_stale(cls) -> None:
+        """Drop cached singleton after hot reload when instance predates new methods."""
+        if cls._instance is not None and not hasattr(cls._instance, "_ensure_llm_client"):
+            cls._instance = None
+            cls._initialized = False
+
+    @classmethod
     def reset_instance(cls):
         """Reset the singleton so new API keys can be picked up after Settings changes."""
         cls._instance = None
         cls._initialized = False
 
     def __new__(cls):
+        cls._reset_singleton_if_stale()
         if cls._instance is None:
             cls._instance = super(DocumentAnalyzer, cls).__new__(cls)
         return cls._instance
@@ -204,6 +221,8 @@ class DocumentAnalyzer:
                 model_name=self.default_model,
                 cache_dir=str(self.llm_cache_path),
             )
+            self._llm_client_model = self.default_model
+            self._llm_api_key = os.getenv(self._api_key_env_for_model(self.default_model))
 
             current_openai_key = os.getenv("OPENAI_API_KEY")
             if APIKeyManager.is_configured_key(current_openai_key):
@@ -213,6 +232,7 @@ class DocumentAnalyzer:
                     model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
                     embed_batch_size=100,
                 )
+                self._embeddings_api_key = current_openai_key
                 Settings.embed_model = self.embeddings
             else:
                 logger.warning("No OpenAI API key - embedding functionality will be limited")
@@ -354,6 +374,7 @@ class DocumentAnalyzer:
             Settings.ingestion_cache = None
 
         try:
+            self._ensure_llm_client()
             response = await self.llm.achat(
                 prompt=(
                     "As a senior equity analyst with expertise in climate science evaluating a company's "
@@ -413,6 +434,7 @@ class DocumentAnalyzer:
                 # Batch scoring - all chunks in one call
                 chunks_text = "\n\n".join([f"[CHUNK {i + 1}]\n{chunk['text']}" for i, chunk in enumerate(chunks)])
 
+                self._ensure_llm_client()
                 response = await self.llm.achat(
                     prompt=(
                         "As a senior equity analyst with expertise in climate science evaluating a company's "
@@ -547,7 +569,7 @@ class DocumentAnalyzer:
     async def process_document(
         self,
         file_path: str,
-        selected_questions: List[int],
+        selected_questions: List[str | int],
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
@@ -557,7 +579,7 @@ class DocumentAnalyzer:
 
         Args:
             file_path: Path to document file or URN for backend resources
-            selected_questions: List of question numbers to process
+            selected_questions: Question ids (``tcfd_1``, ``esrs_e1_climate_examples_9``) or legacy numbers
             use_llm_scoring: Whether to use LLM for chunk scoring
             single_call: Whether to use single LLM call per question
             force_recompute: Whether to force recomputation
@@ -660,33 +682,28 @@ class DocumentAnalyzer:
 
             yield {"status": f"Document loaded with {len(chunks)} chunks"}
 
-            # 2. Process each question
-            for question_number in selected_questions:
+            if not selected_questions:
+                yield {"error": "Select at least one question to analyze."}
+                return
+
+            question_ids = self.normalize_question_ids(selected_questions)
+            for bad_ref in self.unresolved_question_refs(selected_questions):
+                yield {"error": f"Question {bad_ref} not found"}
+            if not question_ids:
+                return
+
+            # 2. Process each question by canonical id
+            for question_id in question_ids:
                 try:
-                    logger.info(f"[ANALYSIS] Processing question number {question_number}")
-                    question_data = self.get_question_by_number(question_number)
-                    if not question_data:
-                        logger.warning(f"[ANALYSIS] Question {question_number} not found")
-                        yield {"error": f"Question {question_number} not found"}
+                    resolved = self.resolve_question(question_id)
+                    if not resolved:
+                        logger.warning(f"[ANALYSIS] Question {question_id} not found")
+                        yield {"error": f"Question {question_id} not found"}
                         continue
 
-                    # Use the same prefix extraction logic as get_question_by_number
-                    question_set_mapping = {
-                        "everest": "ev",
-                        "tcfd": "tcfd",
-                        "s4m": "s4m",
-                        "lucia": "lucia",
-                        "climretrieve": "climretr",
-                    }
-                    question_prefix = question_set_mapping.get(self.question_set, self.question_set)
-                    # If still not found in mapping, try to extract prefix from actual question IDs
-                    if question_prefix == self.question_set and self.questions:
-                        first_qid = next(iter(self.questions.keys()), "")
-                        if first_qid and "_" in first_qid:
-                            question_prefix = first_qid.split("_")[0]
-
-                    question_id = f"{question_prefix}_{question_number}"
-                    logger.info(f"[ANALYSIS] Question ID: {question_id}")
+                    question_id, question_data = resolved
+                    question_number = self._question_number_from_id(question_id)
+                    logger.info(f"[ANALYSIS] Processing question {question_id}")
 
                     yield {"status": f"Processing question {question_number}: {question_data['text'][:50]}..."}
 
@@ -817,14 +834,30 @@ class DocumentAnalyzer:
 
                 except Exception as e:
                     logger.error(
-                        f"[ANALYSIS] Error processing question {question_number}: {e!s}",
+                        f"[ANALYSIS] Error processing question {question_id}: {e!s}",
                         exc_info=True,
                     )
-                    yield {"error": f"Error processing question {question_number}: {e!s}"}
+                    yield {"error": f"Error processing question {question_id}: {e!s}"}
 
         except Exception as e:
             logger.error(f"[ANALYSIS] Error processing document: {e!s}", exc_info=True)
             yield {"error": f"Error processing document: {e!s}"}
+
+    def _ensure_embeddings_client(self) -> None:
+        """Initialize or refresh OpenAI embeddings client from current OPENAI_API_KEY."""
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not APIKeyManager.is_configured_key(openai_key):
+            raise RuntimeError("OpenAI embeddings unavailable — set OPENAI_API_KEY.")
+        cached_key = getattr(self, "_embeddings_api_key", None)
+        if self.embeddings is None or cached_key != openai_key:
+            self.embeddings = OpenAIEmbedding(
+                api_key=openai_key,
+                api_base=os.getenv("OPENAI_API_BASE"),
+                model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
+                embed_batch_size=100,
+            )
+            self._embeddings_api_key = openai_key
+            Settings.embed_model = self.embeddings
 
     def _create_chunks(self, file_path: str) -> List[Dict[str, Any]]:
         """Create document chunks with embeddings"""
@@ -853,6 +886,8 @@ class DocumentAnalyzer:
                 )
 
             logger.info(f"Created {len(text_chunks)} chunks")
+
+            self._ensure_embeddings_client()
 
             # Compute embeddings in batches
             BATCH_SIZE = 100  # Process 100 chunks at a time
@@ -994,6 +1029,7 @@ class DocumentAnalyzer:
 
             # Get LLM response
             try:
+                self._ensure_llm_client()
                 response = await self.llm.achat(messages)
                 response_text = response.message.content  # Changed from response.content to response.message.content
                 logger.info("=== LLM Response ===")
@@ -1092,19 +1128,27 @@ class DocumentAnalyzer:
 
         except Exception as e:
             logger.error(f"Error analyzing chunks: {e!s}", exc_info=True)
-            return {
-                "ANSWER": f"Error analyzing document: {e!s}",
-                "SCORE": 0,
-                "EVIDENCE": [],
-                "GAPS": ["Error during analysis"],
-                "SOURCES": [],
-                "chunks": processed_chunks if "processed_chunks" in locals() else [],
-                "question_text": question_data["text"],
-                "guidelines": question_data.get("guidelines", ""),
-            }
+            raise
 
     def _load_questions(self) -> dict:
-        """Load questions from YAML files"""
+        """Load questions from YAML files (storage path via question_loader, then bundled)."""
+        from report_analyst.core.question_loader import get_question_loader
+
+        qset = get_question_loader().get_question_set(self.question_set)
+        if qset:
+            questions = {
+                q_id: {
+                    "text": q_data.get("text", ""),
+                    "guidelines": q_data.get("guidelines", ""),
+                }
+                for q_id, q_data in qset.questions.items()
+            }
+            log_analysis_step(
+                f"✓ Loaded {len(questions)} questions for {self.question_set} via question_loader"
+            )
+            return questions
+
+        # Fallback: bundled questionsets only (no QUESTIONSETS_PATH override)
         # Look for question set file in multiple possible locations
         possible_paths = [
             Path(__file__).parent.parent / "questionsets" / f"{self.question_set}_questions.yaml",  # app/questionsets
@@ -1148,42 +1192,72 @@ class DocumentAnalyzer:
             logger.exception("Full error:")  # This will log the full traceback
             return {}
 
-    def get_question_by_number(self, number: int) -> Optional[Dict]:
-        """Get question data by its number."""
-        try:
-            # Handle question set to prefix mapping
-            question_set_mapping = {
-                "everest": "ev",
-                "tcfd": "tcfd",
-                "s4m": "s4m",
-                "lucia": "lucia",
-                "climretrieve": "climretr",  # Map climretrieve to climretr shortcut
-            }
+    def question_id_for_number(self, number: int) -> Optional[str]:
+        """Legacy: map 1-based question number to canonical question id in self.questions."""
+        prefix = QUESTION_SET_ID_PREFIX.get(self.question_set, self.question_set)
+        key = f"{prefix}_{number}"
+        if key in self.questions:
+            return key
+        # Fall back to prefix from loaded IDs (e.g. climretr when set is climretrieve)
+        if self.questions:
+            first_qid = next(iter(self.questions.keys()), "")
+            if "_" in first_qid:
+                extracted = first_qid[: first_qid.rfind("_")]
+                key = f"{extracted}_{number}"
+                if key in self.questions:
+                    return key
+        return None
 
-            # Get the correct prefix for the question set
-            question_prefix = question_set_mapping.get(self.question_set, self.question_set)
+    def resolve_question(self, ref: str | int) -> Optional[tuple[str, Dict]]:
+        """Resolve a question reference to (canonical_id, question_data).
 
-            # If still not found in mapping, try to extract prefix from actual question IDs
-            if question_prefix == self.question_set and self.questions:
-                # Extract prefix from first question ID (e.g., "climretr_1" -> "climretr")
-                first_qid = next(iter(self.questions.keys()), "")
-                if first_qid and "_" in first_qid:
-                    extracted_prefix = first_qid.split("_")[0]
-                    logger.info(
-                        f"[ANALYSIS] Extracted prefix '{extracted_prefix}' from question IDs "
-                        f"(question_set='{self.question_set}')"
-                    )
-                    question_prefix = extracted_prefix
-
-            question_key = f"{question_prefix}_{number}"
-            logger.debug(f"Looking for question {number} with key: {question_key}")
-            logger.debug(f"Available question keys: {list(self.questions.keys())}")
-
-            return self.questions.get(question_key)
-        except Exception as e:
-            logger.error(f"Error getting question {number}: {e!s}")
-            logger.exception("Full error:")
+        Accepts full YAML ids (``tcfd_1``, ``esrs_e1_climate_examples_9``, ``ev_1``)
+        or legacy 1-based numbers / bare digit strings when question_set is set.
+        """
+        if isinstance(ref, str):
+            ref = ref.strip()
+            if ref in self.questions:
+                return ref, self.questions[ref]
+            if ref.isdigit():
+                return self.resolve_question(int(ref))
             return None
+
+        qid = self.question_id_for_number(ref)
+        if qid is None:
+            return None
+        return qid, self.questions[qid]
+
+    def normalize_question_ids(self, selected: List[str | int]) -> List[str]:
+        """Return canonical question ids, preserving order and dropping duplicates."""
+        seen: set[str] = set()
+        ids: List[str] = []
+        for ref in selected:
+            resolved = self.resolve_question(ref)
+            if resolved is None:
+                continue
+            qid = resolved[0]
+            if qid not in seen:
+                seen.add(qid)
+                ids.append(qid)
+        return ids
+
+    def unresolved_question_refs(self, selected: List[str | int]) -> List[str]:
+        """Return selection entries that did not resolve to a loaded question."""
+        unresolved: List[str] = []
+        for ref in selected:
+            if self.resolve_question(ref) is None:
+                unresolved.append(str(ref))
+        return unresolved
+
+    @staticmethod
+    def _question_number_from_id(question_id: str) -> Optional[int]:
+        suffix = question_id.rsplit("_", 1)[-1]
+        return int(suffix) if suffix.isdigit() else None
+
+    def get_question_by_number(self, number: int) -> Optional[Dict]:
+        """Get question data by its number (legacy — prefer resolve_question with full id)."""
+        resolved = self.resolve_question(number)
+        return resolved[1] if resolved else None
 
     def update_parameters(self, chunk_size: int, chunk_overlap: int, top_k: int):
         """Update analysis parameters and recreate text splitter."""
@@ -1200,21 +1274,44 @@ class DocumentAnalyzer:
 
         logger.info("Updated parameters and recreated text splitter")
 
+    def _api_key_env_for_model(self, model_name: str) -> str:
+        if model_name.startswith("gpt-"):
+            return "OPENAI_API_KEY"
+        if model_name.startswith("gemini-") or model_name.startswith("models/gemini-"):
+            return "GOOGLE_API_KEY"
+        raise ValueError(f"Unsupported model: {model_name}")
+
+    def _llm_model_name(self) -> str:
+        if self.llm and hasattr(self.llm, "model"):
+            return self.llm.model
+        return self.default_model
+
+    def _ensure_llm_client(self, model_name: str | None = None) -> None:
+        """Initialize or refresh the LLM client when model or API key changes."""
+        if self.use_backend_llm:
+            return
+        model_name = model_name or self._llm_model_name()
+        env_var = self._api_key_env_for_model(model_name)
+        current_key = os.getenv(env_var)
+        cached_key = getattr(self, "_llm_api_key", None)
+        cached_model = getattr(self, "_llm_client_model", None)
+        if self.llm is None or cached_model != model_name or cached_key != current_key:
+            if not self._has_key_for_model(model_name):
+                self.llm = None
+                logger.warning("Cannot initialize %s without its API key", model_name)
+                return
+            self.llm = get_llm(
+                model_name=model_name,
+                cache_dir=str(self.llm_cache_path),
+            )
+            self._llm_api_key = current_key
+            self._llm_client_model = model_name
+
     def update_llm_model(self, model_name: str):
         """Update the LLM model."""
         logger.info(f"Updating LLM model to: {model_name}")
-
         self.default_model = model_name
-        if not self._has_key_for_model(model_name):
-            self.llm = None
-            logger.warning("Cannot initialize %s without its API key", model_name)
-            return
-
-        # Initialize LLM with caching using the provider factory
-        self.llm = get_llm(
-            model_name=model_name,
-            cache_dir=str(self.llm_cache_path),
-        )
+        self._ensure_llm_client(model_name)
 
     def get_all_cached_answers(self, question_set: str) -> Dict[str, Any]:
         """Get all cached answers for a question set"""
@@ -1330,6 +1427,7 @@ class DocumentAnalyzer:
         try:
             logger.info(f"Getting similar chunks for query: {query_text[:50]}...")
 
+            self._ensure_embeddings_client()
             # Get embedding for the query
             query_embedding = self.embeddings.get_text_embedding(query_text)
 
@@ -1491,13 +1589,7 @@ class DocumentAnalyzer:
 
         except Exception as e:
             logger.error(f"Error parsing analysis response: {e!s}", exc_info=True)
-            return {
-                "ANSWER": f"Error parsing analysis: {e!s}",
-                "SCORE": 0,
-                "EVIDENCE": [],
-                "GAPS": ["Error during analysis"],
-                "SOURCES": [],
-            }
+            raise ValueError(f"Error parsing analysis: {e!s}") from e
 
 
 def create_analysis_dataframes(results: Dict) -> pd.DataFrame:
