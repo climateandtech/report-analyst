@@ -5,6 +5,7 @@ Tests for the QuestionSetLoader functionality
 import os
 import tempfile
 
+import pytest
 import yaml
 
 from report_analyst.core.question_loader import (
