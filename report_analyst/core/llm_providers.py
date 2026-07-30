@@ -14,6 +14,13 @@ from llama_index.llms.openai import OpenAI
 logger = logging.getLogger(__name__)
 
 
+def centralized_llm_requested() -> bool:
+    use_backend = os.getenv("USE_BACKEND", "false").lower() == "true"
+    use_centralized = os.getenv("USE_CENTRALIZED_LLM", "false").lower() == "true"
+    use_full = os.getenv("USE_FULL_BACKEND_ANALYSIS", "false").lower() == "true"
+    return use_backend and (use_centralized or use_full)
+
+
 def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
     """
     Factory function to get LLM implementations based on model name.
@@ -29,7 +36,14 @@ def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
     Raises:
         ValueError: If the API key for the selected model is not available
         ValueError: If the model type is not supported
+        RuntimeError: If centralized LLM is enabled (must use NATSLLMChatAdapter)
     """
+    if centralized_llm_requested():
+        raise RuntimeError(
+            "Centralized LLM mode is active (USE_BACKEND + USE_CENTRALIZED_LLM). "
+            "Local OpenAI/Gemini clients are disabled; use DocumentAnalyzer with NATS LLM."
+        )
+
     # OpenAI models
     if model_name.startswith("gpt-"):
         api_key = os.getenv("OPENAI_API_KEY")
