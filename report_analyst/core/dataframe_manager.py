@@ -1,6 +1,6 @@
-import json
+# ruff: noqa: BLE001, E501, E722, S307
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
@@ -26,7 +26,7 @@ def format_list_field(field: Any) -> str:
                 chunk = item.get("chunk", "Unknown")
                 formatted_items.append(f"• {text} [Chunk {chunk}]")
             else:
-                formatted_items.append(f"• {str(item)}")
+                formatted_items.append(f"• {item!s}")
         return "\n".join(formatted_items)
     return str(field)
 
@@ -40,7 +40,7 @@ def extract_evidence_text(evidence: Any) -> str:
     return str(evidence)
 
 
-def create_analysis_dataframes(cached_results: Dict, file_key: str = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def create_analysis_dataframes(cached_results: Dict, file_key: str | None = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Create analysis and chunks dataframes from database results."""
     try:
         analysis_rows = []
@@ -57,10 +57,16 @@ def create_analysis_dataframes(cached_results: Dict, file_key: str = None) -> Tu
                 logger.info(f"Processing question {question_id} with keys: {list(result.keys())}")
 
                 # Create analysis row
+                score = result.get("SCORE", 0)
+                try:
+                    score = float(score) if score is not None else 0
+                except (ValueError, TypeError):
+                    score = 0
+
                 analysis_row = {
                     "Question ID": question_id,
                     "Analysis": result.get("ANSWER", ""),
-                    "Score": float(result.get("SCORE", 0)),
+                    "Score": score,
                     "Key Evidence": format_list_field(result.get("EVIDENCE", [])),
                     "Gaps": format_list_field(result.get("GAPS", [])),
                     "Sources": format_list_field(result.get("SOURCES", [])),
@@ -68,8 +74,8 @@ def create_analysis_dataframes(cached_results: Dict, file_key: str = None) -> Tu
                 analysis_rows.append(analysis_row)
                 logger.info(f"Added analysis row for question {question_id}")
 
-                # Process chunks - use exactly what's in the database
-                chunks = data.get("chunks", [])
+                # Process chunks - check both result and data for chunks
+                chunks = result.get("chunks", data.get("chunks", []))
                 logger.info(f"Processing {len(chunks)} chunks for question {question_id}")
 
                 for chunk in chunks:
@@ -90,7 +96,7 @@ def create_analysis_dataframes(cached_results: Dict, file_key: str = None) -> Tu
                     )
 
             except Exception as e:
-                logger.error(f"Error processing result for question {question_id}: {str(e)}")
+                logger.error(f"Error processing result for question {question_id}: {e!s}")
                 logger.error(f"Result data: {data}")
                 continue
 
@@ -111,7 +117,7 @@ def create_analysis_dataframes(cached_results: Dict, file_key: str = None) -> Tu
         return analysis_df, chunks_df
 
     except Exception as e:
-        logger.error(f"Error creating dataframes: {str(e)}")
+        logger.error(f"Error creating dataframes: {e!s}")
         return pd.DataFrame(), pd.DataFrame()
 
 

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Viewer with Chunks - Standalone Example</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <pdf-viewer-with-chunks
+            id="pdf-viewer"
+            pdf-url=""
+            chunks='[]'
+            questions='[]'
+        ></pdf-viewer-with-chunks>
+    </div>
+
+    <!-- Load PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <!-- Load the web component -->
+    <script type="module">
+        // Import the web component
+        import PdfViewerWithChunks from '../dist/pdf-viewer.es.js';
+        
+        // Example data
+        const exampleChunks = [
+            {
+                text: "This is an example chunk of text from the document. It contains relevant information about climate risk disclosure.",
+                metadata: {
+                    page_number: 1,
+                    source: "example.pdf"
+                },
+                is_evidence: true,
+                evidence_order: 1,
+                similarity_score: 0.85,
+                llm_score: 0.92,
+                chunk_order: 0,
+                question_id: "q1"
+            },
+            {
+                text: "Another chunk of text that discusses governance structures and risk management processes.",
+                metadata: {
+                    page_number: 2,
+                    source: "example.pdf"
+                },
+                is_evidence: false,
+                similarity_score: 0.72,
+                chunk_order: 1,
+                question_id: "q1"
+            }
+        ];
+        
+        const exampleQuestions = [
+            {
+                question_id: "q1",
+                text: "How does the organization identify and assess climate-related risks?",
+                chunks: exampleChunks
+            }
+        ];
+        
+        // Get the component element
+        const viewer = document.getElementById('pdf-viewer');
+        
+        // Set example data
+        viewer.setChunks(exampleChunks);
+        viewer.setQuestions(exampleQuestions);
+        
+        // Example: Load a PDF (you would replace this with your actual PDF URL or data)
+        // viewer.setPdfUrl('https://example.com/sample.pdf');
+        // Or with base64 data:
+        // viewer.setPdfData('data:application/pdf;base64,...');
+        
+        // Listen for chunk selection events
+        viewer.addEventListener('chunk-selected', (e) => {
+            console.log('Chunk selected:', e.detail);
+        });
+    </script>
+</body>
+</html>
+

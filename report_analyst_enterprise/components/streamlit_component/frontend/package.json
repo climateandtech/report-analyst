@@ -1,0 +1,22 @@
+{
+  "name": "streamlit-pdf-viewer",
+  "version": "0.1.0",
+  "description": "Streamlit custom component for PDF viewing with chunk overlays",
+  "private": true,
+  "scripts": {
+    "dev:pdf-viewer": "vite --config vite.config.pdf-viewer.ts",
+    "build:pdf-viewer": "vite build --config vite.config.pdf-viewer.ts && node -e \"const fs=require('fs'); const html=fs.readFileSync('build/index-pdf-viewer.html','utf8'); const fixedHtml=html.replace('src=\\\"/index-pdf-viewer.js\\\"','src=\\\"index-pdf-viewer.js\\\"'); fs.writeFileSync('build/index-pdf-viewer.html', fixedHtml); fs.mkdirSync('build/pdf-viewer', {recursive: true}); if(fs.existsSync('build/index-pdf-viewer.js')) fs.copyFileSync('build/index-pdf-viewer.js', 'build/pdf-viewer/index-pdf-viewer.js'); if(fs.existsSync('build/pdf-viewer.es.js')) fs.copyFileSync('build/pdf-viewer.es.js', 'build/pdf-viewer/pdf-viewer.es.js'); const pdfViewerHtml=html.replace('src=\\\"/index-pdf-viewer.js\\\"','src=\\\"index-pdf-viewer.js\\\"'); fs.writeFileSync('build/pdf-viewer/index.html', pdfViewerHtml);\""
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "streamlit-component-lib": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.4.21"
+  }
+}
