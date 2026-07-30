@@ -36,12 +36,13 @@ def get_llm(model_name: str, cache_dir: Optional[str] = None, **kwargs) -> Any:
     Raises:
         ValueError: If the API key for the selected model is not available
         ValueError: If the model type is not supported
-        RuntimeError: If centralized LLM is enabled (must use NATSLLMChatAdapter)
+        RuntimeError: If centralized LLM is enabled (must use enterprise NATSLLMChatAdapter)
     """
     if centralized_llm_requested():
         raise RuntimeError(
             "Centralized LLM mode is active (USE_BACKEND + USE_CENTRALIZED_LLM). "
-            "Local OpenAI/Gemini clients are disabled; use DocumentAnalyzer with NATS LLM."
+            "Local OpenAI/Gemini clients are disabled; use DocumentAnalyzer with "
+            "report_analyst_enterprise.nats_llm_adapter.NATSLLMChatAdapter."
         )
 
     # OpenAI models
