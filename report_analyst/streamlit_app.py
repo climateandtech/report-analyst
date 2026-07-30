@@ -4566,15 +4566,8 @@ def main():
 
                 # Initialize analyzer if not already in session state
                 if "analyzer" not in st.session_state:
-                    # Create a minimal analyzer for cache_manager access
-                    from report_analyst.core.analyzer import DocumentAnalyzer
-                    from report_analyst.core.cache_manager import CacheManager
-
-                    cache_manager = CacheManager()
-                    analyzer = DocumentAnalyzer(cache_manager=cache_manager)
-                    st.session_state.analyzer = analyzer
-                else:
-                    analyzer = st.session_state.analyzer
+                    st.session_state.analyzer = ReportAnalyzer()
+                analyzer = st.session_state.analyzer
 
                 benchmark_ui = BenchmarkingUI(analyzer.cache_manager)
 
