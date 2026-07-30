@@ -26,6 +26,30 @@ from .storage import LlamaVectorStore
 # Setup logging at the top of the file
 logger = logging.getLogger(__name__)
 
+PROCESSING_STEPS = ("chunk", "embed", "map", "answer")
+PROCESSING_STEP_LABELS = {
+    "chunk": "Chunk",
+    "embed": "Embed",
+    "map": "Map",
+    "answer": "Answer",
+}
+
+
+def normalize_processing_step(step: str | None) -> str:
+    """Map UI labels (Chunk/Embed/...) or keys to a processing step key."""
+    if not step:
+        return "answer"
+    key = step.strip().lower()
+    if key in PROCESSING_STEPS:
+        return key
+    label_map = {v.lower(): k for k, v in PROCESSING_STEP_LABELS.items()}
+    return label_map.get(key, "answer")
+
+
+def processing_step_rank(step: str) -> int:
+    return PROCESSING_STEPS.index(normalize_processing_step(step))
+
+
 # Load environment variables
 load_dotenv()
 
@@ -552,6 +576,7 @@ class DocumentAnalyzer:
         single_call: bool = True,
         force_recompute: bool = False,
         pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
+        max_processing_step: str = "answer",
     ) -> AsyncGenerator[Dict, None]:
         """Process a document for selected questions
 
@@ -562,16 +587,20 @@ class DocumentAnalyzer:
             single_call: Whether to use single LLM call per question
             force_recompute: Whether to force recomputation
             pre_retrieved_chunks: Optional pre-retrieved chunks (e.g., from backend)
+            max_processing_step: Stop after this pipeline stage (chunk/embed/map/answer)
         """
         try:
+            step_key = normalize_processing_step(max_processing_step)
+            step_level = processing_step_rank(step_key)
             # Add more detailed logging
             logger.info(f"[ANALYSIS] Starting document processing for {file_path}")
             logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
             logger.info(
-                "[ANALYSIS] LLM scoring: %s, Single call: %s, Force recompute: %s",
+                "[ANALYSIS] LLM scoring: %s, Single call: %s, Force recompute: %s, Max step: %s",
                 use_llm_scoring,
                 single_call,
                 force_recompute,
+                step_key,
             )
             logger.info(
                 "[ANALYSIS] Current chunk parameters: size=%s, overlap=%s, top_k=%s",
@@ -580,7 +609,7 @@ class DocumentAnalyzer:
                 self.chunk_params["top_k"],
             )
 
-            if not self.use_backend_llm and self.llm is None:
+            if step_level >= processing_step_rank("map") and not self.use_backend_llm and self.llm is None:
                 yield {
                     "error": (
                         "No API key configured. Add an OpenAI or Google/Gemini key in Settings → API Keys "
@@ -632,7 +661,6 @@ class DocumentAnalyzer:
 
                 if not chunks:
                     logger.info("[ANALYSIS] No chunks found in cache with current parameters, creating new chunks")
-                    # If no chunks in cache with current parameters, create them
                     # Check if file_path is a URN (backend resource)
                     if file_path.startswith("urn:report-analyst:backend:"):
                         logger.warning(
@@ -646,19 +674,52 @@ class DocumentAnalyzer:
                             )
                         }
                         return
-                    chunks = self._create_chunks(file_path)
-                    logger.info(f"[ANALYSIS] Created {len(chunks)} new chunks")
-
-                    # Save chunks to cache with current parameters
-                    self.cache_manager.save_document_chunks(
-                        file_path=file_path,
-                        chunks=chunks,
-                        chunk_size=self.chunk_params["chunk_size"],
-                        chunk_overlap=self.chunk_params["chunk_overlap"],
-                    )
-                    logger.info(f"[ANALYSIS] Saved {len(chunks)} chunks to cache")
+                    if step_level == processing_step_rank("chunk"):
+                        chunks = self._create_text_chunks(file_path)
+                        logger.info(f"[ANALYSIS] Created {len(chunks)} text-only chunks")
+                        self.cache_manager.save_text_only_chunks(
+                            file_path=file_path,
+                            chunks=chunks,
+                            chunk_size=self.chunk_params["chunk_size"],
+                            chunk_overlap=self.chunk_params["chunk_overlap"],
+                        )
+                        logger.info(f"[ANALYSIS] Saved {len(chunks)} text-only chunks to cache")
+                    else:
+                        chunks = self._create_chunks(file_path)
+                        logger.info(f"[ANALYSIS] Created {len(chunks)} new chunks with embeddings")
+                        self.cache_manager.save_document_chunks(
+                            file_path=file_path,
+                            chunks=chunks,
+                            chunk_size=self.chunk_params["chunk_size"],
+                            chunk_overlap=self.chunk_params["chunk_overlap"],
+                        )
+                        logger.info(f"[ANALYSIS] Saved {len(chunks)} chunks to cache")
 
             yield {"status": f"Document loaded with {len(chunks)} chunks"}
+
+            if step_level >= processing_step_rank("embed") and not any(c.get("embedding") is not None for c in chunks):
+                if not chunks:
+                    if file_path.startswith("urn:report-analyst:backend:"):
+                        yield {"error": "Backend resource requires pre-retrieved chunks with embeddings."}
+                        return
+                    chunks = self._create_chunks(file_path)
+                else:
+                    chunks = self._add_embeddings_to_chunks(chunks)
+                self.cache_manager.save_document_chunks(
+                    file_path=file_path,
+                    chunks=chunks,
+                    chunk_size=self.chunk_params["chunk_size"],
+                    chunk_overlap=self.chunk_params["chunk_overlap"],
+                )
+                logger.info(f"[ANALYSIS] Stored {len(chunks)} chunks with embeddings")
+
+            if step_level <= processing_step_rank("embed"):
+                yield {"status": f"Completed {PROCESSING_STEP_LABELS[step_key]} step ({len(chunks)} chunks)"}
+                return
+
+            if not selected_questions:
+                yield {"error": "Select at least one question for Map or Answer steps."}
+                return
 
             # 2. Process each question
             for question_number in selected_questions:
@@ -733,6 +794,12 @@ class DocumentAnalyzer:
                         # Ensure llm_score is set to None when not using LLM scoring
                         for chunk in similar_chunks:
                             chunk["llm_score"] = None
+
+                    if step_level <= processing_step_rank("map"):
+                        yield {
+                            "status": f"Completed Map step for question {question_number} ({len(similar_chunks)} chunks ranked)"
+                        }
+                        continue
 
                     # 4. Run LLM analysis (evidence determination happens here)
                     logger.info(f"[ANALYSIS] Running LLM analysis for question {question_id}")
@@ -825,6 +892,80 @@ class DocumentAnalyzer:
         except Exception as e:
             logger.error(f"[ANALYSIS] Error processing document: {e!s}", exc_info=True)
             yield {"error": f"Error processing document: {e!s}"}
+
+    def _split_pdf_to_text_chunks(self, file_path: str) -> List[Dict[str, Any]]:
+        """Split a PDF into text chunks without computing embeddings."""
+        reader = PyMuPDFReader()
+        docs = reader.load(file_path=file_path)
+        logger.info(f"Loaded {len(docs)} pages from document")
+
+        text_chunks: List[Dict[str, Any]] = []
+        for doc in docs:
+            nodes = self.text_splitter.split_text(doc.text)
+            for chunk in nodes:
+                text = chunk.strip()
+                if not text:
+                    continue
+                text_chunks.append(
+                    {
+                        "text": text,
+                        "metadata": {
+                            **doc.metadata,
+                            "chunk_size": self.chunk_params["chunk_size"],
+                            "chunk_overlap": self.chunk_params["chunk_overlap"],
+                        },
+                        "embedding": None,
+                        "similarity": 0.0,
+                        "computed_score": 0.0,
+                    }
+                )
+        logger.info(f"Split document into {len(text_chunks)} text chunks")
+        return text_chunks
+
+    def _create_text_chunks(self, file_path: str) -> List[Dict[str, Any]]:
+        """Create document chunks without embeddings (Chunk step only)."""
+        try:
+            return self._split_pdf_to_text_chunks(file_path)
+        except Exception as e:
+            logger.error(f"Error creating text chunks: {e!s}", exc_info=True)
+            raise
+
+    def _ensure_embeddings_client(self) -> None:
+        """Initialize or refresh OpenAI embeddings client from current OPENAI_API_KEY."""
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
+            raise RuntimeError("OpenAI embeddings unavailable — set OPENAI_API_KEY for the Embed step.")
+        if self.embeddings is None:
+            self.embeddings = OpenAIEmbedding(
+                api_key=openai_key,
+                api_base=os.getenv("OPENAI_API_BASE"),
+                model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
+                embed_batch_size=100,
+            )
+            Settings.embed_model = self.embeddings
+
+    def _add_embeddings_to_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Compute embeddings for existing text chunks."""
+        self._ensure_embeddings_client()
+
+        embedded: List[Dict[str, Any]] = []
+        batch_size = 100
+        texts = [c["text"] for c in chunks if c.get("text")]
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i : i + batch_size]
+            batch_embeddings = self.embeddings.get_text_embedding_batch(batch_texts)
+            for text, embedding in zip(batch_texts, batch_embeddings, strict=False):
+                if embedding is None:
+                    continue
+                source = next(c for c in chunks if c["text"] == text)
+                embedded.append(
+                    {
+                        **source,
+                        "embedding": np.array(embedding, dtype=np.float32),
+                    }
+                )
+        logger.info(f"Added embeddings to {len(embedded)}/{len(chunks)} chunks")
+        return embedded
 
     def _create_chunks(self, file_path: str) -> List[Dict[str, Any]]:
         """Create document chunks with embeddings"""
