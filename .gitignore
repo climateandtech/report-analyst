@@ -54,3 +54,7 @@ node_modules
 Agents.md
 report-analyst.code-workspace
 .vscode/launch.json
+
+# Dependabot
+depenabot_alerts.csv
+/depenabot_alerts
