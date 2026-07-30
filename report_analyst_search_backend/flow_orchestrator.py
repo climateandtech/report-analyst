@@ -258,11 +258,45 @@ class FlowOrchestrator:
         return self._analyze_local(chunks, questions)
 
     def _analyze_enhanced(self, chunks: List[Dict[str, Any]], questions: List[str]) -> AnalysisResult:
-        """Enhanced analysis with centralized LLM and data lake"""
-        # This would use NATS LLM and store in data lake
-        # For now, fallback to local analysis
+        """Enhanced analysis with platform contribution publish when backend is enabled."""
+        import asyncio
+        import os
+
         st.info("Enhanced analysis not fully implemented - using local analysis")
-        return self._analyze_local(chunks, questions)
+        result = self._analyze_local(chunks, questions)
+        if not (result.success and self.config.use_backend and result.results):
+            return result
+
+        try:
+            from report_analyst_jobs.contribution import publish_analysis_result
+
+            resource_id = chunks[0].get("resource_id") if chunks else None
+            if resource_id:
+                questions_list = result.results.get("questions", questions)
+                answers_list = result.results.get("answers", [])
+                asyncio.run(
+                    publish_analysis_result(
+                        resource_id=str(resource_id),
+                        results={
+                            "answers": answers_list,
+                            "questions": questions_list,
+                        },
+                        provenance={
+                            "model": os.getenv("OPENAI_API_MODEL", "local"),
+                            "provider": "report_analyst",
+                            "mode": "byok_contribution"
+                            if os.getenv("USE_BYOK_CONTRIBUTION", "").lower() in ("1", "true", "yes")
+                            else "centralized",
+                        },
+                    )
+                )
+        except ImportError:
+            pass
+        except Exception as exc:
+            logger.warning("Could not publish analysis result to platform: %s", exc)
+
+        result.stored_in_backend = self.config.use_backend
+        return result
 
     def _configure_question_set(self, default_question_set: str) -> str:
         """Configure question set for backend analysis"""
