@@ -78,7 +78,6 @@ jsonschema-specifications==2024.10.1
 kiwisolver==1.4.8
 kubernetes==32.0.0
 langchain==0.3.20
-langchain-community==0.3.19
 langchain-core==0.3.43
 langchain-openai==0.3.8
 langchain-text-splitters==0.3.6
