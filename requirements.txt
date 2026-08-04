@@ -79,10 +79,10 @@ kiwisolver==1.4.8
 kubernetes==32.0.0
 langchain==0.3.20
 langchain-community==0.3.19
-langchain-core==0.3.43
+langchain-core==0.3.85
 langchain-openai==0.3.8
 langchain-text-splitters==0.3.6
-langsmith==0.3.13
+langsmith==0.3.45
 llama-cloud==0.1.11
 llama-cloud-services==0.6.0
 llama-index-core==0.13.6
