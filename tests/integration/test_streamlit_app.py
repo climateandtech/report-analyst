@@ -55,9 +55,9 @@ def test_env():
 
     # Create test database using CacheManager (which will create all tables)
     db_path = cache_path / "analysis.db"
-    # from report_analyst.core.cache_manager import CacheManager
+    from report_analyst.core.cache_manager import CacheManager
 
-    # cache_manager = CacheManager(db_path=str(db_path))
+    cache_manager = CacheManager(db_path=str(db_path)) # noqa: F841
     # Tables are created automatically by CacheManager.init_db()
 
     # Create test question set
