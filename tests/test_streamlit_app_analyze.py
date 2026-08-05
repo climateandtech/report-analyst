@@ -107,7 +107,7 @@ def test_reanalyze_button_without_openai_call(mocked_report_analyzer, test_pdf_i
     report_analyzer, calls = mocked_report_analyzer
 
     assert test_pdf_in_app_temp.exists()
-    
+
     at = AppTest.from_file(str(PROJECT_ROOT / "report_analyst/streamlit_app.py"))
     at.session_state["nav_page"] = "Report Analyst"
     at.session_state["analyzer"] = report_analyzer
