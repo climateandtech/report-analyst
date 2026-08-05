@@ -11,7 +11,7 @@ import pytest
 from pypdf import PdfWriter
 from streamlit.testing.v1 import AppTest
 
-from report_analyst.streamlit_app import ReportAnalyzer, get_uploaded_files_history
+from report_analyst.streamlit_app import ReportAnalyzer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 

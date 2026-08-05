@@ -9,11 +9,14 @@ import json
 import os
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from types import MethodType
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 import yaml
 from dotenv import load_dotenv
+
+from report_analyst.streamlit_app import ReportAnalyzer
 
 _conftest_dir = Path(__file__).resolve().parent
 _env = _conftest_dir.parent / ".env"
@@ -261,15 +264,6 @@ def mock_nats_message():
         return mock_msg
 
     return _create_message
-
-
-from pathlib import Path
-from types import MethodType
-from unittest.mock import Mock
-
-import pytest
-
-from report_analyst.streamlit_app import ReportAnalyzer
 
 
 @pytest.fixture
