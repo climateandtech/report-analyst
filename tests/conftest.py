@@ -318,17 +318,17 @@ def mocked_report_analyzer():
             generated_results[question_id] = result
             yield result
 
-         # Simulate cached results after analysis
+        # Simulate cached results after analysis
         self.analyzer.cache_manager.get_analysis.return_value = generated_results
 
     async def fake_process_document(
-    self,
-    file_path,
-    selected_questions=None,
-    use_llm_scoring=False,
-    single_call=True,
-    force_recompute=False,
-    pre_retrieved_chunks=None,
+        self,
+        file_path,
+        selected_questions=None,
+        use_llm_scoring=False,
+        single_call=True,
+        force_recompute=False,
+        pre_retrieved_chunks=None,
     ):
         calls.append(
             {
@@ -359,7 +359,7 @@ def mocked_report_analyzer():
     report_analyzer.prompt_manager = Mock()
 
     # Cache used during analysis
-    report_analyzer.cache_manager =MagicMock()
+    report_analyzer.cache_manager = MagicMock()
     report_analyzer.cache_manager.get_analysis.return_value = {}
 
     # Mock nested analyzer used by the Streamlit app
@@ -368,7 +368,7 @@ def mocked_report_analyzer():
     report_analyzer.analyzer.update_parameters.return_value = {}
 
     # Initial cache miss
-    report_analyzer.analyzer.cache_manager =MagicMock()
+    report_analyzer.analyzer.cache_manager = MagicMock()
     report_analyzer.analyzer.cache_manager.get_analysis.return_value = {}
 
     # Replace the real analysis with the fake implementation
@@ -380,6 +380,6 @@ def mocked_report_analyzer():
     report_analyzer.process_document = MethodType(
         fake_process_document,
         report_analyzer,
-    )    
+    )
 
     return report_analyzer, calls
