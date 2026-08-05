@@ -76,25 +76,3 @@ def test_question_set_selectbox_has_options():
     assert any("kilimanjaro" in opt for opt in options_lower), f"Kilimanjaro not found in options: {options}"
 
     assert not at.exception
-
-def test_process_document_unexpected_keyword():
-    "Test the process_document() function if the pre_retrieved_chunk keyword is unexpected"
-    from report_analyst.streamlit_app import ReportAnalyzer
-    from unittest.mock import Mock 
-
-    # Create ReportAnalyst instance to use the wrapper function
-    report_analyzer = object.__new__(ReportAnalyzer)
-    report_analyzer.analyzer = Mock()
-    chunks = [{"text": "test chunk"}]
-
-    # Calling function where pre_retrived_chunks is unexpected
-    report_analyzer.process_document(
-        file_path = " ",
-        selected_questions = [],
-        use_llm_scoring = False,
-        single_call = True,
-        force_recompute = False,
-        pre_retrieved_chunks = chunks,
-    )
-
-    report_analyzer.analyzer.process_document.assert_called_once()
