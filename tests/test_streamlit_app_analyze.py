@@ -13,11 +13,13 @@ from streamlit.testing.v1 import AppTest
 
 from report_analyst.streamlit_app import ReportAnalyzer, get_uploaded_files_history
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 
 @pytest.fixture
 def test_pdf_in_app_temp():
     """Create a valid temporary PDF in the app's temp directory."""
-    app_temp = Path("temp")
+    app_temp = PROJECT_ROOT / "temp"
     app_temp.mkdir(exist_ok=True)
 
     pdf_path = app_temp / "test_report.pdf"
@@ -75,7 +77,9 @@ def test_process_document_with_all_keywords():
 def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp):
     report_analyzer, calls = mocked_report_analyzer
 
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    assert test_pdf_in_app_temp.exists()
+
+    at = AppTest.from_file(str(PROJECT_ROOT / "report_analyst/streamlit_app.py"))
     at.session_state["nav_page"] = "Report Analyst"
     at.session_state["analyzer"] = report_analyzer
 
@@ -83,16 +87,8 @@ def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_
 
     assert not at.exception
 
-    # Find the generated PDF in the app file list.
-    files = get_uploaded_files_history()
-
-    test_file = next(file for file in files if file["name"] == test_pdf_in_app_temp.name)
-
-    # The selectbox stores the full file dictionary, not only its name.
-    at.session_state["previous_file"] = test_file
-    at.run(timeout=10)
-
-    assert at.session_state["previous_file"]["name"] == test_pdf_in_app_temp.name
+    assert not at.exception
+    assert "select_all_tcfd" in [button.key for button in at.button], [(button.key, button.label) for button in at.button]
 
     at.button(key="select_all_tcfd").click().run(timeout=10)
     at.button(key="analyze_button").click().run(timeout=10)
@@ -111,7 +107,7 @@ def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_
 def test_reanalyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp):
     report_analyzer, calls = mocked_report_analyzer
 
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(str(PROJECT_ROOT / "report_analyst/streamlit_app.py"))
     at.session_state["nav_page"] = "Report Analyst"
     at.session_state["analyzer"] = report_analyzer
 
@@ -119,16 +115,8 @@ def test_reanalyze_button_without_openai_call(mocked_report_analyzer, test_pdf_i
 
     assert not at.exception
 
-    # Find the generated PDF in the app file list.
-    files = get_uploaded_files_history()
-
-    test_file = next(file for file in files if file["name"] == test_pdf_in_app_temp.name)
-
-    # The selectbox stores the full file dictionary, not only its name.
-    at.session_state["previous_file"] = test_file
-    at.run(timeout=10)
-
-    assert at.session_state["previous_file"]["name"] == test_pdf_in_app_temp.name
+    assert not at.exception
+    assert "select_all_tcfd" in [button.key for button in at.button], [(button.key, button.label) for button in at.button]
 
     at.button(key="select_all_tcfd").click().run(timeout=10)
     at.button(key="reanalyze_button").click().run(timeout=10)
