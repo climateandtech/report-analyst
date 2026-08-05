@@ -117,6 +117,7 @@ def test_report_analyzer_initialization(report_analyzer):
     assert isinstance(report_analyzer.analyzer, DocumentAnalyzer)
     assert report_analyzer.temp_dir.exists()
 
+
 # FIXME test usufull?
 def test_load_question_set(report_analyzer, test_env):
     """Test loading question sets"""
