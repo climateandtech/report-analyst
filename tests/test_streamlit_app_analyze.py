@@ -8,10 +8,11 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from pypdf import PdfWriter
 from streamlit.testing.v1 import AppTest
 
 from report_analyst.streamlit_app import ReportAnalyzer, get_uploaded_files_history
-from pypdf import PdfWriter
+
 
 @pytest.fixture
 def test_pdf_in_app_temp():
@@ -31,6 +32,7 @@ def test_pdf_in_app_temp():
 
     # Remove only the file created by this test.
     pdf_path.unlink(missing_ok=True)
+
 
 def test_process_document_with_all_keywords():
     "Test the process_document() function if the pre_retrieved_chunk keyword is unexpected"
@@ -70,7 +72,7 @@ def test_process_document_with_all_keywords():
 #         os.environ["TEMP_DIR"] = str(temp_dir)
 
 
-def test_analyze_button_without_openai_call(mocked_report_analyzer,test_pdf_in_app_temp):
+def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp):
     report_analyzer, calls = mocked_report_analyzer
 
     at = AppTest.from_file("report_analyst/streamlit_app.py")
@@ -84,11 +86,7 @@ def test_analyze_button_without_openai_call(mocked_report_analyzer,test_pdf_in_a
     # Find the generated PDF in the app file list.
     files = get_uploaded_files_history()
 
-    test_file = next(
-        file
-        for file in files
-        if file["name"] == test_pdf_in_app_temp.name
-    )
+    test_file = next(file for file in files if file["name"] == test_pdf_in_app_temp.name)
 
     # The selectbox stores the full file dictionary, not only its name.
     at.session_state["previous_file"] = test_file
@@ -110,9 +108,7 @@ def test_analyze_button_without_openai_call(mocked_report_analyzer,test_pdf_in_a
     assert Path(calls[0]["file_path"]).name == test_pdf_in_app_temp.name
 
 
-def test_reanalyze_button_without_openai_call(
-        mocked_report_analyzer,
-        test_pdf_in_app_temp):
+def test_reanalyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp):
     report_analyzer, calls = mocked_report_analyzer
 
     at = AppTest.from_file("report_analyst/streamlit_app.py")
@@ -126,18 +122,14 @@ def test_reanalyze_button_without_openai_call(
     # Find the generated PDF in the app file list.
     files = get_uploaded_files_history()
 
-    test_file = next(
-        file
-        for file in files
-        if file["name"] == test_pdf_in_app_temp.name
-    )
+    test_file = next(file for file in files if file["name"] == test_pdf_in_app_temp.name)
 
     # The selectbox stores the full file dictionary, not only its name.
     at.session_state["previous_file"] = test_file
     at.run(timeout=10)
 
     assert at.session_state["previous_file"]["name"] == test_pdf_in_app_temp.name
-    
+
     at.button(key="select_all_tcfd").click().run(timeout=10)
     at.button(key="reanalyze_button").click().run(timeout=10)
 
