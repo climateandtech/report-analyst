@@ -303,11 +303,11 @@ class ReportAnalyzer:
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
-        pre_retrieved_chunk: Optional[List[Dict[str, Any]]] = None,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ):
         """Delegate to the analyzer's process_document method"""
         return self.analyzer.process_document(
-            file_path, selected_questions, use_llm_scoring, single_call, force_recompute, pre_retrieved_chunk
+            file_path, selected_questions, use_llm_scoring, single_call, force_recompute, pre_retrieved_chunks
         )
 
 

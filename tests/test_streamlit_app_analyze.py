@@ -51,7 +51,7 @@ def test_process_document_with_all_keywords():
         use_llm_scoring=False,
         single_call=True,
         force_recompute=False,
-        pre_retrieved_chunk=chunks,
+        pre_retrieved_chunks=chunks,
     )
 
     report_analyzer.analyzer.process_document.assert_called_once()
