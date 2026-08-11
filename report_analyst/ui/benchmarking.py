@@ -208,7 +208,7 @@ class BenchmarkingUI:
 
     def render_benchmarking_interface(self):
         """Render benchmarking interface"""
-        st.subheader("Run Benchmark Evaluation")
+        st.subheader("Evaluate Benchmark")
 
         # Get datasets from both database and session state (uploaded files)
         db_datasets = []
@@ -244,7 +244,12 @@ class BenchmarkingUI:
 
         # Ranking / retrieval evaluation configuration
         if eval_mode in ("Ranking (retrieval)", "Both"):
-            st.subheader("Ranking evaluation (retrieval)")
+            st.subheader("Ranking Evaluation")
+
+            st.markdown(
+                "Compare your benchmark results against the ground-truth" \
+                " dataset and measure retrieval performance."
+                )
 
             col1, col2 = st.columns(2)
 
@@ -264,7 +269,7 @@ class BenchmarkingUI:
 
                 if reference_options:
                     selected_ref_label = st.selectbox(
-                        "Select Reference (Ground Truth) Dataset:",
+                        "Ground-truth dataset",
                         options=list(reference_options.keys()),
                     )
                     ref_source, ref_id = reference_options[selected_ref_label]
@@ -287,7 +292,7 @@ class BenchmarkingUI:
 
                 if benchmark_options:
                     selected_bench_label = st.selectbox(
-                        "Select Benchmark (Results) Dataset:",
+                        "Benchmark dataset",
                         options=list(benchmark_options.keys()),
                     )
                     bench_source, bench_id = benchmark_options[selected_bench_label]
@@ -297,7 +302,7 @@ class BenchmarkingUI:
 
             # Evaluation name
             evaluation_name = st.text_input(
-                "Evaluation Name:",
+                "Evaluation name:",
                 value=f"eval_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}",
             )
 
@@ -346,11 +351,11 @@ class BenchmarkingUI:
 
         # Classification evaluation configuration
         if eval_mode in ("Classification", "Both"):
-            st.subheader("Classification evaluation (per-chunk labels and scores)")
-            st.caption(
-                "Use this section when your dataset has ground-truth labels (e.g. relevance/usefulness) "
-                "and one or more numeric prediction/score columns."
-            )
+            # st.subheader("Classification evaluation (per-chunk labels and scores)")
+            # st.caption(
+            #     "Use this section when your dataset has ground-truth labels (e.g. relevance/usefulness) "
+            #     "and one or more numeric prediction/score columns."
+            # )
             # Reuse the classification calibration panel so you can configure and run it here
             self._render_classification_calibration_panel("evaluate")
 
@@ -574,16 +579,17 @@ class BenchmarkingUI:
         if not candidates:
             return
 
-        st.subheader("Classification calibration")
+        st.subheader("Classification Evaluation")
         st.caption(
-            "Analyze calibration and classification performance for any dataset with "
-            "a label column and one or more numeric prediction/score columns."
+            "Compare model predictions against ground-truth" \
+            " labels and evaluate classification performance."
         )
 
         # Dataset selector
         labels = [f"{ds.name} ({key})" for key, ds in candidates]
         selected_label = st.selectbox(
-            "Select dataset for calibration analysis:",
+            "Dataset",
+            help="Select the column containing the expected or expert-assigned label.",
             options=labels,
             key=f"{key_prefix}_calibration_dataset_select",
         )
@@ -627,7 +633,7 @@ class BenchmarkingUI:
                 break
 
         label_col = st.selectbox(
-            "Ground-truth label column (e.g. relevance or usefulness):",
+            "Ground-truth label",
             options=label_candidates,
             index=default_label_index,
             key=f"{key_prefix}calibration_label_select",
@@ -641,7 +647,8 @@ class BenchmarkingUI:
 
         # Let the user choose one or more prediction columns (models) to analyze.
         selected_score_cols = st.multiselect(
-            "Prediction / score columns (models):",
+            "Model predictions / scores",
+            help="Select one or more columns containing your model's predictions or scores.",
             options=score_candidates,
             default=default_score_selection,
             key=f"{key_prefix}calibration_score_multiselect",
@@ -1318,7 +1325,7 @@ class BenchmarkingUI:
             if has_query_id_col:
                 default_qid_idx = query_id_options.index(next(c for c in cols if c.lower() == "query_id"))
             query_id_sel = st.selectbox(
-                "How should the query be identified?",
+                "**How should the query be identified?**",
                 options=query_id_options,
                 index=default_qid_idx,
                 key="flex_bm_query_id_strategy",
