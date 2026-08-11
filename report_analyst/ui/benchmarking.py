@@ -66,9 +66,7 @@ class BenchmarkingUI:
 
         # Expected file formats (expandable)
         with st.expander("Expected file formats (CSV, Excel, YAML, JSON)"):
-            st.markdown(
-                "**Supported files**"
-            )
+            st.markdown("**Supported files**")
             st.markdown(
                 "**CSV / Excel** — "
                 "Recommended for new evaluations."
@@ -77,8 +75,7 @@ class BenchmarkingUI:
             )
 
             st.markdown(
-                "**YAML / JSON** — "
-                "Supported for existing benchmark datasets, but cannot be aligned in the wizard. "
+                "**YAML / JSON** — " "Supported for existing benchmark datasets, but cannot be aligned in the wizard. "
             )
             st.markdown(
                 "**Tip:** "
@@ -94,7 +91,7 @@ class BenchmarkingUI:
         # ------------------------------------------------------------------
         # Flexible alignment wizard (experimental)
         # ------------------------------------------------------------------
-        
+
         if eval_mode == "Classification":
             st.subheader(
                 "Upload & Align Dataset for Classification",
@@ -104,7 +101,7 @@ class BenchmarkingUI:
                 ),
             )
             st.caption(
-                "Upload one dataset containing both the expected labels and your model predictions. " \
+                "Upload one dataset containing both the expected labels and your model predictions. "
                 "Match the required columns, then continue to Evaluate."
             )
             # For classification we only need a single (results-style) dataset,
@@ -119,7 +116,7 @@ class BenchmarkingUI:
                 ),
             )
             st.caption(
-                "Upload your reference dataset first, then your benchmark results. " \
+                "Upload your reference dataset first, then your benchmark results. "
                 "Match the required columns in each step. Once both datasets are ready, continue to Evaluate."
             )
 
@@ -247,9 +244,8 @@ class BenchmarkingUI:
             st.subheader("Ranking Evaluation")
 
             st.markdown(
-                "Compare your benchmark results against the ground-truth" \
-                " dataset and measure retrieval performance."
-                )
+                "Compare your benchmark results against the ground-truth" " dataset and measure retrieval performance."
+            )
 
             col1, col2 = st.columns(2)
 
@@ -534,7 +530,7 @@ class BenchmarkingUI:
         if not runs:
             st.info(
                 "Run classification calibration in the **Evaluate** tab (select multiple "
-                "prediction/score columns) to compare models here."
+                "prediction or score columns) to compare models here."
             )
             return
 
@@ -580,10 +576,7 @@ class BenchmarkingUI:
             return
 
         st.subheader("Classification Evaluation")
-        st.caption(
-            "Compare model predictions against ground-truth" \
-            " labels and evaluate classification performance."
-        )
+        st.caption("Compare model predictions against ground-truth" " labels and evaluate classification performance.")
 
         # Dataset selector
         labels = [f"{ds.name} ({key})" for key, ds in candidates]
@@ -647,7 +640,7 @@ class BenchmarkingUI:
 
         # Let the user choose one or more prediction columns (models) to analyze.
         selected_score_cols = st.multiselect(
-            "Model predictions / scores",
+            "Model predictions or scores:",
             help="Select one or more columns containing your model's predictions or scores.",
             options=score_candidates,
             default=default_score_selection,
@@ -1118,7 +1111,7 @@ class BenchmarkingUI:
         cols_lower = {c.lower(): c for c in cols}
 
         # Query definition
-        st.markdown("**Step 1 – Identify the question**")
+        st.markdown("**Step 1 - Identify the question**")
         doc_options = ["<none>", *cols]
         default_doc_idx = 0
         for cand in ("document", "report", "report_name", "doc_id"):
@@ -1126,7 +1119,7 @@ class BenchmarkingUI:
                 default_doc_idx = doc_options.index(cols_lower[cand])
                 break
         document_sel = st.selectbox(
-            "Report / document (used to build query ID):",
+            "Report or document (used to build query ID):",
             options=doc_options,
             index=default_doc_idx,
             key="flex_gt_document_col",
@@ -1152,9 +1145,9 @@ class BenchmarkingUI:
                 default_chunk = cols_lower[cand]
                 break
         # Chunk & relevant part
-        st.markdown("**Step 2 – Select the relevant text**")
+        st.markdown("**Step 2 - Select the relevant text**")
         chunk_text_col = st.selectbox(
-            "Full text / paragraph (or the expert relevant text if no full chunk is stored):",
+            "Full text or paragraph (or the expert relevant text if no full chunk is stored):",
             options=cols,
             index=cols.index(default_chunk) if default_chunk in cols else 0,
             key="flex_gt_chunk_col",
@@ -1167,19 +1160,19 @@ class BenchmarkingUI:
                 default_rel_idx = rel_options.index(cols_lower[cand])
                 break
         rel_sel = st.selectbox(
-            (
-                "Relevant excerpt"
-                "(optional - if you only have relevant text, you can reuse the "
-                "same column as above):"
-            ),
+            "Relevant excerpt (optional):",
             options=rel_options,
             index=default_rel_idx,
             key="flex_gt_relevant_col",
+            help=(
+                "Select the column containing the expert-marked relevant excerpt. "
+                "If no separate excerpt exists, you can reuse the full-text column above."
+            ),
         )
         relevant_part_col = None if rel_sel == "<none>" else rel_sel
 
         # Label columns
-        st.markdown("**Step 3 – Select the ground-truth label**")
+        st.markdown("**Step 3 - Select the ground-truth label**")
         # Suggest numeric or name-based label columns
         df_sample = df_raw.head(50)
         numeric_cols = df_sample.select_dtypes(include=["number"]).columns.tolist()
@@ -1289,7 +1282,7 @@ class BenchmarkingUI:
             # Classification mode: query_id is not used for metrics, but we still
             # let the user label report and criteria columns for context and
             # for potential grouping in future analyses.
-            st.markdown("Step 1 – Add context (optional)**")
+            st.markdown("**Step 1 - Add context (optional)**")
             doc_options = ["<none>", *cols]
             default_doc_idx = 0
             for cand in ("document", "report", "report_name", "doc_id", "company"):
@@ -1319,13 +1312,13 @@ class BenchmarkingUI:
             # derive query_id from document/question as needed.
             qid_col = None
         else:
-            st.markdown("**Step 1 – Identify the query**")
+            st.markdown("**Step 1 - Identify the query**")
             query_id_options = ["<compute from document/question>", *cols]
             default_qid_idx = 0
             if has_query_id_col:
                 default_qid_idx = query_id_options.index(next(c for c in cols if c.lower() == "query_id"))
             query_id_sel = st.selectbox(
-                "**How should the query be identified?**",
+                "How should the query be identified?:",
                 options=query_id_options,
                 index=default_qid_idx,
                 key="flex_bm_query_id_strategy",
@@ -1340,7 +1333,7 @@ class BenchmarkingUI:
                         default_doc_idx = doc_options.index(cols_lower[cand])
                         break
                 document_sel = st.selectbox(
-                    "Report or document ",
+                    "Report or document:",
                     help=("must match the ground-truth file"),
                     options=doc_options,
                     index=default_doc_idx,
@@ -1354,7 +1347,7 @@ class BenchmarkingUI:
                         default_q = cols_lower[cand]
                         break
                 question_col = st.selectbox(
-                    "Question or criteria ",
+                    "Question or criteria:",
                     help=("must match the ground-truth file"),
                     options=cols,
                     index=cols.index(default_q) if default_q in cols else 0,
@@ -1366,14 +1359,14 @@ class BenchmarkingUI:
                 question_col = None
 
         # Chunk & optional relevant part
-        st.markdown("**Step 2 – Select the retrieved text**")
+        st.markdown("**Step 2 - Select the retrieved text**")
         default_chunk = cols[0]
         for cand in ("chunk_text", "paragraph", "context", "text"):
             if cand in cols_lower:
                 default_chunk = cols_lower[cand]
                 break
         chunk_text_col = st.selectbox(
-            "Retrieved text or paragraph",
+            "Retrieved text or paragraph:",
             options=cols,
             index=cols.index(default_chunk) if default_chunk in cols else 0,
             key="flex_bm_chunk_col",
@@ -1386,7 +1379,7 @@ class BenchmarkingUI:
                 default_rel_idx = rel_options.index(cols_lower[cand])
                 break
         rel_sel = st.selectbox(
-            "Relevant text span (optional)",
+            "Relevant text span (optional):",
             help=(
                 "Select this when your benchmark contains the specific text span "
                 "that should match the relevant part in the ground-truth dataset."
@@ -1404,7 +1397,7 @@ class BenchmarkingUI:
         is_classification_mode = st.session_state.get("evaluation_mode") == "Classification"
 
         # Prediction & similarity columns
-        st.markdown("**Step 3 - Model scores and ranking signal**")
+        # st.markdown("**Step 3 - Model scores and ranking signal**")
         df_sample = df_raw.head(50)
         numeric_cols = df_sample.select_dtypes(include=["number"]).columns.tolist()
         pred_suggestions = set()
@@ -1429,8 +1422,9 @@ class BenchmarkingUI:
         sorted(pred_suggestions)
 
         classification_label_col = None
+        ranking_score_col = None
         if is_classification_mode:
-            st.markdown("**Step 3a - Ground-truth label used for classification metrics**")
+            st.markdown("**Step 3 - Select the label and model predictions**")
             # Heuristic: prefer 'relevance' or 'usefulness' as label.
             default_label = cols[0]
             for cand in ("relevance", "usefulness", "label", "class"):
@@ -1442,28 +1436,42 @@ class BenchmarkingUI:
                     continue
                 break
             classification_label_col = st.selectbox(
-                "Column with expert labels (e.g. relevance or usefulness):",
+                "Ground-truth label:",
                 options=cols,
                 index=cols.index(default_label) if default_label in cols else 0,
                 key="flex_bm_classification_label_col",
+                help="Select the column containing the expected or expert-assigned label.",
             )
 
-        st.markdown("**Step 3b - Prediction / score columns from your models**")
-        prediction_cols = st.multiselect(
-            "Select model prediction / score column(s) (e.g. similarity, relevance_score_*):",
-            options=cols,
-            default=[],
-            key="flex_bm_prediction_cols",
-        )
-
-        ranking_score_col = None
-        if prediction_cols:
-            ranking_score_col = st.selectbox(
-                "Which score should be used to rank chunks and decide top-K relevance?",
-                options=prediction_cols,
-                index=0,
-                key="flex_bm_ranking_score_col",
+            prediction_cols = st.multiselect(
+                "Model prediction or score columns:",
+                options=cols,
+                default=[],
+                key="flex_bm_prediction_cols",
+                help="Select one or more columns containing model predictions or scores.",
             )
+        else:
+
+            st.markdown("**Step 3 - Select the ranking score**")
+            prediction_cols = st.multiselect(
+                "Model score columns:",
+                options=cols,
+                default=[],
+                key="flex_bm_prediction_cols",
+                help=(
+                    "Select one or more columns containing scores produced by your model, "
+                    "for example similarity or relevance scores."
+                ),
+            )
+
+            if prediction_cols:
+                ranking_score_col = st.selectbox(
+                    "Score used for ranking:",
+                    options=prediction_cols,
+                    index=0,
+                    key="flex_bm_ranking_score_col",
+                    help="This score determines the order of retrieved chunks.",
+                )
 
         if st.button(
             "Align benchmark (flexible) and use for evaluation",
