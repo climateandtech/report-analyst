@@ -79,7 +79,7 @@ langchain==0.3.30
 langchain-core==0.3.85
 langchain-openai==0.3.8
 langchain-text-splitters==0.3.9
-langsmith==0.3.45
+langsmith==0.8.18
 llama-cloud==0.1.11
 llama-cloud-services==0.6.0
 llama-index-core==0.13.6
@@ -212,7 +212,7 @@ validators==0.34.0
 vectors==1.0.0
 watchfiles==1.0.4
 websocket-client==1.8.0
-websockets==14.2
+websockets==15.0.1
 wrapt==1.17.2
 yarl==1.18.3
 zipp==3.21.0
