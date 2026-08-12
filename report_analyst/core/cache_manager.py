@@ -9,6 +9,7 @@ import numpy as np
 from llama_index.core import Document
 from sqlalchemy import bindparam, text
 
+from .analysis_result_utils import is_stored_analysis_error
 from .database_manager import DatabaseManager
 from .database_schema import indexes, metadata
 
@@ -266,6 +267,14 @@ class CacheManager:
 
     def save_analysis(self, file_path: str, question_id: str, result: Dict, config: Dict):
         """Save analysis result to cache with improved logging"""
+        if is_stored_analysis_error(result):
+            logger.error(
+                "Refusing to cache failed analysis for %s - %s: %s",
+                file_path,
+                question_id,
+                result.get("ANSWER", result.get("error", "unknown error")),
+            )
+            return
         try:
             logger.info(f"Saving analysis for {file_path} - {question_id}")
             logger.info(f"Configuration: {json.dumps(config, indent=2)}")
@@ -705,7 +714,18 @@ class CacheManager:
                                 max(c["similarity_score"] for c in results[question_id]["chunks"]),
                             )
 
-                return results
+                filtered: Dict[str, Any] = {}
+                for question_id, entry in results.items():
+                    payload = entry.get("result", entry)
+                    if is_stored_analysis_error(payload):
+                        logger.warning(
+                            "Omitting cached analysis error for %s: %s",
+                            question_id,
+                            payload.get("ANSWER", payload.get("error", "")),
+                        )
+                        continue
+                    filtered[question_id] = entry
+                return filtered
 
         except Exception as e:
             logger.error(f"Error retrieving analysis: {e!s}", exc_info=True)
