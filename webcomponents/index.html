@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Components Spike</title>
+</head>
+
+<style>
+    h1 {
+        color: rgb(221, 132, 132);
+    }
+</style>
+
+<body>
+
+    <h1>Web Components dddTest</h1>
+
+    <benchmark-example mode="ranking">
+		<h1 slot="header">one</h1>
+		<p slot="content">Hallo</p>
+		<p slot="footer">Zwei</p>
+		
+	</benchmark-example>
+	
+
+</body>
+	<script type="module" src="./components/benchmark-card.js"></script>
+	<script>		
+		customElements.whenDefined("benchmark-example").then(()=>{
+			const x = document.querySelector("benchmark-example")
+			console.log("INDEX: ",x.mode)
+			x.mode = "new"
+		})
+		document.querySelector("#remove").addEventListener("click", () => {
+			document.querySelector("benchmark-example").remove();
+		});
+		
+	</script>
+
+</html>
