@@ -20,7 +20,7 @@ class BenchmarkExample extends HTMLElement {
 	connectedCallback() {
 		logger.info("Custom element added to page.")
 		this.changeSelectedDataset()
-		
+		window.addEventListener("resize", this.handleResize);
 	}
 
 	attributeChangedCallback(name, oldValue, newValue) {
@@ -29,6 +29,11 @@ class BenchmarkExample extends HTMLElement {
 		);
 		this.render();
 	}	
+
+	disconnectedCallback(){
+		logger.info("COMPONENTN IS DISCONNECTED")
+		window.removeEventListener("resize", this.handleResize);
+	}
 
 	render() {
 
@@ -77,6 +82,10 @@ class BenchmarkExample extends HTMLElement {
 	changeSelectedDataset(){
 		this.selectedDataset = "10.000.000"
 		this.render()
+	}
+
+	handleResize() {
+		console.log("Window resized");
 	}
 }
 
