@@ -48,7 +48,6 @@ logger = logging.getLogger(__name__)
 
 # Reduce noise from other libraries
 logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 
 def log_analysis_step(message: str, level: str = "info"):
