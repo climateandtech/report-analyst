@@ -67,9 +67,10 @@ describe("PDF viewer", () => {
   });
 
   it("returns to all questions when the question filter is cleared", () => {
-    viewer._selectedQuestionId = "q1";
-    viewer._selectedQuestionId = null;
+    viewer.setSelectedQuestionId("q1");
+    expect(viewer.getFilteredChunks()).toHaveLength(2);
 
+    viewer.setSelectedQuestionId(null);
     expect(viewer.getFilteredChunks()).toHaveLength(3);
   });
 
