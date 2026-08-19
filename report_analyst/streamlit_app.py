@@ -470,12 +470,13 @@ def display_download_buttons(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame,
 
 def generate_file_key(file_path: str, st) -> str:
     """Generate a cache file key from file path and settings"""
+    llm_model = st.session_state.get("new_llm_model", st.session_state.llm_model)
     return (
         f"{Path(file_path).name}_"
         f"cs{st.session_state.new_chunk_size}_"
         f"ov{st.session_state.new_overlap}_"
         f"tk{st.session_state.new_top_k}_"
-        f"m{st.session_state.new_llm_model}"
+        f"m{llm_model}"
     )
 
 
@@ -1311,7 +1312,7 @@ def display_cache_selector(file_path: str):
         "chunk_size": st.session_state.new_chunk_size,
         "chunk_overlap": st.session_state.new_overlap,
         "top_k": st.session_state.new_top_k,
-        "model": st.session_state.new_llm_model,
+        "model": st.session_state.get("new_llm_model", st.session_state.llm_model),
         "question_set": st.session_state.new_question_set,
     }
 
@@ -1383,7 +1384,7 @@ def update_analyzer_parameters():
     chunk_size = st.session_state.new_chunk_size
     chunk_overlap = st.session_state.new_overlap
     top_k = st.session_state.new_top_k
-    llm_model = st.session_state.new_llm_model
+    llm_model = st.session_state.get("new_llm_model", st.session_state.llm_model)
     available_models = get_available_llm_models()
 
     if not available_models:
@@ -3818,7 +3819,7 @@ def main():
                         "chunk_size": st.session_state.new_chunk_size,
                         "chunk_overlap": st.session_state.new_overlap,
                         "top_k": st.session_state.new_top_k,
-                        "model": st.session_state.new_llm_model,
+                        "model": st.session_state.get("new_llm_model", st.session_state.llm_model),
                         "question_set": st.session_state.new_question_set,
                     }
 
