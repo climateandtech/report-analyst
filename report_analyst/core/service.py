@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from report_analyst.core.question_loader import get_question_loader
 
@@ -100,7 +101,7 @@ def get_reports_for_api(question_set_id: Optional[str] = None) -> List[Dict[str,
         if not allowed_ids:
             return []
         return [r for r in reports if str(r.get("id") or "") in allowed_ids]
-    except Exception as e:
+    except (OSError, RuntimeError, ImportError, AttributeError, TypeError, ValueError, SQLAlchemyError) as e:
         logger.warning("get_reports_for_api failed: %s", e)
         return []
 
@@ -136,7 +137,7 @@ def get_analysis_keys_for_api() -> List[Dict[str, Any]]:
                     }
                 )
         return out
-    except Exception as e:
+    except (OSError, RuntimeError, ImportError, AttributeError, TypeError, ValueError, SQLAlchemyError) as e:
         logger.warning("get_analysis_keys_for_api failed: %s", e)
         return []
 
@@ -181,7 +182,7 @@ def get_consolidated_results_for_api(
         for file_path, question_set, question_id, result_json in rows:
             try:
                 result = json.loads(result_json) if isinstance(result_json, str) else (result_json or {})
-            except Exception:
+            except (json.JSONDecodeError, TypeError):
                 result = {}
             answer = str(result.get("ANSWER") or result.get("answer") or result.get("analysis") or "")
             score = result.get("SCORE", result.get("score", result.get("confidence_score", 0)))
@@ -198,7 +199,7 @@ def get_consolidated_results_for_api(
                 }
             )
         return out
-    except Exception as e:
+    except (OSError, RuntimeError, ImportError, AttributeError, TypeError, ValueError, SQLAlchemyError) as e:
         logger.warning("get_consolidated_results_for_api failed: %s", e)
         return []
 

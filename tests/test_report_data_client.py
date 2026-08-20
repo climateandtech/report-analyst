@@ -188,6 +188,15 @@ def test_report_data_client_error_handling(backend_config):
         assert resources == []
 
 
+def test_list_local_reports_skips_unopenable_pdf(temp_dir):
+    """Invalid PDF bytes that fail open are skipped, not raised."""
+    bad_pdf = temp_dir / "bad.pdf"
+    bad_pdf.write_bytes(b"%PDF-1.4\n" + b"not-a-real-pdf" * 20)
+
+    client = ReportDataClient(temp_dir=temp_dir)
+    assert client._list_local_reports() == []
+
+
 def test_report_resource_urn_with_colons_in_resource_id():
     """Test URN parsing with resource IDs that contain colons"""
     # Some UUIDs or IDs might have colons

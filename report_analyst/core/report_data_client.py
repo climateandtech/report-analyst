@@ -128,7 +128,7 @@ class ReportDataClient:
                 if page_count == 0:
                     logger.warning(f"Skipping {file.name}: PDF has 0 pages, likely invalid")
                     continue
-            except Exception as e:
+            except (OSError, RuntimeError, ValueError) as e:
                 logger.warning(f"Skipping {file.name}: cannot open as PDF ({e!s})")
                 continue
 
@@ -155,7 +155,7 @@ class ReportDataClient:
 
             backend_service = BackendService(config)
             return backend_service.list_reports()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — backend may raise arbitrary client errors
             logger.warning(f"Failed to list backend reports: {e}")
             return []
 
