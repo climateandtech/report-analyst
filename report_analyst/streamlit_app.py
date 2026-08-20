@@ -48,7 +48,6 @@ logger = logging.getLogger(__name__)
 
 # Reduce noise from other libraries
 logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 
 def log_analysis_step(message: str, level: str = "info"):
@@ -303,9 +302,12 @@ class ReportAnalyzer:
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ):
         """Delegate to the analyzer's process_document method"""
-        return self.analyzer.process_document(file_path, selected_questions, use_llm_scoring, single_call, force_recompute)
+        return self.analyzer.process_document(
+            file_path, selected_questions, use_llm_scoring, single_call, force_recompute, pre_retrieved_chunks
+        )
 
 
 def save_uploaded_file(uploaded_file) -> Optional[str]:
@@ -3098,6 +3100,7 @@ def main():
                     f"*Configure via `STORAGE_PATH` environment variable*"
                 )
             else:
+                # FIXME do we need this
                 # Parse PostgreSQL URL to show connection details (masked)
                 database_type = "PostgreSQL"
                 try:
@@ -3232,6 +3235,7 @@ def main():
 
             # Get database URL from session state (set above in Database Configuration)
             database_url_enterprise = st.session_state.get("database_url")
+            # FIXME we can not identify wheter we are in database url
             is_postgres_enterprise = database_url_enterprise and database_url_enterprise.startswith(
                 ("postgresql://", "postgres://")
             )
@@ -3912,7 +3916,7 @@ def main():
                     if analyze_clicked or reanalyze_clicked:
                         # NOW sync the selection state from the widget
                         # Get selected questions from the edited dataframe
-                        selected_questions = edited_df[edited_df["Select"] is True]["QID"].tolist()
+                        selected_questions = edited_df.loc[edited_df["Select"], "QID"].tolist()
 
                         # Update session state for individual question checkboxes (for backward compatibility)
                         for q_id in questions.keys():
