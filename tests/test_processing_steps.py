@@ -69,6 +69,7 @@ async def _async_status_events(*statuses):
 def _isolate_streamlit_module(monkeypatch):
     """Reset streamlit_app.st between tests so random order does not leak mocks."""
     import streamlit as real_streamlit
+
     import report_analyst.streamlit_app as app
 
     monkeypatch.setattr(app, "st", real_streamlit, raising=False)
@@ -543,7 +544,7 @@ def test_display_cached_document_chunks_renders_rows(monkeypatch):
 
     count, embedded = app.display_cached_document_chunks(
         report_analyzer,
-        "/tmp/report.pdf",
+        "report.pdf",
         chunk_size=500,
         chunk_overlap=20,
     )
@@ -581,9 +582,7 @@ async def test_report_analyzer_analyze_document_forwards_max_processing_step(cle
 
 
 @pytest.mark.asyncio
-async def test_analyze_document_and_display_chunk_step_does_not_default_to_answer(
-    monkeypatch, clean_db, tmp_path
-):
+async def test_analyze_document_and_display_chunk_step_does_not_default_to_answer(monkeypatch, clean_db, tmp_path):
     """Regression: analyze_document_and_display without max_processing_step ran full Answer (OpenAI 401)."""
     import report_analyst.streamlit_app as app
 
@@ -723,7 +722,7 @@ def test_display_cached_document_chunks_empty_returns_zero(monkeypatch):
     report_analyzer.cache_manager.get_document_chunks.return_value = []
     monkeypatch.setattr(app.st, "warning", Mock())
 
-    count, embedded = app.display_cached_document_chunks(report_analyzer, "/tmp/missing.pdf")
+    count, embedded = app.display_cached_document_chunks(report_analyzer, "missing.pdf")
 
     assert count == 0
     assert embedded == 0
@@ -746,7 +745,7 @@ def test_display_cached_document_chunks_uses_chunk_text_fallback(monkeypatch):
     monkeypatch.setattr(app.st, "dataframe", capture_dataframe)
     monkeypatch.setattr(app.st, "column_config", Mock(NumberColumn=Mock, TextColumn=Mock, CheckboxColumn=Mock))
 
-    count, embedded = app.display_cached_document_chunks(report_analyzer, "/tmp/report.pdf")
+    count, embedded = app.display_cached_document_chunks(report_analyzer, "report.pdf")
 
     assert count == 1
     assert embedded == 0
@@ -975,9 +974,7 @@ async def test_run_analysis_answer_cache_miss_runs_process_and_completes(monkeyp
         ("answer", "answer"),
     ],
 )
-async def test_report_analyzer_analyze_document_forwards_all_processing_steps(
-    max_step, expected, clean_db, tmp_path
-):
+async def test_report_analyzer_analyze_document_forwards_all_processing_steps(max_step, expected, clean_db, tmp_path):
     import report_analyst.streamlit_app as app
 
     captured: dict = {}
@@ -1095,3 +1092,91 @@ async def test_run_analysis_embed_failure_does_not_show_success(monkeypatch, tmp
 
     progress.error.assert_called()
     progress.success.assert_not_called()
+
+
+def test_normalize_processing_step_via_custom_label(monkeypatch):
+    import report_analyst.core.analyzer as analyzer_mod
+
+    monkeypatch.setitem(analyzer_mod.PROCESSING_STEP_LABELS, "chunk", "Chunk Only")
+    assert normalize_processing_step("Chunk Only") == "chunk"
+    assert normalize_processing_step("unknown-step") == "answer"
+
+
+def test_split_pdf_to_text_chunks_skips_blank(analyzer, tmp_path, monkeypatch):
+    doc = Mock()
+    doc.text = "Hello world.\n\n\n"
+    doc.metadata = {"page": 1}
+
+    class FakeReader:
+        def load(self, file_path):
+            return [doc]
+
+    monkeypatch.setattr("report_analyst.core.analyzer.PyMuPDFReader", FakeReader)
+    monkeypatch.setattr(analyzer, "text_splitter", Mock(split_text=Mock(return_value=["Hello world.", "  ", ""])))
+    chunks = analyzer._split_pdf_to_text_chunks(str(tmp_path / "report.pdf"))
+    assert len(chunks) == 1
+    assert chunks[0]["text"] == "Hello world."
+    assert chunks[0]["embedding"] is None
+
+
+def test_create_text_chunks_wraps_errors(analyzer, monkeypatch):
+    monkeypatch.setattr(analyzer, "_split_pdf_to_text_chunks", Mock(side_effect=ValueError("bad pdf")))
+    with pytest.raises(ValueError, match="bad pdf"):
+        analyzer._create_text_chunks("report.pdf")
+
+
+def test_ensure_embeddings_client_requires_key(analyzer, monkeypatch):
+    analyzer.embeddings = None
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        analyzer._ensure_embeddings_client()
+
+
+def test_add_embeddings_to_chunks_skips_none(analyzer, monkeypatch):
+    analyzer.embeddings = Mock()
+    analyzer.embeddings.get_text_embedding_batch.return_value = [[0.1, 0.2], None]
+    monkeypatch.setattr(analyzer, "_ensure_embeddings_client", Mock())
+    chunks = [{"text": "a"}, {"text": "b"}]
+    embedded = analyzer._add_embeddings_to_chunks(chunks)
+    assert len(embedded) == 1
+    assert embedded[0]["text"] == "a"
+
+
+@pytest.mark.asyncio
+async def test_process_document_backend_urn_without_chunks_errors(analyzer):
+    events = await _collect_process_events(
+        analyzer,
+        file_path="urn:report-analyst:backend:abc",
+        selected_questions=[],
+        max_processing_step="chunk",
+    )
+    assert any(e.get("error") for e in events)
+
+
+@pytest.mark.asyncio
+async def test_process_document_embed_creates_and_saves_chunks(analyzer, clean_db, tmp_path):
+    file_path = str(tmp_path / "embed-new.pdf")
+    embedded = [{"text": "Embedded text.", "metadata": {}, "embedding": [0.1, 0.2]}]
+    analyzer.cache_manager = CacheManager(db_path=str(clean_db))
+    with patch.object(analyzer, "_create_chunks", return_value=embedded) as mock_create:
+        events = await _collect_process_events(
+            analyzer,
+            file_path=file_path,
+            selected_questions=[],
+            max_processing_step="embed",
+        )
+    mock_create.assert_called_once()
+    assert any("Completed Embed" in e.get("status", "") for e in events)
+    stored = analyzer.cache_manager.get_document_chunks(file_path, chunk_size=500, chunk_overlap=20)
+    assert stored
+
+
+def test_ensure_embeddings_client_creates_when_missing(analyzer, monkeypatch):
+    analyzer.embeddings = None
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    fake = Mock()
+    monkeypatch.setattr("report_analyst.core.analyzer.OpenAIEmbedding", Mock(return_value=fake))
+    monkeypatch.setattr("report_analyst.core.analyzer.Settings", Mock())
+    analyzer._ensure_embeddings_client()
+    assert analyzer.embeddings is fake
+

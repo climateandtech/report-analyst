@@ -2,7 +2,6 @@
 import asyncio
 import base64
 import html
-import json
 import logging
 import os
 import sys
@@ -11,7 +10,6 @@ import traceback
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -1282,9 +1280,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
                             "Run Embed again with a valid OPENAI_API_KEY."
                         )
                     else:
-                        progress_text.success(
-                            f"Found stored chunks ({chunk_count}) — {label} step already complete."
-                        )
+                        progress_text.success(f"Found stored chunks ({chunk_count}) — {label} step already complete.")
                     return
         else:
             logger.info(
@@ -1388,9 +1384,7 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
                         "Set a valid OPENAI_API_KEY in Settings (Embed uses OpenAI only, not Gemini)."
                     )
                 else:
-                    progress_text.success(
-                        f"Completed Embed step ({embedded_count}/{chunk_count} chunks with embeddings)."
-                    )
+                    progress_text.success(f"Completed Embed step ({embedded_count}/{chunk_count} chunks with embeddings).")
             elif chunk_count:
                 progress_text.success(f"Completed {label} step ({chunk_count} chunks).")
             else:
@@ -1401,7 +1395,6 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text, m
     except Exception as e:
         progress_text.error(f"Error during analysis: {e!s}")
         logger.error(f"Error during analysis: {e!s}", exc_info=True)
-
 
 
 def main():

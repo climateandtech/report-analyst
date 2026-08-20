@@ -797,7 +797,9 @@ class DocumentAnalyzer:
 
                     if step_level <= processing_step_rank("map"):
                         yield {
-                            "status": f"Completed Map step for question {question_number} ({len(similar_chunks)} chunks ranked)"
+                            "status": (
+                                f"Completed Map step for question {question_number} " f"({len(similar_chunks)} chunks ranked)"
+                            )
                         }
                         continue
 

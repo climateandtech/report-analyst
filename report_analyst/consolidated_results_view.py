@@ -140,9 +140,7 @@ def _render_similarity_chunk_search(analyzer, question_set: str, file_path: str,
 
     rows = _chunks_to_rows(display_chunks, ranked=similarity_view)
     _display_chunk_table(rows, similarity_view=similarity_view)
-    st.info(
-        f"Found {len(raw_chunks)} document chunks ({len(embedded_chunks)} with embeddings)."
-    )
+    st.info(f"Found {len(raw_chunks)} document chunks ({len(embedded_chunks)} with embeddings).")
 
 
 def render_consolidated_chunk_search(analyzer, question_set: str, file_path: str, config: dict) -> bool:
@@ -184,7 +182,7 @@ def render_consolidated_report_view(
 
     try:
         had_chunks = render_consolidated_chunk_search(analyzer, question_set, file_path, config)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"Error displaying document chunks: {e!s}")
         had_chunks = False
 
