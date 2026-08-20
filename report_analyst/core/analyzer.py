@@ -51,9 +51,7 @@ logger.info(
 # Centralized LLM: platform handles inference via NATS — never use placeholder OpenAI keys
 _centralized_llm_active = use_backend and (use_centralized_llm or use_full_backend_analysis)
 if _centralized_llm_active:
-    logger.info(
-        "Centralized LLM mode — inference via platform/NATS (no local OpenAI/Gemini)"
-    )
+    logger.info("Centralized LLM mode — inference via platform/NATS (no local OpenAI/Gemini)")
 else:
     # Only check for API keys if not using backend LLM
     # Check if we need to force the default model based on available keys

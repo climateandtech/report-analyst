@@ -15,6 +15,7 @@ from typing import Any, List, Optional, Union
 
 import nats
 from llama_index.core.llms import ChatMessage, MessageRole
+from nats.errors import Error as NatsError
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,7 @@ class NATSLLMChatAdapter:
 
     async def achat(
         self,
-        messages: Union[str, List[ChatMessage], List[Any]] = None,
+        messages: Optional[Union[str, List[ChatMessage], List[Any]]] = None,
         prompt: Optional[str] = None,
         **kwargs: Any,
     ) -> _ChatResponseWrapper:
@@ -158,7 +159,7 @@ class NATSLLMChatAdapter:
                         future.set_exception(RuntimeError(data["error"]))
                 elif not future.done():
                     future.set_result(data.get("response", ""))
-            except Exception as exc:
+            except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
                 if not future.done():
                     future.set_exception(exc)
 
@@ -167,7 +168,7 @@ class NATSLLMChatAdapter:
             js = self._nc.jetstream()
             try:
                 await js.publish("llm.request", json.dumps(payload).encode())
-            except Exception:
+            except NatsError:
                 await self._nc.publish("llm.request", json.dumps(payload).encode())
             return await asyncio.wait_for(future, timeout=REQUEST_TIMEOUT)
         finally:
