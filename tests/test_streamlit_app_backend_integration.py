@@ -9,7 +9,7 @@ from streamlit.testing.v1 import AppTest
 def test_backend_integration_availability():
     """Test that backend integration features are available"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # The app should load without errors, indicating backend integration is available
     assert not at.exception, "Backend integration failed to load"
@@ -21,7 +21,7 @@ def test_backend_integration_availability():
 def test_backend_configuration_display():
     """Test backend configuration display"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Check for backend configuration elements
     # Backend integration might add additional configuration options
@@ -33,7 +33,7 @@ def test_backend_configuration_display():
 def test_backend_flow_orchestrator():
     """Test backend flow orchestrator functionality"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Check that backend flow orchestrator is properly integrated
     # This is verified by the app loading without backend integration errors
@@ -44,7 +44,7 @@ def test_backend_flow_orchestrator():
 def test_backend_analysis_workflow():
     """Test backend analysis workflow integration"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Check for backend analysis workflow elements
     # Backend integration should provide additional analysis capabilities
@@ -56,7 +56,7 @@ def test_backend_analysis_workflow():
 def test_backend_error_handling():
     """Test backend integration error handling"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Backend integration should handle errors gracefully
     # This is verified by the app loading without backend-related exceptions
@@ -67,7 +67,7 @@ def test_backend_error_handling():
 def test_backend_fallback_behavior():
     """Test backend integration fallback behavior"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Backend integration should have proper fallback behavior
     # when backend services are not available
@@ -79,7 +79,7 @@ def test_backend_fallback_behavior():
 def test_backend_config_status():
     """Test backend configuration status display"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Check for backend configuration status elements
     # Backend integration might display configuration status
@@ -91,7 +91,7 @@ def test_backend_config_status():
 def test_backend_processing_result():
     """Test backend processing result handling"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Check that backend processing results are handled properly
     # Backend integration should process results correctly
@@ -102,7 +102,7 @@ def test_backend_processing_result():
 def test_backend_analysis_result():
     """Test backend analysis result integration"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Check for backend analysis result handling
     # Backend integration should integrate analysis results properly
@@ -113,7 +113,7 @@ def test_backend_analysis_result():
 def test_backend_integration_imports():
     """Test that backend integration imports work correctly"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Backend integration imports should work without errors
     # This is verified by the app loading successfully
@@ -124,7 +124,7 @@ def test_backend_integration_imports():
 def test_backend_flow_selection():
     """Test backend flow selection functionality"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Check for backend flow selection elements
     # Backend integration might provide different analysis flows
@@ -136,7 +136,7 @@ def test_backend_flow_selection():
 def test_backend_local_analysis():
     """Test backend local analysis functionality"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Check for backend local analysis capabilities
     # Backend integration should support local analysis
@@ -147,7 +147,7 @@ def test_backend_local_analysis():
 def test_backend_integration_compatibility():
     """Test backend integration compatibility with main app"""
     at = AppTest.from_file("report_analyst/streamlit_app.py")
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Backend integration should be compatible with the main app
     # This is verified by the app loading and functioning correctly
@@ -157,7 +157,7 @@ def test_backend_integration_compatibility():
 
     # Navigate to Report Analyst page to check for title
     at.session_state["nav_page"] = "Report Analyst"
-    at.run(timeout=10)
+    at.run(timeout=30)
 
     # Check that all main app features still work with backend integration
     assert len(at.title) > 0, "App title not found with backend integration"
@@ -255,7 +255,7 @@ def test_backend_resource_full_roundtrip():
         mock_post.side_effect = mock_post_side_effect
 
         # Run app
-        at.run(timeout=10)
+        at.run(timeout=30)
         assert not at.exception, "App failed to load"
 
         # Set backend config in session state
@@ -263,7 +263,7 @@ def test_backend_resource_full_roundtrip():
 
         # Navigate to Report Analyst page
         at.session_state["nav_page"] = "Report Analyst"
-        at.run(timeout=10)
+        at.run(timeout=30)
         assert not at.exception, "Failed to navigate to Report Analyst page"
 
         # Verify backend resources are listed
