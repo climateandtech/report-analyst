@@ -24,7 +24,7 @@ def test_get_consolidated_results_handles_bad_json_and_db_failure():
     conn.__enter__ = MagicMock(return_value=conn)
     conn.__exit__ = MagicMock(return_value=False)
     conn.execute.return_value.fetchall.return_value = [
-        ("/tmp/r.pdf", "tcfd", "q1", "{not-json"),
+        ("reports/r.pdf", "tcfd", "q1", "{not-json"),
     ]
     cache.db_manager.get_connection.return_value = conn
 
