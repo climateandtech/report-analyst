@@ -46,7 +46,6 @@ logger = logging.getLogger(__name__)
 
 # Reduce noise from other libraries
 logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 
 def log_analysis_step(message: str, level: str = "info"):
@@ -2977,6 +2976,7 @@ def main():
                     f"*Configure via `STORAGE_PATH` environment variable*"
                 )
             else:
+                # FIXME do we need this
                 # Parse PostgreSQL URL to show connection details (masked)
                 database_type = "PostgreSQL"
                 try:
@@ -3111,6 +3111,7 @@ def main():
 
             # Get database URL from session state (set above in Database Configuration)
             database_url_enterprise = st.session_state.get("database_url")
+            # FIXME we can not identify wheter we are in database url
             is_postgres_enterprise = database_url_enterprise and database_url_enterprise.startswith(
                 ("postgresql://", "postgres://")
             )
