@@ -86,12 +86,12 @@ if str(current_dir) not in sys.path:
 logger.info(f"Added {current_dir} to Python path")
 
 # Keep relative imports
-from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.analysis_result_utils import (
     normalize_results_container,
     session_answers_map,
     split_analysis_results,
 )
+from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,

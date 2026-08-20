@@ -91,7 +91,9 @@ async def test_process_document_caches_by_full_question_id(analyzer, tmp_path):
         analyzer, "_get_similar_chunks", AsyncMock(return_value=embedded)
     ), patch.object(
         analyzer, "_analyze_chunks", AsyncMock(return_value={"ANSWER": "1200 tCO2e", "EVIDENCE": []})
-    ), patch.object(analyzer.cache_manager, "save_analysis") as mock_save:
+    ), patch.object(
+        analyzer.cache_manager, "save_analysis"
+    ) as mock_save:
         async for _ in analyzer.process_document(
             file_path=file_path,
             selected_questions=["esrs_e1_climate_examples_9"],
@@ -111,9 +113,9 @@ async def test_process_document_legacy_int_resolves_to_canonical_id(analyzer, tm
 
     with patch.object(analyzer.cache_manager, "get_document_chunks", return_value=embedded), patch.object(
         analyzer, "_get_similar_chunks", AsyncMock(return_value=embedded)
-    ), patch.object(
-        analyzer, "_analyze_chunks", AsyncMock(return_value={"ANSWER": "Yes", "EVIDENCE": []})
-    ), patch.object(analyzer.cache_manager, "save_analysis") as mock_save:
+    ), patch.object(analyzer, "_analyze_chunks", AsyncMock(return_value={"ANSWER": "Yes", "EVIDENCE": []})), patch.object(
+        analyzer.cache_manager, "save_analysis"
+    ) as mock_save:
         async for _ in analyzer.process_document(
             file_path=file_path,
             selected_questions=[1],

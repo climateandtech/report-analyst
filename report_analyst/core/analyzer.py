@@ -1143,9 +1143,7 @@ class DocumentAnalyzer:
                 }
                 for q_id, q_data in qset.questions.items()
             }
-            log_analysis_step(
-                f"✓ Loaded {len(questions)} questions for {self.question_set} via question_loader"
-            )
+            log_analysis_step(f"✓ Loaded {len(questions)} questions for {self.question_set} via question_loader")
             return questions
 
         # Fallback: bundled questionsets only (no QUESTIONSETS_PATH override)
