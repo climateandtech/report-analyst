@@ -1179,4 +1179,3 @@ def test_ensure_embeddings_client_creates_when_missing(analyzer, monkeypatch):
     monkeypatch.setattr("report_analyst.core.analyzer.Settings", Mock())
     analyzer._ensure_embeddings_client()
     assert analyzer.embeddings is fake
-
