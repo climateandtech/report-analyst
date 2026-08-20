@@ -9,11 +9,14 @@ import json
 import os
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock
+from types import MethodType
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 import yaml
 from dotenv import load_dotenv
+
+from report_analyst.streamlit_app import ReportAnalyzer
 
 _conftest_dir = Path(__file__).resolve().parent
 _env = _conftest_dir.parent / ".env"
@@ -261,3 +264,116 @@ def mock_nats_message():
         return mock_msg
 
     return _create_message
+
+
+@pytest.fixture
+def mocked_report_analyzer():
+    """Return a ReportAnalyzer test double without external API calls."""
+
+    # Record analyze_document calls for assertions
+    calls = []
+
+    async def fake_analyze_document(
+        self,
+        file_path,
+        questions,
+        selected_questions,
+        use_llm_scoring=False,
+        single_call=True,
+        force_recompute=False,
+        pre_retrieved_chunks=None,
+    ):
+        calls.append(
+            {
+                "file_path": file_path,
+                "questions": questions,
+                "selected_questions": selected_questions,
+                "use_llm_scoring": use_llm_scoring,
+                "single_call": single_call,
+                "force_recompute": force_recompute,
+                "pre_retrieved_chunks": pre_retrieved_chunks,
+            }
+        )
+
+        generated_results = {}
+
+        # Return one result per selected question
+        for question_id in selected_questions:
+            result = {
+                "question_id": question_id,
+                "ANSWER": "Mocked test answer",
+                "SCORE": 0.8,
+                "EVIDENCE": [],
+                "GAPS": [],
+                "SOURCES": [],
+                "chunks": [],
+            }
+
+            generated_results[question_id] = result
+            yield result
+
+        # Simulate cached results after analysis
+        self.analyzer.cache_manager.get_analysis.return_value = generated_results
+
+    async def fake_process_document(
+        self,
+        file_path,
+        selected_questions=None,
+        use_llm_scoring=False,
+        single_call=True,
+        force_recompute=False,
+        pre_retrieved_chunks=None,
+    ):
+        calls.append(
+            {
+                "file_path": file_path,
+                "selected_questions": selected_questions,
+                "use_llm_scoring": use_llm_scoring,
+                "single_call": single_call,
+                "force_recompute": force_recompute,
+                "pre_retrieved_chunks": pre_retrieved_chunks,
+            }
+        )
+
+        for question_id in selected_questions or []:
+            yield {
+                "question_id": question_id,
+                "ANSWER": "Mocked test answer",
+                "SCORE": 0.8,
+                "EVIDENCE": [],
+                "GAPS": [],
+                "SOURCES": [],
+                "chunks": [],
+            }
+
+    # Create ReportAnalyzer without running __init__
+    report_analyzer = object.__new__(ReportAnalyzer)
+
+    report_analyzer.temp_dir = Path("temp")
+    report_analyzer.prompt_manager = Mock()
+
+    # Cache used during analysis
+    report_analyzer.cache_manager = MagicMock()
+    report_analyzer.cache_manager.get_analysis.return_value = {}
+
+    # Mock nested analyzer used by the Streamlit app
+    report_analyzer.analyzer = Mock()
+    report_analyzer.analyzer.check_step_completion.return_value = {}
+    report_analyzer.analyzer.update_parameters.return_value = {}
+
+    # Initial cache miss
+    report_analyzer.analyzer.cache_manager = MagicMock()
+    report_analyzer.analyzer.cache_manager.get_analysis.return_value = {}
+
+    # Replace the real analysis with the fake implementation
+    report_analyzer.analyze_document = MethodType(
+        fake_analyze_document,
+        report_analyzer,
+    )
+
+    report_analyzer.process_document = MethodType(
+        fake_process_document,
+        report_analyzer,
+    )
+
+    return report_analyzer, calls
