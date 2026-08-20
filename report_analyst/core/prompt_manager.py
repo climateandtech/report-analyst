@@ -95,7 +95,7 @@ class PromptManager:
         self.prompts_dir = Path(prompts_dir)
 
     def get_analysis_messages(
-        self, question: str, context: str, guidelines: str, chunks_data: List[Dict]
+        self, question: str, guidelines: str, chunks_data: List[Dict]
     ) -> List[ChatMessage]:
         """Generate messages for sustainability report question analysis."""
         formatted_chunks = "\n\n".join(

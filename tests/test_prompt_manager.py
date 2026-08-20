@@ -76,7 +76,6 @@ class TestPromptManagerMessages:
         pm = PromptManager()
         messages = pm.get_analysis_messages(
             question="Test?",
-            context="",
             guidelines=ESRS_CLASSIFICATION_GUIDELINES,
             chunks_data=[{"text": "chunk", "relevance_score": 0.5}],
         )
