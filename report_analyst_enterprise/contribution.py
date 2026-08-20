@@ -50,7 +50,7 @@ async def publish_analysis_result(
         subject = f"analysis.result.{request_id}"
         try:
             await js.publish(subject, json.dumps(payload).encode())
-        except Exception:
+        except Exception:  # noqa: BLE001 — JetStream may be absent; fall back to core NATS
             await nc.publish(subject, json.dumps(payload).encode())
         logger.info("Published %s for resource %s", subject, resource_id)
         return request_id

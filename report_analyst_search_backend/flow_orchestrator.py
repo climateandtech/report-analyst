@@ -88,7 +88,7 @@ class FlowOrchestrator:
                 return self._process_complete_backend(uploaded_file)
             else:
                 return ProcessingResult(success=False, error=f"Unknown flow type: {flow_type}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Document processing failed: {e}")
             return ProcessingResult(success=False, error=str(e))
 
@@ -114,7 +114,7 @@ class FlowOrchestrator:
                 return self._analyze_enhanced(chunks, questions)
             else:
                 return AnalysisResult(success=False, error=f"Analysis not supported for flow: {flow_type}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Document analysis failed: {e}")
             return AnalysisResult(success=False, error=str(e))
 
@@ -284,16 +284,18 @@ class FlowOrchestrator:
                         provenance={
                             "model": os.getenv("OPENAI_API_MODEL", "local"),
                             "provider": "report_analyst",
-                            "mode": "byok_contribution"
-                            if os.getenv("USE_BYOK_CONTRIBUTION", "").lower() in ("1", "true", "yes")
-                            else "centralized",
+                            "mode": (
+                                "byok_contribution"
+                                if os.getenv("USE_BYOK_CONTRIBUTION", "").lower() in ("1", "true", "yes")
+                                else "centralized"
+                            ),
                         },
                     )
                 )
         except ImportError:
             # Enterprise package not installed — contribution publish is optional.
             pass
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — contribution publish must not fail analysis
             logger.warning("Could not publish analysis result to platform: %s", exc)
 
         result.stored_in_backend = self.config.use_backend
@@ -305,7 +307,7 @@ class FlowOrchestrator:
 
         # Get dynamic question set options
         if QUESTION_LOADER_AVAILABLE:
-            question_set_options = question_loader.get_question_set_options() + ["custom"]
+            question_set_options = [*question_loader.get_question_set_options(), "custom"]
             # Calculate index for default question set
             try:
                 index = question_set_options.index(default_question_set) if default_question_set in question_set_options else 0
@@ -503,7 +505,7 @@ class FlowOrchestrator:
                 analysis_job_id=request_id,
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"External service analysis failed: {e}")
             return AnalysisResult(success=False, error=str(e))
 
