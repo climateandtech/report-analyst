@@ -282,6 +282,7 @@ def mocked_report_analyzer():
         single_call=True,
         force_recompute=False,
         pre_retrieved_chunks=None,
+        max_processing_step="answer",
     ):
         calls.append(
             {
@@ -292,6 +293,7 @@ def mocked_report_analyzer():
                 "single_call": single_call,
                 "force_recompute": force_recompute,
                 "pre_retrieved_chunks": pre_retrieved_chunks,
+                "max_processing_step": max_processing_step,
             }
         )
 
@@ -323,6 +325,7 @@ def mocked_report_analyzer():
         single_call=True,
         force_recompute=False,
         pre_retrieved_chunks=None,
+        max_processing_step="answer",
     ):
         calls.append(
             {
@@ -332,6 +335,7 @@ def mocked_report_analyzer():
                 "single_call": single_call,
                 "force_recompute": force_recompute,
                 "pre_retrieved_chunks": pre_retrieved_chunks,
+                "max_processing_step": max_processing_step,
             }
         )
 
