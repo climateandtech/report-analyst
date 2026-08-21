@@ -66,7 +66,7 @@ class PostgreSQLFileStorage:
         """Initialize the stored_files table"""
         try:
             metadata = MetaData()
-            stored_files = Table(
+            Table(
                 "stored_files",
                 metadata,
                 Column("id", String(36), primary_key=True),  # UUID as string
@@ -81,8 +81,8 @@ class PostgreSQLFileStorage:
             metadata.create_all(engine, checkfirst=True)
             logger.info("stored_files table initialized")
         except Exception as e:
-            logger.error(f"Error initializing stored_files table: {str(e)}")
-            raise FileStorageError(f"Failed to initialize file storage table: {str(e)}")
+            logger.error("Error initializing stored_files table: %s", e)
+            raise FileStorageError(f"Failed to initialize file storage table: {e}") from e
 
     def store_file(self, file_bytes: bytes, filename: str, content_type: Optional[str] = None) -> str:
         """
@@ -124,8 +124,8 @@ class PostgreSQLFileStorage:
             logger.info(f"Stored file {filename} (ID: {file_id}, size: {file_size} bytes) in PostgreSQL")
             return file_id
         except Exception as e:
-            logger.error(f"Error storing file in PostgreSQL: {str(e)}")
-            raise FileStorageError(f"Failed to store file: {str(e)}")
+            logger.error("Error storing file in PostgreSQL: %s", e)
+            raise FileStorageError(f"Failed to store file: {e}") from e
 
     def retrieve_file(self, file_id: str) -> Optional[bytes]:
         """
@@ -147,8 +147,8 @@ class PostgreSQLFileStorage:
                     return bytes(row[0])
                 return None
         except Exception as e:
-            logger.error(f"Error retrieving file {file_id} from PostgreSQL: {str(e)}")
-            raise FileStorageError(f"Failed to retrieve file: {str(e)}")
+            logger.error("Error retrieving file %s from PostgreSQL: %s", file_id, e)
+            raise FileStorageError(f"Failed to retrieve file: {e}") from e
 
     def get_file_info(self, file_id: str) -> Optional[dict]:
         """
@@ -179,8 +179,8 @@ class PostgreSQLFileStorage:
                         "created_at": row[3],
                     }
                 return None
-        except Exception as e:
-            logger.error(f"Error getting file info for {file_id}: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - metadata lookup is best effort
+            logger.error("Error getting file info for %s: %s", file_id, e)
             return None
 
     def delete_file(self, file_id: str) -> bool:
@@ -199,8 +199,8 @@ class PostgreSQLFileStorage:
                 result = conn.execute(query, {"file_id": file_id})
                 conn.commit()
                 return result.rowcount > 0
-        except Exception as e:
-            logger.error(f"Error deleting file {file_id}: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - deletion reports failure as False
+            logger.error("Error deleting file %s: %s", file_id, e)
             return False
 
     def find_by_filename(self, filename: str) -> Optional[str]:
@@ -221,8 +221,8 @@ class PostgreSQLFileStorage:
                 if row:
                     return row[0]
                 return None
-        except Exception as e:
-            logger.error(f"Error finding file by filename {filename}: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - lookup is best effort
+            logger.error("Error finding file by filename %s: %s", filename, e)
             return None
 
     def save_to_temp(self, file_id: str, temp_dir: Path = Path("temp")) -> Optional[str]:
@@ -255,8 +255,8 @@ class PostgreSQLFileStorage:
 
             logger.info(f"Retrieved file {file_id} to {temp_path}")
             return str(temp_path)
-        except Exception as e:
-            logger.error(f"Error saving file {file_id} to temp: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - temporary export is best effort
+            logger.error("Error saving file %s to temp: %s", file_id, e)
             return None
 
 
@@ -286,6 +286,6 @@ def get_file_storage(
             return PostgreSQLFileStorage(database_url)
 
         return None
-    except Exception as e:
-        logger.warning(f"PostgreSQL file storage not available: {str(e)}")
+    except Exception as e:  # noqa: BLE001 - optional storage must fail closed
+        logger.warning("PostgreSQL file storage not available: %s", e)
         return None
