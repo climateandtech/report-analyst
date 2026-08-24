@@ -6,7 +6,7 @@ import { styles } from "../styles/benchmark-styles.js";
 
 class BenchmarkExample extends HTMLElement {
 
-	static observedAttributes = ["mode","_schema"]
+	static observedAttributes = ["select","_schema"]
 
 	// Always constructor and super 
 	// Shadow to connect the ShadowDOMTree
@@ -61,9 +61,9 @@ class BenchmarkExample extends HTMLElement {
 				// mode
 				renderSelect(container, value, key)
 				// topK
-				renderInteger(container, value)
+				renderInteger(container, value, key)
 				// MetriksatK
-				renderArray(container,value)
+				renderArray(container, value, key)
 			}
 		}
 		const evalMode = this.shadowRoot.querySelector("button#eval-mode")
@@ -127,8 +127,6 @@ function renderSelect(container, value, key){
 		select.name = key
 		for (const content of value.enum){
 			const option = document.createElement("option")
-			// const option = document.createTextNode(content)
-			// options.appendChild(option)
 
 			// Options inside Seltion
 			option.value = content
@@ -142,14 +140,16 @@ function renderSelect(container, value, key){
 	}
 }
 
-function renderInteger(container, value){
+function renderInteger(container, value, key){
 	if(value.type !== "integer"){
 		logger.info("Integer return")
 		return
 	}
 	if(value.type === "integer"){
-		// console.log(`TYPE: ${value}`)
+		console.log(`TYPE: ${value}`)
 		const input = document.createElement("input") 
+		input.name = key
+		logger.info("Name: ", key)
 		for(const content of Object.entries(value)){
 			// console.log(content[0])
 			if(content[0] === "type"){
@@ -166,7 +166,7 @@ function renderInteger(container, value){
 	}
 }
 
-function renderArray(container, value){
+function renderArray(container, value, key){
 	if(value.type !== "array"){
 		logger.info("Array return")
 		return
@@ -174,6 +174,7 @@ function renderArray(container, value){
 	if(value.type === "array"){
 		const div = document.createElement("div") 
 		div.id = "id-for-array"
+		div.name = key
 		const add = document.createElement("button")
 		add.id = "add"
 		add.appendChild(document.createTextNode("Add"))
