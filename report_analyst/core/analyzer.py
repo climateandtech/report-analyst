@@ -1199,6 +1199,28 @@ class DocumentAnalyzer:
 
         logger.info("Updated parameters and recreated text splitter")
 
+    async def retrieve_chunks(
+        self,
+        file_path: str,
+        question_text: str,
+        top_k: int | None = None,
+    ) -> List[Dict[str, Any]]:
+        """Retrieve top-k chunks for a question without running the LLM analysis step."""
+        k = self.chunk_params["top_k"] if top_k is None else top_k
+        self.current_file_path = file_path
+        chunk_size = self.chunk_params["chunk_size"]
+        chunk_overlap = self.chunk_params["chunk_overlap"]
+        chunks = self.cache_manager.get_document_chunks(file_path, chunk_size, chunk_overlap)
+        if not chunks:
+            chunks = self._create_chunks(file_path)
+            self.cache_manager.save_document_chunks(
+                file_path=file_path,
+                chunks=chunks,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+        return await self._get_similar_chunks(question_text, chunks, k)
+
     def update_llm_model(self, model_name: str):
         """Update the LLM model."""
         logger.info(f"Updating LLM model to: {model_name}")

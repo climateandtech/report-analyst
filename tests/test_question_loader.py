@@ -504,3 +504,14 @@ class TestTypedAnswerQuestionSets:
     def test_examples_variant_has_few_shots(self, typed_loader):
         qset = typed_loader.get_question_set("typed_examples")
         assert "Example:" in qset.questions["typed_f1"]["guidelines"]
+
+
+def test_climretrieve_core_questions_require_classification_answers():
+    questions = QuestionSetLoader().get_questions("climretrieve")
+    core_questions = [questions[f"climretr_{index}"] for index in range(1, 17)]
+
+    assert all(
+        question["guidelines"].startswith("- ANSWER type: classification")
+        for question in core_questions
+    )
+    assert questions["climretr_17_ir"]["guidelines"] == ""
