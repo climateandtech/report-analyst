@@ -753,7 +753,7 @@ body.wmd-root {
 <body class="wmd-root wmd-sketch wmd-has-callouts">
   <div class="wmd-annotated">
   <h1 class="wmd-h1">Benchmarking</h1>
-<p class="wmd-paragraph">Evaluate retrieval and extraction against reference datasets.</p>
+<p class="wmd-paragraph">Evaluate retrieval and extraction against a gold set.</p>
 <div id="tabs" class="wmd-container-card">
   <div class="wmd-container-button-group">
   <button class="wmd-button">Datasets</button>
@@ -781,20 +781,22 @@ body.wmd-root {
 </div>
 <div class="wmd-grid wmd-start wmd-grid-2" style="--grid-columns: 2">
   <div class="wmd-grid-item">
-    <h3 class="wmd-h3">Reference (ground truth)</h3>
+    <h3 id="gt" class="wmd-h3">Ground truth / Benchmark</h3>
     <select class="wmd-select">
-    <option value="" disabled selected>DB: TCFD gold labels v1</option>
-    <option value="DB: TCFD gold labels v1">DB: TCFD gold labels v1</option>
-    <option value="Uploaded: microsoft_gt_aligned.csv">Uploaded: microsoft_gt_aligned.csv</option>
+    <option value="" disabled selected>ClimRetrieve</option>
+    <option value="ClimRetrieve">ClimRetrieve</option>
+    <option value="ClimRetrieve report-level">ClimRetrieve report-level</option>
   </select>
+    <p class="wmd-paragraph">Expert-annotated relevant chunks.</p>
   </div>
   <div class="wmd-grid-item">
-    <h3 class="wmd-h3">Benchmark (results)</h3>
+    <h3 id="chunks" class="wmd-h3">Chunks downloaded via CSV</h3>
     <select class="wmd-select">
-    <option value="" disabled selected>DB: Microsoft 2024 run A</option>
-    <option value="DB: Microsoft 2024 run A">DB: Microsoft 2024 run A</option>
-    <option value="Uploaded: microsoft_bm_aligned.csv">Uploaded: microsoft_bm_aligned.csv</option>
+    <option value="" disabled selected>chunks_Microsoft_2024.csv</option>
+    <option value="chunks_Microsoft_2024.csv">chunks_Microsoft_2024.csv</option>
+    <option value="chunks_data.csv">chunks_data.csv</option>
   </select>
+    <p class="wmd-paragraph">Export from Analysis → Download chunks data.</p>
   </div>
 </div>
 <div class="wmd-container-form-group">
@@ -815,6 +817,10 @@ body.wmd-root {
 </div>
   <aside class="wmd-callout wmd-callout-left" data-callout-for="tabs" data-callout-side="left"><p class="wmd-paragraph">tabs</p></aside>
 <aside class="wmd-callout wmd-callout-left" data-callout-for="mode" data-callout-side="left"><p class="wmd-paragraph">mode</p></aside>
+<aside class="wmd-callout wmd-callout-left" data-callout-for="gt" data-callout-side="left"><p class="wmd-paragraph">gold labels
+(ClimRetrieve)</p></aside>
+<aside class="wmd-callout wmd-callout-right" data-callout-for="chunks" data-callout-side="right"><p class="wmd-paragraph">your retrieval
+export</p></aside>
 <aside class="wmd-callout wmd-callout-left" data-callout-for="metrics" data-callout-side="left"><p class="wmd-paragraph">metrics</p></aside>
   <svg class="wmd-callout-leaders" aria-hidden="true"></svg>
 </div>

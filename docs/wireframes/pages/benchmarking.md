@@ -1,5 +1,5 @@
 # Benchmarking
-Evaluate retrieval and extraction against reference datasets.
+Evaluate retrieval and extraction against a gold set.
 
 ::: card {#tabs}
 [Datasets] [Evaluate]* [Results] [Annotate]
@@ -24,16 +24,30 @@ mode
 
 ::: grid-2 {.start}
 
-### Reference (ground truth)
-[DB: TCFD gold labels v1___________v]
-- DB: TCFD gold labels v1
-- Uploaded: microsoft_gt_aligned.csv
+### Ground truth / Benchmark {#gt}
+[ClimRetrieve___________v]
+- ClimRetrieve
+- ClimRetrieve report-level
 
-### Benchmark (results)
-[DB: Microsoft 2024 run A___________v]
-- DB: Microsoft 2024 run A
-- Uploaded: microsoft_bm_aligned.csv
+Expert-annotated relevant chunks.
 
+### Chunks downloaded via CSV {#chunks}
+[chunks_Microsoft_2024.csv___________v]
+- chunks_Microsoft_2024.csv
+- chunks_data.csv
+
+Export from Analysis → Download chunks data.
+
+:::
+
+::: callout {for:gt side:left}
+gold labels
+(ClimRetrieve)
+:::
+
+::: callout {for:chunks side:right}
+your retrieval
+export
 :::
 
 Evaluation name
