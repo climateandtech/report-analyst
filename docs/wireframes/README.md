@@ -1,23 +1,45 @@
 # Report Analyst wireframes
 
-Sketch screens of the Report Analyst UI (analysis, consolidated results, PDF viewer, benchmarking). No CT Platform chrome.
+Sketch screens of the Report Analyst UI (no CT Platform chrome). GitHub renders the PNGs below.
 
-Open the HTML in a browser:
-
-- [Analysis](out/analysis.html)
-- [View all results](out/view-all-results.html)
-- [PDF viewer](out/report-viewer.html)
-- [Benchmarking](out/benchmarking.html)
-
-Sources are WireMD Markdown in `pages/`. Callouts, `{#id}` anchors, PDF overlays (`.retrieved` / `.evidence`), and selected config cards (`{.primary}` on a grid heading) need the WireMD fork branch `feat/callouts` (repo `devolute/wiremd`).
-
-Rebuild after editing a page:
+Syntax that these pages use (`{#id}`, `::: callout`, PDF overlays, selected config cards) lives in the [devolute/wiremd](https://github.com/devolute/wiremd) fork, branch [`feat/callouts`](https://github.com/devolute/wiremd/tree/feat/callouts).
 
 ```bash
-cd /path/to/wiremd   # feat/callouts
+npm install github:devolute/wiremd#feat/callouts
+```
+
+## Analysis
+
+![Analysis](renders/analysis.png)
+
+[Source](pages/analysis.md) · [HTML](out/analysis.html)
+
+## View all results
+
+![View all results](renders/view-all-results.png)
+
+[Source](pages/view-all-results.md) · [HTML](out/view-all-results.html)
+
+## PDF viewer
+
+![PDF viewer](renders/report-viewer.png)
+
+[Source](pages/report-viewer.md) · [HTML](out/report-viewer.html)
+
+## Benchmarking
+
+![Benchmarking](renders/benchmarking.png)
+
+[Source](pages/benchmarking.md) · [HTML](out/benchmarking.html)
+
+## Rebuild
+
+Edit a page under `pages/`, then from a checkout of [devolute/wiremd@feat/callouts](https://github.com/devolute/wiremd/tree/feat/callouts):
+
+```bash
 npm run build
 node bin/wiremd.js /path/to/report-analyst/docs/wireframes/pages/analysis.md \
   -s sketch -o /path/to/report-analyst/docs/wireframes/out/analysis.html
 ```
 
-Repeat for `view-all-results`, `report-viewer`, and `benchmarking`.
+Repeat for `view-all-results`, `report-viewer`, and `benchmarking`. Recapture PNGs into `renders/` if the figure should update on GitHub.
