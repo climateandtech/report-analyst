@@ -507,6 +507,7 @@ For detailed deployment patterns (Docker, Kubernetes, NATS workers, etc.), see:
 - `scripts/README_CLIMRETRIEVE.md` – ClimRetrieve benchmark and generic CSV evaluation
 - `report_analyst_jobs/README.md` – Job processing and worker patterns
 - `docs/CI.md` – Continuous integration and testing
+- `docs/wireframes/` – Sketch screens of the Report Analyst UI (analysis, results, PDF viewer, benchmarking)
 
 ---
 
