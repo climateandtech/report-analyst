@@ -5,10 +5,9 @@ Clean, modular Streamlit app supporting multiple backend integration flows.
 """
 
 import logging
-import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import List
 
 import streamlit as st
 
@@ -27,9 +26,7 @@ try:
     )
     from report_analyst_search_backend.flow_orchestrator import (
         AnalysisResult,
-        ProcessingResult,
         create_flow_orchestrator,
-        needs_local_analysis,
     )
 
     BACKEND_INTEGRATION_AVAILABLE = True
@@ -190,7 +187,7 @@ def configure_questions() -> List[str]:
     """Configure questions for analysis"""
 
     if CORE_FUNCTIONALITY_AVAILABLE:
-        question_set_options = question_loader.get_question_set_options() + ["custom"]
+        question_set_options = [*question_loader.get_question_set_options(), "custom"]
     else:
         # Fallback: use a generic approach without hardcoded names
         question_set_options = ["custom"]  # Only custom when core functionality unavailable
@@ -221,7 +218,7 @@ def display_analysis_results(result: AnalysisResult, config: BackendConfig):
     method = results.get("method", "unknown")
 
     # Display Q&A
-    for i, (question, answer) in enumerate(zip(questions, answers)):
+    for i, (question, answer) in enumerate(zip(questions, answers, strict=False)):
         st.write(f"**Question {i+1}:** {question}")
         st.write(f"**Answer:** {answer}")
         st.divider()
@@ -254,8 +251,8 @@ def display_backend_analysis_results(result: AnalysisResult):
         st.write(f"**Stored in Backend:** {'Yes' if result.stored_in_backend else 'No'}")
 
     with col2:
-        st.write(f"**Analysis Method:** Complete Backend")
-        st.write(f"**Multi-user Access:** Available to authorized users")
+        st.write("**Analysis Method:** Complete Backend")
+        st.write("**Multi-user Access:** Available to authorized users")
 
     # Display results
     st.subheader("Results")
@@ -265,7 +262,7 @@ def display_backend_analysis_results(result: AnalysisResult):
             questions = result.results["questions"]
             answers = result.results["answers"]
 
-            for i, (question, answer) in enumerate(zip(questions, answers)):
+            for i, (question, answer) in enumerate(zip(questions, answers, strict=False)):
                 st.write(f"**Question {i+1}:** {question}")
                 st.write(f"**Answer:** {answer}")
                 st.divider()
@@ -278,7 +275,7 @@ def display_backend_analysis_results(result: AnalysisResult):
     st.subheader("Backend Analysis Benefits")
     st.info("""
     **Persistent Storage**: Results stored in backend database
-    **Multi-User Access**: Available to all authorized users  
+    **Multi-User Access**: Available to all authorized users
     **Centralized Processing**: All computation done in backend
     **Scalable**: Backend handles multiple concurrent analyses
     **Consistent**: Same analysis logic across all clients
@@ -340,7 +337,7 @@ def run_fallback_mode():
     st.header("Document Analysis")
 
     if CORE_FUNCTIONALITY_AVAILABLE:
-        question_set_options = question_loader.get_question_set_options() + ["custom"]
+        question_set_options = [*question_loader.get_question_set_options(), "custom"]
         question_set_name = st.selectbox(
             "Select Question Set",
             options=question_set_options,
