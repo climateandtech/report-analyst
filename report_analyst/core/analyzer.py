@@ -1113,7 +1113,6 @@ class DocumentAnalyzer:
             # Create analysis prompt with indexed chunks
             messages = self.prompt_manager.get_analysis_messages(
                 question=question_data["text"],
-                context="",
                 guidelines=question_data.get("guidelines", ""),
                 chunks_data=[
                     {
