@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("pdfjs-dist/build/pdf.mjs", () => ({
   GlobalWorkerOptions: { workerSrc: "" },
@@ -21,6 +21,10 @@ function textItem(str, x, y, width) {
 
 describe("PDF viewer", () => {
   let viewer;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   beforeEach(() => {
     viewer = new PdfViewerWithChunks();
@@ -252,7 +256,12 @@ describe("PDF viewer", () => {
 
     const page = {
       getViewport: vi.fn(({ scale }) => ({ width: 600 * scale, height: 800 * scale })),
-      getTextContent: vi.fn().mockResolvedValue({ items: [] }),
+      streamTextContent: vi.fn().mockReturnValue(new ReadableStream({
+        start(controller) {
+          controller.enqueue({ items: [] });
+          controller.close();
+        },
+      })),
     };
     const pdfDoc = { numPages: 4, getPage: vi.fn().mockResolvedValue(page) };
     const sourceCanvas = document.createElement("canvas");
@@ -381,5 +390,43 @@ describe("PDF viewer", () => {
   it("fits the PDF page into the width remaining beside the chunks sidebar", () => {
     expect(viewer.getFitScale(600, 500)).toBeCloseTo(460 / 600);
     expect(viewer.getFitScale(600, 1200)).toBeCloseTo(1160 / 600);
+  });
+
+  it("rerenders the first page when its container width settles", () => {
+    let resizeCallback;
+    const observe = vi.fn();
+    vi.stubGlobal("ResizeObserver", class ResizeObserver {
+      constructor(callback) {
+        resizeCallback = callback;
+      }
+
+      observe(target) {
+        observe(target);
+      }
+
+      disconnect() {}
+    });
+
+    viewer.render();
+    const content = viewer.shadowRoot.getElementById("viewer-content");
+    let containerWidth = 80;
+    Object.defineProperty(content, "clientWidth", {
+      configurable: true,
+      get: () => containerWidth,
+    });
+    viewer._pdfDoc = { numPages: 1 };
+    viewer._lastRenderedWidth = containerWidth;
+    viewer.renderCurrentPage = vi.fn().mockImplementation(() => {
+      viewer._lastRenderedWidth = containerWidth;
+    });
+
+    viewer.observeViewerSize();
+    expect(observe).toHaveBeenCalledWith(content);
+
+    containerWidth = 640;
+    resizeCallback();
+    resizeCallback();
+
+    expect(viewer.renderCurrentPage).toHaveBeenCalledOnce();
   });
 });

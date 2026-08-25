@@ -17,11 +17,22 @@ export default defineConfig({
           ),
           `${outputDirectory}/pdf.worker.min.mjs`,
         );
+        copyFileSync(
+          fileURLToPath(new URL("./src/pdfjs-map-polyfill.js", import.meta.url)),
+          `${outputDirectory}/pdfjs-map-polyfill.js`,
+        );
+        copyFileSync(
+          fileURLToPath(new URL("./src/pdf-worker-bootstrap.mjs", import.meta.url)),
+          `${outputDirectory}/pdf-worker-bootstrap.mjs`,
+        );
       },
     },
   ],
   build: {
     emptyOutDir: false,
+    rollupOptions: {
+      external: ["./pdfjs-map-polyfill.js"],
+    },
     lib: {
       entry: "src/pdf-viewer.js",
       formats: ["es"],

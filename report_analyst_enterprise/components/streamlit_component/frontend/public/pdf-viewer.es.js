@@ -1,3 +1,4 @@
+import "./pdfjs-map-polyfill.js";
 //#region node_modules/pdfjs-dist/build/pdf.mjs
 var e = typeof process == "object" && process + "" == "[object process]" && !process.versions.nw && !(process.versions.electron && process.type && process.type !== "browser"), t = [
 	Infinity,
@@ -16346,20 +16347,20 @@ globalThis._pdfjsTestingUtils = { HighlightOutliner: ki }, globalThis.pdfjsLib =
 	VerbosityLevel: g,
 	version: Rr,
 	XfaLayer: be
-}, gr.workerSrc = "./pdf.worker.min.mjs";
+}, gr.workerSrc = "./pdf-worker-bootstrap.mjs";
 var na = 6, ra = "__unmapped__", ia = "\n  <style>\n    :host {\n      display: block;\n      height: 100vh;\n      font-family: system-ui, sans-serif;\n    }\n    .container {\n      display: flex;\n      width: 100%;\n      height: 100%;\n      min-width: 0;\n      background: #f5f5f5;\n    }\n    .sidebar {\n      display: flex;\n      flex: 0 0 clamp(220px, 32%, 350px);\n      flex-direction: column;\n      min-width: 0;\n      overflow: hidden;\n      background: white;\n      border-right: 1px solid #e0e0e0;\n    }\n    .sidebar-header {\n      padding: 16px;\n      background: #fafafa;\n      border-bottom: 1px solid #e0e0e0;\n    }\n    .sidebar-header h3 {\n      margin: 0 0 12px;\n      font-size: 16px;\n    }\n    .question-select {\n      width: 100%;\n      margin-bottom: 12px;\n      padding: 8px;\n    }\n    .evidence-filter {\n      display: flex;\n      align-items: center;\n      gap: 8px;\n      color: #666;\n      font-size: 14px;\n    }\n    .chunks-list {\n      flex: 1;\n      overflow-y: auto;\n      padding: 8px;\n    }\n    .empty {\n      padding: 16px;\n      color: #777;\n      text-align: center;\n    }\n    .chunk-item {\n      margin-bottom: 8px;\n      padding: 12px;\n      background: white;\n      border: 1px solid #e0e0e0;\n      border-radius: 6px;\n      cursor: pointer;\n    }\n    .chunk-item:hover {\n      border-color: #4313c8;\n      box-shadow: 0 2px 4px rgba(67, 19, 200, 0.1);\n    }\n    .chunk-item.evidence {\n      background: #f8f7ff;\n      border-left: 4px solid #4313c8;\n    }\n    .chunk-header,\n    .badges,\n    .chunk-scores {\n      display: flex;\n      align-items: center;\n    }\n    .chunk-header {\n      justify-content: space-between;\n      margin-bottom: 8px;\n    }\n    .chunk-title {\n      color: #333;\n      font-size: 14px;\n      font-weight: 600;\n    }\n    .badges {\n      gap: 4px;\n    }\n    .badge {\n      padding: 2px 8px;\n      border-radius: 12px;\n      background: #e0e0e0;\n      color: #666;\n      font-size: 11px;\n      font-weight: 600;\n    }\n    .badge.evidence {\n      background: #4313c8;\n      color: white;\n    }\n    .chunk-text {\n      display: -webkit-box;\n      overflow: hidden;\n      color: #666;\n      font-size: 13px;\n      line-height: 1.5;\n      -webkit-box-orient: vertical;\n      -webkit-line-clamp: 3;\n    }\n    .chunk-scores {\n      gap: 12px;\n      margin-top: 8px;\n      color: #888;\n      font-size: 11px;\n    }\n    .viewer {\n      display: flex;\n      flex: 1;\n      flex-direction: column;\n      min-width: 0;\n      overflow: hidden;\n      background: #525252;\n    }\n    .viewer-controls {\n      display: flex;\n      align-items: center;\n      gap: 12px;\n      padding: 12px 16px;\n      background: white;\n      border-bottom: 1px solid #e0e0e0;\n    }\n    .viewer-controls button {\n      padding: 6px 12px;\n      background: white;\n      border: 1px solid #ddd;\n      border-radius: 4px;\n      cursor: pointer;\n    }\n    .viewer-controls button:disabled {\n      cursor: default;\n      opacity: 0.45;\n    }\n    .page-info {\n      color: #666;\n      font-size: 14px;\n    }\n    .viewer-content {\n      display: flex;\n      flex: 1;\n      align-items: flex-start;\n      justify-content: center;\n      overflow: auto;\n      padding: 20px;\n    }\n    .page-container {\n      position: relative;\n      flex: none;\n      background: white;\n      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);\n    }\n    .page-canvas {\n      display: block;\n    }\n    .page-highlights {\n      position: absolute;\n      inset: 0;\n      pointer-events: none;\n    }\n    .highlight {\n      position: absolute;\n      z-index: 1;\n      background: transparent;\n      border: 1px solid rgba(67, 19, 200, 0.35);\n      border-radius: 2px;\n      pointer-events: auto;\n      transition: background-color 0.15s ease, border-color 0.15s ease;\n    }\n    .highlight:hover {\n      background: rgba(67, 19, 200, 0.2);\n      border-color: rgba(67, 19, 200, 0.75);\n    }\n    .highlight.evidence {\n      border-color: #4313c8;\n    }\n    .highlight.evidence:hover {\n      background: rgba(67, 19, 200, 0.3);\n    }\n    .message {\n      margin: auto;\n      color: #eee;\n      font-size: 14px;\n    }\n    .message.error {\n      color: #fecaca;\n    }\n  </style>\n";
 function aa(e) {
 	return String(e || "").normalize("NFKC").replace(/\u00ad/g, "").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
 }
 var oa = class extends HTMLElement {
 	constructor() {
-		super(), this.attachShadow({ mode: "open" }), this._pdfData = null, this._pdfDoc = null, this._loadingTask = null, this._chunks = [], this._questions = [], this._selectedQuestionId = null, this._showEvidenceOnly = !1, this._currentPage = 1, this._renderId = 0;
+		super(), this.attachShadow({ mode: "open" }), this._pdfData = null, this._pdfDoc = null, this._loadingTask = null, this._chunks = [], this._questions = [], this._selectedQuestionId = null, this._showEvidenceOnly = !1, this._currentPage = 1, this._renderId = 0, this._lastRenderedWidth = 0, this._resizeObserver = null;
 	}
 	connectedCallback() {
-		this.render();
+		this.render(), this.observeViewerSize();
 	}
 	disconnectedCallback() {
-		this.resetPdfDocument();
+		this._resizeObserver?.disconnect(), this._resizeObserver = null, this.resetPdfDocument();
 	}
 	setPdfData(e) {
 		e !== this._pdfData && (this.resetPdfDocument(), this._pdfData = e || null, this.isConnected && this.loadAndRenderPdf());
@@ -16383,7 +16384,15 @@ var oa = class extends HTMLElement {
 		t !== this._showEvidenceOnly && (this._showEvidenceOnly = t, this.updateFilters());
 	}
 	resetPdfDocument() {
-		this._renderId += 1, this._loadingTask?.destroy(), this._loadingTask = null, this._pdfDoc && this._pdfDoc.destroy(), this._pdfDoc = null, this._currentPage = 1;
+		this._renderId += 1, this._loadingTask?.destroy(), this._loadingTask = null, this._pdfDoc && this._pdfDoc.destroy(), this._pdfDoc = null, this._currentPage = 1, this._lastRenderedWidth = 0;
+	}
+	observeViewerSize() {
+		if (this._resizeObserver?.disconnect(), typeof ResizeObserver != "function") return;
+		let e = this.shadowRoot?.getElementById("viewer-content");
+		e && (this._resizeObserver = new ResizeObserver(() => {
+			let t = e.clientWidth;
+			!this._pdfDoc || t <= 0 || t === this._lastRenderedWidth || this.renderCurrentPage();
+		}), this._resizeObserver.observe(e));
 	}
 	render() {
 		this.shadowRoot.innerHTML = `${ia}
@@ -16517,13 +16526,15 @@ var oa = class extends HTMLElement {
 		if (!e) return;
 		let t = ++this._renderId;
 		try {
-			let n = await this.loadPdf(), r = Math.min(Math.max(this._currentPage, 1), n.numPages), i = await n.getPage(r), a = i.getViewport({ scale: 1 }), o = this.getFitScale(a.width, e.clientWidth), s = i.getViewport({ scale: o }), c = await this.renderPage(i, s), l = (await i.getTextContent()).items;
+			let n = await this.loadPdf(), r = Math.min(Math.max(this._currentPage, 1), n.numPages), i = await n.getPage(r), a = i.getViewport({ scale: 1 }), o = e.clientWidth;
+			this._lastRenderedWidth = o;
+			let s = this.getFitScale(a.width, o), c = i.getViewport({ scale: s }), l = await this.renderPage(i, c), u = await this.readTextItems(i);
 			if (t !== this._renderId) return;
 			this._currentPage = r, this.updatePageControls();
-			let u = document.createElement("div");
-			u.className = "page-container", u.append(c);
-			let d = this.renderHighlights(l, s, r);
-			d.childElementCount && u.append(d), e.replaceChildren(u);
+			let d = document.createElement("div");
+			d.className = "page-container", d.append(l);
+			let f = this.renderHighlights(u, c, r);
+			f.childElementCount && d.append(f), e.replaceChildren(d);
 		} catch (e) {
 			t === this._renderId && this.showMessage(`Error rendering page: ${e.message}`, "error");
 		}
@@ -16544,6 +16555,18 @@ var oa = class extends HTMLElement {
 			0,
 			0
 		]), await e.render(a).promise, r;
+	}
+	async readTextItems(e) {
+		let t = e.streamTextContent().getReader(), n = [];
+		try {
+			for (;;) {
+				let { value: e, done: r } = await t.read();
+				if (r) return n;
+				n.push(...e.items);
+			}
+		} finally {
+			t.releaseLock();
+		}
 	}
 	renderHighlights(e, t, n) {
 		let r = document.createElement("div");

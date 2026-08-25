@@ -1,6 +1,7 @@
+import "./pdfjs-map-polyfill.js";
 import * as pdfjsLib from "pdfjs-dist/build/pdf.mjs";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf-worker-bootstrap.mjs";
 
 const MIN_MATCH_TOKENS = 6;
 const UNMAPPED_QUESTION_ID = "__unmapped__";
@@ -224,13 +225,18 @@ class PdfViewerWithChunks extends HTMLElement {
     this._showEvidenceOnly = false;
     this._currentPage = 1;
     this._renderId = 0;
+    this._lastRenderedWidth = 0;
+    this._resizeObserver = null;
   }
 
   connectedCallback() {
     this.render();
+    this.observeViewerSize();
   }
 
   disconnectedCallback() {
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
     this.resetPdfDocument();
   }
 
@@ -288,6 +294,28 @@ class PdfViewerWithChunks extends HTMLElement {
     if (this._pdfDoc) void this._pdfDoc.destroy();
     this._pdfDoc = null;
     this._currentPage = 1;
+    this._lastRenderedWidth = 0;
+  }
+
+  observeViewerSize() {
+    this._resizeObserver?.disconnect();
+    if (typeof ResizeObserver !== "function") return;
+
+    const content = this.shadowRoot?.getElementById("viewer-content");
+    if (!content) return;
+
+    this._resizeObserver = new ResizeObserver(() => {
+      const width = content.clientWidth;
+      if (
+        !this._pdfDoc ||
+        width <= 0 ||
+        width === this._lastRenderedWidth
+      ) {
+        return;
+      }
+      void this.renderCurrentPage();
+    });
+    this._resizeObserver.observe(content);
   }
 
   render() {
@@ -512,10 +540,12 @@ class PdfViewerWithChunks extends HTMLElement {
       const pageNumber = Math.min(Math.max(this._currentPage, 1), pdf.numPages);
       const page = await pdf.getPage(pageNumber);
       const baseViewport = page.getViewport({ scale: 1 });
-      const scale = this.getFitScale(baseViewport.width, content.clientWidth);
+      const containerWidth = content.clientWidth;
+      this._lastRenderedWidth = containerWidth;
+      const scale = this.getFitScale(baseViewport.width, containerWidth);
       const viewport = page.getViewport({ scale });
       const canvas = await this.renderPage(page, viewport);
-      const textItems = (await page.getTextContent()).items;
+      const textItems = await this.readTextItems(page);
       if (renderId !== this._renderId) return;
 
       this._currentPage = pageNumber;
@@ -553,6 +583,20 @@ class PdfViewerWithChunks extends HTMLElement {
     }
     await page.render(renderContext).promise;
     return canvas;
+  }
+
+  async readTextItems(page) {
+    const reader = page.streamTextContent().getReader();
+    const items = [];
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) return items;
+        items.push(...value.items);
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   renderHighlights(textItems, viewport, pageNumber) {
