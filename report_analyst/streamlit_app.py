@@ -3845,6 +3845,10 @@ def main():
                             st.warning("Please select at least one question to analyze.")
                         else:
                             try:
+                        else:
+                            try:
+                                # Initialize progress display
+                                progress_text = st.empty()
                                 # Initialize progress display
                                 progress_text = st.empty()
 
