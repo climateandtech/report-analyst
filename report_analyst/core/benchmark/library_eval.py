@@ -231,7 +231,7 @@ def match_retrieved_to_ground_truth(
     retrieved_text: str,
     gt_rows: pd.DataFrame,
 ) -> tuple[str, bool, float]:
-    """Map an OSA chunk onto a ClimRetrieve chunk_id when overlap is high enough."""
+    """Map an OSA chunk onto one ClimRetrieve evidence-span ID."""
     chunk_id, matched, score, _ = _match_retrieved_to_ground_truth(retrieved_text, gt_rows)
     return chunk_id, matched, score
 
@@ -273,6 +273,7 @@ def build_osa_retrieval_rows(
                     "document": document,
                     "question": question,
                     "chunk_id": chunk_id,
+                    "retrieved_chunk_id": generate_chunk_id(text),
                     "position": position,
                     "chunk_order": _chunk_order(chunk),
                     "score": float(chunk.get("score") or chunk.get("similarity_score") or chunk.get("similarity") or 0.0),
@@ -341,13 +342,100 @@ def _apply_split_ground_truth_hits(
     return rows
 
 
+def build_retrieval_match_table(
+    retrieval_rows: pd.DataFrame,
+    ground_truth: pd.DataFrame,
+) -> pd.DataFrame:
+    """Explode all query-scoped retrieved-chunk-to-evidence matches."""
+    if retrieval_rows.empty or ground_truth.empty:
+        return pd.DataFrame()
+    config_columns = [
+        column
+        for column in ("config_id", "chunk_size", "chunk_overlap", "top_k")
+        if column in retrieval_rows.columns
+    ]
+    matches: list[dict[str, Any]] = []
+    group_columns = [*config_columns, "query_id"]
+    for key, query_results in retrieval_rows.groupby(group_columns, dropna=False):
+        query_id = key[-1] if isinstance(key, tuple) else key
+        query_gt = ground_truth[ground_truth["query_id"] == query_id]
+        if query_gt.empty:
+            continue
+        for result in query_results.itertuples(index=False):
+            for evidence in query_gt.itertuples(index=False):
+                match = classify_text_match(str(result.chunk_text), str(evidence.chunk_text))
+                if is_ground_truth_hit(match):
+                    matches.append(_match_row(result, evidence, match, config_columns, [int(result.position)]))
+        ordered = query_results.dropna(subset=["chunk_order"]).sort_values("chunk_order")
+        ordered_rows = list(ordered.itertuples(index=False))
+        for left, right in pairwise(ordered_rows):
+            if int(right.chunk_order) != int(left.chunk_order) + 1:
+                continue
+            for evidence in query_gt.itertuples(index=False):
+                match = classify_chunk_group_match(
+                    [str(left.chunk_text), str(right.chunk_text)],
+                    [str(evidence.chunk_text)],
+                )
+                if match.relation is not MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED:
+                    continue
+                completion = max((left, right), key=lambda row: int(row.position))
+                matches.append(
+                    _match_row(
+                        completion,
+                        evidence,
+                        match,
+                        config_columns,
+                        [int(left.position), int(right.position)],
+                    )
+                )
+    if not matches:
+        return pd.DataFrame()
+    frame = pd.DataFrame(matches)
+    frame["relation_priority"] = frame["is_split"].astype(int)
+    frame = frame.sort_values(["retrieval_position", "relation_priority"])
+    frame = frame.drop_duplicates(
+        [*config_columns, "query_id", "retrieval_position", "ground_truth_chunk_id"],
+        keep="first",
+    )
+    return frame.drop(columns="relation_priority").reset_index(drop=True)
+
+
+def _match_row(
+    result: Any,
+    evidence: Any,
+    match: TextMatch,
+    config_columns: Sequence[str],
+    component_positions: Sequence[int],
+) -> dict[str, Any]:
+    return {
+        **{column: getattr(result, column) for column in config_columns},
+        "query_id": str(result.query_id),
+        "document": str(result.document),
+        "question": str(result.question),
+        "retrieved_chunk_id": str(result.retrieved_chunk_id),
+        "retrieval_position": int(result.position),
+        "chunk_order": result.chunk_order,
+        "ground_truth_chunk_id": str(evidence.chunk_id),
+        "relevance_grade": float(evidence.score),
+        "match_relation": match.relation.value,
+        "match_jaccard": match.jaccard,
+        "retrieved_coverage": match.retrieved_coverage,
+        "ground_truth_coverage": match.ground_truth_coverage,
+        "component_positions": json.dumps(list(component_positions)),
+        "is_split": len(component_positions) > 1,
+    }
+
+
 def query_match_metrics(
     retrieval_rows: pd.DataFrame,
     ground_truth: pd.DataFrame,
+    *,
+    matches: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Per-query strict coverage and chunk-boundary diagnostics."""
     if retrieval_rows.empty:
         return pd.DataFrame()
+    match_table = build_retrieval_match_table(retrieval_rows, ground_truth) if matches is None else matches
     config_columns = [
         column
         for column in ("config_id", "chunk_size", "chunk_overlap", "top_k")
@@ -359,33 +447,69 @@ def query_match_metrics(
         values = key if isinstance(key, tuple) else (key,)
         dimensions = dict(zip([*config_columns, *query_columns], values, strict=True))
         query_gt = ground_truth[ground_truth["query_id"] == dimensions["query_id"]]
+        if query_gt.empty:
+            continue
         n_ground_truth = query_gt["chunk_id"].astype(str).nunique()
-        hits = group[group["matched_climretrieve"].fillna(False)].drop_duplicates("chunk_id")
-        hit_count = hits["chunk_id"].astype(str).nunique()
+        query_matches = _match_rows_for_dimensions(match_table, dimensions, config_columns)
+        evidence_hits = (
+            query_matches.sort_values("retrieval_position").drop_duplicates("ground_truth_chunk_id")
+            if not query_matches.empty
+            else query_matches
+        )
+        hit_count = evidence_hits["ground_truth_chunk_id"].astype(str).nunique() if not evidence_hits.empty else 0
+        relevant_chunk_count = query_matches["retrieval_position"].nunique() if not query_matches.empty else 0
         rows.append(
             {
                 **dimensions,
                 "n_ground_truth": n_ground_truth,
                 "n_retrieved": len(group),
                 "hit_count": hit_count,
-                "strict_precision": hit_count / len(group) if len(group) else 0.0,
+                "strict_precision": relevant_chunk_count / len(group) if len(group) else 0.0,
                 "strict_recall": hit_count / n_ground_truth if n_ground_truth else 0.0,
                 "complete_set_hit": bool(n_ground_truth and hit_count == n_ground_truth),
-                "exact_hit_count": int((hits["match_relation"] == MatchRelation.EXACT.value).sum()),
+                "exact_hit_count": (
+                    int((evidence_hits["match_relation"] == MatchRelation.EXACT.value).sum())
+                    if not evidence_hits.empty
+                    else 0
+                ),
                 "contained_hit_count": int(
-                    (hits["match_relation"] == MatchRelation.RETRIEVED_CONTAINS_GROUND_TRUTH.value).sum()
-                ),
+                    (evidence_hits["match_relation"] == MatchRelation.RETRIEVED_CONTAINS_GROUND_TRUTH.value).sum()
+                )
+                if not evidence_hits.empty
+                else 0,
                 "split_hit_count": int(
-                    (hits["match_relation"] == MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED.value).sum()
-                ),
+                    (
+                        evidence_hits["match_relation"]
+                        == MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED.value
+                    ).sum()
+                )
+                if not evidence_hits.empty
+                else 0,
                 "partial_candidate_count": int(
                     (group["match_relation"] == MatchRelation.PARTIAL_OVERLAP.value).sum()
                 ),
-                "mean_hit_retrieved_coverage": hits["retrieved_coverage"].mean(),
-                "mean_hit_ground_truth_coverage": hits["ground_truth_coverage"].mean(),
+                "mean_hit_retrieved_coverage": (
+                    evidence_hits["retrieved_coverage"].mean() if not evidence_hits.empty else float("nan")
+                ),
+                "mean_hit_ground_truth_coverage": (
+                    evidence_hits["ground_truth_coverage"].mean() if not evidence_hits.empty else float("nan")
+                ),
             }
         )
     return pd.DataFrame(rows)
+
+
+def _match_rows_for_dimensions(
+    matches: pd.DataFrame,
+    dimensions: Mapping[str, Any],
+    config_columns: Sequence[str],
+) -> pd.DataFrame:
+    if matches.empty:
+        return matches
+    selected = matches[matches["query_id"] == dimensions["query_id"]]
+    for column in config_columns:
+        selected = selected[selected[column] == dimensions[column]]
+    return selected
 
 
 def summarize_query_match_metrics(query_metrics: pd.DataFrame) -> pd.DataFrame:
@@ -423,12 +547,16 @@ def ranked_query_metrics(
     retrieval_rows: pd.DataFrame,
     ground_truth: pd.DataFrame,
     *,
+    matches: pd.DataFrame | None = None,
+    corpus_matches: pd.DataFrame | None = None,
     k_values: Sequence[int],
     binary_relevance_min: float = 2.0,
 ) -> pd.DataFrame:
-    """Per-query standard IR metrics using strict, deduplicated ground-truth hits."""
+    """Per-query IR metrics with one maximum relevance grade per ranked chunk."""
     if retrieval_rows.empty:
         return pd.DataFrame()
+    retrieval_matches = build_retrieval_match_table(retrieval_rows, ground_truth) if matches is None else matches
+    ideal_matches = retrieval_matches if corpus_matches is None else corpus_matches
     config_columns = [
         column
         for column in ("config_id", "chunk_size", "chunk_overlap", "top_k")
@@ -440,18 +568,25 @@ def ranked_query_metrics(
         values = key if isinstance(key, tuple) else (key,)
         dimensions = dict(zip([*config_columns, *query_columns], values, strict=True))
         query_gt = ground_truth[ground_truth["query_id"] == dimensions["query_id"]]
-        relevance = dict(zip(query_gt["chunk_id"].astype(str), query_gt["score"].astype(float), strict=True))
+        if query_gt.empty:
+            continue
+        query_matches = _match_rows_for_dimensions(retrieval_matches, dimensions, config_columns)
+        rank_gains = (
+            query_matches.groupby("retrieval_position")["relevance_grade"].max().to_dict()
+            if not query_matches.empty
+            else {}
+        )
         ranked_gains: list[float] = []
-        seen: set[str] = set()
         for result in group.sort_values("position").itertuples(index=False):
-            chunk_id = str(result.chunk_id)
-            gain = relevance.get(chunk_id, 0.0) if chunk_id not in seen else 0.0
-            ranked_gains.append(gain)
-            if gain > 0:
-                seen.add(chunk_id)
+            ranked_gains.append(float(rank_gains.get(int(result.position), 0.0)))
+        query_ideal_matches = _match_rows_for_dimensions(ideal_matches, dimensions, config_columns)
+        ideal_gains = (
+            query_ideal_matches.groupby("retrieval_position")["relevance_grade"].max().sort_values(ascending=False).tolist()
+            if not query_ideal_matches.empty
+            else []
+        )
         binary = [int(gain >= binary_relevance_min) for gain in ranked_gains]
-        total_relevant = sum(gain >= binary_relevance_min for gain in relevance.values())
-        ideal_gains = sorted(relevance.values(), reverse=True)
+        total_relevant = sum(gain >= binary_relevance_min for gain in ideal_gains)
         average_precision = _average_precision(binary, total_relevant)
         reciprocal_rank = next((1.0 / rank for rank, rel in enumerate(binary, start=1) if rel), 0.0)
         for k in k_values:
@@ -569,7 +704,12 @@ def overlap_row(gt_ids: set[str], osa_ids: set[str], *, query_id: str, document:
     }
 
 
-def build_overlap_table(ground_truth: pd.DataFrame, osa_retrieval: pd.DataFrame) -> pd.DataFrame:
+def build_overlap_table(
+    ground_truth: pd.DataFrame,
+    osa_retrieval: pd.DataFrame,
+    *,
+    matches: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     """Per-query overlap of ClimRetrieve relevant chunks vs OSA retrieved chunks."""
     rows: list[dict[str, Any]] = []
     for query_id, gt_group in ground_truth.groupby("query_id"):
@@ -577,7 +717,12 @@ def build_overlap_table(ground_truth: pd.DataFrame, osa_retrieval: pd.DataFrame)
         document = str(gt_group["document"].iloc[0])
         question = str(gt_group["question"].iloc[0])
         gt_ids = set(gt_group["chunk_id"].astype(str))
-        osa_ids = set(osa_group.loc[osa_group["matched_climretrieve"], "chunk_id"].astype(str))
+        if matches is None:
+            osa_ids = set(osa_group.loc[osa_group["matched_climretrieve"], "chunk_id"].astype(str))
+        else:
+            osa_ids = set(
+                matches.loc[matches["query_id"] == query_id, "ground_truth_chunk_id"].astype(str)
+            )
         rows.append(overlap_row(gt_ids, osa_ids, query_id=str(query_id), document=document, question=question))
     return pd.DataFrame(rows)
 

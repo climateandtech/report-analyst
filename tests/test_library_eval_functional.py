@@ -19,6 +19,9 @@ from report_analyst.core.benchmark.library_eval import (
 from report_analyst.core.benchmark.retrieval_results_loader import load_flexible_dataset_from_csv
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "ct_reit_chunk_matching.json"
+SAMPLE_RESULTS_PATH = (
+    Path(__file__).parent / "fixtures" / "climretrieve_retrieval_sample_results.csv"
+)
 
 
 def fixture_chunk(fixture, chunk_size: int, chunk_index: int) -> dict:
@@ -118,3 +121,13 @@ def test_split_ground_truth_gain_occurs_when_second_adjacent_chunk_arrives():
     assert ranked.loc[ranked["k"] == 2, "recall"].iloc[0] == 1.0
     intervals = bootstrap_macro_intervals(ranked, ["recall"], group_columns=["k"], n_bootstrap=100)
     assert intervals.loc[intervals["k"] == 2, "ci_low"].iloc[0] == 1.0
+
+
+def test_sample_results_fixture_preserves_paired_chunk_configurations():
+    results = pd.read_csv(SAMPLE_RESULTS_PATH)
+    pair_columns = ["document", "question"]
+
+    assert len(results) == 16
+    assert results[pair_columns].drop_duplicates().shape[0] == 8
+    assert set(results["chunk_size"]) == {200, 400}
+    assert (results.groupby(pair_columns)["chunk_size"].nunique() == 2).all()

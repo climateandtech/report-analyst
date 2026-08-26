@@ -10,12 +10,15 @@ from report_analyst.core.benchmark.library_eval import (
     build_ground_truth_rows,
     build_osa_retrieval_rows,
     build_overlap_table,
+    build_retrieval_match_table,
     citation_consistency,
     cited_chunk_ids,
     match_question,
     metrics_to_frame,
     parse_osa_score,
     parse_yes_no_answer,
+    query_match_metrics,
+    ranked_query_metrics,
     retrieved_chunk_ids,
     score_stability,
     select_labelled_reports,
@@ -93,6 +96,45 @@ def test_build_osa_retrieval_rows_matches_overlapping_chunk():
     assert bool(osa.loc[0, "matched_climretrieve"]) is True
     assert osa.loc[0, "chunk_id"] == generate_chunk_id("Net-zero by 2050 for operations.")
     assert bool(osa.loc[1, "matched_climretrieve"]) is False
+
+
+def test_match_table_preserves_all_ground_truth_spans_for_the_query():
+    labels = pd.DataFrame(
+        {
+            "Document": ["D", "D", "D"],
+            "Question": ["Q", "Q", "Other Q"],
+            "Relevant": ["alpha evidence", "beta evidence", "gamma evidence"],
+            "Source Relevance Score": [2, 3, 3],
+        }
+    )
+    gt = build_ground_truth_rows(labels, ["D"])
+    retrieval = build_osa_retrieval_rows(
+        {("D", "Q"): [{"text": "alpha evidence and beta evidence plus gamma evidence", "score": 0.9}]},
+        gt,
+    )
+
+    matches = build_retrieval_match_table(retrieval, gt)
+
+    assert set(matches["ground_truth_chunk_id"]) == {
+        generate_chunk_id("alpha evidence"),
+        generate_chunk_id("beta evidence"),
+    }
+    assert matches["relevance_grade"].max() == 3
+    query_metrics = query_match_metrics(retrieval, gt, matches=matches)
+    assert query_metrics.loc[0, "hit_count"] == 2
+    assert query_metrics.loc[0, "strict_recall"] == 1.0
+    ranking = ranked_query_metrics(
+        retrieval,
+        gt,
+        matches=matches,
+        corpus_matches=matches,
+        k_values=[1],
+        binary_relevance_min=2,
+    )
+    assert ranking.loc[0, "precision"] == 1.0
+    assert ranking.loc[0, "ndcg"] == 1.0
+    overlap = build_overlap_table(gt[gt["question"] == "Q"], retrieval, matches=matches)
+    assert overlap.loc[0, "n_both"] == 2
 
 
 def test_overlap_table_counts_intersection():

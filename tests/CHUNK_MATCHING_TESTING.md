@@ -28,10 +28,16 @@ Behavioral matcher and functional benchmark tests load these extracted report
 chunks and the ClimRetrieve text from the fixture; they do not construct
 fictional report evidence.
 
+`tests/fixtures/climretrieve_retrieval_sample_results.csv` stores the paper
+metrics from the reproducible two-report, four-question sample run for
+AstraZeneca and Boeing at 200- and 400-token chunk sizes. It includes both
+unique-evidence coverage and chunk-level ranking metrics at `k=10`.
+
 The fixture covers:
 
 - exact text;
 - a report-analyst chunk containing ClimRetrieve evidence;
+- multiple query-specific ClimRetrieve evidence spans contained by one chunk;
 - the reverse containment direction;
 - one 400-token chunk split across two adjacent 200-token chunks;
 - two 200-token chunks merged into one 400-token chunk;

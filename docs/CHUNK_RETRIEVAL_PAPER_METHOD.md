@@ -15,7 +15,10 @@ triple. A retrieval configuration fixes:
 - any reranking or LLM-scoring setting.
 
 The same report-question pairs are evaluated under every configuration.
-Configuration comparisons therefore use paired observations.
+Configuration comparisons therefore use paired observations. Ranking metrics
+include only pairs with at least one expert-annotated evidence span; unjudged
+pairs are counted and reported separately rather than treated as retrieval
+failures.
 
 ## Ground truth
 
@@ -28,8 +31,7 @@ ClimRetrieve supplies report text spans with relevance grades:
 
 The graded values are retained for nDCG. Following the ClimRetrieve base
 evaluation, binary ranking metrics treat grades `2` and `3` as relevant. Grade
-`1` is retained for sensitivity analysis and strict source-coverage
-diagnostics.
+`1` remains part of graded nDCG and strict source-coverage diagnostics.
 
 ## Candidate generation versus acceptance
 
@@ -63,6 +65,13 @@ For retrieved sequence `R` and ground-truth sequence `G`:
 
 A fraction of matching tokens is never sufficient for a binary hit.
 
+Matches are restricted to evidence spans with the same report and question as
+the retrieved chunk. A chunk may contain several such spans. The exported
+match table preserves every chunk--span relation, while ranking treats the
+chunk as one item with the maximum relevance grade among its matched spans.
+Repeated occurrences and additional spans do not create multiple gains at one
+rank. Evidence recall separately counts unique matched spans.
+
 ## Split ground truth across retrieved chunks
 
 A ground-truth span may cross a chunk boundary. Split matching is restricted to
@@ -77,14 +86,12 @@ For each adjacent pair:
 5. require the complete ordered ground-truth sequence to occur in the merged
    sequence.
 
-If the pair succeeds, the ground-truth item receives one gain at the later of
-the two retrieval ranks. This is the first rank at which the complete evidence
-is available. Earlier fragments receive zero gain, and a ground-truth item can
-be credited only once.
+If the pair succeeds, the completion is associated with the later of the two
+retrieval ranks. This is the first rank at which the complete evidence is
+available. If several spans complete at the same rank, the ranked chunk still
+receives one gain equal to their maximum relevance grade.
 
 The current paper configuration tests windows of at most two adjacent chunks.
-Changing this limit is a preregistered sensitivity analysis, not an implicit
-matcher change.
 
 ## Ranking metrics
 
@@ -96,23 +103,25 @@ For rank `i` starting at one and ClimRetrieve grade `rel_i`:
 
 `nDCG@k = DCG@k / IDCG@k`
 
-`IDCG` uses the same query's ground-truth grades sorted in descending order.
-Each ground-truth item contributes gain once. Query nDCG values are
-macro-averaged, giving each report-question pair equal weight.
+For each chunking configuration, all corpus chunks are matched before
+retrieval evaluation. `IDCG` sorts the resulting chunk-level maximum relevance
+grades. Thus, one chunk contributes at most one gain even if it contains
+several evidence spans. Query nDCG values are macro-averaged, giving each
+judged report-question pair equal weight.
 
 ### Secondary metrics
 
 - `Precision@k`: accepted grade-2-or-3 hits in the first `k` ranks divided by
   `k`.
-- `Recall@k`: unique accepted grade-2-or-3 items in the first `k` ranks divided
-  by all grade-2-or-3 items for the query.
+- `Recall@k`: accepted grade-2-or-3 chunks in the first `k` ranks divided by
+  all grade-2-or-3 corpus chunks for the query and chunking configuration.
 - `F1@k`: harmonic mean of Precision@k and Recall@k.
 - `Hit@k`: whether at least one grade-2-or-3 item is complete by rank `k`.
-- `Complete-set Hit@k`: whether every grade-2-or-3 item is complete by rank
+- `Complete-set Hit@k`: whether every grade-2-or-3 chunk is retrieved by rank
   `k`.
 - `MRR`: reciprocal rank of the first accepted grade-2-or-3 item.
 - `AP`: sum of precision at each accepted relevant rank, divided by the total
-  number of grade-2-or-3 ground-truth items.
+  number of grade-2-or-3 corpus chunks.
 - `MAP`: macro mean of AP across report-question pairs.
 
 We report `k ∈ {1, 3, 5, 10}` and retain per-query rows.
