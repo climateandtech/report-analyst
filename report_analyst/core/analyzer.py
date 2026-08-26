@@ -851,6 +851,8 @@ class DocumentAnalyzer:
                         for chunk in nodes
                     ]
                 )
+            for chunk_order, chunk in enumerate(text_chunks):
+                chunk.metadata["chunk_order"] = chunk_order
 
             logger.info(f"Created {len(text_chunks)} chunks")
 

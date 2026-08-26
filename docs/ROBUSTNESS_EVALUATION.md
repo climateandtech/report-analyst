@@ -67,6 +67,28 @@ Chunk selection is represented by pairwise Jaccard similarity between the
 selected chunk sets from repeated runs. Range CSVs contain count, mean,
 standard deviation, minimum, quartiles, median, maximum, and max-minus-min.
 
+## Chunk boundary matching
+
+Retrieval exports classify text matches as `exact`,
+`retrieved_contains_ground_truth`, `ground_truth_contains_retrieved`,
+`partial_overlap`, or `no_match`. They also include Jaccard and directional
+coverage values. `partial_overlap` is diagnostic and does not count as a
+ground-truth hit. A hit requires full ordered ground-truth containment in one
+retrieved chunk or across an overlap-deduplicated contiguous chunk window. The
+group matcher additionally distinguishes split, merged, and many-to-many chunk
+boundaries.
+
+METEOR, BERTScore, or embedding similarity may be exported as diagnostic
+candidate-ranking signals, but they must not independently turn partial
+evidence into a hit. For verbatim report-source labels, ordered full
+ground-truth coverage remains the acceptance rule.
+
+`tests/fixtures/ct_reit_chunk_matching.json` contains embedding-mapped,
+real-report examples at chunk sizes 200 and 400. See
+`tests/CHUNK_MATCHING_TESTING.md` for fixture provenance and regeneration.
+The paper-ready formulas, relevance threshold, split-rank rule, and confidence
+interval procedure are specified in `docs/CHUNK_RETRIEVAL_PAPER_METHOD.md`.
+
 ## Typed answer comparison
 
 ClimRetrieve answers are free text, but most begin with an explicit `YES` or

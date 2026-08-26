@@ -697,6 +697,7 @@ def test_chunk_size_creation(analyzer, test_env):
 
             # Verify chunks were created
             assert len(chunks) > 0, f"No chunks created for chunk_size={chunk_size}"
+            assert [chunk["metadata"]["chunk_order"] for chunk in chunks] == list(range(len(chunks)))
 
             # Verify chunk metadata
             for chunk in chunks:

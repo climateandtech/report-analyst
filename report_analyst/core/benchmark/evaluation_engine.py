@@ -168,7 +168,7 @@ class EvaluationEngine:
 
         # Compute MRR and MAP
         result["reciprocal_rank"] = self._reciprocal_rank(binary_relevance)
-        result["average_precision"] = self._average_precision(binary_relevance)
+        result["average_precision"] = self._average_precision(binary_relevance, total_relevant)
 
         return result
 
@@ -200,19 +200,13 @@ class EvaluationEngine:
         # DCG at K
         dcg = 0.0
         for i in range(min(k, len(retrieved_relevance))):
-            if i == 0:
-                dcg += retrieved_relevance[i]
-            else:
-                dcg += retrieved_relevance[i] / np.log2(i + 1)
+            dcg += retrieved_relevance[i] / np.log2(i + 2)
 
         # Ideal DCG at K (sort ground truth scores in descending order)
         ideal_scores = sorted(ground_truth.values(), reverse=True)
         idcg = 0.0
         for i in range(min(k, len(ideal_scores))):
-            if i == 0:
-                idcg += ideal_scores[i]
-            else:
-                idcg += ideal_scores[i] / np.log2(i + 1)
+            idcg += ideal_scores[i] / np.log2(i + 2)
 
         if idcg == 0:
             return 0.0
@@ -226,7 +220,7 @@ class EvaluationEngine:
                 return 1.0 / (i + 1)
         return 0.0
 
-    def _average_precision(self, binary_relevance: List[int]) -> float:
+    def _average_precision(self, binary_relevance: List[int], total_relevant: int | None = None) -> float:
         """Compute average precision"""
         if not any(binary_relevance):
             return 0.0
@@ -240,8 +234,8 @@ class EvaluationEngine:
                 precision_at_i = relevant_count / (i + 1)
                 ap += precision_at_i
 
-        total_relevant = sum(binary_relevance)
-        return ap / total_relevant if total_relevant > 0 else 0.0
+        denominator = total_relevant if total_relevant is not None else sum(binary_relevance)
+        return ap / denominator if denominator > 0 else 0.0
 
     def _aggregate_metrics(self, question_results: List[Dict], k_values: List[int]) -> EvaluationMetrics:
         """Aggregate metrics across all questions"""

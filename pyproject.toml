@@ -47,6 +47,9 @@ exclude = '''
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "e2e: opt-in tests that call live external services",
+]
 
 [tool.ruff]
 target-version = "py312"
