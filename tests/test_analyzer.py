@@ -190,7 +190,7 @@ def test_env(clean_db):
 def analyzer(test_env, clean_db):
     """Create a DocumentAnalyzer instance with mocked LLM"""
     with (
-        patch("langchain_openai.ChatOpenAI") as mock_llm,
+        patch("report_analyst.core.analyzer.get_llm") as mock_llm,
         patch("llama_index.embeddings.openai.OpenAIEmbedding") as mock_embedding,
         patch("llama_index.core.Settings"),
     ):
@@ -342,7 +342,7 @@ def test_update_llm_model(analyzer):
     mock_llm = Mock()
     mock_llm.model = new_model
 
-    with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
+    with patch("report_analyst.core.analyzer.get_llm", return_value=mock_llm):
         analyzer.update_llm_model(new_model)
         assert analyzer.llm.model == new_model
 
@@ -545,7 +545,7 @@ def test_get_all_cached_answers(analyzer):
 async def test_document_analysis_workflow(test_env):
     """Test the main document analysis workflow"""
     with (
-        patch("langchain_openai.ChatOpenAI") as mock_llm,
+        patch("report_analyst.core.analyzer.get_llm") as mock_llm,
         patch("llama_index.embeddings.openai.OpenAIEmbedding") as mock_embedding,
         patch("llama_index.core.Settings"),
     ):
