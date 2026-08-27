@@ -34,7 +34,32 @@ def test_complete_profile_maps_all_questions_without_limit():
     configured = get_question_loader().get_questions("climretrieve_complete_6")
     labels = pd.DataFrame({"question": [question["text"] for question in configured.values()]})
 
-    assert len(map_questions(labels, "climretrieve_complete_6", limit=None)) == 6
+    assert (
+        len(
+            map_questions(
+                labels,
+                "climretrieve_complete_6",
+                limit=None,
+                exact_only=True,
+            )
+        )
+        == 6
+    )
+
+
+def test_complete_profile_rejects_similar_nonidentical_question():
+    configured = get_question_loader().get_questions("climretrieve_complete_6")
+    questions = [question["text"] for question in configured.values()]
+    questions[0] = questions[0].replace("reference", "refer to")
+    labels = pd.DataFrame({"question": questions})
+
+    with pytest.raises(RuntimeError, match="missing exact ClimRetrieve matches"):
+        map_questions(
+            labels,
+            "climretrieve_complete_6",
+            limit=None,
+            exact_only=True,
+        )
 
 
 def test_checkpoint_run_persists_each_result_before_next_run(tmp_path):

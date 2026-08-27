@@ -88,12 +88,22 @@ def map_questions(
     labels: pd.DataFrame,
     question_set: str,
     limit: int | None,
+    *,
+    exact_only: bool = False,
 ) -> pd.DataFrame:
     osa_questions = get_question_loader().get_questions(question_set)
-    clim_questions = sorted(labels["question"].dropna().unique())
+    clim_questions = sorted(labels["question"].dropna().astype(str).unique())
+    exact_questions = set(clim_questions)
     rows = []
+    missing_exact = []
     for question_id, payload in osa_questions.items():
-        clim_question = match_question(payload["text"], clim_questions)
+        osa_text = str(payload["text"])
+        if exact_only:
+            clim_question = osa_text if osa_text in exact_questions else None
+            if clim_question is None:
+                missing_exact.append(f"{question_id}: {osa_text}")
+        else:
+            clim_question = match_question(osa_text, clim_questions)
         if clim_question:
             rows.append(
                 {
@@ -103,6 +113,10 @@ def map_questions(
                     "climretrieve_question": clim_question,
                 }
             )
+    if missing_exact:
+        raise RuntimeError(
+            "Configured benchmark questions are missing exact ClimRetrieve matches: " + "; ".join(missing_exact)
+        )
     mapped = pd.DataFrame(rows).drop_duplicates("climretrieve_question")
     return mapped.head(limit) if limit is not None else mapped
 
@@ -264,6 +278,7 @@ async def run_evaluation(args: argparse.Namespace) -> None:
         labels,
         args.question_set,
         None if configured_documents else args.questions,
+        exact_only=bool(configured_documents),
     )
     if reports.empty:
         raise RuntimeError("No labelled reports matched PDFs in --reports-dir")
