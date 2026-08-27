@@ -2,6 +2,9 @@
 
 import pandas as pd
 from scripts.analyze_robustness_results import (
+    build_all_evaluation_metrics,
+    build_answer_robustness_metrics,
+    build_answer_robustness_summary,
     build_benchmark_manifest_frames,
     build_overall_classification_metrics,
     build_pairwise_citation_overlap,
@@ -9,7 +12,10 @@ from scripts.analyze_robustness_results import (
     build_topk_comparison,
     build_topk_containment,
     calculate_direct_retrieval_metrics,
+    plot_all_evaluation_metrics_table,
     plot_answer_confusion_matrix,
+    plot_answer_label_robustness,
+    plot_answer_robustness_metrics_table,
     plot_citation_overlap_by_run_pair,
     plot_overall_performance_metrics,
     plot_paper_robustness_figure,
@@ -247,13 +253,39 @@ def test_overall_performance_metrics_plot_is_written(tmp_path):
         labels,
     )
 
-    plot_overall_performance_metrics(
-        build_overall_classification_metrics(answers),
-        retrieval["direct_ranking_summary"],
-        tmp_path,
+    classification = build_overall_classification_metrics(answers)
+    ranking = retrieval["direct_ranking_summary"]
+    robustness = build_answer_robustness_summary(answers)
+    metrics = build_all_evaluation_metrics(
+        classification,
+        robustness,
+        ranking,
     )
+    plot_overall_performance_metrics(classification, ranking, tmp_path)
+    plot_all_evaluation_metrics_table(metrics, tmp_path)
 
     assert (tmp_path / "overall_performance_metrics.png").exists()
+    assert (tmp_path / "all_evaluation_metrics_table.png").exists()
+    assert set(metrics["section"]) == {
+        "Classification",
+        "Direct retrieval",
+        "Robustness",
+    }
+
+
+def test_answer_label_robustness_plot_is_written(tmp_path):
+    answers, _ = reconstruct_tables(_raw_rows())
+
+    plot_answer_label_robustness(answers, tmp_path)
+    summary = build_answer_robustness_summary(answers)
+    metrics = build_answer_robustness_metrics(answers)
+    plot_answer_robustness_metrics_table(metrics, tmp_path)
+
+    assert (tmp_path / "answer_label_robustness.png").exists()
+    assert (tmp_path / "answer_robustness_metrics_table.png").exists()
+    assert summary["label_stability_rate"].eq(1).all()
+    assert summary["answer_text_stability_rate"].eq(1).all()
+    assert metrics["changed_pairs"].eq(0).all()
 
 
 def test_benchmark_manifest_emits_and_validates_full_matrix(tmp_path):

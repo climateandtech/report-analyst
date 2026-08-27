@@ -268,6 +268,155 @@ def build_overall_classification_metrics(
     return pd.DataFrame(rows)
 
 
+def build_answer_robustness_summary(
+    answers: pd.DataFrame,
+) -> pd.DataFrame:
+    """Summarize exact run-to-run stability for answer outputs."""
+    working = answers.copy()
+    working["answer_label"] = [
+        normalize_answer_label(binary, answer)
+        for binary, answer in zip(
+            working["answer_yes_no"],
+            working["answer"],
+            strict=True,
+        )
+    ]
+    pair_metrics = (
+        working.groupby(["document", "question", "config_id"])
+        .agg(
+            label_stable=(
+                "answer_label",
+                lambda values: values.nunique(dropna=False) == 1,
+            ),
+            answer_text_stable=(
+                "answer",
+                lambda values: values.nunique(dropna=False) == 1,
+            ),
+            score_stable=(
+                "answer_score",
+                lambda values: values.nunique(dropna=False) == 1,
+            ),
+            citation_set_stable=(
+                "cited_chunk_ids",
+                lambda values: values.nunique(dropna=False) == 1,
+            ),
+        )
+        .reset_index()
+    )
+    return (
+        pair_metrics.groupby("config_id")
+        .agg(
+            n_pairs=("label_stable", "size"),
+            label_stability_rate=("label_stable", "mean"),
+            answer_text_stability_rate=("answer_text_stable", "mean"),
+            score_stability_rate=("score_stable", "mean"),
+            citation_set_stability_rate=("citation_set_stable", "mean"),
+        )
+        .reset_index()
+    )
+
+
+def build_answer_robustness_metrics(
+    answers: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return presentation-ready stability counts and rates."""
+    summary = build_answer_robustness_summary(answers)
+    metric_columns = [
+        ("Answer label", "label_stability_rate"),
+        ("Exact answer text", "answer_text_stability_rate"),
+        ("Answer score", "score_stability_rate"),
+        ("Citation set", "citation_set_stability_rate"),
+    ]
+    rows = []
+    for result in summary.itertuples(index=False):
+        for metric, column in metric_columns:
+            rate = float(getattr(result, column))
+            stable_pairs = round(result.n_pairs * rate)
+            rows.append(
+                {
+                    "config_id": result.config_id,
+                    "metric": metric,
+                    "stable_pairs": stable_pairs,
+                    "changed_pairs": result.n_pairs - stable_pairs,
+                    "total_pairs": result.n_pairs,
+                    "stability_rate": rate,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def build_all_evaluation_metrics(
+    classification: pd.DataFrame,
+    robustness: pd.DataFrame,
+    retrieval: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Combine classification, retrieval, and robustness metrics."""
+    rows = []
+    if not classification.empty:
+        result = classification.iloc[0]
+        for metric, column in [
+            ("Accuracy", "accuracy"),
+            ("Answered-only accuracy", "answered_accuracy"),
+            ("Balanced accuracy", "balanced_accuracy"),
+            ("Macro F1", "macro_f1"),
+            ("Answer coverage", "coverage"),
+            ("Yes precision", "yes_precision"),
+            ("Yes recall", "yes_recall"),
+            ("Yes F1", "yes_f1"),
+            ("No precision", "no_precision"),
+            ("No recall", "no_recall"),
+            ("No F1", "no_f1"),
+        ]:
+            rows.append(
+                {
+                    "section": "Classification",
+                    "metric": metric,
+                    "value": float(result[column]),
+                    "n_pairs": int(result["n_labelled_pairs"]),
+                    "scope": "Human-labelled pairs",
+                }
+            )
+    if retrieval is not None and not retrieval.empty:
+        result = retrieval.iloc[0]
+        for metric, column in [
+            ("Precision@5", "precision"),
+            ("Evidence recall@5", "recall"),
+            ("F1@5", "f1"),
+            ("nDCG@5", "ndcg"),
+            ("Hit rate@5", "hit_rate"),
+            ("Complete-set hit@5", "complete_set_hit_rate"),
+            ("MAP@5", "MAP"),
+            ("MRR@5", "MRR"),
+        ]:
+            rows.append(
+                {
+                    "section": "Direct retrieval",
+                    "metric": metric,
+                    "value": float(result[column]),
+                    "n_pairs": int(result["n_queries"]),
+                    "scope": "Human-annotated queries",
+                }
+            )
+    if not robustness.empty:
+        result = robustness.iloc[0]
+        for metric, column in [
+            ("Answer-label stability", "label_stability_rate"),
+            ("Exact-text stability", "answer_text_stability_rate"),
+            ("Answer-score stability", "score_stability_rate"),
+            ("Citation-set stability", "citation_set_stability_rate"),
+        ]:
+            rows.append(
+                {
+                    "section": "Robustness",
+                    "metric": metric,
+                    "value": float(result[column]),
+                    "n_pairs": int(result["n_pairs"]),
+                    "scope": "Repeated report-question pairs",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 def build_question_summary(answers: pd.DataFrame) -> pd.DataFrame:
     """Summarize all answer categories and score variation by configuration."""
     working = answers.copy()
@@ -880,6 +1029,207 @@ def plot_answer_confusion_matrix(
     plt.close(fig)
 
 
+def plot_answer_label_robustness(
+    answers: pd.DataFrame,
+    output_dir: Path,
+) -> None:
+    """Plot categorical composition and exact run-to-run answer stability."""
+    working = answers.copy()
+    working["answer_label"] = [
+        normalize_answer_label(binary, answer)
+        for binary, answer in zip(
+            working["answer_yes_no"],
+            working["answer"],
+            strict=True,
+        )
+    ]
+    label_order = ["Yes", "No", "Unclear", "Not disclosed", "Other"]
+    run_counts = (
+        pd.crosstab(working["run_id"], working["answer_label"]).reindex(columns=label_order, fill_value=0).sort_index()
+    )
+    summary = build_answer_robustness_summary(answers).iloc[0]
+    colors = {
+        "Yes": "#4C78A8",
+        "No": "#F58518",
+        "Unclear": "#B279A2",
+        "Not disclosed": "#E45756",
+        "Other": "#9D9D9D",
+    }
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5.3))
+    bottom = np.zeros(len(run_counts))
+    for label in label_order:
+        values = run_counts[label].to_numpy()
+        if not values.any():
+            continue
+        axes[0].bar(
+            [f"Run {int(run_id)}" for run_id in run_counts.index],
+            values,
+            bottom=bottom,
+            label=label,
+            color=colors[label],
+        )
+        bottom += values
+    axes[0].set(
+        title="A. Answer-label composition by run",
+        xlabel="Repeated analysis",
+        ylabel="Report-question pairs",
+    )
+    axes[0].legend(title="OSA answer")
+    stability_metrics = [
+        ("Answer\nlabel", "label_stability_rate"),
+        ("Exact answer\ntext", "answer_text_stability_rate"),
+        ("Answer\nscore", "score_stability_rate"),
+        ("Citation\nset", "citation_set_stability_rate"),
+    ]
+    bars = axes[1].bar(
+        [label for label, _ in stability_metrics],
+        [summary[column] for _, column in stability_metrics],
+        color="#54A24B",
+        alpha=0.85,
+    )
+    axes[1].bar_label(
+        bars,
+        labels=[f"{summary[column]:.0%}" for _, column in stability_metrics],
+        padding=3,
+    )
+    axes[1].set(
+        title="B. Exact stability across repeated runs",
+        xlabel="Output component",
+        ylabel="Pairs with identical output",
+        ylim=(0, 1.08),
+    )
+    axes[1].yaxis.set_major_formatter(PercentFormatter(1))
+    for ax in axes:
+        ax.grid(axis="y", alpha=0.25)
+    fig.suptitle(
+        "OSA Yes/No/Unclear robustness",
+        fontsize=14,
+        fontweight="bold",
+    )
+    fig.tight_layout()
+    fig.savefig(output_dir / "answer_label_robustness.png", dpi=200)
+    plt.close(fig)
+
+
+def plot_answer_robustness_metrics_table(
+    metrics: pd.DataFrame,
+    output_dir: Path,
+) -> None:
+    """Render exact robustness counts as a publication-ready table."""
+    if metrics.empty:
+        return
+    selected = metrics[metrics["config_id"] == metrics.iloc[0]["config_id"]]
+    cells = [
+        [
+            row.metric,
+            f"{int(row.stable_pairs)}/{int(row.total_pairs)}",
+            str(int(row.changed_pairs)),
+            f"{row.stability_rate:.1%}",
+        ]
+        for row in selected.itertuples(index=False)
+    ]
+    fig, ax = plt.subplots(figsize=(8.5, 2.8))
+    ax.axis("off")
+    table = ax.table(
+        cellText=cells,
+        colLabels=[
+            "Output component",
+            "Stable pairs",
+            "Changed pairs",
+            "Stability rate",
+        ],
+        cellLoc="center",
+        colLoc="center",
+        loc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 1.55)
+    for column in range(4):
+        table[(0, column)].set_facecolor("#4C78A8")
+        table[(0, column)].set_text_props(color="white", weight="bold")
+    for row in range(1, len(cells) + 1):
+        table[(row, 0)].set_text_props(ha="left")
+        if row % 2 == 0:
+            for column in range(4):
+                table[(row, column)].set_facecolor("#F2F2F2")
+    ax.set_title(
+        "OSA robustness metrics across repeated runs",
+        fontsize=13,
+        fontweight="bold",
+        pad=12,
+    )
+    fig.tight_layout()
+    fig.savefig(
+        output_dir / "answer_robustness_metrics_table.png",
+        dpi=200,
+        bbox_inches="tight",
+    )
+    plt.close(fig)
+
+
+def plot_all_evaluation_metrics_table(
+    metrics: pd.DataFrame,
+    output_dir: Path,
+) -> None:
+    """Render one table containing all primary evaluation metrics."""
+    if metrics.empty:
+        return
+    cells = [
+        [
+            row.section,
+            row.metric,
+            f"{row.value:.1%}",
+            str(int(row.n_pairs)),
+            row.scope,
+        ]
+        for row in metrics.itertuples(index=False)
+    ]
+    fig, ax = plt.subplots(figsize=(12, 10))
+    ax.axis("off")
+    table = ax.table(
+        cellText=cells,
+        colLabels=["Section", "Metric", "Value", "N", "Evaluation scope"],
+        cellLoc="center",
+        colLoc="center",
+        colWidths=[0.15, 0.25, 0.1, 0.08, 0.32],
+        loc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9.5)
+    table.scale(1, 1.35)
+    for column in range(5):
+        table[(0, column)].set_facecolor("#355C7D")
+        table[(0, column)].set_text_props(color="white", weight="bold")
+    section_colors = {
+        "Classification": "#EAF2F8",
+        "Direct retrieval": "#FEF1E6",
+        "Robustness": "#EAF5E7",
+    }
+    for row_index, row in enumerate(
+        metrics.itertuples(index=False),
+        start=1,
+    ):
+        for column in range(5):
+            table[(row_index, column)].set_facecolor(section_colors[row.section])
+        table[(row_index, 0)].set_text_props(weight="bold", ha="left")
+        table[(row_index, 1)].set_text_props(ha="left")
+        table[(row_index, 4)].set_text_props(ha="left")
+    ax.set_title(
+        "OSA evaluation metrics",
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+    fig.tight_layout()
+    fig.savefig(
+        output_dir / "all_evaluation_metrics_table.png",
+        dpi=200,
+        bbox_inches="tight",
+    )
+    plt.close(fig)
+
+
 def plot_overall_performance_metrics(
     classification: pd.DataFrame,
     retrieval: pd.DataFrame | None,
@@ -1414,6 +1764,8 @@ def analyze(
         "chunk_rows": chunks,
         "question_configuration_summary": question_summary,
         "pair_classifications": pair_classifications,
+        "answer_robustness_summary": build_answer_robustness_summary(answers),
+        "answer_robustness_metrics": build_answer_robustness_metrics(answers),
         "overall_classification_metrics": (build_overall_classification_metrics(answers)),
         "retrieved_chunk_consistency": retrieved,
         "citation_consistency": citations,
@@ -1436,6 +1788,11 @@ def analyze(
                 benchmark_question_set,
             )
         )
+    frames["all_evaluation_metrics"] = build_all_evaluation_metrics(
+        frames["overall_classification_metrics"],
+        frames["answer_robustness_summary"],
+        frames.get("direct_ranking_summary"),
+    )
     write_outputs(output_dir, frames)
     plot_configuration_heatmaps(
         answers,
@@ -1453,6 +1810,15 @@ def analyze(
         output_dir,
     )
     plot_answer_confusion_matrix(answers, output_dir)
+    plot_answer_label_robustness(answers, output_dir)
+    plot_answer_robustness_metrics_table(
+        frames["answer_robustness_metrics"],
+        output_dir,
+    )
+    plot_all_evaluation_metrics_table(
+        frames["all_evaluation_metrics"],
+        output_dir,
+    )
     plot_overall_performance_metrics(
         frames["overall_classification_metrics"],
         frames.get("direct_ranking_summary"),

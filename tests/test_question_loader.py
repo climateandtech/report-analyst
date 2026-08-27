@@ -341,11 +341,12 @@ class TestQuestionSetLoader:
             "lucia",
             "climretrieve",
             "climretrieve_complete",
+            "climretrieve_complete_6",
             "custom",
         }
         assert set(question_set_options) == expected_sets
-        # 7 real sets + "custom" UI option
-        assert len(question_set_options) == 8
+        # 8 real sets + "custom" UI option
+        assert len(question_set_options) == 9
         assert "custom" in question_set_options
         assert "everest" in question_set_options
         assert "tcfd" in question_set_options
@@ -397,11 +398,12 @@ class TestQuestionSetLoader:
             "lucia",
             "climretrieve",
             "climretrieve_complete",
+            "climretrieve_complete_6",
         ]
         for expected_set in expected_sets:
             assert expected_set in options1, f"Expected question set '{expected_set}' not found in options"
 
-        assert len(options1) == 7
+        assert len(options1) == 8
 
 
 TYPED_ANSWER_QUESTIONSET = {

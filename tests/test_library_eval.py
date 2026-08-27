@@ -62,6 +62,13 @@ def test_match_question_aligns_near_duplicate_wording():
     assert match_question(osa, clim) == clim[0]
 
 
+def test_match_question_prefers_exact_match_over_earlier_fuzzy_match():
+    exact = "Do company targets reference external adaptation goals?"
+    fuzzy = "Do company targets align with external adaptation goals?"
+
+    assert match_question(exact, [fuzzy, exact], min_jaccard=0.5) == exact
+
+
 def test_select_labelled_reports_prefers_named_pdfs_and_requires_labels():
     pdfs = [
         "CT REIT 2022 ESG Report.pdf",

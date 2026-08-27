@@ -118,6 +118,7 @@ def match_question(osa_question: str, climretrieve_questions: Sequence[str], *, 
     for question in climretrieve_questions:
         if normalize_text(question) == osa_norm:
             return question
+    for question in climretrieve_questions:
         if token_jaccard(osa_question, question) >= min_jaccard:
             return question
     return None
@@ -364,9 +365,7 @@ def _apply_split_ground_truth_hits(
                 "match_jaccard": match.jaccard,
                 "retrieved_coverage": match.retrieved_coverage,
                 "ground_truth_coverage": match.ground_truth_coverage,
-                "split_component_ranks": "|".join(
-                    str(rows[index]["position"]) for index in component_indices
-                ),
+                "split_component_ranks": "|".join(str(rows[index]["position"]) for index in component_indices),
             }
         )
         matched_ids.add(ground_truth_id)
@@ -381,9 +380,7 @@ def build_retrieval_match_table(
     if retrieval_rows.empty or ground_truth.empty:
         return pd.DataFrame()
     config_columns = [
-        column
-        for column in ("config_id", "chunk_size", "chunk_overlap", "top_k")
-        if column in retrieval_rows.columns
+        column for column in ("config_id", "chunk_size", "chunk_overlap", "top_k") if column in retrieval_rows.columns
     ]
     matches: list[dict[str, Any]] = []
     group_columns = [*config_columns, "query_id"]
@@ -468,9 +465,7 @@ def query_match_metrics(
         return pd.DataFrame()
     match_table = build_retrieval_match_table(retrieval_rows, ground_truth) if matches is None else matches
     config_columns = [
-        column
-        for column in ("config_id", "chunk_size", "chunk_overlap", "top_k")
-        if column in retrieval_rows.columns
+        column for column in ("config_id", "chunk_size", "chunk_overlap", "top_k") if column in retrieval_rows.columns
     ]
     query_columns = ["query_id", "document", "question"]
     rows: list[dict[str, Any]] = []
@@ -499,9 +494,7 @@ def query_match_metrics(
                 "strict_recall": hit_count / n_ground_truth if n_ground_truth else 0.0,
                 "complete_set_hit": bool(n_ground_truth and hit_count == n_ground_truth),
                 "exact_hit_count": (
-                    int((evidence_hits["match_relation"] == MatchRelation.EXACT.value).sum())
-                    if not evidence_hits.empty
-                    else 0
+                    int((evidence_hits["match_relation"] == MatchRelation.EXACT.value).sum()) if not evidence_hits.empty else 0
                 ),
                 "contained_hit_count": int(
                     (evidence_hits["match_relation"] == MatchRelation.RETRIEVED_CONTAINS_GROUND_TRUTH.value).sum()
@@ -509,16 +502,11 @@ def query_match_metrics(
                 if not evidence_hits.empty
                 else 0,
                 "split_hit_count": int(
-                    (
-                        evidence_hits["match_relation"]
-                        == MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED.value
-                    ).sum()
+                    (evidence_hits["match_relation"] == MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED.value).sum()
                 )
                 if not evidence_hits.empty
                 else 0,
-                "partial_candidate_count": int(
-                    (group["match_relation"] == MatchRelation.PARTIAL_OVERLAP.value).sum()
-                ),
+                "partial_candidate_count": int((group["match_relation"] == MatchRelation.PARTIAL_OVERLAP.value).sum()),
                 "mean_hit_retrieved_coverage": (
                     evidence_hits["retrieved_coverage"].mean() if not evidence_hits.empty else float("nan")
                 ),
@@ -548,9 +536,7 @@ def summarize_query_match_metrics(query_metrics: pd.DataFrame) -> pd.DataFrame:
     if query_metrics.empty:
         return pd.DataFrame()
     config_columns = [
-        column
-        for column in ("config_id", "chunk_size", "chunk_overlap", "top_k")
-        if column in query_metrics.columns
+        column for column in ("config_id", "chunk_size", "chunk_overlap", "top_k") if column in query_metrics.columns
     ]
     grouped = query_metrics.groupby(config_columns, dropna=False) if config_columns else [((), query_metrics)]
     rows: list[dict[str, Any]] = []
@@ -589,9 +575,7 @@ def ranked_query_metrics(
     retrieval_matches = build_retrieval_match_table(retrieval_rows, ground_truth) if matches is None else matches
     ideal_matches = retrieval_matches if corpus_matches is None else corpus_matches
     config_columns = [
-        column
-        for column in ("config_id", "chunk_size", "chunk_overlap", "top_k")
-        if column in retrieval_rows.columns
+        column for column in ("config_id", "chunk_size", "chunk_overlap", "top_k") if column in retrieval_rows.columns
     ]
     query_columns = ["query_id", "document", "question"]
     rows: list[dict[str, Any]] = []
@@ -603,9 +587,7 @@ def ranked_query_metrics(
             continue
         query_matches = _match_rows_for_dimensions(retrieval_matches, dimensions, config_columns)
         rank_gains = (
-            query_matches.groupby("retrieval_position")["relevance_grade"].max().to_dict()
-            if not query_matches.empty
-            else {}
+            query_matches.groupby("retrieval_position")["relevance_grade"].max().to_dict() if not query_matches.empty else {}
         )
         ranked_gains: list[float] = []
         for result in group.sort_values("position").itertuples(index=False):
@@ -660,9 +642,7 @@ def summarize_ranked_query_metrics(query_metrics: pd.DataFrame) -> pd.DataFrame:
     if query_metrics.empty:
         return pd.DataFrame()
     dimensions = [
-        column
-        for column in ("config_id", "chunk_size", "chunk_overlap", "top_k", "k")
-        if column in query_metrics.columns
+        column for column in ("config_id", "chunk_size", "chunk_overlap", "top_k", "k") if column in query_metrics.columns
     ]
     return (
         query_metrics.groupby(dimensions, dropna=False)
@@ -751,9 +731,7 @@ def build_overlap_table(
         if matches is None:
             osa_ids = set(osa_group.loc[osa_group["matched_climretrieve"], "chunk_id"].astype(str))
         else:
-            osa_ids = set(
-                matches.loc[matches["query_id"] == query_id, "ground_truth_chunk_id"].astype(str)
-            )
+            osa_ids = set(matches.loc[matches["query_id"] == query_id, "ground_truth_chunk_id"].astype(str))
         rows.append(overlap_row(gt_ids, osa_ids, query_id=str(query_id), document=document, question=question))
     return pd.DataFrame(rows)
 
@@ -963,12 +941,8 @@ def question_configuration_summary(runs: pd.DataFrame) -> pd.DataFrame:
     working["answer_score_numeric"] = working["answer_score"].map(parse_osa_score)
     if "answer_yes_no" not in working.columns:
         working["answer_yes_no"] = working["answer"].map(parse_yes_no_answer)
-    working["answer_yes_no"] = working["answer_yes_no"].map(
-        lambda value: None if pd.isna(value) else _coerce_bool(value)
-    )
-    working["expert_yes_no"] = working["expert_yes_no"].map(
-        lambda value: None if pd.isna(value) else _coerce_bool(value)
-    )
+    working["answer_yes_no"] = working["answer_yes_no"].map(lambda value: None if pd.isna(value) else _coerce_bool(value))
+    working["expert_yes_no"] = working["expert_yes_no"].map(lambda value: None if pd.isna(value) else _coerce_bool(value))
     rows: list[dict[str, Any]] = []
     group_columns = ["document", "question", "config_id", "chunk_size", "top_k"]
     for key, group in working.groupby(group_columns, dropna=False):
@@ -981,21 +955,12 @@ def question_configuration_summary(runs: pd.DataFrame) -> pd.DataFrame:
                 "n_runs": len(group),
                 "mean_answer_score": group["answer_score_numeric"].mean(),
                 "answer_score_std": group["answer_score_numeric"].std(),
-                "modal_answer": (
-                    ("Yes" if bool(modal.iloc[0]) else "No") if not modal.empty else "Unclear"
-                ),
+                "modal_answer": (("Yes" if bool(modal.iloc[0]) else "No") if not modal.empty else "Unclear"),
                 "answer_agreement": (
-                    float(predictions.value_counts(normalize=True).iloc[0])
-                    if not predictions.empty
-                    else float("nan")
+                    float(predictions.value_counts(normalize=True).iloc[0]) if not predictions.empty else float("nan")
                 ),
                 "answer_accuracy": (
-                    float(
-                        (
-                            comparable["expert_yes_no"]
-                            == comparable["answer_yes_no"]
-                        ).mean()
-                    )
+                    float((comparable["expert_yes_no"] == comparable["answer_yes_no"]).mean())
                     if not comparable.empty
                     else float("nan")
                 ),
@@ -1072,11 +1037,7 @@ def pairwise_chunk_selection(runs: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     grouped = runs.groupby(["document", "question", "config_id"], dropna=False)
     for (document, question, config_id), group in grouped:
-        dimensions = {
-            key: group[key].iloc[0]
-            for key in ("chunk_size", "top_k")
-            if key in group.columns
-        }
+        dimensions = {key: group[key].iloc[0] for key in ("chunk_size", "top_k") if key in group.columns}
         run_sets = [
             (row.run_id, _split_ids(row.retrieved_chunk_ids))
             for row in group[["run_id", "retrieved_chunk_ids"]].itertuples(index=False)

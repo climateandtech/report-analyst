@@ -84,7 +84,11 @@ def load_labels(path: Path) -> pd.DataFrame:
     raise ValueError(f"Unsupported labels format: {path.suffix}")
 
 
-def map_questions(labels: pd.DataFrame, question_set: str, limit: int) -> pd.DataFrame:
+def map_questions(
+    labels: pd.DataFrame,
+    question_set: str,
+    limit: int | None,
+) -> pd.DataFrame:
     osa_questions = get_question_loader().get_questions(question_set)
     clim_questions = sorted(labels["question"].dropna().unique())
     rows = []
@@ -99,7 +103,8 @@ def map_questions(labels: pd.DataFrame, question_set: str, limit: int) -> pd.Dat
                     "climretrieve_question": clim_question,
                 }
             )
-    return pd.DataFrame(rows).drop_duplicates("climretrieve_question").head(limit)
+    mapped = pd.DataFrame(rows).drop_duplicates("climretrieve_question")
+    return mapped.head(limit) if limit is not None else mapped
 
 
 def load_configured_documents(question_set: str) -> list[str]:
@@ -255,7 +260,11 @@ async def run_evaluation(args: argparse.Namespace) -> None:
         if configured_documents
         else select_labelled_reports(raw_labels, pdf_names, n=args.reports)
     )
-    questions = map_questions(labels, args.question_set, args.questions)
+    questions = map_questions(
+        labels,
+        args.question_set,
+        None if configured_documents else args.questions,
+    )
     if reports.empty:
         raise RuntimeError("No labelled reports matched PDFs in --reports-dir")
     if questions.empty:

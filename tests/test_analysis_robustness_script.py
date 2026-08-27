@@ -6,10 +6,35 @@ import pandas as pd
 import pytest
 from scripts.evaluate_analysis_robustness import (
     checkpoint_run,
+    load_configured_documents,
+    map_questions,
     select_configured_reports,
     summarize_evaluation,
     validate_complete_matrix,
 )
+
+from report_analyst.core.question_loader import get_question_loader
+
+
+@pytest.mark.parametrize(
+    ("question_set", "expected_reports"),
+    [
+        ("climretrieve_complete", 13),
+        ("climretrieve_complete_6", 8),
+    ],
+)
+def test_complete_benchmark_profiles_have_configured_reports(
+    question_set,
+    expected_reports,
+):
+    assert len(load_configured_documents(question_set)) == expected_reports
+
+
+def test_complete_profile_maps_all_questions_without_limit():
+    configured = get_question_loader().get_questions("climretrieve_complete_6")
+    labels = pd.DataFrame({"question": [question["text"] for question in configured.values()]})
+
+    assert len(map_questions(labels, "climretrieve_complete_6", limit=None)) == 6
 
 
 def test_checkpoint_run_persists_each_result_before_next_run(tmp_path):
