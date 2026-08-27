@@ -217,9 +217,9 @@ class TestQuestionSetLoader:
         for qset_id, expected_shortcut in expected_shortcuts.items():
             if qset_id in question_sets:
                 qset = question_sets[qset_id]
-                assert (
-                    qset.shortcut == expected_shortcut
-                ), f"Expected {qset_id} to have shortcut '{expected_shortcut}', got '{qset.shortcut}'"
+                assert qset.shortcut == expected_shortcut, (
+                    f"Expected {qset_id} to have shortcut '{expected_shortcut}', got '{qset.shortcut}'"
+                )
 
     def test_get_question_set_methods(self):
         """Test various getter methods"""
@@ -340,11 +340,12 @@ class TestQuestionSetLoader:
             "kilimanjaro",
             "lucia",
             "climretrieve",
+            "climretrieve_complete",
             "custom",
         }
         assert set(question_set_options) == expected_sets
-        # 6 real sets + "custom" UI option
-        assert len(question_set_options) == 7
+        # 7 real sets + "custom" UI option
+        assert len(question_set_options) == 8
         assert "custom" in question_set_options
         assert "everest" in question_set_options
         assert "tcfd" in question_set_options
@@ -395,11 +396,12 @@ class TestQuestionSetLoader:
             "kilimanjaro",
             "lucia",
             "climretrieve",
+            "climretrieve_complete",
         ]
         for expected_set in expected_sets:
             assert expected_set in options1, f"Expected question set '{expected_set}' not found in options"
 
-        assert len(options1) == 6
+        assert len(options1) == 7
 
 
 TYPED_ANSWER_QUESTIONSET = {
@@ -510,8 +512,5 @@ def test_climretrieve_core_questions_require_classification_answers():
     questions = QuestionSetLoader().get_questions("climretrieve")
     core_questions = [questions[f"climretr_{index}"] for index in range(1, 17)]
 
-    assert all(
-        question["guidelines"].startswith("- ANSWER type: classification")
-        for question in core_questions
-    )
+    assert all(question["guidelines"].startswith("- ANSWER type: classification") for question in core_questions)
     assert questions["climretr_17_ir"]["guidelines"] == ""
