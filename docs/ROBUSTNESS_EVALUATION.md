@@ -1,17 +1,50 @@
 # Repeated-analysis robustness evaluation
 
-Run the same report questions `N` times without using stored analysis answers:
+Download the exact PDFs for a configured benchmark profile:
+
+```bash
+PYTHONPATH=. ./venv/bin/python scripts/download_climretrieve_reports.py \
+  --question-set climretrieve_complete \
+  --output-dir notebooks/data/climretrieve_pdfs
+```
+
+Use `climretrieve_complete` for 13 reports × 5 questions or
+`climretrieve_complete_6` for 8 reports × 6 questions. The downloader reads the
+authoritative report list from the question-set YAML, skips existing files,
+validates the PDF header, and replaces files atomically. Pass `--overwrite` to
+download existing files again.
+
+Configured profiles use exact ClimRetrieve question text and fail before any
+LLM calls when a report PDF, source document, question, or human-labelled
+report-question pair is missing.
+
+Run the same report questions `N` times without using stored analysis answers.
+Keep top-k and chunk-size experiments separate so only one factor changes.
+
+Top-k experiment, with chunk size fixed at 200:
 
 ```bash
 PYTHONPATH=. ./venv/bin/python scripts/evaluate_analysis_robustness.py \
   --labels notebooks/data/ClimRetrieve_base.xlsx \
   --reports-dir notebooks/data/climretrieve_pdfs \
-  --output-dir evaluation_output \
-  --runs 5 \
+  --output-dir evaluation_output/topk \
+  --question-set climretrieve_complete \
+  --runs 3 \
   --top-k 5 10 \
-  --chunk-sizes 300 500 800 \
-  --reports 10 \
-  --questions 16
+  --chunk-size 200
+```
+
+Chunk-size experiment, with top-k fixed at 5:
+
+```bash
+PYTHONPATH=. ./venv/bin/python scripts/evaluate_analysis_robustness.py \
+  --labels notebooks/data/ClimRetrieve_base.xlsx \
+  --reports-dir notebooks/data/climretrieve_pdfs \
+  --output-dir evaluation_output/chunk-size \
+  --question-set climretrieve_complete \
+  --runs 3 \
+  --top-k 5 \
+  --chunk-sizes 200 400
 ```
 
 Set `OPENAI_API_KEY` or `GOOGLE_API_KEY` first. Use `--model` to override the
