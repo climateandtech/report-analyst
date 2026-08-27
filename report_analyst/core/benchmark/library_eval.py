@@ -227,6 +227,37 @@ def _chunk_order(chunk: Mapping[str, Any]) -> int | None:
         return None
 
 
+def build_chunk_dataset_rows(
+    chunks: Sequence[Mapping[str, Any]],
+    *,
+    document: str,
+    pdf_filename: str,
+    config_id: str,
+    chunk_size: int,
+    chunk_overlap: int,
+) -> pd.DataFrame:
+    """Flatten generated document chunks without storing embedding vectors."""
+    rows = []
+    for fallback_order, chunk in enumerate(chunks):
+        text = _chunk_text(chunk)
+        metadata = chunk.get("metadata") or {}
+        chunk_order = _chunk_order(chunk)
+        rows.append(
+            {
+                "document": document,
+                "pdf_filename": pdf_filename,
+                "config_id": config_id,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "chunk_id": generate_chunk_id(text),
+                "chunk_order": chunk_order if chunk_order is not None else fallback_order,
+                "page": metadata.get("page") or metadata.get("page_number") or metadata.get("source"),
+                "chunk_text": text,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def match_retrieved_to_ground_truth(
     retrieved_text: str,
     gt_rows: pd.DataFrame,
@@ -908,6 +939,70 @@ def yes_no_answer_comparison(runs: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
             }
         )
     return detail, pd.DataFrame(rows)
+
+
+def question_configuration_summary(runs: pd.DataFrame) -> pd.DataFrame:
+    """Summarize answer quality and stability for question-by-config heatmaps."""
+    columns = [
+        "document",
+        "question",
+        "config_id",
+        "chunk_size",
+        "top_k",
+        "n_runs",
+        "mean_answer_score",
+        "answer_score_std",
+        "modal_answer",
+        "answer_agreement",
+        "answer_accuracy",
+        "n_scored_answers",
+    ]
+    if runs.empty:
+        return pd.DataFrame(columns=columns)
+    working = runs.copy()
+    working["answer_score_numeric"] = working["answer_score"].map(parse_osa_score)
+    if "answer_yes_no" not in working.columns:
+        working["answer_yes_no"] = working["answer"].map(parse_yes_no_answer)
+    working["answer_yes_no"] = working["answer_yes_no"].map(
+        lambda value: None if pd.isna(value) else _coerce_bool(value)
+    )
+    working["expert_yes_no"] = working["expert_yes_no"].map(
+        lambda value: None if pd.isna(value) else _coerce_bool(value)
+    )
+    rows: list[dict[str, Any]] = []
+    group_columns = ["document", "question", "config_id", "chunk_size", "top_k"]
+    for key, group in working.groupby(group_columns, dropna=False):
+        predictions = group["answer_yes_no"].dropna()
+        modal = predictions.mode()
+        comparable = group.dropna(subset=["expert_yes_no", "answer_yes_no"])
+        rows.append(
+            {
+                **dict(zip(group_columns, key, strict=True)),
+                "n_runs": len(group),
+                "mean_answer_score": group["answer_score_numeric"].mean(),
+                "answer_score_std": group["answer_score_numeric"].std(),
+                "modal_answer": (
+                    ("Yes" if bool(modal.iloc[0]) else "No") if not modal.empty else "Unclear"
+                ),
+                "answer_agreement": (
+                    float(predictions.value_counts(normalize=True).iloc[0])
+                    if not predictions.empty
+                    else float("nan")
+                ),
+                "answer_accuracy": (
+                    float(
+                        (
+                            comparable["expert_yes_no"]
+                            == comparable["answer_yes_no"]
+                        ).mean()
+                    )
+                    if not comparable.empty
+                    else float("nan")
+                ),
+                "n_scored_answers": len(comparable),
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
 
 
 def _coerce_bool(value: Any) -> bool:

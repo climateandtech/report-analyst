@@ -6,6 +6,7 @@ import pandas as pd
 
 from report_analyst.core.benchmark.dataset_mapper import generate_chunk_id, generate_query_id
 from report_analyst.core.benchmark.library_eval import (
+    build_chunk_dataset_rows,
     build_climretrieve_answer_rows,
     build_ground_truth_rows,
     build_osa_retrieval_rows,
@@ -96,6 +97,29 @@ def test_build_osa_retrieval_rows_matches_overlapping_chunk():
     assert bool(osa.loc[0, "matched_climretrieve"]) is True
     assert osa.loc[0, "chunk_id"] == generate_chunk_id("Net-zero by 2050 for operations.")
     assert bool(osa.loc[1, "matched_climretrieve"]) is False
+
+
+def test_build_chunk_dataset_rows_exports_text_without_embeddings():
+    rows = build_chunk_dataset_rows(
+        [
+            {
+                "text": "First generated chunk.",
+                "embedding": [0.1, 0.2],
+                "metadata": {"chunk_order": 4, "page": 7},
+            },
+            {"text": "Second generated chunk.", "metadata": {}},
+        ],
+        document="Report",
+        pdf_filename="report.pdf",
+        config_id="cs200",
+        chunk_size=200,
+        chunk_overlap=20,
+    )
+
+    assert rows["chunk_order"].tolist() == [4, 1]
+    assert rows["page"].iloc[0] == 7
+    assert "embedding" not in rows.columns
+    assert rows["chunk_id"].nunique() == 2
 
 
 def test_match_table_preserves_all_ground_truth_spans_for_the_query():

@@ -15,6 +15,7 @@ from report_analyst.core.benchmark.library_eval import (
     citations_are_subset,
     generate_run_uid,
     pairwise_chunk_selection,
+    question_configuration_summary,
     retrieved_chunk_consistency,
     score_distribution_summary,
     score_range,
@@ -166,3 +167,25 @@ def test_yes_no_answer_comparison_scores_only_explicit_labels():
 
     assert len(detail) == 2
     assert metrics.loc[0, "accuracy"] == 0.5
+
+
+def test_question_configuration_summary_is_heatmap_ready():
+    runs = pd.DataFrame(
+        {
+            "document": ["R1"] * 6,
+            "question": ["Q1"] * 6,
+            "config_id": ["cs200_k5"] * 3 + ["cs400_k10"] * 3,
+            "chunk_size": [200] * 3 + [400] * 3,
+            "top_k": [5] * 3 + [10] * 3,
+            "answer_score": [6, 8, 7, 8, 9, 10],
+            "answer": ["Yes", "Yes", "No", "Yes", "Yes", "Yes"],
+            "expert_yes_no": [True] * 6,
+        }
+    )
+
+    summary = question_configuration_summary(runs).set_index("config_id")
+
+    assert set(summary.index) == {"cs200_k5", "cs400_k10"}
+    assert summary.loc["cs200_k5", "answer_accuracy"] == 2 / 3
+    assert summary.loc["cs200_k5", "answer_agreement"] == 2 / 3
+    assert summary.loc["cs400_k10", "modal_answer"] == "Yes"
