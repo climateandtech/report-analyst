@@ -14,6 +14,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import yaml
 from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -27,6 +28,7 @@ from report_analyst.core.benchmark.library_eval import (
     citation_subset_rate,
     combine_analysis_run_rows,
     filter_core_questions,
+    match_document_to_pdf,
     match_question,
     normalize_climretrieve_columns,
     pairwise_chunk_selection,
@@ -47,6 +49,7 @@ CHECKPOINT_FILES = (
     "evaluation_manifest.json",
     "raw_analysis_runs.jsonl",
 )
+QUESTION_SET_DIRECTORY = Path(__file__).parent.parent / "report_analyst" / "questionsets"
 
 
 def parse_args() -> argparse.Namespace:
@@ -97,6 +100,68 @@ def map_questions(labels: pd.DataFrame, question_set: str, limit: int) -> pd.Dat
                 }
             )
     return pd.DataFrame(rows).drop_duplicates("climretrieve_question").head(limit)
+
+
+def load_configured_documents(question_set: str) -> list[str]:
+    """Read an optional authoritative document list from a question set."""
+    path = QUESTION_SET_DIRECTORY / f"{question_set}_questions.yaml"
+    if not path.exists():
+        return []
+    with path.open() as handle:
+        config = yaml.safe_load(handle)
+    documents = config.get("documents", [])
+    if len(documents) != len(set(documents)):
+        raise ValueError(f"Duplicate documents in {path}")
+    return documents
+
+
+def select_configured_reports(
+    labels: pd.DataFrame,
+    pdf_filenames: list[str],
+    documents: list[str],
+) -> pd.DataFrame:
+    """Resolve every configured document or fail before evaluation starts."""
+    normalized = filter_core_questions(normalize_climretrieve_columns(labels))
+    counts = normalized.groupby("document").size().to_dict()
+    missing_labels = [document for document in documents if document not in counts]
+    rows = []
+    missing_pdfs = []
+    for document in documents:
+        pdf_filename = match_document_to_pdf(document, pdf_filenames)
+        if pdf_filename is None:
+            missing_pdfs.append(document)
+            continue
+        rows.append(
+            {
+                "document": document,
+                "pdf_filename": pdf_filename,
+                "n_labels": int(counts.get(document, 0)),
+                "configured": True,
+            }
+        )
+    errors = []
+    if missing_labels:
+        errors.append("missing from ClimRetrieve labels: " + ", ".join(missing_labels))
+    if missing_pdfs:
+        errors.append("missing PDFs: " + ", ".join(missing_pdfs))
+    if errors:
+        raise RuntimeError("Configured benchmark reports are incomplete; " + "; ".join(errors))
+    return pd.DataFrame(rows)
+
+
+def validate_complete_matrix(
+    labels: pd.DataFrame,
+    reports: pd.DataFrame,
+    questions: pd.DataFrame,
+) -> None:
+    """Require a human-labelled row for every configured report/question."""
+    available = set(labels[["document", "question"]].drop_duplicates().itertuples(index=False, name=None))
+    expected = {(document, question) for document in reports["document"] for question in questions["climretrieve_question"]}
+    missing = sorted(expected - available)
+    if missing:
+        preview = ", ".join(f"{document} / {question}" for document, question in missing[:3])
+        suffix = f" (+{len(missing) - 3} more)" if len(missing) > 3 else ""
+        raise RuntimeError(f"Configured benchmark matrix is missing {len(missing)} human-labelled pairs: {preview}{suffix}")
 
 
 def prepare_output(directory: Path, overwrite: bool) -> None:
@@ -180,12 +245,23 @@ async def run_evaluation(args: argparse.Namespace) -> None:
     raw_labels = load_labels(args.labels)
     labels = filter_core_questions(normalize_climretrieve_columns(raw_labels))
     pdf_names = sorted(path.name for path in args.reports_dir.glob("*.pdf"))
-    reports = select_labelled_reports(raw_labels, pdf_names, n=args.reports)
+    configured_documents = load_configured_documents(args.question_set)
+    reports = (
+        select_configured_reports(
+            raw_labels,
+            pdf_names,
+            configured_documents,
+        )
+        if configured_documents
+        else select_labelled_reports(raw_labels, pdf_names, n=args.reports)
+    )
     questions = map_questions(labels, args.question_set, args.questions)
     if reports.empty:
         raise RuntimeError("No labelled reports matched PDFs in --reports-dir")
     if questions.empty:
         raise RuntimeError(f"No {args.question_set} questions matched ClimRetrieve labels")
+    if configured_documents:
+        validate_complete_matrix(labels, reports, questions)
 
     reports.to_csv(args.output_dir / "selected_reports.csv", index=False)
     questions.to_csv(args.output_dir / "question_map.csv", index=False)
@@ -198,10 +274,7 @@ async def run_evaluation(args: argparse.Namespace) -> None:
         questions["climretrieve_question"].tolist(),
     )
     expert_answers.to_csv(args.output_dir / "climretrieve_answers.csv", index=False)
-    expert_lookup = {
-        (row.document, row.question): row
-        for row in expert_answers.itertuples(index=False)
-    }
+    expert_lookup = {(row.document, row.question): row for row in expert_answers.itertuples(index=False)}
 
     DocumentAnalyzer.reset_instance()
     analyzer = DocumentAnalyzer()
@@ -290,9 +363,7 @@ def _write_factor_deltas(
             score_frames.append(topk_score_delta(stability, low, high).assign(chunk_size=chunk_size))
             containment_frames.append(topk_retrieved_containment(runs, low, high).assign(chunk_size=chunk_size))
         pd.concat(score_frames, ignore_index=True).to_csv(output_dir / "topk_answer_score_delta.csv", index=False)
-        pd.concat(containment_frames, ignore_index=True).to_csv(
-            output_dir / "topk_retrieved_containment.csv", index=False
-        )
+        pd.concat(containment_frames, ignore_index=True).to_csv(output_dir / "topk_retrieved_containment.csv", index=False)
 
     if len(chunk_size_values) >= 2:
         low_size, high_size = chunk_size_values[:2]

@@ -3,7 +3,13 @@
 import json
 
 import pandas as pd
-from scripts.evaluate_analysis_robustness import checkpoint_run, summarize_evaluation
+import pytest
+from scripts.evaluate_analysis_robustness import (
+    checkpoint_run,
+    select_configured_reports,
+    summarize_evaluation,
+    validate_complete_matrix,
+)
 
 
 def test_checkpoint_run_persists_each_result_before_next_run(tmp_path):
@@ -87,3 +93,34 @@ def test_summaries_separate_topk_and_chunk_size_factors(tmp_path):
     assert len(ranges) == 4
     assert (tmp_path / "topk_answer_score_delta.csv").exists()
     assert (tmp_path / "chunk_size_answer_score_delta.csv").exists()
+
+
+def test_configured_reports_fail_when_a_pdf_is_missing():
+    labels = pd.DataFrame(
+        [
+            {
+                "Document": document,
+                "Question": "Question?",
+                "Relevant": "Evidence",
+                "Answer": "[YES].",
+                "Core 16 Question": 1,
+            }
+            for document in ("A.pdf", "B.pdf")
+        ]
+    )
+
+    with pytest.raises(RuntimeError, match=r"missing PDFs: B\.pdf"):
+        select_configured_reports(
+            labels,
+            ["A.pdf"],
+            ["A.pdf", "B.pdf"],
+        )
+
+
+def test_configured_reports_fail_when_human_label_pair_is_missing():
+    labels = pd.DataFrame([{"document": "A.pdf", "question": "Question one?"}])
+    reports = pd.DataFrame({"document": ["A.pdf"]})
+    questions = pd.DataFrame({"climretrieve_question": ["Question one?", "Question two?"]})
+
+    with pytest.raises(RuntimeError, match="missing 1 human-labelled pairs"):
+        validate_complete_matrix(labels, reports, questions)
