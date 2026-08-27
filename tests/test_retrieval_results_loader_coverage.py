@@ -58,14 +58,12 @@ def test_load_retrieval_results_from_sqlite_and_export():
         db_path = tmp.name
     try:
         conn = sqlite3.connect(db_path)
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE retrieval_results (
                 query_id TEXT, report_id TEXT, chunk_id TEXT, chunk_text TEXT,
                 position INTEGER, score REAL, similarity_score REAL, llm_score REAL
             )
-            """
-        )
+            """)
         conn.execute("INSERT INTO retrieval_results VALUES ('q1','r1','c1','t',1,0.9,0.8,0.7)")
         conn.commit()
         conn.close()
