@@ -137,8 +137,9 @@ class QuestionSetLoader:
         return list(self.get_question_sets().keys())
 
     def reload(self):
-        """Force reload of question sets"""
+        """Force reload of question sets (also re-reads QUESTIONSETS_PATH)."""
         self._question_sets = None
+        self._questionsets_paths = self._get_questionsets_paths()
         logger.info("[QUESTION_LOADER] Question sets cache cleared, will reload on next access")
 
 
