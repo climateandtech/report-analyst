@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from llama_index.core import Document
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 
 from .database_manager import DatabaseManager
 from .database_schema import indexes, metadata
@@ -625,85 +625,8 @@ class CacheManager:
                     result = json.loads(result_json)
                     results[question_id] = {
                         "result": result,
-                        "chunks": [],  # Will be populated from chunk_relevance
+                        "chunks": result.get("chunks", []),
                     }
-
-                # Now get the chunk information for each question
-                if results:
-                    chunk_query = text(
-                        """
-                            SELECT
-                                ac.question_id,
-                                dc.chunk_text,
-                                dc.metadata as chunk_metadata,
-                                cr.chunk_order,
-                                cr.similarity_score,
-                                cr.llm_score,
-                                cr.is_evidence,
-                                cr.evidence_order,
-                                cr.metadata as relevance_metadata
-                            FROM analysis_cache ac
-                            JOIN questions q ON q.question_id = ac.question_id
-                            JOIN question_analysis qa ON qa.question_id = q.id AND qa.file_path = ac.file_path
-                            JOIN chunk_relevance cr ON cr.question_analysis_id = qa.id
-                            JOIN document_chunks dc ON cr.document_chunk_id = dc.id
-                            WHERE ac.file_path = :file_path
-                            AND ac.chunk_size = :chunk_size
-                            AND ac.chunk_overlap = :chunk_overlap
-                            AND ac.top_k = :top_k
-                            AND ac.model = :model
-                            AND ac.question_set = :question_set
-                            AND ac.question_id IN :question_ids
-                            ORDER BY ac.question_id, cr.chunk_order
-                            """
-                    ).bindparams(bindparam("question_ids", expanding=True))
-
-                    chunk_params = {
-                        "file_path": str(file_path),
-                        "chunk_size": config["chunk_size"],
-                        "chunk_overlap": config["chunk_overlap"],
-                        "top_k": config["top_k"],
-                        "model": config["model"],
-                        "question_set": db_question_set,
-                    }
-                    chunk_params["question_ids"] = list(results.keys())
-
-                    logger.info("Executing chunk query with params: %s", list(chunk_params.keys()))
-                    chunk_result = conn.execute(chunk_query, chunk_params)
-                    chunk_rows = chunk_result.fetchall()
-                    logger.info(f"Retrieved {len(chunk_rows)} chunk rows")
-
-                    # Add chunks to their respective questions
-                    for row in chunk_rows:
-                        question_id = row[0]
-                        chunk_info = {
-                            "text": row[1],
-                            "metadata": json.loads(row[2]) if row[2] else {},
-                            "chunk_order": row[3],
-                            "similarity_score": row[4],  # Raw similarity score from DB
-                            "llm_score": row[5],  # Raw LLM score from DB
-                            "is_evidence": row[6],  # Raw is_evidence from DB
-                            "evidence_order": row[7],
-                            "relevance_metadata": json.loads(row[8]) if row[8] else {},
-                        }
-                        logger.info(
-                            "Raw DB values for chunk - similarity_score: %s, llm_score: %s, is_evidence: %s",
-                            row[4],
-                            row[5],
-                            row[6],
-                        )
-                        results[question_id]["chunks"].append(chunk_info)
-
-                    # Sort chunks by their order
-                    for question_id in results:
-                        results[question_id]["chunks"].sort(key=lambda x: x["chunk_order"])
-                        logger.info("Question %s: %s chunks", question_id, len(results[question_id]["chunks"]))
-                        if results[question_id]["chunks"]:
-                            logger.info(
-                                "  Similarity range: %.4f - %.4f",
-                                min(c["similarity_score"] for c in results[question_id]["chunks"]),
-                                max(c["similarity_score"] for c in results[question_id]["chunks"]),
-                            )
 
                 return results
 
