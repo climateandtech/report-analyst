@@ -207,6 +207,43 @@ describe("PDF viewer", () => {
     expect(viewer.navigateToPage).toHaveBeenCalledWith(3);
   });
 
+  it("does not highlight unmapped chunks by default", () => {
+    viewer._chunks = [
+      { text: "First unmapped report chunk with enough matching words", metadata: { page_number: 1 } },
+      { text: "Second unmapped report chunk with enough matching words", metadata: { page_number: 1 } },
+    ];
+    viewer.findChunkTextPositions = vi.fn().mockReturnValue([
+      { x: 10, y: 20, width: 100, height: 30 },
+    ]);
+
+    const highlights = viewer.renderHighlights([], createViewport(), 1);
+
+    expect(highlights.childElementCount).toBe(0);
+    expect(viewer.findChunkTextPositions).not.toHaveBeenCalled();
+  });
+
+  it("navigates to an unmapped chunk without highlighting it", async () => {
+    const selectedChunk = {
+      text: "Selected unmapped report chunk with enough matching words",
+      metadata: { page_number: 1 },
+    };
+    viewer._chunks = [
+      selectedChunk,
+      { text: "Other unmapped report chunk with enough matching words", metadata: { page_number: 1 } },
+    ];
+    viewer.navigateToPage = vi.fn().mockResolvedValue(undefined);
+    viewer.findChunkTextPositions = vi.fn().mockReturnValue([
+      { x: 10, y: 20, width: 100, height: 30 },
+    ]);
+
+    await viewer.navigateToChunk(selectedChunk);
+    const highlights = viewer.renderHighlights([], createViewport(), 1);
+
+    expect(viewer.navigateToPage).toHaveBeenCalledWith(1);
+    expect(highlights.childElementCount).toBe(0);
+    expect(viewer.findChunkTextPositions).not.toHaveBeenCalled();
+  });
+
   it("keeps question and evidence filters while changing pages", async () => {
     viewer._selectedQuestionId = "q1";
     viewer._showEvidenceOnly = true;

@@ -930,13 +930,10 @@ def display_pdf_viewer(
     raw_chunks: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in results.items()}
-    if not results and not raw_chunks:
-        return
-
     questions_data = {question_id: question.get("text", question_id) for question_id, question in questions.items()}
     viewer_key = Path(str(file_path)).stem or "analysis"
 
-    with st.expander("PDF Viewer with Chunks", expanded=False):
+    with st.expander("PDF Viewer with Chunks", expanded=True):
         pdf_viewer(
             pdf_path=str(file_path),
             chunks_data=chunks_by_question,

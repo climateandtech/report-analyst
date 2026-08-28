@@ -66,6 +66,7 @@ def test_pdf_viewer_passes_chunks_and_questions(tmp_path):
     chunks = kwargs["chunks"]
     questions = kwargs["questions"]
     assert [chunk["question_id"] for chunk in chunks] == ["q1", "q2", None]
+    assert [chunk["text"] for chunk in chunks] == ["Evidence", "Retrieved", "Unmapped"]
     assert chunks[2] == {
         "text": "Unmapped",
         "metadata": {"page_number": 3},
@@ -117,3 +118,23 @@ def test_display_pdf_viewer_opens_for_unmapped_chunks():
         "q1": "First question",
         "q2": "Second question",
     }
+
+
+def test_display_pdf_viewer_opens_without_analysis():
+    component = Mock()
+
+    with (
+        patch("report_analyst.streamlit_app.st.expander", return_value=nullcontext()) as expander,
+        patch("report_analyst.streamlit_app.pdf_viewer", component),
+    ):
+        display_pdf_viewer(
+            file_path="report.pdf",
+            results={},
+            questions={"q1": {"text": "First question"}},
+            raw_chunks=[],
+        )
+
+    expander.assert_called_once_with("PDF Viewer with Chunks", expanded=True)
+    component.assert_called_once()
+    assert component.call_args.kwargs["chunks_data"] == {}
+    assert component.call_args.kwargs["unmapped_chunks"] == []

@@ -107,7 +107,7 @@ def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_
     assert any(expander.label == "PDF Viewer with Chunks" for expander in at.expander)
 
 
-def test_reanalyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp):
+def test_reanalyze_button_forces_recompute_without_cache_lookup(mocked_report_analyzer, test_pdf_in_app_temp):
     report_analyzer, calls = mocked_report_analyzer
 
     assert test_pdf_in_app_temp.exists()
