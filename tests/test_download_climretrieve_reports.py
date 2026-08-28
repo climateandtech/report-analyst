@@ -3,6 +3,7 @@
 from io import BytesIO
 
 import pytest
+
 from scripts.download_climretrieve_reports import (
     build_download_url,
     download_report,

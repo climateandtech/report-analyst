@@ -4,6 +4,8 @@ import json
 
 import pandas as pd
 import pytest
+
+from report_analyst.core.question_loader import get_question_loader
 from scripts.evaluate_analysis_robustness import (
     checkpoint_run,
     load_configured_documents,
@@ -12,8 +14,6 @@ from scripts.evaluate_analysis_robustness import (
     summarize_evaluation,
     validate_complete_matrix,
 )
-
-from report_analyst.core.question_loader import get_question_loader
 
 
 @pytest.mark.parametrize(

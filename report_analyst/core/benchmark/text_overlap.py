@@ -220,12 +220,15 @@ def best_overlap(
         if score > best_score:
             best_score = score
             best_text = candidate
-        if is_text_match(
-            retrieved,
-            candidate,
-            jaccard_min=jaccard_min,
-            containment_min=containment_min,
-        ) and contained > best_score:
+        if (
+            is_text_match(
+                retrieved,
+                candidate,
+                jaccard_min=jaccard_min,
+                containment_min=containment_min,
+            )
+            and contained > best_score
+        ):
             best_score = max(best_score, contained)
             best_text = candidate
     if best_text is None:

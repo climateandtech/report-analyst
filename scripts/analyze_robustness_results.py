@@ -378,12 +378,7 @@ def build_all_evaluation_metrics(
     if retrieval is not None:
         frames.append(retrieval)
     config_ids = sorted(
-        {
-            str(config_id)
-            for frame in frames
-            if not frame.empty
-            for config_id in frame["config_id"].dropna().unique()
-        }
+        {str(config_id) for frame in frames if not frame.empty for config_id in frame["config_id"].dropna().unique()}
     )
     rows: list[dict[str, Any]] = []
     for config_id in config_ids:
@@ -1343,9 +1338,7 @@ def plot_overall_performance_metrics(
         x = np.arange(len(metrics))
         width = 0.8 / len(frame)
         colors = plt.cm.Set2(np.linspace(0, 1, len(frame)))
-        for index, (row, color) in enumerate(
-            zip(frame.itertuples(index=False), colors, strict=True)
-        ):
+        for index, (row, color) in enumerate(zip(frame.itertuples(index=False), colors, strict=True)):
             values = [float(getattr(row, column)) for _, column in metrics]
             label = row.config_id
             if include_cutoff:
@@ -1383,20 +1376,14 @@ def plot_robustness_boxplots(
     output_dir: Path,
 ) -> None:
     """Show score and citation stability distributions by configuration."""
-    score_pairs = (
-        answers.groupby(["document", "question", "config_id"])["answer_score"]
-        .agg(["min", "max"])
-        .reset_index()
-    )
+    score_pairs = answers.groupby(["document", "question", "config_id"])["answer_score"].agg(["min", "max"]).reset_index()
     score_pairs["score_range"] = score_pairs["max"] - score_pairs["min"]
     config_ids = sorted(answers["config_id"].dropna().unique())
     score_values = [
-        score_pairs.loc[score_pairs["config_id"].eq(config_id), "score_range"].dropna()
-        for config_id in config_ids
+        score_pairs.loc[score_pairs["config_id"].eq(config_id), "score_range"].dropna() for config_id in config_ids
     ]
     citation_values = [
-        citations.loc[citations["config_id"].eq(config_id), "citation_jaccard"].dropna()
-        for config_id in config_ids
+        citations.loc[citations["config_id"].eq(config_id), "citation_jaccard"].dropna() for config_id in config_ids
     ]
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
     panels = [
@@ -1474,21 +1461,13 @@ def plot_answer_scores_by_configuration(
 ) -> None:
     """Compare pair-level mean scores and paired configuration deltas."""
     metadata = (
-        answers[["config_id", "chunk_size", "top_k"]]
-        .drop_duplicates()
-        .sort_values(["chunk_size", "top_k", "config_id"])
+        answers[["config_id", "chunk_size", "top_k"]].drop_duplicates().sort_values(["chunk_size", "top_k", "config_id"])
     )
     pair_means = (
-        answers.groupby(["document", "question", "config_id"])["answer_score"]
-        .mean()
-        .rename("mean_score")
-        .reset_index()
+        answers.groupby(["document", "question", "config_id"])["answer_score"].mean().rename("mean_score").reset_index()
     )
     config_ids = metadata["config_id"].astype(str).tolist()
-    score_values = [
-        pair_means.loc[pair_means["config_id"].eq(config_id), "mean_score"].dropna()
-        for config_id in config_ids
-    ]
+    score_values = [pair_means.loc[pair_means["config_id"].eq(config_id), "mean_score"].dropna() for config_id in config_ids]
     wide = pair_means.pivot(
         index=["document", "question"],
         columns="config_id",
@@ -1533,10 +1512,7 @@ def plot_answer_scores_by_configuration(
     axes[0, 0].grid(axis="y", alpha=0.25)
 
     if comparisons:
-        delta_values = [
-            (wide[high_config] - wide[low_config]).dropna()
-            for _, low_config, high_config in comparisons
-        ]
+        delta_values = [(wide[high_config] - wide[low_config]).dropna() for _, low_config, high_config in comparisons]
         delta_plot = axes[0, 1].boxplot(
             delta_values,
             tick_labels=[label for label, _, _ in comparisons],

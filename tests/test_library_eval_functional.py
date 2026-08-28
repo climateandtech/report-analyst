@@ -19,9 +19,7 @@ from report_analyst.core.benchmark.library_eval import (
 from report_analyst.core.benchmark.retrieval_results_loader import load_flexible_dataset_from_csv
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "ct_reit_chunk_matching.json"
-SAMPLE_RESULTS_PATH = (
-    Path(__file__).parent / "fixtures" / "climretrieve_retrieval_sample_results.csv"
-)
+SAMPLE_RESULTS_PATH = Path(__file__).parent / "fixtures" / "climretrieve_retrieval_sample_results.csv"
 
 
 def fixture_chunk(fixture, chunk_size: int, chunk_index: int) -> dict:

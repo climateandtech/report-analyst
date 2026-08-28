@@ -99,30 +99,21 @@ def test_real_200_chunk_contains_climretrieve_text(ct_reit_fixture):
     retrieved = fixture_chunk(ct_reit_fixture, 200, 77)
     ground_truth = ct_reit_fixture["ground_truth"]["text"]
 
-    assert (
-        classify_text_match(retrieved, ground_truth).relation
-        is MatchRelation.RETRIEVED_CONTAINS_GROUND_TRUTH
-    )
+    assert classify_text_match(retrieved, ground_truth).relation is MatchRelation.RETRIEVED_CONTAINS_GROUND_TRUTH
 
 
 def test_real_400_chunk_contains_200_chunk(ct_reit_fixture):
     retrieved = fixture_chunk(ct_reit_fixture, 400, 45)
     ground_truth = fixture_chunk(ct_reit_fixture, 200, 77)
 
-    assert (
-        classify_text_match(retrieved, ground_truth).relation
-        is MatchRelation.RETRIEVED_CONTAINS_GROUND_TRUTH
-    )
+    assert classify_text_match(retrieved, ground_truth).relation is MatchRelation.RETRIEVED_CONTAINS_GROUND_TRUTH
 
 
 def test_real_200_chunk_is_contained_by_400_chunk(ct_reit_fixture):
     retrieved = fixture_chunk(ct_reit_fixture, 200, 77)
     ground_truth = fixture_chunk(ct_reit_fixture, 400, 45)
 
-    assert (
-        classify_text_match(retrieved, ground_truth).relation
-        is MatchRelation.GROUND_TRUTH_CONTAINS_RETRIEVED
-    )
+    assert classify_text_match(retrieved, ground_truth).relation is MatchRelation.GROUND_TRUTH_CONTAINS_RETRIEVED
 
 
 def test_real_400_chunk_is_split_across_two_200_chunks(ct_reit_fixture):
@@ -132,10 +123,7 @@ def test_real_400_chunk_is_split_across_two_200_chunks(ct_reit_fixture):
     ]
     ground_truth = [fixture_chunk(ct_reit_fixture, 400, 45)]
 
-    assert (
-        classify_chunk_group_match(retrieved, ground_truth).relation
-        is MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED
-    )
+    assert classify_chunk_group_match(retrieved, ground_truth).relation is MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED
 
 
 def test_real_400_chunk_merges_two_200_chunks(ct_reit_fixture):
@@ -145,10 +133,7 @@ def test_real_400_chunk_merges_two_200_chunks(ct_reit_fixture):
         fixture_chunk(ct_reit_fixture, 200, 77),
     ]
 
-    assert (
-        classify_chunk_group_match(retrieved, ground_truth).relation
-        is MatchRelation.RETRIEVED_MERGES_GROUND_TRUTH
-    )
+    assert classify_chunk_group_match(retrieved, ground_truth).relation is MatchRelation.RETRIEVED_MERGES_GROUND_TRUTH
 
 
 def test_real_reversed_200_chunks_do_not_reconstruct_400_chunk(ct_reit_fixture):
@@ -159,8 +144,7 @@ def test_real_reversed_200_chunks_do_not_reconstruct_400_chunk(ct_reit_fixture):
     ground_truth = [fixture_chunk(ct_reit_fixture, 400, 45)]
 
     assert (
-        classify_chunk_group_match(retrieved, ground_truth).relation
-        is not MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED
+        classify_chunk_group_match(retrieved, ground_truth).relation is not MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED
     )
 
 

@@ -496,16 +496,16 @@ def query_match_metrics(
                 "exact_hit_count": (
                     int((evidence_hits["match_relation"] == MatchRelation.EXACT.value).sum()) if not evidence_hits.empty else 0
                 ),
-                "contained_hit_count": int(
-                    (evidence_hits["match_relation"] == MatchRelation.RETRIEVED_CONTAINS_GROUND_TRUTH.value).sum()
-                )
-                if not evidence_hits.empty
-                else 0,
-                "split_hit_count": int(
-                    (evidence_hits["match_relation"] == MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED.value).sum()
-                )
-                if not evidence_hits.empty
-                else 0,
+                "contained_hit_count": (
+                    int((evidence_hits["match_relation"] == MatchRelation.RETRIEVED_CONTAINS_GROUND_TRUTH.value).sum())
+                    if not evidence_hits.empty
+                    else 0
+                ),
+                "split_hit_count": (
+                    int((evidence_hits["match_relation"] == MatchRelation.GROUND_TRUTH_SPLIT_ACROSS_RETRIEVED.value).sum())
+                    if not evidence_hits.empty
+                    else 0
+                ),
                 "partial_candidate_count": int((group["match_relation"] == MatchRelation.PARTIAL_OVERLAP.value).sum()),
                 "mean_hit_retrieved_coverage": (
                     evidence_hits["retrieved_coverage"].mean() if not evidence_hits.empty else float("nan")

@@ -5,6 +5,7 @@ from argparse import Namespace
 from pathlib import Path
 
 import pytest
+
 from scripts.generate_chunk_match_fixture import build_fixture
 
 

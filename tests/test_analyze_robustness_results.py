@@ -1,6 +1,7 @@
 """Tests for analysis of denormalized robustness results."""
 
 import pandas as pd
+
 from scripts.analyze_robustness_results import (
     build_all_evaluation_metrics,
     build_answer_robustness_metrics,

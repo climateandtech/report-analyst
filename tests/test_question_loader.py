@@ -217,9 +217,9 @@ class TestQuestionSetLoader:
         for qset_id, expected_shortcut in expected_shortcuts.items():
             if qset_id in question_sets:
                 qset = question_sets[qset_id]
-                assert qset.shortcut == expected_shortcut, (
-                    f"Expected {qset_id} to have shortcut '{expected_shortcut}', got '{qset.shortcut}'"
-                )
+                assert (
+                    qset.shortcut == expected_shortcut
+                ), f"Expected {qset_id} to have shortcut '{expected_shortcut}', got '{qset.shortcut}'"
 
     def test_get_question_set_methods(self):
         """Test various getter methods"""
