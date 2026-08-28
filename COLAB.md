@@ -3,7 +3,16 @@
 This guide explains how to use the **benchmarking and diagnostics** parts of
 `report-analyst` from Google Colab (or any notebook environment).
 
-You can use it to:
+For a full **end-to-end analysis without Streamlit** (10 ClimRetrieve-labelled
+reports, retrieval vs ClimRetrieve, robustness of scores/citations, CSV
+exports), open `notebooks/osa_library_e2e_climretrieve.ipynb`. The public
+GitHub install does **not** need a token.
+
+The same repeated-analysis study can run without Jupyter:
+`scripts/evaluate_analysis_robustness.py` checkpoints every answer and selected
+chunk before the next run. See `docs/ROBUSTNESS_EVALUATION.md`.
+
+You can also use the library to:
 
 - **Evaluate retrieval systems from CSV files** (Precision@K, Recall@K, F1@K,
   NDCG@K, MAP, MRR).
@@ -29,10 +38,11 @@ Then install from your repo and branch (replace `<org>`, `<repo>`, and `<branch>
 
 ```python
 # Public repo – no token needed
-!pip install --no-cache-dir "git+https://github.com/<org>/<repo>.git@<branch>#subdirectory=report-analyst"
+!pip install --no-cache-dir "git+https://github.com/climateandtech/report-analyst.git@notebooks/library-e2e-climretrieve"
 ```
 
-If the repo is **private**, use a GitHub personal access token. Store it in Colab secrets or as an environment variable (e.g. `GITHUB_TOKEN`) and do **not** commit it:
+If the repo is **private**, use a GitHub personal access token stored in Colab
+secrets or `GITHUB_TOKEN`. Do not hardcode it:
 
 ```python
 import os

@@ -88,20 +88,28 @@ def test_env():
     test_pdf = storage_path / "test_report.pdf"
     test_pdf.write_bytes(b"%PDF-1.4\n%Test PDF")
 
-    # Set environment variables
+    # Set environment variables (restore on teardown — do not leak into other tests)
+    env_keys = ("STORAGE_PATH", "QUESTIONSETS_PATH", "OPENAI_API_KEY")
+    original_env = {key: os.environ.get(key) for key in env_keys}
     os.environ["STORAGE_PATH"] = str(storage_path)
     os.environ["QUESTIONSETS_PATH"] = str(questions_dir)
     os.environ["OPENAI_API_KEY"] = "test-key"
 
-    yield {
-        "temp_dir": temp_dir,
-        "storage_path": storage_path,
-        "questions_dir": questions_dir,
-        "db_path": db_path,
-        "test_pdf": test_pdf,
-    }
-
-    shutil.rmtree(temp_dir)
+    try:
+        yield {
+            "temp_dir": temp_dir,
+            "storage_path": storage_path,
+            "questions_dir": questions_dir,
+            "db_path": db_path,
+            "test_pdf": test_pdf,
+        }
+    finally:
+        for key, value in original_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        shutil.rmtree(temp_dir)
 
 
 @pytest.fixture

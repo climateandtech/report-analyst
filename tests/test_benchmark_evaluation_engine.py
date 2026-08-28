@@ -141,6 +141,9 @@ class TestEvaluationEngine:
         # No relevant documents
         assert engine._average_precision([0, 0, 0, 0]) == 0.0
 
+    def test_average_precision_penalizes_unretrieved_relevant_items(self, engine):
+        assert engine._average_precision([1, 0], total_relevant=2) == 0.5
+
     def test_ndcg_at_k(self, engine):
         """Test NDCG@K calculation"""
         retrieved_relevance = [1.0, 0.8, 0.0, 0.6]
@@ -154,10 +157,10 @@ class TestEvaluationEngine:
         ndcg_3 = engine._ndcg_at_k(retrieved_relevance, ground_truth, 3)
 
         # Calculate expected DCG@3
-        dcg = 1.0 + 0.8 / np.log2(2) + 0.0 / np.log2(3)
+        dcg = 1.0 + 0.8 / np.log2(3) + 0.0 / np.log2(4)
 
         # Calculate expected IDCG@3 (ideal ranking: [1.0, 0.8, 0.6])
-        idcg = 1.0 + 0.8 / np.log2(2) + 0.6 / np.log2(3)
+        idcg = 1.0 + 0.8 / np.log2(3) + 0.6 / np.log2(4)
 
         expected_ndcg = dcg / idcg
         assert abs(ndcg_3 - expected_ndcg) < 1e-10

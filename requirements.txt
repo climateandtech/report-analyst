@@ -110,6 +110,7 @@ numpy==1.26.4
 oauthlib==3.2.2
 onnxruntime==1.20.1
 openai==1.81.0
+openpyxl==3.1.5
 openinference-instrumentation==0.1.23
 openinference-instrumentation-langchain==0.1.35
 openinference-semantic-conventions==0.1.14

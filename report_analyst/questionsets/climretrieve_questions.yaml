@@ -5,54 +5,55 @@ description: Comprehensive sustainability labeling framework for evaluating clim
 questions:
 - id: climretr_1
   text: Does the company provide definitions for climate change adaptation?
-  guidelines: ''
+  guidelines: &climretrieve_classification |-
+    - ANSWER type: classification — exactly one of Yes / No / Unclear / Not disclosed
 - id: climretr_2
   text: Has the company identified any synergies between its climate change adaptation goals and other business goals?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_3
   text: Does the company report the climate change scenarios used to test the resilience of its business strategy?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_4
   text: Does the company seek to adjust its business model to better provide climate change adaptation products and services?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_5
   text: Does the company have any engagements with industry peers in relation to climate change?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_6
   text: Does the company have a specific process in place to identify risks arising from climate change?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_7
   text: Does the company report the methodology used to identify the dependencies and impact of its business activities on
     the environment?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_8
   text: Does the company refer to any third party scenarios when identifying climate-related risks or opportunities (e.g.
     IPCC trajectories, NGFS scenarios, etc.)?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_9
   text: Does the company encourage downstream partners to carry out climate-related risk assessments?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_10
   text: Does the company report how adjustments to its business operations will allow it to adapt to climate change?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_11
   text: Do the environmental/sustainability targets set by the company reference external climate change adaptation goals/targets?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_12
   text: Do the environmental/sustainability targets set by the company align with external climate change adaptation goals/targets?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_13
   text: Does the company report short-term actions taken or planned to reduce its waste generation?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_14
   text: Does the company report a plan to engage with downstream partners on water consumption or water pollution?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_15
   text: Does the company identify any impacts of its business activities on the environment?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_16
   text: Does the company have a strategy on waste management?
-  guidelines: ''
+  guidelines: *climretrieve_classification
 - id: climretr_17_ir
   text: We search for details on how a company's efforts to adapt to climate change are integrated with and support its broader
     business objectives. This includes examining how initiatives aimed at increasing climate resilience also contribute to
