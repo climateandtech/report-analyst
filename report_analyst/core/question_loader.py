@@ -9,7 +9,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import yaml
 
@@ -52,7 +52,7 @@ class QuestionSetLoader:
         """Load all question sets from YAML files"""
         question_sets = {}
 
-        logger.info(f"[QUESTION_LOADER] Looking for question set files in:")
+        logger.info("[QUESTION_LOADER] Looking for question set files in:")
         for path in self._questionsets_paths:
             logger.info(f"[QUESTION_LOADER] - {path.resolve()}")
 
@@ -97,8 +97,8 @@ class QuestionSetLoader:
 
                 logger.info(f"[QUESTION_LOADER] ✓ Loaded {len(questions)} questions for {question_set_id}")
 
-            except Exception as e:
-                logger.error(f"[QUESTION_LOADER] Error loading question set from {yaml_file}: {str(e)}")
+            except (OSError, yaml.YAMLError, AttributeError, TypeError, ValueError, KeyError) as e:
+                logger.error(f"[QUESTION_LOADER] Error loading question set from {yaml_file}: {e!s}")
                 continue
 
         if not question_sets:
