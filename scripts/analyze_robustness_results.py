@@ -345,74 +345,109 @@ def build_answer_robustness_metrics(
     return pd.DataFrame(rows)
 
 
+def _append_evaluation_metrics(
+    rows: list[dict[str, Any]],
+    *,
+    config_id: str,
+    section: str,
+    result: pd.Series,
+    metrics: list[tuple[str, str]],
+    count_column: str,
+    scope: str,
+) -> None:
+    for metric, column in metrics:
+        rows.append(
+            {
+                "config_id": config_id,
+                "section": section,
+                "metric": metric,
+                "value": float(result[column]),
+                "n_pairs": int(result[count_column]),
+                "scope": scope,
+            }
+        )
+
+
 def build_all_evaluation_metrics(
     classification: pd.DataFrame,
     robustness: pd.DataFrame,
     retrieval: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Combine classification, retrieval, and robustness metrics."""
-    rows = []
-    if not classification.empty:
-        result = classification.iloc[0]
-        for metric, column in [
-            ("Accuracy", "accuracy"),
-            ("Answered-only accuracy", "answered_accuracy"),
-            ("Balanced accuracy", "balanced_accuracy"),
-            ("Macro F1", "macro_f1"),
-            ("Answer coverage", "coverage"),
-            ("Yes precision", "yes_precision"),
-            ("Yes recall", "yes_recall"),
-            ("Yes F1", "yes_f1"),
-            ("No precision", "no_precision"),
-            ("No recall", "no_recall"),
-            ("No F1", "no_f1"),
-        ]:
-            rows.append(
-                {
-                    "section": "Classification",
-                    "metric": metric,
-                    "value": float(result[column]),
-                    "n_pairs": int(result["n_labelled_pairs"]),
-                    "scope": "Human-labelled pairs",
-                }
+    """Combine classification, retrieval, and robustness by configuration."""
+    frames = [classification, robustness]
+    if retrieval is not None:
+        frames.append(retrieval)
+    config_ids = sorted(
+        {
+            str(config_id)
+            for frame in frames
+            if not frame.empty
+            for config_id in frame["config_id"].dropna().unique()
+        }
+    )
+    rows: list[dict[str, Any]] = []
+    for config_id in config_ids:
+        selected = classification[classification["config_id"].eq(config_id)]
+        if not selected.empty:
+            _append_evaluation_metrics(
+                rows,
+                config_id=config_id,
+                section="Classification",
+                result=selected.iloc[0],
+                metrics=[
+                    ("Accuracy", "accuracy"),
+                    ("Answered-only accuracy", "answered_accuracy"),
+                    ("Balanced accuracy", "balanced_accuracy"),
+                    ("Macro F1", "macro_f1"),
+                    ("Answer coverage", "coverage"),
+                    ("Yes precision", "yes_precision"),
+                    ("Yes recall", "yes_recall"),
+                    ("Yes F1", "yes_f1"),
+                    ("No precision", "no_precision"),
+                    ("No recall", "no_recall"),
+                    ("No F1", "no_f1"),
+                ],
+                count_column="n_labelled_pairs",
+                scope="Human-labelled pairs",
             )
-    if retrieval is not None and not retrieval.empty:
-        result = retrieval.iloc[0]
-        for metric, column in [
-            ("Precision@5", "precision"),
-            ("Evidence recall@5", "recall"),
-            ("F1@5", "f1"),
-            ("nDCG@5", "ndcg"),
-            ("Hit rate@5", "hit_rate"),
-            ("Complete-set hit@5", "complete_set_hit_rate"),
-            ("MAP@5", "MAP"),
-            ("MRR@5", "MRR"),
-        ]:
-            rows.append(
-                {
-                    "section": "Direct retrieval",
-                    "metric": metric,
-                    "value": float(result[column]),
-                    "n_pairs": int(result["n_queries"]),
-                    "scope": "Human-annotated queries",
-                }
-            )
-    if not robustness.empty:
-        result = robustness.iloc[0]
-        for metric, column in [
-            ("Answer-label stability", "label_stability_rate"),
-            ("Exact-text stability", "answer_text_stability_rate"),
-            ("Answer-score stability", "score_stability_rate"),
-            ("Citation-set stability", "citation_set_stability_rate"),
-        ]:
-            rows.append(
-                {
-                    "section": "Robustness",
-                    "metric": metric,
-                    "value": float(result[column]),
-                    "n_pairs": int(result["n_pairs"]),
-                    "scope": "Repeated report-question pairs",
-                }
+        if retrieval is not None:
+            selected = retrieval[retrieval["config_id"].eq(config_id)]
+            if not selected.empty:
+                result = selected.iloc[0]
+                cutoff = int(result["k"])
+                _append_evaluation_metrics(
+                    rows,
+                    config_id=config_id,
+                    section="Direct retrieval",
+                    result=result,
+                    metrics=[
+                        (f"Precision@{cutoff}", "precision"),
+                        (f"Evidence recall@{cutoff}", "recall"),
+                        (f"F1@{cutoff}", "f1"),
+                        (f"nDCG@{cutoff}", "ndcg"),
+                        (f"Hit rate@{cutoff}", "hit_rate"),
+                        (f"Complete-set hit@{cutoff}", "complete_set_hit_rate"),
+                        (f"MAP@{cutoff}", "MAP"),
+                        (f"MRR@{cutoff}", "MRR"),
+                    ],
+                    count_column="n_queries",
+                    scope="Human-annotated queries",
+                )
+        selected = robustness[robustness["config_id"].eq(config_id)]
+        if not selected.empty:
+            _append_evaluation_metrics(
+                rows,
+                config_id=config_id,
+                section="Robustness",
+                result=selected.iloc[0],
+                metrics=[
+                    ("Answer-label stability", "label_stability_rate"),
+                    ("Exact-text stability", "answer_text_stability_rate"),
+                    ("Answer-score stability", "score_stability_rate"),
+                    ("Citation-set stability", "citation_set_stability_rate"),
+                ],
+                count_column="n_pairs",
+                scope="Repeated report-question pairs",
             )
     return pd.DataFrame(rows)
 
@@ -988,43 +1023,55 @@ def plot_answer_confusion_matrix(
     answers: pd.DataFrame,
     output_dir: Path,
 ) -> None:
-    """Plot expert versus modal OSA labels without counting repeat runs twice."""
+    """Plot one modal-answer confusion matrix per configuration."""
     pairs = build_pair_classifications(answers)
     if pairs.empty:
         return
     expert_order = ["Yes", "No"]
     osa_order = ["Yes", "No", "Unclear"]
-    counts = pd.crosstab(pairs["expert_label"], pairs["osa_label"]).reindex(
-        index=expert_order,
-        columns=osa_order,
-        fill_value=0,
+    config_ids = sorted(pairs["config_id"].unique())
+    fig, axes = plt.subplots(
+        1,
+        len(config_ids),
+        figsize=(6 * len(config_ids), 4.8),
+        squeeze=False,
+        sharey=True,
+        constrained_layout=True,
     )
-    proportions = counts.div(counts.sum(axis=1), axis=0)
-    fig, ax = plt.subplots(figsize=(7, 4.8))
-    image = ax.imshow(proportions, cmap="Blues", vmin=0, vmax=1)
-    ax.set_xticks(range(len(osa_order)), osa_order)
-    ax.set_yticks(range(len(expert_order)), expert_order)
-    ax.set(
-        xlabel="OSA answer",
-        ylabel="ClimRetrieve expert answer",
-        title=f"Answer confusion matrix ({len(pairs)} labelled pairs)",
-    )
-    for row_index in range(len(expert_order)):
-        for column_index in range(len(osa_order)):
-            count = int(counts.iloc[row_index, column_index])
-            proportion = proportions.iloc[row_index, column_index]
-            color = "white" if proportion > 0.55 else "black"
-            ax.text(
-                column_index,
-                row_index,
-                f"{count}\n({proportion:.0%})",
-                ha="center",
-                va="center",
-                color=color,
-                fontsize=11,
-            )
-    fig.colorbar(image, ax=ax, label="Share within expert class")
-    fig.tight_layout()
+    image = None
+    for ax, config_id in zip(axes[0], config_ids, strict=True):
+        selected = pairs[pairs["config_id"].eq(config_id)]
+        counts = pd.crosstab(selected["expert_label"], selected["osa_label"]).reindex(
+            index=expert_order,
+            columns=osa_order,
+            fill_value=0,
+        )
+        proportions = counts.div(counts.sum(axis=1), axis=0)
+        image = ax.imshow(proportions, cmap="Blues", vmin=0, vmax=1)
+        ax.set_xticks(range(len(osa_order)), osa_order)
+        ax.set_yticks(range(len(expert_order)), expert_order)
+        ax.set(
+            xlabel="OSA answer",
+            title=f"{config_id} ({len(selected)} labelled pairs)",
+        )
+        for row_index in range(len(expert_order)):
+            for column_index in range(len(osa_order)):
+                count = int(counts.iloc[row_index, column_index])
+                proportion = proportions.iloc[row_index, column_index]
+                color = "white" if proportion > 0.55 else "black"
+                ax.text(
+                    column_index,
+                    row_index,
+                    f"{count}\n({proportion:.0%})",
+                    ha="center",
+                    va="center",
+                    color=color,
+                    fontsize=11,
+                )
+    axes[0, 0].set_ylabel("ClimRetrieve expert answer")
+    if image is not None:
+        fig.colorbar(image, ax=axes.ravel().tolist(), label="Share within expert class")
+    fig.suptitle("Answer confusion matrices by configuration")
     fig.savefig(output_dir / "answer_confusion_matrix.png", dpi=200)
     plt.close(fig)
 
@@ -1033,7 +1080,7 @@ def plot_answer_label_robustness(
     answers: pd.DataFrame,
     output_dir: Path,
 ) -> None:
-    """Plot categorical composition and exact run-to-run answer stability."""
+    """Compare categorical composition and stability across configurations."""
     working = answers.copy()
     working["answer_label"] = [
         normalize_answer_label(binary, answer)
@@ -1044,10 +1091,16 @@ def plot_answer_label_robustness(
         )
     ]
     label_order = ["Yes", "No", "Unclear", "Not disclosed", "Other"]
-    run_counts = (
-        pd.crosstab(working["run_id"], working["answer_label"]).reindex(columns=label_order, fill_value=0).sort_index()
+    composition = (
+        pd.crosstab(
+            working["config_id"],
+            working["answer_label"],
+            normalize="index",
+        )
+        .reindex(columns=label_order, fill_value=0)
+        .sort_index()
     )
-    summary = build_answer_robustness_summary(answers).iloc[0]
+    summary = build_answer_robustness_summary(answers).sort_values("config_id")
     colors = {
         "Yes": "#4C78A8",
         "No": "#F58518",
@@ -1056,13 +1109,13 @@ def plot_answer_label_robustness(
         "Other": "#9D9D9D",
     }
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.3))
-    bottom = np.zeros(len(run_counts))
+    bottom = np.zeros(len(composition))
     for label in label_order:
-        values = run_counts[label].to_numpy()
+        values = composition[label].to_numpy()
         if not values.any():
             continue
         axes[0].bar(
-            [f"Run {int(run_id)}" for run_id in run_counts.index],
+            composition.index,
             values,
             bottom=bottom,
             label=label,
@@ -1070,10 +1123,11 @@ def plot_answer_label_robustness(
         )
         bottom += values
     axes[0].set(
-        title="A. Answer-label composition by run",
-        xlabel="Repeated analysis",
-        ylabel="Report-question pairs",
+        title="A. Answer-label composition by configuration",
+        xlabel="Configuration",
+        ylabel="Share of model answers",
     )
+    axes[0].yaxis.set_major_formatter(PercentFormatter(1))
     axes[0].legend(title="OSA answer")
     stability_metrics = [
         ("Answer\nlabel", "label_stability_rate"),
@@ -1081,24 +1135,30 @@ def plot_answer_label_robustness(
         ("Answer\nscore", "score_stability_rate"),
         ("Citation\nset", "citation_set_stability_rate"),
     ]
-    bars = axes[1].bar(
-        [label for label, _ in stability_metrics],
-        [summary[column] for _, column in stability_metrics],
-        color="#54A24B",
-        alpha=0.85,
-    )
-    axes[1].bar_label(
-        bars,
-        labels=[f"{summary[column]:.0%}" for _, column in stability_metrics],
-        padding=3,
+    metric_labels = [label for label, _ in stability_metrics]
+    x = np.arange(len(metric_labels))
+    width = 0.8 / len(summary)
+    for index, row in enumerate(summary.itertuples(index=False)):
+        values = [getattr(row, column) for _, column in stability_metrics]
+        axes[1].bar(
+            x + index * width,
+            values,
+            width,
+            label=row.config_id,
+            alpha=0.85,
+        )
+    axes[1].set_xticks(
+        x + width * (len(summary) - 1) / 2,
+        metric_labels,
     )
     axes[1].set(
-        title="B. Exact stability across repeated runs",
+        title="B. Exact stability by configuration",
         xlabel="Output component",
         ylabel="Pairs with identical output",
         ylim=(0, 1.08),
     )
     axes[1].yaxis.set_major_formatter(PercentFormatter(1))
+    axes[1].legend(title="Configuration")
     for ax in axes:
         ax.grid(axis="y", alpha=0.25)
     fig.suptitle(
@@ -1115,24 +1175,25 @@ def plot_answer_robustness_metrics_table(
     metrics: pd.DataFrame,
     output_dir: Path,
 ) -> None:
-    """Render exact robustness counts as a publication-ready table."""
+    """Render all configuration-specific robustness counts in one table."""
     if metrics.empty:
         return
-    selected = metrics[metrics["config_id"] == metrics.iloc[0]["config_id"]]
     cells = [
         [
+            row.config_id,
             row.metric,
             f"{int(row.stable_pairs)}/{int(row.total_pairs)}",
             str(int(row.changed_pairs)),
             f"{row.stability_rate:.1%}",
         ]
-        for row in selected.itertuples(index=False)
+        for row in metrics.sort_values(["config_id", "metric"]).itertuples(index=False)
     ]
-    fig, ax = plt.subplots(figsize=(8.5, 2.8))
+    fig, ax = plt.subplots(figsize=(10.5, max(3.5, 0.38 * len(cells))))
     ax.axis("off")
     table = ax.table(
         cellText=cells,
         colLabels=[
+            "Configuration",
             "Output component",
             "Stable pairs",
             "Changed pairs",
@@ -1145,13 +1206,13 @@ def plot_answer_robustness_metrics_table(
     table.auto_set_font_size(False)
     table.set_fontsize(10)
     table.scale(1, 1.55)
-    for column in range(4):
+    for column in range(5):
         table[(0, column)].set_facecolor("#4C78A8")
         table[(0, column)].set_text_props(color="white", weight="bold")
     for row in range(1, len(cells) + 1):
-        table[(row, 0)].set_text_props(ha="left")
+        table[(row, 1)].set_text_props(ha="left")
         if row % 2 == 0:
-            for column in range(4):
+            for column in range(5):
                 table[(row, column)].set_facecolor("#F2F2F2")
     ax.set_title(
         "OSA robustness metrics across repeated runs",
@@ -1172,62 +1233,61 @@ def plot_all_evaluation_metrics_table(
     metrics: pd.DataFrame,
     output_dir: Path,
 ) -> None:
-    """Render one table containing all primary evaluation metrics."""
+    """Render one primary evaluation table per configuration."""
     if metrics.empty:
         return
-    cells = [
-        [
-            row.section,
-            row.metric,
-            f"{row.value:.1%}",
-            str(int(row.n_pairs)),
-            row.scope,
+    for config_id, selected in metrics.groupby("config_id", sort=True):
+        cells = [
+            [
+                row.section,
+                row.metric,
+                f"{row.value:.1%}",
+                str(int(row.n_pairs)),
+                row.scope,
+            ]
+            for row in selected.itertuples(index=False)
         ]
-        for row in metrics.itertuples(index=False)
-    ]
-    fig, ax = plt.subplots(figsize=(12, 10))
-    ax.axis("off")
-    table = ax.table(
-        cellText=cells,
-        colLabels=["Section", "Metric", "Value", "N", "Evaluation scope"],
-        cellLoc="center",
-        colLoc="center",
-        colWidths=[0.15, 0.25, 0.1, 0.08, 0.32],
-        loc="center",
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(9.5)
-    table.scale(1, 1.35)
-    for column in range(5):
-        table[(0, column)].set_facecolor("#355C7D")
-        table[(0, column)].set_text_props(color="white", weight="bold")
-    section_colors = {
-        "Classification": "#EAF2F8",
-        "Direct retrieval": "#FEF1E6",
-        "Robustness": "#EAF5E7",
-    }
-    for row_index, row in enumerate(
-        metrics.itertuples(index=False),
-        start=1,
-    ):
+        fig, ax = plt.subplots(figsize=(12, 10))
+        ax.axis("off")
+        table = ax.table(
+            cellText=cells,
+            colLabels=["Section", "Metric", "Value", "N", "Evaluation scope"],
+            cellLoc="center",
+            colLoc="center",
+            colWidths=[0.15, 0.25, 0.1, 0.08, 0.32],
+            loc="center",
+        )
+        table.auto_set_font_size(False)
+        table.set_fontsize(9.5)
+        table.scale(1, 1.35)
         for column in range(5):
-            table[(row_index, column)].set_facecolor(section_colors[row.section])
-        table[(row_index, 0)].set_text_props(weight="bold", ha="left")
-        table[(row_index, 1)].set_text_props(ha="left")
-        table[(row_index, 4)].set_text_props(ha="left")
-    ax.set_title(
-        "OSA evaluation metrics",
-        fontsize=14,
-        fontweight="bold",
-        pad=14,
-    )
-    fig.tight_layout()
-    fig.savefig(
-        output_dir / "all_evaluation_metrics_table.png",
-        dpi=200,
-        bbox_inches="tight",
-    )
-    plt.close(fig)
+            table[(0, column)].set_facecolor("#355C7D")
+            table[(0, column)].set_text_props(color="white", weight="bold")
+        section_colors = {
+            "Classification": "#EAF2F8",
+            "Direct retrieval": "#FEF1E6",
+            "Robustness": "#EAF5E7",
+        }
+        for row_index, row in enumerate(selected.itertuples(index=False), start=1):
+            for column in range(5):
+                table[(row_index, column)].set_facecolor(section_colors[row.section])
+            table[(row_index, 0)].set_text_props(weight="bold", ha="left")
+            table[(row_index, 1)].set_text_props(ha="left")
+            table[(row_index, 4)].set_text_props(ha="left")
+        ax.set_title(
+            f"OSA evaluation metrics — {config_id}",
+            fontsize=14,
+            fontweight="bold",
+            pad=14,
+        )
+        fig.tight_layout()
+        safe_config = re.sub(r"[^A-Za-z0-9_-]+", "_", str(config_id)).strip("_")
+        fig.savefig(
+            output_dir / f"all_evaluation_metrics_table_{safe_config}.png",
+            dpi=200,
+            bbox_inches="tight",
+        )
+        plt.close(fig)
 
 
 def plot_overall_performance_metrics(
@@ -1235,7 +1295,7 @@ def plot_overall_performance_metrics(
     retrieval: pd.DataFrame | None,
     output_dir: Path,
 ) -> None:
-    """Plot pair-level classification and direct retrieval summary metrics."""
+    """Compare classification and retrieval metrics across configurations."""
     if classification.empty:
         return
     has_retrieval = retrieval is not None and not retrieval.empty
@@ -1245,47 +1305,62 @@ def plot_overall_performance_metrics(
         figsize=(14 if has_retrieval else 7, 5.5),
         squeeze=False,
     )
+    classification_metrics = [
+        ("Accuracy", "accuracy"),
+        ("Balanced\naccuracy", "balanced_accuracy"),
+        ("Macro F1", "macro_f1"),
+        ("Coverage", "coverage"),
+    ]
+    retrieval_metrics = [
+        ("Precision", "precision"),
+        ("Recall", "recall"),
+        ("Hit", "hit_rate"),
+        ("Complete\nhit", "complete_set_hit_rate"),
+        ("nDCG", "ndcg"),
+        ("MAP", "MAP"),
+        ("MRR", "MRR"),
+    ]
     panels = [
         (
             axes[0, 0],
-            classification.iloc[0],
-            [
-                ("Accuracy", "accuracy"),
-                ("Balanced\naccuracy", "balanced_accuracy"),
-                ("Macro F1", "macro_f1"),
-                ("Coverage", "coverage"),
-            ],
+            classification.sort_values("config_id"),
+            classification_metrics,
             "A. Overall answer classification",
-            "#4C78A8",
+            False,
         )
     ]
-    if has_retrieval:
+    if has_retrieval and retrieval is not None:
         panels.append(
             (
                 axes[0, 1],
-                retrieval.iloc[0],
-                [
-                    ("Precision@5", "precision"),
-                    ("Recall@5", "recall"),
-                    ("Hit@5", "hit_rate"),
-                    ("Complete\nhit@5", "complete_set_hit_rate"),
-                    ("nDCG@5", "ndcg"),
-                    ("MAP@5", "MAP"),
-                    ("MRR@5", "MRR"),
-                ],
-                "B. Direct evidence retrieval",
-                "#F58518",
+                retrieval.sort_values("config_id"),
+                retrieval_metrics,
+                "B. Direct evidence retrieval at configured k",
+                True,
             )
         )
-    for ax, row, metrics, title, color in panels:
-        labels = [label for label, _ in metrics]
-        values = [float(row[column]) for _, column in metrics]
-        bars = ax.bar(labels, values, color=color, alpha=0.85)
-        ax.bar_label(
-            bars,
-            labels=[f"{value:.1%}" for value in values],
-            padding=3,
-            fontsize=9,
+    for ax, frame, metrics, title, include_cutoff in panels:
+        x = np.arange(len(metrics))
+        width = 0.8 / len(frame)
+        colors = plt.cm.Set2(np.linspace(0, 1, len(frame)))
+        for index, (row, color) in enumerate(
+            zip(frame.itertuples(index=False), colors, strict=True)
+        ):
+            values = [float(getattr(row, column)) for _, column in metrics]
+            label = row.config_id
+            if include_cutoff:
+                label = f"{label} (@{int(row.k)})"
+            ax.bar(
+                x + index * width,
+                values,
+                width,
+                label=label,
+                color=color,
+                alpha=0.9,
+            )
+        ax.set_xticks(
+            x + width * (len(frame) - 1) / 2,
+            [label for label, _ in metrics],
         )
         ax.set(
             title=title,
@@ -1294,8 +1369,9 @@ def plot_overall_performance_metrics(
         )
         ax.yaxis.set_major_formatter(PercentFormatter(1))
         ax.grid(axis="y", alpha=0.25)
-        ax.tick_params(axis="x", labelrotation=20)
-    fig.suptitle("OSA evaluation summary", fontsize=14, fontweight="bold")
+        ax.tick_params(axis="x", labelrotation=15)
+        ax.legend(title="Configuration")
+    fig.suptitle("OSA evaluation summary by configuration", fontsize=14, fontweight="bold")
     fig.tight_layout()
     fig.savefig(output_dir / "overall_performance_metrics.png", dpi=200)
     plt.close(fig)
@@ -1306,13 +1382,22 @@ def plot_robustness_boxplots(
     citations: pd.DataFrame,
     output_dir: Path,
 ) -> None:
-    """Show question-level score and citation stability distributions by report."""
-    score_pairs = answers.groupby(["document", "question"])["answer_score"].agg(["min", "max"]).reset_index()
+    """Show score and citation stability distributions by configuration."""
+    score_pairs = (
+        answers.groupby(["document", "question", "config_id"])["answer_score"]
+        .agg(["min", "max"])
+        .reset_index()
+    )
     score_pairs["score_range"] = score_pairs["max"] - score_pairs["min"]
-    documents = sorted(answers["document"].dropna().unique())
-    labels = [textwrap.shorten(Path(document).stem, width=22, placeholder="...") for document in documents]
-    score_values = [score_pairs.loc[score_pairs["document"] == document, "score_range"].dropna() for document in documents]
-    citation_values = [citations.loc[citations["document"] == document, "citation_jaccard"].dropna() for document in documents]
+    config_ids = sorted(answers["config_id"].dropna().unique())
+    score_values = [
+        score_pairs.loc[score_pairs["config_id"].eq(config_id), "score_range"].dropna()
+        for config_id in config_ids
+    ]
+    citation_values = [
+        citations.loc[citations["config_id"].eq(config_id), "citation_jaccard"].dropna()
+        for config_id in config_ids
+    ]
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
     panels = [
         (
@@ -1333,7 +1418,7 @@ def plot_robustness_boxplots(
     for ax, values, color, title, ylabel in panels:
         plot = ax.boxplot(
             values,
-            tick_labels=labels,
+            tick_labels=config_ids,
             patch_artist=True,
             showfliers=False,
             medianprops={"color": "black"},
@@ -1344,8 +1429,8 @@ def plot_robustness_boxplots(
         for index, group_values in enumerate(values, start=1):
             x = np.linspace(index - 0.12, index + 0.12, len(group_values))
             ax.scatter(x, group_values, color=color, alpha=0.75, s=25)
-        ax.set_xticks(range(1, len(labels) + 1), labels, rotation=25, ha="right")
-        ax.set(title=title, xlabel="Report", ylabel=ylabel)
+        ax.set_xticks(range(1, len(config_ids) + 1), config_ids, rotation=15, ha="right")
+        ax.set(title=title, xlabel="Configuration", ylabel=ylabel)
         ax.grid(axis="y", alpha=0.25)
     axes[1].set_ylim(-0.03, 1.05)
     fig.suptitle("Question-level OSA robustness distributions")
@@ -1354,26 +1439,168 @@ def plot_robustness_boxplots(
     plt.close(fig)
 
 
+def _score_comparison_specs(metadata: pd.DataFrame) -> list[tuple[str, str, str]]:
+    specs = []
+    for chunk_size, group in metadata.groupby("chunk_size", sort=True):
+        ordered = group.sort_values("top_k")
+        if len(ordered) > 1:
+            specs.append(
+                (
+                    f"Top-k effect\nk{int(ordered.iloc[-1]['top_k'])} - "
+                    f"k{int(ordered.iloc[0]['top_k'])}\n({int(chunk_size)} tokens)",
+                    str(ordered.iloc[0]["config_id"]),
+                    str(ordered.iloc[-1]["config_id"]),
+                )
+            )
+            break
+    for top_k, group in metadata.groupby("top_k", sort=True):
+        ordered = group.sort_values("chunk_size")
+        if len(ordered) > 1:
+            specs.append(
+                (
+                    f"Chunk-size effect\n{int(ordered.iloc[-1]['chunk_size'])} - "
+                    f"{int(ordered.iloc[0]['chunk_size'])}\n(k={int(top_k)})",
+                    str(ordered.iloc[0]["config_id"]),
+                    str(ordered.iloc[-1]["config_id"]),
+                )
+            )
+            break
+    return specs
+
+
+def plot_answer_scores_by_configuration(
+    answers: pd.DataFrame,
+    output_dir: Path,
+) -> None:
+    """Compare pair-level mean scores and paired configuration deltas."""
+    metadata = (
+        answers[["config_id", "chunk_size", "top_k"]]
+        .drop_duplicates()
+        .sort_values(["chunk_size", "top_k", "config_id"])
+    )
+    pair_means = (
+        answers.groupby(["document", "question", "config_id"])["answer_score"]
+        .mean()
+        .rename("mean_score")
+        .reset_index()
+    )
+    config_ids = metadata["config_id"].astype(str).tolist()
+    score_values = [
+        pair_means.loc[pair_means["config_id"].eq(config_id), "mean_score"].dropna()
+        for config_id in config_ids
+    ]
+    wide = pair_means.pivot(
+        index=["document", "question"],
+        columns="config_id",
+        values="mean_score",
+    )
+    comparisons = _score_comparison_specs(metadata)
+    fig, axes = plt.subplots(
+        1,
+        2 if comparisons else 1,
+        figsize=(14 if comparisons else 7, 5.5),
+        squeeze=False,
+    )
+    score_plot = axes[0, 0].boxplot(
+        score_values,
+        tick_labels=config_ids,
+        patch_artist=True,
+        showfliers=False,
+        medianprops={"color": "black"},
+    )
+    colors = plt.cm.Set2(np.linspace(0, 1, len(config_ids)))
+    for position, (box, values, color) in enumerate(
+        zip(score_plot["boxes"], score_values, colors, strict=True),
+        start=1,
+    ):
+        box.set_facecolor(color)
+        box.set_alpha(0.7)
+        offsets = np.linspace(-0.12, 0.12, len(values))
+        axes[0, 0].scatter(
+            position + offsets,
+            values,
+            color=color,
+            edgecolor="black",
+            linewidth=0.25,
+            alpha=0.65,
+            s=22,
+        )
+    axes[0, 0].set(
+        title="A. Mean answer scores by configuration",
+        xlabel="Configuration",
+        ylabel="Three-run mean OSA score per report-question pair",
+    )
+    axes[0, 0].grid(axis="y", alpha=0.25)
+
+    if comparisons:
+        delta_values = [
+            (wide[high_config] - wide[low_config]).dropna()
+            for _, low_config, high_config in comparisons
+        ]
+        delta_plot = axes[0, 1].boxplot(
+            delta_values,
+            tick_labels=[label for label, _, _ in comparisons],
+            patch_artist=True,
+            showfliers=False,
+            medianprops={"color": "black"},
+        )
+        for position, (box, values, color) in enumerate(
+            zip(
+                delta_plot["boxes"],
+                delta_values,
+                plt.cm.Set2(np.linspace(0, 1, len(delta_values))),
+                strict=True,
+            ),
+            start=1,
+        ):
+            box.set_facecolor(color)
+            box.set_alpha(0.7)
+            offsets = np.linspace(-0.12, 0.12, len(values))
+            axes[0, 1].scatter(
+                position + offsets,
+                values,
+                color=color,
+                edgecolor="black",
+                linewidth=0.25,
+                alpha=0.65,
+                s=22,
+            )
+        axes[0, 1].axhline(0, color="black", linewidth=0.9)
+        axes[0, 1].set(
+            title="B. Paired score changes between configurations",
+            xlabel="Controlled ablation",
+            ylabel="Mean-score difference per report-question pair",
+        )
+        axes[0, 1].grid(axis="y", alpha=0.25)
+    fig.suptitle("OSA answer-score sensitivity to retrieval configuration")
+    fig.tight_layout()
+    fig.savefig(output_dir / "answer_score_by_configuration.png", dpi=200)
+    plt.close(fig)
+
+
 def plot_score_quantile_intervals_by_run(
     answers: pd.DataFrame,
     output_dir: Path,
 ) -> None:
-    """Compare score distributions using central 80% quantile intervals."""
-    documents = sorted(answers["document"].dropna().unique())
+    """Compare run score distributions within each configuration."""
+    config_ids = sorted(answers["config_id"].dropna().unique())
     run_ids = sorted(answers["run_id"].dropna().unique())
     colors = plt.cm.Set2(np.linspace(0, 1, len(run_ids)))
-    width = 0.22
-    fig, ax = plt.subplots(figsize=(12, 5.5))
-    for run_index, (run_id, color) in enumerate(zip(run_ids, colors, strict=True)):
+    fig, axes = plt.subplots(
+        1,
+        len(config_ids),
+        figsize=(6 * len(config_ids), 5.5),
+        squeeze=False,
+        sharey=True,
+    )
+    for ax, config_id in zip(axes[0], config_ids, strict=True):
         values = [
             answers.loc[
-                (answers["document"] == document) & (answers["run_id"] == run_id),
+                answers["config_id"].eq(config_id) & answers["run_id"].eq(run_id),
                 "answer_score",
             ].dropna()
-            for document in documents
+            for run_id in run_ids
         ]
-        offset = (run_index - (len(run_ids) - 1) / 2) * (width + 0.03)
-        positions = np.arange(len(documents)) + offset
         statistics = [
             {
                 "med": float(np.median(group_values)),
@@ -1387,17 +1614,22 @@ def plot_score_quantile_intervals_by_run(
         ]
         plot = ax.bxp(
             statistics,
-            positions=positions,
-            widths=width,
+            positions=np.arange(len(run_ids)),
+            widths=0.5,
             patch_artist=True,
             showfliers=False,
             medianprops={"color": "black"},
         )
-        for box in plot["boxes"]:
+        for box, color in zip(plot["boxes"], colors, strict=True):
             box.set_facecolor(color)
             box.set_alpha(0.75)
-        for position, group_values in zip(positions, values, strict=True):
-            point_offsets = np.linspace(-0.035, 0.035, len(group_values))
+        for position, group_values, color in zip(
+            np.arange(len(run_ids)),
+            values,
+            colors,
+            strict=True,
+        ):
+            point_offsets = np.linspace(-0.12, 0.12, len(group_values))
             ax.scatter(
                 position + point_offsets,
                 group_values,
@@ -1408,16 +1640,17 @@ def plot_score_quantile_intervals_by_run(
                 s=20,
                 zorder=3,
             )
-        ax.plot([], [], color=color, linewidth=8, label=f"Run {int(run_id)}")
-    labels = [textwrap.shorten(Path(document).stem, width=24, placeholder="...") for document in documents]
-    ax.set_xticks(range(len(documents)), labels, rotation=25, ha="right")
-    ax.set(
-        title="OSA score distributions: central 80% quantile intervals",
-        xlabel="Report",
-        ylabel="OSA answer score",
-    )
-    ax.grid(axis="y", alpha=0.25)
-    ax.legend(title="Repeated analysis")
+        ax.set_xticks(
+            range(len(run_ids)),
+            [f"Run {int(run_id)}" for run_id in run_ids],
+        )
+        ax.set(
+            title=config_id,
+            xlabel="Repeated analysis",
+            ylabel="OSA answer score",
+        )
+        ax.grid(axis="y", alpha=0.25)
+    fig.suptitle("OSA score distributions by configuration: central 80% intervals")
     fig.tight_layout()
     fig.savefig(output_dir / "answer_score_quantile_interval_plot.png", dpi=200)
     plt.close(fig)
@@ -1451,38 +1684,46 @@ def plot_citation_overlap_by_run_pair(
     answers: pd.DataFrame,
     output_dir: Path,
 ) -> None:
-    """Plot citation chunk overlap distributions for each run pair."""
+    """Plot citation change by run pair within each configuration."""
     overlaps = build_pairwise_citation_overlap(answers)
     if overlaps.empty:
         return
-    documents = sorted(overlaps["document"].dropna().unique())
+    config_ids = sorted(overlaps["config_id"].dropna().unique())
     run_pairs = sorted(overlaps["run_pair"].dropna().unique())
     colors = plt.cm.Set2(np.linspace(0, 1, len(run_pairs)))
-    width = 0.22
-    fig, ax = plt.subplots(figsize=(12, 5.5))
-    for pair_index, (run_pair, color) in enumerate(zip(run_pairs, colors, strict=True)):
+    fig, axes = plt.subplots(
+        1,
+        len(config_ids),
+        figsize=(6 * len(config_ids), 5.5),
+        squeeze=False,
+        sharey=True,
+    )
+    for ax, config_id in zip(axes[0], config_ids, strict=True):
         values = [
             overlaps.loc[
-                (overlaps["document"] == document) & (overlaps["run_pair"] == run_pair),
+                overlaps["config_id"].eq(config_id) & overlaps["run_pair"].eq(run_pair),
                 "citation_change",
             ].dropna()
-            for document in documents
+            for run_pair in run_pairs
         ]
-        offset = (pair_index - (len(run_pairs) - 1) / 2) * (width + 0.03)
-        positions = np.arange(len(documents)) + offset
         plot = ax.boxplot(
             values,
-            positions=positions,
-            widths=width,
+            positions=np.arange(len(run_pairs)),
+            widths=0.5,
             patch_artist=True,
             showfliers=False,
             medianprops={"color": "black"},
         )
-        for box in plot["boxes"]:
+        for box, color in zip(plot["boxes"], colors, strict=True):
             box.set_facecolor(color)
             box.set_alpha(0.75)
-        for position, group_values in zip(positions, values, strict=True):
-            point_offsets = np.linspace(-0.035, 0.035, len(group_values))
+        for position, group_values, color in zip(
+            np.arange(len(run_pairs)),
+            values,
+            colors,
+            strict=True,
+        ):
+            point_offsets = np.linspace(-0.12, 0.12, len(group_values))
             ax.scatter(
                 position + point_offsets,
                 group_values,
@@ -1493,18 +1734,19 @@ def plot_citation_overlap_by_run_pair(
                 s=20,
                 zorder=3,
             )
-        ax.plot([], [], color=color, linewidth=8, label=f"Runs {run_pair}")
-    labels = [textwrap.shorten(Path(document).stem, width=24, placeholder="...") for document in documents]
-    ax.set_xticks(range(len(documents)), labels, rotation=25, ha="right")
-    ax.set_ylim(-0.03, 1.05)
-    ax.set(
-        title="Citation chunk-set change between repeated runs",
-        xlabel="Report",
-        ylabel="Citation change (1 - Jaccard)",
-    )
-    ax.yaxis.set_major_formatter(lambda value, _position: f"{value:.0%}")
-    ax.grid(axis="y", alpha=0.25)
-    ax.legend(title="Run comparison", loc="lower left")
+        ax.set_xticks(
+            range(len(run_pairs)),
+            [f"Runs {run_pair}" for run_pair in run_pairs],
+        )
+        ax.set_ylim(-0.03, 1.05)
+        ax.set(
+            title=config_id,
+            xlabel="Run comparison",
+            ylabel="Citation change (1 - Jaccard)",
+        )
+        ax.yaxis.set_major_formatter(lambda value, _position: f"{value:.0%}")
+        ax.grid(axis="y", alpha=0.25)
+    fig.suptitle("Citation chunk-set change by configuration")
     fig.tight_layout()
     fig.savefig(output_dir / "citation_chunk_change_by_run_pair.png", dpi=200)
     plt.close(fig)
@@ -1825,6 +2067,7 @@ def analyze(
         output_dir,
     )
     plot_robustness_boxplots(answers, citations, output_dir)
+    plot_answer_scores_by_configuration(answers, output_dir)
     plot_score_quantile_intervals_by_run(answers, output_dir)
     plot_citation_overlap_by_run_pair(answers, output_dir)
     return frames

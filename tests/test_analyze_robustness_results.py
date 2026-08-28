@@ -16,6 +16,7 @@ from scripts.analyze_robustness_results import (
     plot_answer_confusion_matrix,
     plot_answer_label_robustness,
     plot_answer_robustness_metrics_table,
+    plot_answer_scores_by_configuration,
     plot_citation_overlap_by_run_pair,
     plot_overall_performance_metrics,
     plot_paper_robustness_figure,
@@ -265,7 +266,18 @@ def test_overall_performance_metrics_plot_is_written(tmp_path):
     plot_all_evaluation_metrics_table(metrics, tmp_path)
 
     assert (tmp_path / "overall_performance_metrics.png").exists()
-    assert (tmp_path / "all_evaluation_metrics_table.png").exists()
+    assert (tmp_path / "all_evaluation_metrics_table_cs200_k2.png").exists()
+    assert (tmp_path / "all_evaluation_metrics_table_cs200_k3.png").exists()
+    assert set(metrics["config_id"]) == {"cs200_k2", "cs200_k3"}
+    assert set(
+        metrics.loc[
+            metrics["section"].eq("Direct retrieval"),
+            ["config_id", "metric"],
+        ].itertuples(index=False, name=None)
+    ) >= {
+        ("cs200_k2", "Precision@2"),
+        ("cs200_k3", "Precision@3"),
+    }
     assert set(metrics["section"]) == {
         "Classification",
         "Direct retrieval",
@@ -277,11 +289,13 @@ def test_answer_label_robustness_plot_is_written(tmp_path):
     answers, _ = reconstruct_tables(_raw_rows())
 
     plot_answer_label_robustness(answers, tmp_path)
+    plot_answer_scores_by_configuration(answers, tmp_path)
     summary = build_answer_robustness_summary(answers)
     metrics = build_answer_robustness_metrics(answers)
     plot_answer_robustness_metrics_table(metrics, tmp_path)
 
     assert (tmp_path / "answer_label_robustness.png").exists()
+    assert (tmp_path / "answer_score_by_configuration.png").exists()
     assert (tmp_path / "answer_robustness_metrics_table.png").exists()
     assert summary["label_stability_rate"].eq(1).all()
     assert summary["answer_text_stability_rate"].eq(1).all()
