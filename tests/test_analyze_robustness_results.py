@@ -305,8 +305,7 @@ def test_answer_label_robustness_plot_is_written(tmp_path):
 
 def test_benchmark_manifest_emits_and_validates_full_matrix(tmp_path):
     manifest = tmp_path / "questions.yaml"
-    manifest.write_text(
-        """
+    manifest.write_text("""
 documents:
   - A.pdf
   - B.pdf
@@ -315,8 +314,7 @@ questions:
     text: Question one?
   - id: q2
     text: Question two?
-"""
-    )
+""")
     labels = pd.DataFrame(
         [
             {
