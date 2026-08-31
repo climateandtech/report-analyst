@@ -277,12 +277,10 @@ class CacheManager:
                 # Ensure question exists in questions table
                 logger.info(f"Ensuring question {question_id} exists in questions table")
                 result_obj = conn.execute(
-                    text(
-                        """
+                    text("""
                         SELECT id FROM questions
                         WHERE question_id = :question_id AND question_set = :question_set
-                    """
-                    ),
+                    """),
                     {"question_id": question_id, "question_set": question_set},
                 )
                 row = result_obj.fetchone()
@@ -295,16 +293,14 @@ class CacheManager:
                     if self.db_manager.is_postgres():
                         # PostgreSQL: ON CONFLICT
                         result_obj = conn.execute(
-                            text(
-                                """
+                            text("""
                                 INSERT INTO questions (question_id, question_set, question_text, guidelines)
                                 VALUES (:question_id, :question_set, :question_text, :guidelines)
                                 ON CONFLICT (question_id, question_set) DO UPDATE
                                 SET question_text = EXCLUDED.question_text,
                                     guidelines = EXCLUDED.guidelines
                                 RETURNING id
-                            """
-                            ),
+                            """),
                             {
                                 "question_id": question_id,
                                 "question_set": question_set,
@@ -315,12 +311,10 @@ class CacheManager:
                     else:
                         # SQLite: INSERT OR REPLACE
                         result_obj = conn.execute(
-                            text(
-                                """
+                            text("""
                                 INSERT OR REPLACE INTO questions (question_id, question_set, question_text, guidelines)
                                 VALUES (:question_id, :question_set, :question_text, :guidelines)
-                            """
-                            ),
+                            """),
                             {
                                 "question_id": question_id,
                                 "question_set": question_set,
@@ -340,8 +334,7 @@ class CacheManager:
                 logger.info("Saving main analysis result")
                 if self.db_manager.is_postgres():
                     result_obj = conn.execute(
-                        text(
-                            """
+                        text("""
                             INSERT INTO question_analysis
                             (file_path, question_id, model, top_k, analysis_result, version, created_at)
                             VALUES (:file_path, :question_id, :model, :top_k, :analysis_result, :version, :created_at)
@@ -349,8 +342,7 @@ class CacheManager:
                             SET analysis_result = EXCLUDED.analysis_result,
                                 created_at = EXCLUDED.created_at
                             RETURNING id
-                        """
-                        ),
+                        """),
                         {
                             "file_path": str(file_path),
                             "question_id": question_db_id,
@@ -363,13 +355,11 @@ class CacheManager:
                     )
                 else:
                     result_obj = conn.execute(
-                        text(
-                            """
+                        text("""
                             INSERT OR REPLACE INTO question_analysis
                             (file_path, question_id, model, top_k, analysis_result, version, created_at)
                             VALUES (:file_path, :question_id, :model, :top_k, :analysis_result, :version, :created_at)
-                        """
-                        ),
+                        """),
                         {
                             "file_path": str(file_path),
                             "question_id": question_db_id,
@@ -382,13 +372,11 @@ class CacheManager:
                     )
                     # Get ID separately for SQLite
                     result_obj = conn.execute(
-                        text(
-                            """
+                        text("""
                             SELECT id FROM question_analysis
                             WHERE file_path = :file_path AND question_id = :question_id
                             AND model = :model AND top_k = :top_k AND version = :version
-                        """
-                        ),
+                        """),
                         {
                             "file_path": str(file_path),
                             "question_id": question_db_id,
@@ -408,12 +396,10 @@ class CacheManager:
 
                         # Get chunk ID from document_chunks table
                         result_obj = conn.execute(
-                            text(
-                                """
+                            text("""
                                 SELECT id FROM document_chunks
                                 WHERE file_path = :file_path AND chunk_text = :chunk_text
-                            """
-                            ),
+                            """),
                             {"file_path": str(file_path), "chunk_text": chunk["text"]},
                         )
                         row = result_obj.fetchone()
@@ -424,8 +410,7 @@ class CacheManager:
                             # Save chunk relevance with all available information
                             if self.db_manager.is_postgres():
                                 conn.execute(
-                                    text(
-                                        """
+                                    text("""
                                         INSERT INTO chunk_relevance
                                         (question_analysis_id, document_chunk_id, chunk_order,
                                          similarity_score, llm_score, is_evidence, evidence_order, metadata)
@@ -438,8 +423,7 @@ class CacheManager:
                                             is_evidence = EXCLUDED.is_evidence,
                                             evidence_order = EXCLUDED.evidence_order,
                                             metadata = EXCLUDED.metadata
-                                    """
-                                    ),
+                                    """),
                                     {
                                         "question_analysis_id": analysis_id,
                                         "document_chunk_id": chunk_id,
@@ -453,15 +437,13 @@ class CacheManager:
                                 )
                             else:
                                 conn.execute(
-                                    text(
-                                        """
+                                    text("""
                                         INSERT OR REPLACE INTO chunk_relevance
                                         (question_analysis_id, document_chunk_id, chunk_order,
                                          similarity_score, llm_score, is_evidence, evidence_order, metadata)
                                         VALUES (:question_analysis_id, :document_chunk_id, :chunk_order,
                                                 :similarity_score, :llm_score, :is_evidence, :evidence_order, :metadata)
-                                    """
-                                    ),
+                                    """),
                                     {
                                         "question_analysis_id": analysis_id,
                                         "document_chunk_id": chunk_id,
@@ -486,8 +468,7 @@ class CacheManager:
                 logger.info("Saving to analysis cache")
                 if self.db_manager.is_postgres():
                     conn.execute(
-                        text(
-                            """
+                        text("""
                             INSERT INTO analysis_cache
                             (file_path, question_id, chunk_size, chunk_overlap, top_k,
                              model, question_set, result, created_at)
@@ -506,8 +487,7 @@ class CacheManager:
                             DO UPDATE
                             SET result = EXCLUDED.result,
                                 created_at = EXCLUDED.created_at
-                        """
-                        ),
+                        """),
                         {
                             "file_path": str(file_path),
                             "question_id": question_id,
@@ -522,8 +502,7 @@ class CacheManager:
                     )
                 else:
                     conn.execute(
-                        text(
-                            """
+                        text("""
                             INSERT OR REPLACE INTO analysis_cache
                             (file_path, question_id, chunk_size, chunk_overlap, top_k,
                              model, question_set, result, created_at)
@@ -538,8 +517,7 @@ class CacheManager:
                                 :result,
                                 :created_at
                             )
-                        """
-                        ),
+                        """),
                         {
                             "file_path": str(file_path),
                             "question_id": question_id,
@@ -683,8 +661,7 @@ class CacheManager:
                         # PostgreSQL: ON CONFLICT
                         for chunk_row in chunk_data:
                             conn.execute(
-                                text(
-                                    """
+                                text("""
                                     INSERT INTO document_chunks
                                     (file_path, chunk_text, chunk_size, chunk_overlap,
                                      embedding, metadata, created_at)
@@ -701,16 +678,14 @@ class CacheManager:
                                     SET embedding = EXCLUDED.embedding,
                                         metadata = EXCLUDED.metadata,
                                         created_at = EXCLUDED.created_at
-                                """
-                                ),
+                                """),
                                 chunk_row,
                             )
                     else:
                         # SQLite: INSERT OR REPLACE
                         for chunk_row in chunk_data:
                             conn.execute(
-                                text(
-                                    """
+                                text("""
                                     INSERT OR REPLACE INTO document_chunks
                                     (file_path, chunk_text, chunk_size, chunk_overlap,
                                      embedding, metadata, created_at)
@@ -723,8 +698,7 @@ class CacheManager:
                                     :metadata,
                                     :created_at
                                 )
-                                """
-                                ),
+                                """),
                                 chunk_row,
                             )
 
@@ -749,13 +723,11 @@ class CacheManager:
         try:
             with self.db_manager.get_connection() as conn:
                 result_obj = conn.execute(
-                    text(
-                        """
+                    text("""
                         SELECT chunk_text, embedding, metadata
                         FROM document_chunks
                         WHERE file_path = :file_path
-                    """
-                    ),
+                    """),
                     {"file_path": str(file_path)},
                 )
                 chunks = []
@@ -825,15 +797,11 @@ class CacheManager:
         """
         try:
             with self.db_manager.get_connection() as conn:
-                result_obj = conn.execute(
-                    text(
-                        """
+                result_obj = conn.execute(text("""
                         SELECT DISTINCT file_path, question_set
                         FROM analysis_cache
                         ORDER BY question_set, file_path
-                        """
-                    )
-                )
+                        """))
                 rows = result_obj.fetchall()
                 return [{"file_path": row[0], "question_set": row[1]} for row in rows]
         except Exception as e:
@@ -847,25 +815,19 @@ class CacheManager:
                 if file_path:
                     logger.info(f"Checking cache for file: {file_path}")
                     result_obj = conn.execute(
-                        text(
-                            """
+                        text("""
                             SELECT DISTINCT chunk_size, chunk_overlap, top_k, model, question_set
                             FROM analysis_cache
                             WHERE file_path = :file_path
-                        """
-                        ),
+                        """),
                         {"file_path": str(file_path)},
                     )
                 else:
                     logger.info("Checking all cache entries")
-                    result_obj = conn.execute(
-                        text(
-                            """
+                    result_obj = conn.execute(text("""
                             SELECT DISTINCT file_path, chunk_size, chunk_overlap, top_k, model, question_set
                             FROM analysis_cache
-                        """
-                        )
-                    )
+                        """))
 
                 rows = result_obj.fetchall()
                 logger.info(f"Found {len(rows)} distinct configurations:")
@@ -884,8 +846,7 @@ class CacheManager:
             with self.db_manager.get_connection() as conn:
                 # First get all analysis results
                 result_obj = conn.execute(
-                    text(
-                        """
+                    text("""
                         SELECT ac.question_id, ac.result,
                                dc.chunk_text, dc.metadata as chunk_metadata,
                                cr.chunk_order, cr.similarity_score,
@@ -898,8 +859,7 @@ class CacheManager:
                         LEFT JOIN document_chunks dc ON cr.document_chunk_id = dc.id
                         WHERE ac.question_set = :question_set
                         ORDER BY ac.question_id, cr.chunk_order
-                    """
-                    ),
+                    """),
                     {"question_set": question_set},
                 )
 
@@ -967,8 +927,7 @@ class CacheManager:
 
                     if self.db_manager.is_postgres():
                         conn.execute(
-                            text(
-                                """
+                            text("""
                                 INSERT INTO document_chunks
                                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                                 VALUES (
@@ -984,8 +943,7 @@ class CacheManager:
                                 SET embedding = EXCLUDED.embedding,
                                     metadata = EXCLUDED.metadata,
                                     created_at = EXCLUDED.created_at
-                            """
-                            ),
+                            """),
                             {
                                 "file_path": str(file_path),
                                 "chunk_text": chunk["text"],
@@ -998,8 +956,7 @@ class CacheManager:
                         )
                     else:
                         conn.execute(
-                            text(
-                                """
+                            text("""
                                 INSERT OR REPLACE INTO document_chunks
                                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                                 VALUES (
@@ -1011,8 +968,7 @@ class CacheManager:
                                     :metadata,
                                     :created_at
                                 )
-                            """
-                            ),
+                            """),
                             {
                                 "file_path": str(file_path),
                                 "chunk_text": chunk["text"],
@@ -1028,12 +984,10 @@ class CacheManager:
 
                 # Verify chunks were saved
                 result_obj = conn.execute(
-                    text(
-                        """
+                    text("""
                         SELECT COUNT(*) FROM document_chunks
                         WHERE file_path = :file_path AND chunk_size = :chunk_size AND chunk_overlap = :chunk_overlap
-                    """
-                    ),
+                    """),
                     {
                         "file_path": str(file_path),
                         "chunk_size": chunk_size,
@@ -1188,15 +1142,13 @@ class CacheManager:
         try:
             with self.db_manager.get_connection() as conn:
                 result_obj = conn.execute(
-                    text(
-                        """
+                    text("""
                         SELECT COUNT(DISTINCT q.question_id)
                         FROM questions q
                         JOIN question_analysis qa ON qa.question_id = q.id
                         JOIN chunk_relevance cr ON cr.question_analysis_id = qa.id
                         WHERE qa.file_path = :file_path AND qa.model = :model AND qa.top_k = :top_k
-                    """
-                    ),
+                    """),
                     {
                         "file_path": str(file_path),
                         "model": config["model"],
