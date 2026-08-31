@@ -4,6 +4,7 @@ Tests for the QuestionSetLoader functionality
 
 import os
 import tempfile
+from pathlib import Path
 
 import pytest
 import yaml
@@ -273,6 +274,24 @@ class TestQuestionSetLoader:
         assert len(question_sets2) > 0
         assert len(question_sets1) == len(question_sets2)
 
+    def test_reload_rereads_questionsets_path(self, monkeypatch, tmp_path):
+        """reload() must pick up QUESTIONSETS_PATH changes, not keep the init-time path."""
+        questions_dir = tmp_path / "questionsets"
+        questions_dir.mkdir()
+        (questions_dir / "path_probe_questions.yaml").write_text(
+            "name: Path Probe\ndescription: reload path check\nquestions:\n"
+            "  - id: probe_1\n    text: Probe?\n    guidelines: g\n",
+            encoding="utf-8",
+        )
+
+        monkeypatch.delenv("QUESTIONSETS_PATH", raising=False)
+        loader = QuestionSetLoader()
+        monkeypatch.setenv("QUESTIONSETS_PATH", str(questions_dir))
+        loader.reload()
+
+        assert "path_probe" in loader.get_question_sets()
+        assert loader.get_questions("path_probe")["probe_1"]["text"] == "Probe?"
+
     def test_error_handling_invalid_yaml(self):
         """Test error handling with invalid YAML file"""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -340,11 +359,13 @@ class TestQuestionSetLoader:
             "kilimanjaro",
             "lucia",
             "climretrieve",
+            "climretrieve_complete",
+            "climretrieve_complete_6",
             "custom",
         }
         assert set(question_set_options) == expected_sets
-        # 6 real sets + "custom" UI option
-        assert len(question_set_options) == 7
+        # 8 real sets + "custom" UI option
+        assert len(question_set_options) == 9
         assert "custom" in question_set_options
         assert "everest" in question_set_options
         assert "tcfd" in question_set_options
@@ -395,11 +416,13 @@ class TestQuestionSetLoader:
             "kilimanjaro",
             "lucia",
             "climretrieve",
+            "climretrieve_complete",
+            "climretrieve_complete_6",
         ]
         for expected_set in expected_sets:
             assert expected_set in options1, f"Expected question set '{expected_set}' not found in options"
 
-        assert len(options1) == 6
+        assert len(options1) == 8
 
 
 TYPED_ANSWER_QUESTIONSET = {
@@ -504,3 +527,14 @@ class TestTypedAnswerQuestionSets:
     def test_examples_variant_has_few_shots(self, typed_loader):
         qset = typed_loader.get_question_set("typed_examples")
         assert "Example:" in qset.questions["typed_f1"]["guidelines"]
+
+
+def test_climretrieve_core_questions_require_classification_answers(monkeypatch):
+    package_questionsets = Path(__file__).resolve().parents[1] / "report_analyst" / "questionsets"
+    monkeypatch.setenv("QUESTIONSETS_PATH", str(package_questionsets))
+
+    questions = QuestionSetLoader().get_questions("climretrieve")
+    core_questions = [questions[f"climretr_{index}"] for index in range(1, 17)]
+
+    assert all(question["guidelines"].startswith("- ANSWER type: classification") for question in core_questions)
+    assert questions["climretr_17_ir"]["guidelines"] == ""
