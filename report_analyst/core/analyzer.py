@@ -14,12 +14,11 @@ from llama_index.core import Document, Settings
 from llama_index.core.ingestion import IngestionCache
 from llama_index.core.llms import ChatMessage
 from llama_index.core.node_parser import SentenceSplitter
-from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.file import PyMuPDFReader
 
 from .api_key_manager import APIKeyManager
 from .cache_manager import CacheManager
-from .llm_providers import get_llm
+from .llm_providers import build_openai_embedding, get_llm, is_permanent_openai_quota_error
 from .prompt_manager import PromptManager
 from .storage import LlamaVectorStore
 
@@ -231,12 +230,7 @@ class DocumentAnalyzer:
 
             current_openai_key = os.getenv("OPENAI_API_KEY")
             if APIKeyManager.is_configured_key(current_openai_key):
-                self.embeddings = OpenAIEmbedding(
-                    api_key=current_openai_key,
-                    api_base=os.getenv("OPENAI_API_BASE"),
-                    model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
-                    embed_batch_size=100,
-                )
+                self.embeddings = build_openai_embedding(api_key=current_openai_key)
                 Settings.embed_model = self.embeddings
             else:
                 logger.warning("No OpenAI API key - embedding functionality will be limited")
@@ -938,12 +932,7 @@ class DocumentAnalyzer:
         if not openai_key:
             raise RuntimeError("OpenAI embeddings unavailable — set OPENAI_API_KEY for the Embed step.")
         if self.embeddings is None:
-            self.embeddings = OpenAIEmbedding(
-                api_key=openai_key,
-                api_base=os.getenv("OPENAI_API_BASE"),
-                model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
-                embed_batch_size=100,
-            )
+            self.embeddings = build_openai_embedding(api_key=openai_key)
             Settings.embed_model = self.embeddings
 
     def _add_embeddings_to_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1041,6 +1030,8 @@ class DocumentAnalyzer:
                                 logger.warning("Skipping chunk - embedding is None")
 
                 except Exception as e:
+                    if is_permanent_openai_quota_error(e):
+                        raise
                     logger.error(f"Error computing embeddings for batch: {e!s}", exc_info=True)
                     # Continue with next batch, storing chunks without embeddings
                     for chunk in batch:
@@ -1491,6 +1482,8 @@ class DocumentAnalyzer:
             return similar_chunks
 
         except Exception as e:
+            if is_permanent_openai_quota_error(e):
+                raise
             logger.error(f"Error getting similar chunks: {e!s}", exc_info=True)
             return []
 

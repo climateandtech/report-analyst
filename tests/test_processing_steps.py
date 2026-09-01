@@ -101,7 +101,7 @@ def analyzer(monkeypatch, clean_db):
     monkeypatch.setenv("USE_BACKEND", "false")
     monkeypatch.setenv("USE_CENTRALIZED_LLM", "false")
     DocumentAnalyzer.reset_instance()
-    with patch("llama_index.embeddings.openai.OpenAIEmbedding"), patch(
+    with patch("report_analyst.core.llm_providers.build_openai_embedding"), patch(
         "report_analyst.core.llm_providers.get_llm"
     ) as mock_get_llm:
         mock_get_llm.return_value = Mock(model="gpt-4o-mini", achat=AsyncMock())
@@ -1175,7 +1175,7 @@ def test_ensure_embeddings_client_creates_when_missing(analyzer, monkeypatch):
     analyzer.embeddings = None
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     fake = Mock()
-    monkeypatch.setattr("report_analyst.core.analyzer.OpenAIEmbedding", Mock(return_value=fake))
+    monkeypatch.setattr("report_analyst.core.analyzer.build_openai_embedding", Mock(return_value=fake))
     monkeypatch.setattr("report_analyst.core.analyzer.Settings", Mock())
     analyzer._ensure_embeddings_client()
     assert analyzer.embeddings is fake
