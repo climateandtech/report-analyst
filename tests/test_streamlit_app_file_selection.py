@@ -8,15 +8,21 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
+APP_PATH = Path(__file__).resolve().parents[1] / "report_analyst" / "streamlit_app.py"
+TEST_PDF = (
+    b"%PDF-1.4\n%Test PDF\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+    b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+    b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\n"
+    b"xref\n0 4\ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n100\n%%EOF"
+)
+
 
 def test_file_selection_with_file_uri():
     """Test that file selection works correctly with file:// URIs"""
     # Create a temporary PDF file
     with tempfile.TemporaryDirectory() as temp_dir:
         test_pdf = Path(temp_dir) / "test_report.pdf"
-        test_pdf.write_bytes(
-            b"%PDF-1.4\n%Test PDF\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\nxref\n0 4\ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n100\n%%EOF"
-        )
+        test_pdf.write_bytes(TEST_PDF)
 
         # Set temp directory in environment
         import os
@@ -25,7 +31,7 @@ def test_file_selection_with_file_uri():
         os.environ["TEMP_DIR"] = str(temp_dir)
 
         try:
-            at = AppTest.from_file("report_analyst/streamlit_app.py")
+            at = AppTest.from_file(APP_PATH)
             at.session_state["nav_page"] = "Report Analyst"
             at.run(timeout=10)
 
@@ -63,9 +69,7 @@ def test_file_path_resolution_from_uri():
     # Create a temporary PDF file
     with tempfile.TemporaryDirectory() as temp_dir:
         test_pdf = Path(temp_dir) / "test_report.pdf"
-        test_pdf.write_bytes(
-            b"%PDF-1.4\n%Test PDF\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\nxref\n0 4\ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n100\n%%EOF"
-        )
+        test_pdf.write_bytes(TEST_PDF)
 
         # Set temp directory in environment
         import os
@@ -109,9 +113,7 @@ def test_file_not_found_error_not_shown():
     # Create a temporary PDF file
     with tempfile.TemporaryDirectory() as temp_dir:
         test_pdf = Path(temp_dir) / "test_report.pdf"
-        test_pdf.write_bytes(
-            b"%PDF-1.4\n%Test PDF\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\nxref\n0 4\ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n100\n%%EOF"
-        )
+        test_pdf.write_bytes(TEST_PDF)
 
         # Set temp directory in environment
         import os
@@ -120,7 +122,7 @@ def test_file_not_found_error_not_shown():
         os.environ["TEMP_DIR"] = str(temp_dir)
 
         try:
-            at = AppTest.from_file("report_analyst/streamlit_app.py")
+            at = AppTest.from_file(APP_PATH)
             at.session_state["nav_page"] = "Report Analyst"
             at.run(timeout=10)
 

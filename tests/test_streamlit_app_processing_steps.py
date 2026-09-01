@@ -3,12 +3,16 @@ Tests for Processing Steps slider functionality in streamlit app using AppTest.
 Tests that the slider exists, is interactive, and controls step selection.
 """
 
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
+
+APP_PATH = Path(__file__).resolve().parents[1] / "report_analyst" / "streamlit_app.py"
 
 
 def test_processing_steps_slider_exists():
     """Test that Processing Steps slider is present"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
@@ -30,7 +34,7 @@ def test_processing_steps_slider_exists():
 
 def test_processing_steps_slider_interactive():
     """Test that Processing Steps slider is interactive"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
@@ -52,20 +56,13 @@ def test_processing_steps_slider_interactive():
 
 def test_processing_steps_displayed():
     """Test that Processing Steps are displayed with correct labels"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Check that Processing Steps section exists
     # This is verified by the app loading without errors
     assert not at.exception, "App should load without errors"
-
-    # Check for Processing Steps heading
-    has_processing_steps = False
-    for header in at.header:
-        if "Processing Steps" in str(header.value):
-            has_processing_steps = True
-            break
 
     # Processing Steps might only show when a file is selected
     # So we just verify the app loads correctly

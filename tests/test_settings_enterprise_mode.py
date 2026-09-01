@@ -7,16 +7,19 @@ Tests that the "Enterprise mode enabled" message only appears when:
 """
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
+
+APP_PATH = Path(__file__).resolve().parents[1] / "report_analyst" / "streamlit_app.py"
 
 
 def test_enterprise_mode_message_only_when_checked():
     """Test that enterprise mode message only shows when checkbox is checked"""
     # Run without USE_S3_UPLOAD env var to test checkbox behavior
     with patch.dict(os.environ, {"USE_S3_UPLOAD": "false"}, clear=False):
-        at = AppTest.from_file("report_analyst/streamlit_app.py")
+        at = AppTest.from_file(APP_PATH)
         at.run(timeout=10)
 
         # Navigate to Settings page
@@ -40,8 +43,9 @@ def test_enterprise_mode_message_only_when_checked():
 
         # After unchecking, the message should NOT appear
         page_text = str(at)
-        if "Enterprise mode enabled" in page_text:
-            assert False, "Enterprise mode message should not appear when checkbox is unchecked"
+        assert (
+            "Enterprise mode enabled" not in page_text
+        ), "Enterprise mode message should not appear when checkbox is unchecked"
 
         # Now check the checkbox
         checkbox.set_value(True)
@@ -55,7 +59,7 @@ def test_enterprise_mode_checkbox_state_persistence():
     """Test that checkbox state persists correctly across reruns"""
     # Run without USE_S3_UPLOAD env var to test checkbox behavior
     with patch.dict(os.environ, {"USE_S3_UPLOAD": "false"}, clear=False):
-        at = AppTest.from_file("report_analyst/streamlit_app.py")
+        at = AppTest.from_file(APP_PATH)
         at.run(timeout=10)
 
         # Navigate to Settings
@@ -79,8 +83,9 @@ def test_enterprise_mode_checkbox_state_persistence():
 
         # Check that enterprise mode message is NOT shown when unchecked
         page_text = str(at)
-        if "Enterprise mode enabled" in page_text:
-            assert False, "Enterprise mode message should NOT appear when checkbox is unchecked"
+        assert (
+            "Enterprise mode enabled" not in page_text
+        ), "Enterprise mode message should NOT appear when checkbox is unchecked"
 
         # Rerun - state should persist
         at.run(timeout=10)
@@ -93,7 +98,7 @@ def test_enterprise_mode_env_var_detection():
     # When USE_S3_UPLOAD=true is in env, session state should be True
     env_value = os.getenv("USE_S3_UPLOAD", "false").lower() == "true"
 
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     at.run(timeout=10)
 
     # Navigate to Settings

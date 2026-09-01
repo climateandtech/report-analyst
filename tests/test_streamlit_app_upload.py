@@ -3,12 +3,16 @@ Tests for file upload functionality in streamlit_app.py using AppTest.
 Tests that the app loads correctly with file upload capabilities.
 """
 
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
+
+APP_PATH = Path(__file__).resolve().parents[1] / "report_analyst" / "streamlit_app.py"
 
 
 def test_app_loads_with_upload_capability():
     """Test that app loads without errors and has upload functionality"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     # Navigate to Report Analyst page to check for title
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -23,7 +27,7 @@ def test_app_loads_with_upload_capability():
 
 def test_app_has_file_related_ui():
     """Test that app has file-related UI elements"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     # Navigate to Report Analyst page where file selectbox might be located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)

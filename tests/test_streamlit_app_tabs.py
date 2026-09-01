@@ -3,12 +3,16 @@ Tests for streamlit app tabs and data loading functionality using AppTest.
 Tests Previous Reports, Upload New, and Consolidated Results tabs.
 """
 
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
+
+APP_PATH = Path(__file__).resolve().parents[1] / "report_analyst" / "streamlit_app.py"
 
 
 def test_tabs_exist():
     """Test that all three main navigation pages are present"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     at.run(timeout=10)
 
     # Check that navigation page is set in session state
@@ -29,20 +33,13 @@ def test_tabs_exist():
 
 def test_previous_reports_tab():
     """Test Report Analyst page functionality (previously called Previous Reports)"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     # Navigate to Report Analyst page
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Check that we're on the Report Analyst page
     assert at.session_state["nav_page"] == "Report Analyst", "Not on Report Analyst page"
-
-    # Check if selectbox for previous files exists
-    has_file_selectbox = False
-    for sb in at.selectbox:
-        if "previously analyzed report" in str(sb.label).lower() or "previous_file" in str(sb.key):
-            has_file_selectbox = True
-            break
 
     # The selectbox might not be visible if no previous files exist
     # This is expected behavior, so we just check the page exists
@@ -51,7 +48,7 @@ def test_previous_reports_tab():
 
 def test_upload_new_tab():
     """Test Upload Report page functionality (previously called Upload New)"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     # Navigate to Upload Report page
     at.session_state["nav_page"] = "Upload Report"
     at.run(timeout=10)
@@ -59,8 +56,6 @@ def test_upload_new_tab():
     # Check that we're on the Upload Report page
     assert at.session_state["nav_page"] == "Upload Report", "Not on Upload Report page"
 
-    # Check for file uploader in the app (should be present)
-    has_file_uploader = hasattr(at, "file_uploader") and len(at.file_uploader) > 0
     # File uploader might not be visible initially in AppTest, so this is optional
     # The important thing is that the page exists and the app loads without errors
     assert not at.exception
@@ -68,7 +63,7 @@ def test_upload_new_tab():
 
 def test_consolidated_results_tab():
     """Test All Results page functionality (previously called Consolidated Results)"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     # Navigate to All Results page
     at.session_state["nav_page"] = "All Results"
     at.run(timeout=10)
@@ -90,7 +85,7 @@ def test_consolidated_results_tab():
 
 def test_configuration_expander():
     """Test Analysis Configuration expander"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     # Navigate to Report Analyst page where the expander is located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -108,7 +103,7 @@ def test_configuration_expander():
 
 def test_configuration_widgets():
     """Test configuration widgets (chunk size, overlap, top_k, model)"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     # Navigate to Report Analyst page where configuration widgets are located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -130,7 +125,7 @@ def test_configuration_widgets():
 
 def test_question_set_selection():
     """Test question set selection functionality"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     # Navigate to Report Analyst page where question set selectbox is located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -159,7 +154,7 @@ def test_question_set_selection():
 
 def test_analysis_controls():
     """Test analysis control checkboxes and buttons"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     # Navigate to Report Analyst page where analysis controls are located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -182,7 +177,7 @@ def test_analysis_controls():
 
 def test_footer_display():
     """Test that footer with Climate+Tech branding is displayed"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     at.run(timeout=10)
 
     # Check for footer content in markdown
@@ -193,7 +188,7 @@ def test_footer_display():
 
 def test_session_state_initialization():
     """Test that session state variables are properly initialized"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(APP_PATH)
     at.run(timeout=10)
 
     # The app should initialize without errors, which means session state is set up correctly
