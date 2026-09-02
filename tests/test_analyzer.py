@@ -166,7 +166,9 @@ def test_env(clean_db):
             f,
         )
 
-    # Set environment variables
+    # Set environment variables (restore on teardown — do not leak into other tests)
+    env_keys = ("OPENAI_API_KEY", "OPENAI_ORGANIZATION", "STORAGE_PATH", "QUESTIONSETS_PATH")
+    original_env = {key: os.environ.get(key) for key in env_keys}
     os.environ["OPENAI_API_KEY"] = "test-key"
     os.environ["OPENAI_ORGANIZATION"] = "test-org"
     os.environ["STORAGE_PATH"] = str(storage_path)
@@ -174,23 +176,29 @@ def test_env(clean_db):
 
     print("Test environment setup complete")  # Debug print
 
-    yield {
-        "temp_dir": temp_dir,
-        "storage_path": storage_path,
-        "test_file": storage_path / "test_report.pdf",
-        "questions_dir": questions_dir,
-        "db_path": clean_db,
-    }
-
-    print("Cleaning up test environment")  # Debug print
-    shutil.rmtree(temp_dir)
+    try:
+        yield {
+            "temp_dir": temp_dir,
+            "storage_path": storage_path,
+            "test_file": storage_path / "test_report.pdf",
+            "questions_dir": questions_dir,
+            "db_path": clean_db,
+        }
+    finally:
+        print("Cleaning up test environment")  # Debug print
+        for key, value in original_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        shutil.rmtree(temp_dir)
 
 
 @pytest.fixture(scope="function")
 def analyzer(test_env, clean_db):
     """Create a DocumentAnalyzer instance with mocked LLM"""
     with (
-        patch("langchain_openai.ChatOpenAI") as mock_llm,
+        patch("report_analyst.core.analyzer.get_llm") as mock_llm,
         patch("llama_index.embeddings.openai.OpenAIEmbedding") as mock_embedding,
         patch("llama_index.core.Settings"),
     ):
@@ -342,7 +350,7 @@ def test_update_llm_model(analyzer):
     mock_llm = Mock()
     mock_llm.model = new_model
 
-    with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
+    with patch("report_analyst.core.analyzer.get_llm", return_value=mock_llm):
         analyzer.update_llm_model(new_model)
         assert analyzer.llm.model == new_model
 
@@ -545,7 +553,7 @@ def test_get_all_cached_answers(analyzer):
 async def test_document_analysis_workflow(test_env):
     """Test the main document analysis workflow"""
     with (
-        patch("langchain_openai.ChatOpenAI") as mock_llm,
+        patch("report_analyst.core.analyzer.get_llm") as mock_llm,
         patch("llama_index.embeddings.openai.OpenAIEmbedding") as mock_embedding,
         patch("llama_index.core.Settings"),
     ):
@@ -697,6 +705,7 @@ def test_chunk_size_creation(analyzer, test_env):
 
             # Verify chunks were created
             assert len(chunks) > 0, f"No chunks created for chunk_size={chunk_size}"
+            assert [chunk["metadata"]["chunk_order"] for chunk in chunks] == list(range(len(chunks)))
 
             # Verify chunk metadata
             for chunk in chunks:
