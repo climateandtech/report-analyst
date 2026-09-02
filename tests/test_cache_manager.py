@@ -37,12 +37,10 @@ def test_init_db(temp_db):
     """Test database initialization"""
     # Check if tables exist
     with sqlite3.connect(temp_db.db_path) as conn:
-        cursor = conn.execute(
-            """
+        cursor = conn.execute("""
             SELECT name FROM sqlite_master
             WHERE type='table' AND (name='analysis_cache' OR name='document_chunks')
-        """
-        )
+        """)
         tables = [row[0] for row in cursor.fetchall()]
 
     assert "analysis_cache" in tables
@@ -138,6 +136,59 @@ def test_config_matching(temp_db):
     # Try to retrieve with config2
     cached = temp_db.get_analysis(file_path, config2, [question_id])
     assert len(cached) == 0  # Should not find results with different config
+
+
+def test_get_analysis_keeps_chunks_with_matching_model(temp_db):
+    file_path = "test_doc.pdf"
+    question_id = "tcfd_1"
+    base_config = {
+        "chunk_size": 500,
+        "chunk_overlap": 20,
+        "top_k": 5,
+        "question_set": "tcfd",
+    }
+    gpt4_config = {**base_config, "model": "gpt-4o"}
+    mini_config = {**base_config, "model": "gpt-4o-mini"}
+    chunks = [
+        {
+            "text": "Shared report chunk",
+            "embedding": [0.1, 0.2],
+            "chunk_order": 0,
+            "similarity_score": 0.8,
+            "llm_score": None,
+            "metadata": {"page_number": 1},
+        }
+    ]
+    temp_db.save_document_chunks(file_path, chunks, 500, 20)
+
+    temp_db.save_analysis(
+        file_path,
+        question_id,
+        {
+            "ANSWER": "Answer with evidence",
+            "EVIDENCE": [{"chunk": 1}],
+            "chunks": [{**chunks[0], "is_evidence": True, "evidence_order": 1}],
+        },
+        gpt4_config,
+    )
+    temp_db.save_analysis(
+        file_path,
+        question_id,
+        {
+            "ANSWER": "Answer without evidence",
+            "EVIDENCE": [],
+            "chunks": [{**chunks[0], "is_evidence": False, "evidence_order": None}],
+        },
+        mini_config,
+    )
+
+    gpt4_result = temp_db.get_analysis(file_path, gpt4_config, [question_id])[question_id]
+    mini_result = temp_db.get_analysis(file_path, mini_config, [question_id])[question_id]
+
+    assert gpt4_result["result"]["ANSWER"] == "Answer with evidence"
+    assert [chunk["is_evidence"] for chunk in gpt4_result["chunks"]] == [True]
+    assert mini_result["result"]["ANSWER"] == "Answer without evidence"
+    assert [chunk["is_evidence"] for chunk in mini_result["chunks"]] == [False]
 
 
 def test_multiple_questions(temp_db):
