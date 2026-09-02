@@ -176,6 +176,7 @@ def render_consolidated_report_view(
     config: dict,
     *,
     display_analysis_results,
+    display_pdf_viewer=None,
 ) -> None:
     """Show chunk search and optional cached answer results for one report/config."""
     logger.info(f"Getting results for {Path(file_path).name} with config: {config}")
@@ -239,5 +240,7 @@ def render_consolidated_report_view(
         chunks_df = pd.DataFrame(question_chunks_rows) if question_chunks_rows else pd.DataFrame()
         file_key = f"{Path(file_path).stem}_cs{config['chunk_size']}"
         display_analysis_results(analysis_df, chunks_df, file_key)
+        if display_pdf_viewer is not None:
+            display_pdf_viewer(file_path, cached_results, questions)
     else:
         st.warning("No results found in stored for this configuration")

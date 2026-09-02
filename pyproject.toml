@@ -47,11 +47,14 @@ exclude = '''
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "e2e: opt-in tests that call live external services",
+]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 127
-src = ["report_analyst", "tests"]
+src = ["report_analyst", "scripts", "tests"]
 
 [tool.ruff.lint]
 # TODO: expand toward select = ["ALL"] fix-on-touch (docstrings, typing, complexity).
@@ -82,6 +85,7 @@ known-first-party = [
     "report_analyst_enterprise",
     "report_analyst_jobs",
     "report_analyst_search_backend",
+    "scripts",
 ]
 
 [tool.ruff.lint.per-file-ignores]

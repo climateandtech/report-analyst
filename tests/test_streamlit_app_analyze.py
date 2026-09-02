@@ -90,6 +90,8 @@ def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_
     select_all_button = next(button for button in at.button if button.key.startswith("select_all_"))
 
     select_all_button.click().run(timeout=10)
+    cache_get_analysis = report_analyzer.analyzer.cache_manager.get_analysis
+    cache_get_analysis.reset_mock()
     at.button(key="analyze_button").click().run(timeout=10)
 
     assert len(at.error) == 0, [e.value for e in at.error]
@@ -101,9 +103,11 @@ def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_
     assert calls[0]["force_recompute"] is False
     assert calls[0]["pre_retrieved_chunks"] is None
     assert Path(calls[0]["file_path"]).name == test_pdf_in_app_temp.name
+    assert cache_get_analysis.call_count == 1
+    assert any(expander.label == "PDF Viewer with Chunks" for expander in at.expander)
 
 
-def test_reanalyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp):
+def test_reanalyze_button_forces_recompute_without_cache_lookup(mocked_report_analyzer, test_pdf_in_app_temp):
     report_analyzer, calls = mocked_report_analyzer
 
     assert test_pdf_in_app_temp.exists()
@@ -119,6 +123,8 @@ def test_reanalyze_button_without_openai_call(mocked_report_analyzer, test_pdf_i
     select_all_button = next(button for button in at.button if button.key.startswith("select_all_"))
 
     select_all_button.click().run(timeout=10)
+    cache_get_analysis = report_analyzer.analyzer.cache_manager.get_analysis
+    cache_get_analysis.reset_mock()
     at.button(key="reanalyze_button").click().run(timeout=10)
 
     assert len(at.error) == 0, [e.value for e in at.error]
@@ -127,3 +133,5 @@ def test_reanalyze_button_without_openai_call(mocked_report_analyzer, test_pdf_i
     assert calls[0]["selected_questions"]
     assert calls[0]["force_recompute"] is True
     assert calls[0]["pre_retrieved_chunks"] is None
+    cache_get_analysis.assert_not_called()
+    assert any(expander.label == "PDF Viewer with Chunks" for expander in at.expander)
