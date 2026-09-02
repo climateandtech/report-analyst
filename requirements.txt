@@ -139,7 +139,7 @@ Pygments==2.20.0
 PyMuPDF==1.24.0
 PyMuPDFb==1.24.0
 pyparsing==3.2.1
-pypdf==6.15.0
+pypdf==6.16.1
 PyPika==0.48.9
 pyproject_hooks==1.2.0
 psycopg2-binary==2.9.10
@@ -194,7 +194,7 @@ tiktoken==0.9.0
 tokenizers==0.21.0
 toml==0.10.2
 tomlkit==0.13.2
-tornado==6.5.7
+tornado==6.5.8
 tqdm==4.67.1
 typer==0.15.1
 typing-inspect==0.9.0
