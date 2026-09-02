@@ -34,6 +34,10 @@ streamlit.diff
 cache.db
 *.db
 
+# Notebook local data (PDFs, ClimRetrieve downloads, eval CSVs)
+notebooks/data/
+notebooks/output/
+
 # Environment and backup files
 .env.backup
 inputlucia

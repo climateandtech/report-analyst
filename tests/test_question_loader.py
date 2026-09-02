@@ -4,7 +4,9 @@ Tests for the QuestionSetLoader functionality
 
 import os
 import tempfile
+from pathlib import Path
 
+import pytest
 import yaml
 
 from report_analyst.core.question_loader import (
@@ -272,6 +274,24 @@ class TestQuestionSetLoader:
         assert len(question_sets2) > 0
         assert len(question_sets1) == len(question_sets2)
 
+    def test_reload_rereads_questionsets_path(self, monkeypatch, tmp_path):
+        """reload() must pick up QUESTIONSETS_PATH changes, not keep the init-time path."""
+        questions_dir = tmp_path / "questionsets"
+        questions_dir.mkdir()
+        (questions_dir / "path_probe_questions.yaml").write_text(
+            "name: Path Probe\ndescription: reload path check\nquestions:\n"
+            "  - id: probe_1\n    text: Probe?\n    guidelines: g\n",
+            encoding="utf-8",
+        )
+
+        monkeypatch.delenv("QUESTIONSETS_PATH", raising=False)
+        loader = QuestionSetLoader()
+        monkeypatch.setenv("QUESTIONSETS_PATH", str(questions_dir))
+        loader.reload()
+
+        assert "path_probe" in loader.get_question_sets()
+        assert loader.get_questions("path_probe")["probe_1"]["text"] == "Probe?"
+
     def test_error_handling_invalid_yaml(self):
         """Test error handling with invalid YAML file"""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -339,11 +359,13 @@ class TestQuestionSetLoader:
             "kilimanjaro",
             "lucia",
             "climretrieve",
+            "climretrieve_complete",
+            "climretrieve_complete_6",
             "custom",
         }
         assert set(question_set_options) == expected_sets
-        # 6 real sets + "custom" UI option
-        assert len(question_set_options) == 7
+        # 8 real sets + "custom" UI option
+        assert len(question_set_options) == 9
         assert "custom" in question_set_options
         assert "everest" in question_set_options
         assert "tcfd" in question_set_options
@@ -394,8 +416,125 @@ class TestQuestionSetLoader:
             "kilimanjaro",
             "lucia",
             "climretrieve",
+            "climretrieve_complete",
+            "climretrieve_complete_6",
         ]
         for expected_set in expected_sets:
             assert expected_set in options1, f"Expected question set '{expected_set}' not found in options"
 
-        assert len(options1) == 6
+        assert len(options1) == 8
+
+
+TYPED_ANSWER_QUESTIONSET = {
+    "name": "Typed Answer Test Set",
+    "shortcut": "typed-test",
+    "description": "Minimal questionset exercising ANSWER type guidelines",
+    "questions": [
+        {
+            "id": "typed_f1",
+            "text": "Is there a climate strategy?",
+            "guidelines": (
+                "- ANSWER type: classification — exactly one of Yes / No / Unclear / Not disclosed\n"
+                "- Name the specific plan or program"
+            ),
+        },
+        {
+            "id": "typed_f4",
+            "text": "How many tCO2e carbon credits were purchased?",
+            "guidelines": (
+                "- ANSWER type: quantity — numeric value with unit (tCO2e, %, EUR/t, etc.) "
+                "or Unclear / Not disclosed if not reported\n"
+                "- Do not count RECs as carbon credit purchases"
+            ),
+        },
+        {
+            "id": "typed_f5",
+            "text": "Are there quality assurance processes for certificates?",
+            "guidelines": (
+                "- ANSWER type: classification — exactly one of Yes / No / Unclear / Not disclosed "
+                "/ Not applicable (Not applicable only when the report shows no carbon credit purchases)\n"
+                "- deferred: strict F4→F5 chaining requires sequential analysis"
+            ),
+        },
+    ],
+}
+
+TYPED_ANSWER_EXAMPLES_QUESTIONSET = {
+    "name": "Typed Answer Examples",
+    "shortcut": "typed-examples",
+    "description": "Typed answers with few-shot examples",
+    "questions": [
+        {
+            "id": "typed_f1",
+            "text": "Is there a climate strategy?",
+            "guidelines": (
+                "- ANSWER type: classification — exactly one of Yes / No / Unclear / Not disclosed\n"
+                "Example: Yes — board-approved transition plan disclosed"
+            ),
+        },
+    ],
+}
+
+
+class TestTypedAnswerQuestionSets:
+    """Load questionsets whose guidelines declare ANSWER type (fixture YAML, no local ESRS files)."""
+
+    @pytest.fixture
+    def typed_loader(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for filename, payload in (
+                ("typed_test_questions.yaml", TYPED_ANSWER_QUESTIONSET),
+                ("typed_examples_questions.yaml", TYPED_ANSWER_EXAMPLES_QUESTIONSET),
+            ):
+                with open(os.path.join(temp_dir, filename), "w") as handle:
+                    yaml.dump(payload, handle)
+
+            original = os.environ.get("QUESTIONSETS_PATH")
+            os.environ["QUESTIONSETS_PATH"] = temp_dir
+            loader = QuestionSetLoader()
+            yield loader
+            loader.reload()
+            if original is not None:
+                os.environ["QUESTIONSETS_PATH"] = original
+            elif "QUESTIONSETS_PATH" in os.environ:
+                del os.environ["QUESTIONSETS_PATH"]
+
+    def test_baseline_loads_questions(self, typed_loader):
+        qset = typed_loader.get_question_set("typed_test")
+        assert qset is not None
+        assert len(qset.questions) == 3
+        assert qset.shortcut == "typed-test"
+
+    def test_baseline_guidelines_structure(self, typed_loader):
+        q = typed_loader.get_questions("typed_test")["typed_f1"]
+        guidelines = q["guidelines"]
+        assert guidelines.strip().startswith("- ANSWER type:")
+        assert "classification" in guidelines.splitlines()[0]
+        for section in ("## Overall answer policy", "## JSON mapping", "## Answer type"):
+            assert section not in guidelines
+        assert "Few-shot examples" not in guidelines
+
+    def test_quantity_questions_use_quantity_answer_type(self, typed_loader):
+        questions = typed_loader.get_questions("typed_test")
+        first_line = questions["typed_f4"]["guidelines"].strip().splitlines()[0]
+        assert "quantity" in first_line
+
+    def test_f5_cross_question_deferred_flag(self, typed_loader):
+        g = typed_loader.get_questions("typed_test")["typed_f5"]["guidelines"]
+        assert "Not applicable" in g.splitlines()[0]
+        assert "deferred" in g.lower()
+
+    def test_examples_variant_has_few_shots(self, typed_loader):
+        qset = typed_loader.get_question_set("typed_examples")
+        assert "Example:" in qset.questions["typed_f1"]["guidelines"]
+
+
+def test_climretrieve_core_questions_require_classification_answers(monkeypatch):
+    package_questionsets = Path(__file__).resolve().parents[1] / "report_analyst" / "questionsets"
+    monkeypatch.setenv("QUESTIONSETS_PATH", str(package_questionsets))
+
+    questions = QuestionSetLoader().get_questions("climretrieve")
+    core_questions = [questions[f"climretr_{index}"] for index in range(1, 17)]
+
+    assert all(question["guidelines"].startswith("- ANSWER type: classification") for question in core_questions)
+    assert questions["climretr_17_ir"]["guidelines"] == ""
