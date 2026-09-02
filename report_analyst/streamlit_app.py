@@ -48,7 +48,6 @@ logger = logging.getLogger(__name__)
 
 # Reduce noise from other libraries
 logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 
 def log_analysis_step(message: str, level: str = "info"):
@@ -103,6 +102,7 @@ from report_analyst.core.llm_models import (
 )
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
+from report_analyst_enterprise.components.streamlit_component.backend import pdf_viewer
 
 # Load environment variables
 load_dotenv()
@@ -301,9 +301,12 @@ class ReportAnalyzer:
         use_llm_scoring: bool = False,
         single_call: bool = True,
         force_recompute: bool = False,
+        pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
     ):
         """Delegate to the analyzer's process_document method"""
-        return self.analyzer.process_document(file_path, selected_questions, use_llm_scoring, single_call, force_recompute)
+        return self.analyzer.process_document(
+            file_path, selected_questions, use_llm_scoring, single_call, force_recompute, pre_retrieved_chunks
+        )
 
 
 def save_uploaded_file(uploaded_file) -> Optional[str]:
@@ -465,12 +468,13 @@ def display_download_buttons(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame,
 
 def generate_file_key(file_path: str, st) -> str:
     """Generate a cache file key from file path and settings"""
+    llm_model = st.session_state.get("new_llm_model", st.session_state.llm_model)
     return (
         f"{Path(file_path).name}_"
         f"cs{st.session_state.new_chunk_size}_"
         f"ov{st.session_state.new_overlap}_"
         f"tk{st.session_state.new_top_k}_"
-        f"m{st.session_state.new_llm_model}"
+        f"m{llm_model}"
     )
 
 
@@ -927,6 +931,27 @@ def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame,
         st.error(f"Error displaying results: {e!s}")
 
 
+def display_pdf_viewer(
+    file_path: str,
+    results: Dict[str, Dict],
+    questions: Dict[str, Dict],
+    raw_chunks: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in results.items()}
+    questions_data = {question_id: question.get("text", question_id) for question_id, question in questions.items()}
+    viewer_key = Path(str(file_path)).stem or "analysis"
+
+    with st.expander("PDF Viewer with Chunks", expanded=True):
+        pdf_viewer(
+            pdf_path=str(file_path),
+            chunks_data=chunks_by_question,
+            questions_data=questions_data,
+            unmapped_chunks=raw_chunks,
+            key=f"pdf_viewer_{viewer_key}",
+            height=800,
+        )
+
+
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
     """Display consolidated results for all analyzed documents
 
@@ -1272,6 +1297,7 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                         # Display results using the existing display function
                         file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
                         display_analysis_results(analysis_df, chunks_df, file_key)
+                        display_pdf_viewer(file_path, cached_results, questions)
                     else:
                         st.warning("No results found in stored for this configuration")
                 else:
@@ -1291,7 +1317,7 @@ def display_cache_selector(file_path: str):
         "chunk_size": st.session_state.new_chunk_size,
         "chunk_overlap": st.session_state.new_overlap,
         "top_k": st.session_state.new_top_k,
-        "model": st.session_state.new_llm_model,
+        "model": st.session_state.get("new_llm_model", st.session_state.llm_model),
         "question_set": st.session_state.new_question_set,
     }
 
@@ -1363,7 +1389,7 @@ def update_analyzer_parameters():
     chunk_size = st.session_state.new_chunk_size
     chunk_overlap = st.session_state.new_overlap
     top_k = st.session_state.new_top_k
-    llm_model = st.session_state.new_llm_model
+    llm_model = st.session_state.get("new_llm_model", st.session_state.llm_model)
     available_models = get_available_llm_models()
 
     if not available_models:
@@ -1550,11 +1576,8 @@ def main():
         if "use_llm_scoring" not in st.session_state:
             st.session_state.use_llm_scoring = False  # Default LLM scoring setting
 
-        if "force_recompute" not in st.session_state:
-            st.session_state.force_recompute = False  # Default recompute setting
-
         if "results" not in st.session_state:
-            st.session_state.results = {}  # Initialize empty results
+            st.session_state.results = {"answers": {}}
 
         if "current_file" not in st.session_state:
             st.session_state.current_file = None  # Initialize current file
@@ -3108,6 +3131,7 @@ def main():
                     f"*Configure via `STORAGE_PATH` environment variable*"
                 )
             else:
+                # FIXME do we need this
                 # Parse PostgreSQL URL to show connection details (masked)
                 database_type = "PostgreSQL"
                 try:
@@ -3242,6 +3266,7 @@ def main():
 
             # Get database URL from session state (set above in Database Configuration)
             database_url_enterprise = st.session_state.get("database_url")
+            # FIXME we can not identify wheter we are in database url
             is_postgres_enterprise = database_url_enterprise and database_url_enterprise.startswith(
                 ("postgresql://", "postgres://")
             )
@@ -3912,6 +3937,20 @@ def main():
 
                     # Don't sync to session state here - only sync when analyze button is clicked
 
+                    is_backend = st.session_state.get("backend_chunks") is not None
+                    backend_uri = st.session_state.get("backend_resource_uri")
+                    if is_backend and backend_uri:
+                        analysis_file_path = backend_uri
+                    else:
+                        analysis_file_path = str(Path(file_path).resolve()) if file_path else file_path
+                    config = {
+                        "chunk_size": st.session_state.new_chunk_size,
+                        "chunk_overlap": st.session_state.new_overlap,
+                        "top_k": st.session_state.new_top_k,
+                        "model": st.session_state.get("new_llm_model", st.session_state.llm_model),
+                        "question_set": st.session_state.new_question_set,
+                    }
+
                     # Analysis button and results
                     col1, col2 = st.columns([2, 1])
                     with col1:
@@ -3919,6 +3958,7 @@ def main():
                     with col2:
                         reanalyze_clicked = st.button("Reanalyze", key="reanalyze_button")
 
+                    fresh_viewer_results = {}
                     if analyze_clicked or reanalyze_clicked:
                         # NOW sync the selection state from the widget
                         # Get selected questions from the edited dataframe
@@ -3933,42 +3973,20 @@ def main():
                             st.warning("Please select at least one question to analyze.")
                         else:
                             try:
-                                # Set force_recompute based on which button was clicked
-                                st.session_state.force_recompute = reanalyze_clicked
-
-                                # Get current configuration
-                                config = {
-                                    "chunk_size": st.session_state.new_chunk_size,
-                                    "chunk_overlap": st.session_state.new_overlap,
-                                    "top_k": st.session_state.new_top_k,
-                                    "model": st.session_state.new_llm_model,
-                                    "question_set": st.session_state.new_question_set,
-                                }
-
                                 # Initialize progress display
                                 progress_text = st.empty()
 
-                                # Check if this is a backend resource
-                                is_backend = st.session_state.get("backend_chunks") is not None
-                                backend_uri = st.session_state.get("backend_resource_uri")
-
-                                # Use URN as file_path for backend resources, absolute path string for local files
-                                # This maintains backwards compatibility with SQLite cache
-                                if is_backend and backend_uri:
-                                    analysis_file_path = backend_uri  # URN string
-                                else:
-                                    # Local file - ensure it's absolute path string (backwards compatible)
-                                    analysis_file_path = str(Path(file_path).resolve()) if file_path else file_path
-
                                 if reanalyze_clicked:
-                                    # For reanalysis, skip cache check and analyze all selected questions
                                     progress_text.info(f"Reanalyzing {len(selected_questions)} questions...")
                                     asyncio.run(
-                                        run_analysis(
+                                        analyze_document_and_display(
                                             analyzer,
                                             file_path=analysis_file_path,
+                                            questions=questions,
                                             selected_questions=selected_questions,
-                                            progress_text=progress_text,
+                                            use_llm_scoring=st.session_state.new_llm_scoring,
+                                            single_call=st.session_state.new_batch_scoring,
+                                            force_recompute=True,
                                         )
                                     )
                                 else:
@@ -3981,11 +3999,7 @@ def main():
 
                                     if cached_results:
                                         # Process cached results
-                                        for (
-                                            question_id,
-                                            result,
-                                        ) in cached_results.items():
-                                            st.session_state.results["answers"][question_id] = result
+                                        st.session_state.results["answers"].update(cached_results)
 
                                         # Generate file key for display
                                         file_key = generate_file_key(analysis_file_path, st)
@@ -4021,21 +4035,21 @@ def main():
                                             st.error(f"Error during analysis: {e!s}")
                                             st.exception(e)
 
-                                    # Get final results
-                                    all_results = analyzer.analyzer.cache_manager.get_analysis(
-                                        file_path=str(file_path),
-                                        config=config,
-                                        question_ids=selected_questions,
-                                    )
+                                session_answers = st.session_state.results["answers"]
+                                all_results = {
+                                    question_id: session_answers[question_id]
+                                    for question_id in selected_questions
+                                    if question_id in session_answers
+                                }
 
-                                    # Process all results into dataframes
-                                    if all_results:
-                                        analysis_df, chunks_df = create_analysis_dataframes(all_results)
-                                        file_key = Path(file_path).stem
-                                        display_analysis_results(analysis_df, chunks_df, file_key)
-                                        progress_text.success(f"✓ Analysis complete for {len(selected_questions)} questions")
-                                    else:
-                                        progress_text.error("No results found after analysis")
+                                if all_results:
+                                    fresh_viewer_results = all_results
+                                    analysis_df, chunks_df = create_analysis_dataframes(all_results)
+                                    file_key = Path(file_path).stem
+                                    display_analysis_results(analysis_df, chunks_df, file_key)
+                                    progress_text.success(f"✓ Analysis complete for {len(selected_questions)} questions")
+                                else:
+                                    progress_text.error("No results found after analysis")
 
                             except Exception as e:
                                 logger.error(
@@ -4043,6 +4057,29 @@ def main():
                                     exc_info=True,
                                 )
                                 st.error(f"Error during analysis: {e!s}")
+
+                    viewer_results = fresh_viewer_results
+                    if not viewer_results:
+                        viewer_results = analyzer.analyzer.cache_manager.get_analysis(
+                            file_path=analysis_file_path,
+                            config=config,
+                        )
+                    if viewer_results:
+                        raw_chunks = []
+                    elif is_backend:
+                        raw_chunks = st.session_state.get("backend_chunks") or []
+                    else:
+                        raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
+                            file_path=analysis_file_path,
+                            chunk_size=config["chunk_size"],
+                            chunk_overlap=config["chunk_overlap"],
+                        )
+                    display_pdf_viewer(
+                        str(analysis_file_path),
+                        viewer_results,
+                        questions,
+                        raw_chunks,
+                    )
                 else:
                     # Show helpful error message
                     if file_path is None:
