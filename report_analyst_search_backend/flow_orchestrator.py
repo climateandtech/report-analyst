@@ -88,7 +88,7 @@ class FlowOrchestrator:
                 return self._process_complete_backend(uploaded_file)
             else:
                 return ProcessingResult(success=False, error=f"Unknown flow type: {flow_type}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Document processing failed: {e}")
             return ProcessingResult(success=False, error=str(e))
 
@@ -114,7 +114,7 @@ class FlowOrchestrator:
                 return self._analyze_enhanced(chunks, questions)
             else:
                 return AnalysisResult(success=False, error=f"Analysis not supported for flow: {flow_type}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Document analysis failed: {e}")
             return AnalysisResult(success=False, error=str(e))
 
@@ -258,11 +258,48 @@ class FlowOrchestrator:
         return self._analyze_local(chunks, questions)
 
     def _analyze_enhanced(self, chunks: List[Dict[str, Any]], questions: List[str]) -> AnalysisResult:
-        """Enhanced analysis with centralized LLM and data lake"""
-        # This would use NATS LLM and store in data lake
-        # For now, fallback to local analysis
+        """Enhanced analysis with platform contribution publish when backend is enabled."""
+        import asyncio
+        import os
+
         st.info("Enhanced analysis not fully implemented - using local analysis")
-        return self._analyze_local(chunks, questions)
+        result = self._analyze_local(chunks, questions)
+        if not (result.success and self.config.use_backend and result.results):
+            return result
+
+        try:
+            from report_analyst_enterprise.contribution import publish_analysis_result
+
+            resource_id = chunks[0].get("resource_id") if chunks else None
+            if resource_id:
+                questions_list = result.results.get("questions", questions)
+                answers_list = result.results.get("answers", [])
+                asyncio.run(
+                    publish_analysis_result(
+                        resource_id=str(resource_id),
+                        results={
+                            "answers": answers_list,
+                            "questions": questions_list,
+                        },
+                        provenance={
+                            "model": os.getenv("OPENAI_API_MODEL", "local"),
+                            "provider": "report_analyst",
+                            "mode": (
+                                "byok_contribution"
+                                if os.getenv("USE_BYOK_CONTRIBUTION", "").lower() in ("1", "true", "yes")
+                                else "centralized"
+                            ),
+                        },
+                    )
+                )
+        except ImportError:
+            # Enterprise package not installed — contribution publish is optional.
+            pass
+        except Exception as exc:  # noqa: BLE001 — contribution publish must not fail analysis
+            logger.warning("Could not publish analysis result to platform: %s", exc)
+
+        result.stored_in_backend = self.config.use_backend
+        return result
 
     def _configure_question_set(self, default_question_set: str) -> str:
         """Configure question set for backend analysis"""
@@ -270,7 +307,7 @@ class FlowOrchestrator:
 
         # Get dynamic question set options
         if QUESTION_LOADER_AVAILABLE:
-            question_set_options = question_loader.get_question_set_options() + ["custom"]
+            question_set_options = [*question_loader.get_question_set_options(), "custom"]
             # Calculate index for default question set
             try:
                 index = question_set_options.index(default_question_set) if default_question_set in question_set_options else 0
@@ -468,7 +505,7 @@ class FlowOrchestrator:
                 analysis_job_id=request_id,
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"External service analysis failed: {e}")
             return AnalysisResult(success=False, error=str(e))
 
