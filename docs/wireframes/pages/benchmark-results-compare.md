@@ -3,7 +3,7 @@ Review metrics and compare saved evaluations.
 
 ::: card {#tabs}
 [Upload & map] [Evaluation] [Results]* [Annotation]
-::
+:::
 
 ::: card {#summary}
 ### Microsoft retrieval · v2
@@ -23,7 +23,7 @@ Higher values indicate that relevant chunks were ranked earlier and the result i
 
 ::: callout {for:map side:left}
 primary ranking score
-::
+:::
 
 ::: card {#compare}
 ### Compare evaluations
@@ -45,9 +45,8 @@ Select saved runs to compare side by side.
 | Precision@5 | 0.780 | 0.702 | +0.078 |
 
 [Open question-level comparison]  [Save comparison]  [Export CSV]
-::
 
 ::: callout {for:compare side:right}
 spot meaningful
 differences
-::
+:::

@@ -19,7 +19,7 @@ Upload your system output, align it with the benchmark format, then confirm the 
 Selected file: **chunks_Microsoft_2024.csv**  ·  1,240 rows  ·  Uploaded just now
 
 Supported ranking fields: query/item ID, report ID, chunk ID, position/rank, optional score.
-::
+:::
 
 ::: card {#benchmark}
 ### Benchmark format
@@ -33,15 +33,13 @@ Reference set: [ClimRetrieve v1________________v]
 [Download sample format]
 :::
 
-:::
-
 ::: callout {for:upload side:left}
 your dataset
-::
+:::
 
 ::: callout {for:benchmark side:right}
 reference structure
-::
+:::
 
 ::: card {#align}
 ### Align columns
@@ -77,9 +75,10 @@ reuse later
 [Microsoft retrieval · v2________________________]
 
 [Save dataset]*  [Continue to evaluation]*
-::
+:::
 
 ::: callout {for:mapping side:right}
 the user sees
 the mapped result
-::
+:::
+

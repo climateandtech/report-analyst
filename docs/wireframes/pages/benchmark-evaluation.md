@@ -18,7 +18,7 @@ Ranking compares the order of retrieved chunks. Classification compares one pred
 choose a track
 :::
 
-::: card {#benchmark}
+::: {#benchmark}
 ### Benchmark set
 [ClimRetrieve v1________________v]
 - ClimRetrieve v1
@@ -26,9 +26,9 @@ choose a track
 - ClimateFinanceBench
 
 16 questions · 4 question types · shared reference set
-::
+:::
 
-::: card {#dataset}
+::: {#dataset}
 ### Your dataset
 [Microsoft retrieval · v2____________v]
 - Microsoft retrieval · v2
@@ -36,12 +36,12 @@ choose a track
 - Northwind retrieval · v1
 
 Saved from Upload & map · ranking format validated
-::
+:::
 
 ::: callout {for:benchmark side:left}
 same questions
 for every run
-::
+:::
 
 ::: callout {for:dataset side:right}
 your configured
@@ -81,8 +81,8 @@ K values: [1, 3, 5, 10________________v]
 Evaluation name: [Microsoft v2 · ClimRetrieve v1________________]
 
 [Review matched questions]  [Start evaluation]*
-::
+
 
 ::: callout {for:ranking side:right}
 MAP · MRR · Precision@K · Recall@K
-::
+:::
