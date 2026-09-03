@@ -617,8 +617,7 @@ class CacheManager:
 
                 # Now get the chunk information for each question
                 if results:
-                    chunk_query = text(
-                        """
+                    chunk_query = text("""
                             SELECT
                                 ac.question_id,
                                 dc.chunk_text,
@@ -646,8 +645,7 @@ class CacheManager:
                             AND ac.question_set = :question_set
                             AND ac.question_id IN :question_ids
                             ORDER BY ac.question_id, cr.chunk_order
-                            """
-                    ).bindparams(bindparam("question_ids", expanding=True))
+                            """).bindparams(bindparam("question_ids", expanding=True))
 
                     chunk_params = {
                         "file_path": str(file_path),
