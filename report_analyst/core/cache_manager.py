@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from llama_index.core import Document
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from .analysis_result_utils import is_stored_analysis_error
 from .database_manager import DatabaseManager
