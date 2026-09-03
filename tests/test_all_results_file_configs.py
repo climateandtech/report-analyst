@@ -224,7 +224,7 @@ def test_display_consolidated_results_single_config(monkeypatch):
     analyzer.analyzer.cache_manager = object()
     called = {}
 
-    def fake_render(a, qs, fp, config, display_analysis_results=None):
+    def fake_render(a, qs, fp, config, display_analysis_results=None, display_pdf_viewer=None):
         called["args"] = (qs, fp, config)
 
     monkeypatch.setattr(app, "render_consolidated_report_view", fake_render)
