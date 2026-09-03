@@ -66,6 +66,7 @@ importlib_metadata==7.2.1
 importlib_resources==6.5.2
 iniconfig==2.0.0
 isort==6.0.1
+itsdangerous==2.2.0
 Jinja2==3.1.6
 jiter==0.8.2
 joblib==1.4.2
@@ -183,7 +184,7 @@ sqlean.py==3.47.0
 sqlite-vec==0.1.6
 sqlite-vss==0.1.2
 starlette==1.3.1
-streamlit==1.54.0
+streamlit==1.62.0
 streamlit-card==1.0.2
 streamlit-option-menu==0.4.0
 striprtf==0.0.26
@@ -202,10 +203,11 @@ typing_extensions==4.12.2
 tzdata==2025.1
 tzlocal==5.2
 urllib3==2.7.0
-uvicorn==0.27.1
+uvicorn==0.52.4
 uvloop==0.21.0
 validators==0.34.0
 vectors==1.0.0
+watchdog==6.0.0
 watchfiles==1.0.4
 websocket-client==1.8.0
 websockets==15.0.1
