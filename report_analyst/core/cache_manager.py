@@ -631,7 +631,11 @@ class CacheManager:
                                 cr.metadata as relevance_metadata
                             FROM analysis_cache ac
                             JOIN questions q ON q.question_id = ac.question_id
-                            JOIN question_analysis qa ON qa.question_id = q.id AND qa.file_path = ac.file_path
+                            JOIN question_analysis qa
+                                ON qa.question_id = q.id
+                                AND qa.file_path = ac.file_path
+                                AND qa.model = ac.model
+                                AND qa.top_k = ac.top_k
                             JOIN chunk_relevance cr ON cr.question_analysis_id = qa.id
                             JOIN document_chunks dc ON cr.document_chunk_id = dc.id
                             WHERE ac.file_path = :file_path
@@ -660,16 +664,23 @@ class CacheManager:
                     chunk_rows = chunk_result.fetchall()
                     logger.info(f"Retrieved {len(chunk_rows)} chunk rows")
 
+                    if chunk_rows:
+                        for question_id in results:
+                            results[question_id]["chunks"] = []
+
                     # Add chunks to their respective questions
                     for row in chunk_rows:
                         question_id = row[0]
+                        is_evidence = row[6]
+                        if is_evidence is not None:
+                            is_evidence = bool(is_evidence)
                         chunk_info = {
                             "text": row[1],
                             "metadata": json.loads(row[2]) if row[2] else {},
                             "chunk_order": row[3],
                             "similarity_score": row[4],  # Raw similarity score from DB
                             "llm_score": row[5],  # Raw LLM score from DB
-                            "is_evidence": row[6],  # Raw is_evidence from DB
+                            "is_evidence": is_evidence,
                             "evidence_order": row[7],
                             "relevance_metadata": json.loads(row[8]) if row[8] else {},
                         }
