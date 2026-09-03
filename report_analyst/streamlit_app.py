@@ -1044,19 +1044,23 @@ def display_pdf_viewer(
     questions: Dict[str, Dict],
     raw_chunks: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
-    chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in results.items()}
-    questions_data = {question_id: question.get("text", question_id) for question_id, question in questions.items()}
+    chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in (results or {}).items()}
+    questions_data = {question_id: question.get("text", question_id) for question_id, question in (questions or {}).items()}
     viewer_key = Path(str(file_path)).stem or "analysis"
 
     with st.expander("PDF Viewer with Chunks", expanded=True):
-        pdf_viewer(
-            pdf_path=str(file_path),
-            chunks_data=chunks_by_question,
-            questions_data=questions_data,
-            unmapped_chunks=raw_chunks,
-            key=f"pdf_viewer_{viewer_key}",
-            height=800,
-        )
+        try:
+            pdf_viewer(
+                pdf_path=str(file_path),
+                chunks_data=chunks_by_question,
+                questions_data=questions_data,
+                unmapped_chunks=raw_chunks,
+                key=f"pdf_viewer_{viewer_key}",
+                height=800,
+            )
+        except Exception as e:
+            logger.error(f"Error rendering PDF viewer: {e!s}", exc_info=True)
+            st.error(f"Error rendering PDF viewer: {e!s}")
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
@@ -3888,12 +3892,15 @@ def main():
                                 if reanalyze_clicked:
                                     progress_text.info(f"Reanalyzing {len(selected_questions)} questions...")
                                     asyncio.run(
-                                        run_analysis(
+                                        analyze_document_and_display(
                                             analyzer,
                                             file_path=analysis_file_path,
+                                            questions=questions,
                                             selected_questions=selected_questions,
-                                            progress_text=progress_text,
-                                            max_processing_step=get_max_processing_step(),
+                                            use_llm_scoring=st.session_state.new_llm_scoring,
+                                            single_call=st.session_state.new_batch_scoring,
+                                            force_recompute=True,
+                                            max_processing_step=max_step,
                                         )
                                     )
                                 else:
@@ -3938,20 +3945,24 @@ def main():
                                             st.error(f"Error during analysis: {e!s}")
                                             st.exception(e)
 
-                                    all_results = analyzer.analyzer.cache_manager.get_analysis(
-                                        file_path=str(file_path),
-                                        config=config,
-                                        question_ids=selected_questions,
-                                    )
+                                results_bag = st.session_state.get("results") or {}
+                                session_answers = (
+                                    results_bag.get("answers", results_bag) if isinstance(results_bag, dict) else {}
+                                )
+                                all_results = {
+                                    question_id: session_answers[question_id]
+                                    for question_id in selected_questions
+                                    if question_id in session_answers
+                                }
 
-                                    if all_results:
-                                        fresh_viewer_results = all_results
-                                        analysis_df, chunks_df = create_analysis_dataframes(all_results)
-                                        file_key = Path(file_path).stem
-                                        display_analysis_results(analysis_df, chunks_df, file_key)
-                                        progress_text.success(f"✓ Analysis complete for {len(selected_questions)} questions")
-                                    else:
-                                        progress_text.error("No results found after analysis")
+                                if all_results:
+                                    fresh_viewer_results = all_results
+                                    analysis_df, chunks_df = create_analysis_dataframes(all_results)
+                                    file_key = Path(file_path).stem
+                                    display_analysis_results(analysis_df, chunks_df, file_key)
+                                    progress_text.success(f"✓ Analysis complete for {len(selected_questions)} questions")
+                                else:
+                                    progress_text.error("No results found after analysis")
 
                             except Exception as e:
                                 logger.error(
@@ -3960,28 +3971,32 @@ def main():
                                 )
                                 st.error(f"Error during analysis: {e!s}")
 
-                    viewer_results = fresh_viewer_results
-                    if not viewer_results:
-                        viewer_results = analyzer.analyzer.cache_manager.get_analysis(
-                            file_path=analysis_file_path,
-                            config=config,
+                    try:
+                        viewer_results = fresh_viewer_results
+                        if not viewer_results:
+                            viewer_results = analyzer.analyzer.cache_manager.get_analysis(
+                                file_path=analysis_file_path,
+                                config=config,
+                            )
+                        if viewer_results:
+                            raw_chunks = []
+                        elif is_backend:
+                            raw_chunks = st.session_state.get("backend_chunks") or []
+                        else:
+                            raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
+                                file_path=analysis_file_path,
+                                chunk_size=config["chunk_size"],
+                                chunk_overlap=config["chunk_overlap"],
+                            )
+                        display_pdf_viewer(
+                            str(analysis_file_path),
+                            viewer_results,
+                            questions,
+                            raw_chunks,
                         )
-                    if viewer_results:
-                        raw_chunks = []
-                    elif is_backend:
-                        raw_chunks = st.session_state.get("backend_chunks") or []
-                    else:
-                        raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
-                            file_path=analysis_file_path,
-                            chunk_size=config["chunk_size"],
-                            chunk_overlap=config["chunk_overlap"],
-                        )
-                    display_pdf_viewer(
-                        str(analysis_file_path),
-                        viewer_results,
-                        questions,
-                        raw_chunks,
-                    )
+                    except Exception as e:
+                        logger.error(f"Error displaying PDF viewer: {e!s}", exc_info=True)
+                        st.error(f"Error displaying PDF viewer: {e!s}")
 
                 else:
                     # Show helpful error message

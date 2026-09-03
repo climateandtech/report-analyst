@@ -907,15 +907,11 @@ class CacheManager:
         """Distinct (file_path, chunk_size, chunk_overlap) rows from document_chunks."""
         try:
             with self.db_manager.get_connection() as conn:
-                result_obj = conn.execute(
-                    text(
-                        """
+                result_obj = conn.execute(text("""
                         SELECT DISTINCT file_path, chunk_size, chunk_overlap
                         FROM document_chunks
                         ORDER BY file_path, chunk_size, chunk_overlap
-                        """
-                    )
-                )
+                        """))
                 return list(result_obj.fetchall())
         except Exception as e:
             logger.error(f"Error listing document chunk configs: {e}", exc_info=True)
@@ -969,27 +965,23 @@ class CacheManager:
                     }
                     if self.db_manager.is_postgres():
                         conn.execute(
-                            text(
-                                """
+                            text("""
                                 INSERT INTO document_chunks
                                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                                 VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, NULL, :metadata, :created_at)
                                 ON CONFLICT (file_path, chunk_text, chunk_size, chunk_overlap) DO UPDATE
                                 SET metadata = EXCLUDED.metadata,
                                     created_at = EXCLUDED.created_at
-                            """
-                            ),
+                            """),
                             params,
                         )
                     else:
                         conn.execute(
-                            text(
-                                """
+                            text("""
                                 INSERT OR REPLACE INTO document_chunks
                                 (file_path, chunk_text, chunk_size, chunk_overlap, embedding, metadata, created_at)
                                 VALUES (:file_path, :chunk_text, :chunk_size, :chunk_overlap, NULL, :metadata, :created_at)
-                            """
-                            ),
+                            """),
                             params,
                         )
             logger.info(f"Saved {len(chunks)} text-only chunks")

@@ -74,6 +74,17 @@ def pytest_configure(config):
     # Register custom markers
     config.addinivalue_line("markers", "postgres: mark test as requiring PostgreSQL")
     config.addinivalue_line("markers", "integration: mark test as integration test")
+    os.environ.setdefault("MPLBACKEND", "Agg")
+
+
+@pytest.fixture(autouse=True)
+def _reset_document_analyzer_singleton():
+    """Keep DocumentAnalyzer from leaking cache/LLM state across tests."""
+    from report_analyst.core.analyzer import DocumentAnalyzer
+
+    DocumentAnalyzer.reset_instance()
+    yield
+    DocumentAnalyzer.reset_instance()
 
 
 # =============================================================================
