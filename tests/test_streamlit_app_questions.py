@@ -3,16 +3,12 @@ Tests for question set functionality in streamlit_app.py using AppTest.
 Tests dynamic question loading and selection.
 """
 
-from pathlib import Path
-
 from streamlit.testing.v1 import AppTest
 
-APP_PATH = Path(__file__).resolve().parents[1] / "report_analyst" / "streamlit_app.py"
 
-
-def test_question_set_selectbox_exists():
+def test_question_set_selectbox_exists(streamlit_app_path):
     """Test question set selectbox is present"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page where question set selectbox is located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -28,9 +24,9 @@ def test_question_set_selectbox_exists():
     assert not at.exception
 
 
-def test_question_sets_loaded_dynamically():
+def test_question_sets_loaded_dynamically(streamlit_app_path):
     """Test question sets loaded from question_loader"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page where question set selectbox is located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -50,9 +46,9 @@ def test_question_sets_loaded_dynamically():
     assert not at.exception
 
 
-def test_question_set_selectbox_has_options():
+def test_question_set_selectbox_has_options(streamlit_app_path):
     """Test question set selectbox has multiple options available"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page where question set selectbox is located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)

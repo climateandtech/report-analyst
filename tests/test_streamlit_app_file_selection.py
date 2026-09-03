@@ -8,7 +8,6 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
-APP_PATH = Path(__file__).resolve().parents[1] / "report_analyst" / "streamlit_app.py"
 TEST_PDF = (
     b"%PDF-1.4\n%Test PDF\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
     b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
@@ -17,7 +16,7 @@ TEST_PDF = (
 )
 
 
-def test_file_selection_with_file_uri():
+def test_file_selection_with_file_uri(streamlit_app_path):
     """Test that file selection works correctly with file:// URIs"""
     # Create a temporary PDF file
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -31,7 +30,7 @@ def test_file_selection_with_file_uri():
         os.environ["TEMP_DIR"] = str(temp_dir)
 
         try:
-            at = AppTest.from_file(APP_PATH)
+            at = AppTest.from_file(streamlit_app_path)
             at.session_state["nav_page"] = "Report Analyst"
             at.run(timeout=10)
 
@@ -108,7 +107,7 @@ def test_file_path_resolution_from_uri():
                 del os.environ["TEMP_DIR"]
 
 
-def test_file_not_found_error_not_shown():
+def test_file_not_found_error_not_shown(streamlit_app_path):
     """Test that 'File not found: None' error is not shown when file is selected"""
     # Create a temporary PDF file
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -122,7 +121,7 @@ def test_file_not_found_error_not_shown():
         os.environ["TEMP_DIR"] = str(temp_dir)
 
         try:
-            at = AppTest.from_file(APP_PATH)
+            at = AppTest.from_file(streamlit_app_path)
             at.session_state["nav_page"] = "Report Analyst"
             at.run(timeout=10)
 

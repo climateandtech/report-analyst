@@ -3,16 +3,12 @@ Tests for streamlit app tabs and data loading functionality using AppTest.
 Tests Previous Reports, Upload New, and Consolidated Results tabs.
 """
 
-from pathlib import Path
-
 from streamlit.testing.v1 import AppTest
 
-APP_PATH = Path(__file__).resolve().parents[1] / "report_analyst" / "streamlit_app.py"
 
-
-def test_tabs_exist():
+def test_tabs_exist(streamlit_app_path):
     """Test that all three main navigation pages are present"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     at.run(timeout=10)
 
     # Check that navigation page is set in session state
@@ -31,9 +27,9 @@ def test_tabs_exist():
     assert not at.exception
 
 
-def test_previous_reports_tab():
+def test_previous_reports_tab(streamlit_app_path):
     """Test Report Analyst page functionality (previously called Previous Reports)"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -46,9 +42,9 @@ def test_previous_reports_tab():
     assert not at.exception
 
 
-def test_upload_new_tab():
+def test_upload_new_tab(streamlit_app_path):
     """Test Upload Report page functionality (previously called Upload New)"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Upload Report page
     at.session_state["nav_page"] = "Upload Report"
     at.run(timeout=10)
@@ -61,9 +57,9 @@ def test_upload_new_tab():
     assert not at.exception
 
 
-def test_consolidated_results_tab():
+def test_consolidated_results_tab(streamlit_app_path):
     """Test All Results page functionality (previously called Consolidated Results)"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to All Results page
     at.session_state["nav_page"] = "All Results"
     at.run(timeout=10)
@@ -83,9 +79,9 @@ def test_consolidated_results_tab():
     assert not at.exception
 
 
-def test_configuration_expander():
+def test_configuration_expander(streamlit_app_path):
     """Test Analysis Configuration expander"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page where the expander is located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -101,9 +97,9 @@ def test_configuration_expander():
     assert not at.exception
 
 
-def test_configuration_widgets():
+def test_configuration_widgets(streamlit_app_path):
     """Test configuration widgets (chunk size, overlap, top_k, model)"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page where configuration widgets are located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -123,9 +119,9 @@ def test_configuration_widgets():
     assert not at.exception
 
 
-def test_question_set_selection():
+def test_question_set_selection(streamlit_app_path):
     """Test question set selection functionality"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page where question set selectbox is located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -152,9 +148,9 @@ def test_question_set_selection():
     assert not at.exception
 
 
-def test_analysis_controls():
+def test_analysis_controls(streamlit_app_path):
     """Test analysis control checkboxes and buttons"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page where analysis controls are located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -175,9 +171,9 @@ def test_analysis_controls():
     # The important thing is that the app loads correctly and handles the page navigation.
 
 
-def test_footer_display():
+def test_footer_display(streamlit_app_path):
     """Test that footer with Climate+Tech branding is displayed"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     at.run(timeout=10)
 
     # Check for footer content in markdown
@@ -186,9 +182,9 @@ def test_footer_display():
     assert not at.exception
 
 
-def test_session_state_initialization():
+def test_session_state_initialization(streamlit_app_path):
     """Test that session state variables are properly initialized"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     at.run(timeout=10)
 
     # The app should initialize without errors, which means session state is set up correctly

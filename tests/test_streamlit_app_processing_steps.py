@@ -3,16 +3,12 @@ Tests for Processing Steps slider functionality in streamlit app using AppTest.
 Tests that the slider exists, is interactive, and controls step selection.
 """
 
-from pathlib import Path
-
 from streamlit.testing.v1 import AppTest
 
-APP_PATH = Path(__file__).resolve().parents[1] / "report_analyst" / "streamlit_app.py"
 
-
-def test_processing_steps_slider_exists():
+def test_processing_steps_slider_exists(streamlit_app_path):
     """Test that Processing Steps slider is present"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
@@ -32,9 +28,9 @@ def test_processing_steps_slider_exists():
     # without causing format_func issues. The important thing is the app loads correctly.
 
 
-def test_processing_steps_slider_interactive():
+def test_processing_steps_slider_interactive(streamlit_app_path):
     """Test that Processing Steps slider is interactive"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
@@ -54,9 +50,9 @@ def test_processing_steps_slider_interactive():
     # in AppTest. The important thing is the app loads correctly and the page structure is there.
 
 
-def test_processing_steps_displayed():
+def test_processing_steps_displayed(streamlit_app_path):
     """Test that Processing Steps are displayed with correct labels"""
-    at = AppTest.from_file(APP_PATH)
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 

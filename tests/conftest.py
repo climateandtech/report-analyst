@@ -33,6 +33,13 @@ for path in [str(project_root), str(parent_dir)]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
+
+@pytest.fixture(scope="session")
+def streamlit_app_path():
+    """Return the Streamlit app path used by AppTest."""
+    return project_root / "report_analyst" / "streamlit_app.py"
+
+
 # Make report_analyst_jobs import optional (ImportError or transitive env/deps failures)
 try:
     from report_analyst_jobs.event_router import EventRouter
