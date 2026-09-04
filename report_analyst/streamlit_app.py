@@ -2,7 +2,6 @@
 import asyncio
 import base64
 import html
-import json
 import logging
 import os
 import sys
@@ -11,7 +10,6 @@ import traceback
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -85,6 +83,7 @@ if str(current_dir) not in sys.path:
 logger.info(f"Added {current_dir} to Python path")
 
 # Keep relative imports
+from report_analyst.consolidated_results_view import render_consolidated_report_view
 from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
@@ -225,6 +224,7 @@ class ReportAnalyzer:
         single_call: bool = True,
         force_recompute: bool = False,
         pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
+        max_processing_step: str = "answer",
     ) -> AsyncGenerator[Dict, None]:
         """Analyze a document using the provided questions
 
@@ -260,6 +260,7 @@ class ReportAnalyzer:
                 single_call,
                 force_recompute,
                 pre_retrieved_chunks=pre_retrieved_chunks,
+                max_processing_step=max_processing_step,
             ):
                 # Pass through status and error messages
                 if "status" in result or "error" in result:
@@ -304,10 +305,17 @@ class ReportAnalyzer:
         single_call: bool = True,
         force_recompute: bool = False,
         pre_retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
+        max_processing_step: str = "answer",
     ):
         """Delegate to the analyzer's process_document method"""
         return self.analyzer.process_document(
-            file_path, selected_questions, use_llm_scoring, single_call, force_recompute, pre_retrieved_chunks
+            file_path,
+            selected_questions,
+            use_llm_scoring,
+            single_call,
+            force_recompute,
+            pre_retrieved_chunks=pre_retrieved_chunks,
+            max_processing_step=max_processing_step,
         )
 
 
@@ -488,6 +496,7 @@ async def analyze_document_and_display(
     use_llm_scoring: bool = False,
     single_call: bool = True,
     force_recompute: bool = False,
+    max_processing_step: str = "answer",
 ):
     """Analyze document and display results as they come in"""
     try:
@@ -574,6 +583,7 @@ async def analyze_document_and_display(
                 single_call,
                 force_recompute,
                 pre_retrieved_chunks=pre_retrieved_chunks,
+                max_processing_step=max_processing_step,
             ):
                 # Add debug logging to see what results we're getting
                 log_analysis_step(f"Received result: {str(result)[:200]}...")
@@ -822,6 +832,56 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
     return result
 
 
+def display_cached_document_chunks(
+    report_analyzer,
+    file_path: str,
+    *,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
+) -> tuple[int, int]:
+    """Render document chunks from cache (Chunk/Embed steps — no question analysis required).
+
+    Returns:
+        (total_chunks, chunks_with_embeddings)
+    """
+    raw_chunks = report_analyzer.cache_manager.get_document_chunks(
+        file_path=file_path,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+    if not raw_chunks:
+        st.warning("No chunks found in cache for this file and configuration.")
+        return 0, 0
+
+    rows = []
+    embedded_count = 0
+    for i, chunk in enumerate(raw_chunks):
+        has_embedding = chunk.get("embedding") is not None
+        if has_embedding:
+            embedded_count += 1
+        rows.append(
+            {
+                "Chunk #": i + 1,
+                "Text": chunk.get("text", chunk.get("chunk_text", "")),
+                "Has Embedding": has_embedding,
+            }
+        )
+
+    st.subheader("Document Chunks")
+    st.dataframe(
+        pd.DataFrame(rows),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Chunk #": st.column_config.NumberColumn("Chunk #", width="small"),
+            "Text": st.column_config.TextColumn("Text", width="large"),
+            "Has Embedding": st.column_config.CheckboxColumn("Has Embedding"),
+        },
+    )
+    st.info(f"Found {len(rows)} document chunks ({embedded_count} with embeddings).")
+    return len(rows), embedded_count
+
+
 def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame, file_key: str | None = None) -> None:
     """Display analysis results in a consistent format for both individual and consolidated views"""
     try:
@@ -923,377 +983,119 @@ def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame,
         st.error(f"Error displaying results: {e!s}")
 
 
+def build_all_results_file_configs(
+    cache_manager,
+    db_question_set: str,
+    *,
+    default_top_k: int,
+    default_model: str,
+) -> dict[str, list[dict]]:
+    """Merge analysis_cache configs with document_chunks-only configs for All Results."""
+    file_configs: dict[str, list[dict]] = {}
+
+    def add_config(
+        file_path: str,
+        chunk_size: int,
+        chunk_overlap: int,
+        top_k: int,
+        model: str,
+        question_set: str,
+        *,
+        chunks_only: bool = False,
+    ) -> None:
+        configs = file_configs.setdefault(str(file_path), [])
+        if any(c["chunk_size"] == chunk_size and c["chunk_overlap"] == chunk_overlap for c in configs):
+            return
+        entry = {
+            "chunk_size": chunk_size,
+            "chunk_overlap": chunk_overlap,
+            "top_k": top_k,
+            "model": model,
+            "question_set": question_set,
+        }
+        if chunks_only:
+            entry["chunks_only"] = True
+        configs.append(entry)
+
+    for config in cache_manager.check_cache_status():
+        if len(config) != 6:
+            continue
+        fp, chunk_size, chunk_overlap, top_k, model, qs = config
+        if qs == db_question_set:
+            add_config(fp, chunk_size, chunk_overlap, top_k, model, qs)
+
+    for fp, chunk_size, chunk_overlap in cache_manager.list_document_chunk_configs():
+        add_config(
+            fp,
+            chunk_size,
+            chunk_overlap,
+            default_top_k,
+            default_model,
+            db_question_set,
+            chunks_only=True,
+        )
+
+    return file_configs
+
+
 def display_pdf_viewer(
     file_path: str,
     results: Dict[str, Dict],
     questions: Dict[str, Dict],
     raw_chunks: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
-    chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in results.items()}
-    questions_data = {question_id: question.get("text", question_id) for question_id, question in questions.items()}
+    chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in (results or {}).items()}
+    questions_data = {question_id: question.get("text", question_id) for question_id, question in (questions or {}).items()}
     viewer_key = Path(str(file_path)).stem or "analysis"
 
     with st.expander("PDF Viewer with Chunks", expanded=True):
-        pdf_viewer(
-            pdf_path=str(file_path),
-            chunks_data=chunks_by_question,
-            questions_data=questions_data,
-            unmapped_chunks=raw_chunks,
-            key=f"pdf_viewer_{viewer_key}",
-            height=800,
-        )
+        try:
+            pdf_viewer(
+                pdf_path=str(file_path),
+                chunks_data=chunks_by_question,
+                questions_data=questions_data,
+                unmapped_chunks=raw_chunks,
+                key=f"pdf_viewer_{viewer_key}",
+                height=800,
+            )
+        except Exception as e:
+            logger.error(f"Error rendering PDF viewer: {e!s}", exc_info=True)
+            st.error(f"Error rendering PDF viewer: {e!s}")
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
-    """Display consolidated results for all analyzed documents
-
-    Args:
-        analyzer: ReportAnalyzer instance
-        question_set: Selected question set identifier
-        file_path: Optional file path. If provided, skip file selection and use this file.
-                   If None, will attempt to get file from cache (backward compatibility).
-        selected_config: Optional configuration dict. If provided, skip config selection and use this config.
-                        If None, will attempt to get config from cache (backward compatibility).
-    """
+    """Display consolidated results for all analyzed documents."""
     try:
-        # Create mapping from question set names to database identifiers
         question_set_mapping = {
             "tcfd": "tcfd",
             "s4m": "s4m",
             "lucia": "lucia",
-            "everest": "ev",  # Everest questions use 'ev_' prefix, so database stores as 'ev'
+            "everest": "ev",
         }
-
-        # Get the database identifier for the selected question set
         db_question_set = question_set_mapping.get(question_set, question_set)
-        logger.info(f"Mapping question set '{question_set}' to database identifier '{db_question_set}'")
 
-        # Get all available cache configurations
-        cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
-        logger.info(f"Found cache configs: {cache_configs}")
-
-        if not cache_configs:
-            st.warning("No stored analyses found")
+        if file_path is not None and selected_config is not None:
+            config = selected_config.get("config", selected_config)
+            render_consolidated_report_view(
+                analyzer,
+                question_set,
+                file_path,
+                config,
+                display_analysis_results=display_analysis_results,
+                display_pdf_viewer=display_pdf_viewer,
+            )
             return
 
-        # Group configurations by file
-        file_configs = {}
-        for config in cache_configs:
-            if len(config) == 6:  # Full config row from cache_status
-                file_path, chunk_size, chunk_overlap, top_k, model, qs = config
-                if qs == db_question_set:  # Only show configs for selected question set using database identifier
-                    if file_path not in file_configs:
-                        file_configs[file_path] = []
-                    file_configs[file_path].append(
-                        {
-                            "chunk_size": chunk_size,
-                            "chunk_overlap": chunk_overlap,
-                            "top_k": top_k,
-                            "model": model,
-                            "question_set": qs,
-                        }
-                    )
-
-        if not file_configs:
-            st.warning(f"No stored results found for question set: {question_set}")
-            return
-
-        # File selection
-        st.subheader("Select Report and Configuration")
-        file_path = st.selectbox(
-            "Select Report",
-            options=list(file_configs.keys()),
-            format_func=lambda x: Path(x).name,
+        file_configs = build_all_results_file_configs(
+            analyzer.analyzer.cache_manager,
+            db_question_set,
+            default_top_k=st.session_state.get("top_k", 5),
+            default_model=st.session_state.get("llm_model", DEFAULT_LLM_MODEL),
         )
 
-        if file_path:
-            # Show configurations for selected file
-            configs = file_configs[file_path]
-            config_options = []
-            for config in configs:
-                label = (
-                    f"Chunk: {config['chunk_size']}, Overlap: {config['chunk_overlap']}, "
-                    f"Top-K: {config['top_k']}, Model: {config['model']}"
-                )
-                config_options.append({"label": label, "config": config})
-
-            selected_config = st.selectbox(
-                "Select Configuration",
-                options=config_options,
-                format_func=lambda x: x["label"],
-            )
-
-            if selected_config:
-                logger.info(f"Getting results for {Path(file_path).name} with config: {selected_config['config']}")
-
-                # Add similarity search section for document chunks
-                try:
-                    raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
-                        file_path=file_path,
-                        chunk_size=selected_config["config"]["chunk_size"],
-                        chunk_overlap=selected_config["config"]["chunk_overlap"],
-                    )
-
-                    if raw_chunks:
-                        # Add similarity search controls
-                        st.subheader("Similarity Search")
-
-                        # Get questions for the current question set
-                        # Make sure analyzer is using the correct question set
-                        if analyzer.analyzer.question_set != question_set:
-                            analyzer.analyzer.update_question_set(question_set)
-                        questions = analyzer.analyzer.questions
-
-                        col1, col2 = st.columns([1, 1])
-                        with col1:
-                            # Question dropdown with shorter, cleaner options
-                            question_options = ["None"] + [f"{q_id}" for q_id in questions.keys()]
-                            selected_question_id = st.selectbox(
-                                "Select a question to sort by similarity:",
-                                options=question_options,
-                                key="chunk_similarity_question",
-                                help="Choose a question from the current question set",
-                            )
-
-                            # Show selected question text below dropdown
-                            if selected_question_id != "None" and selected_question_id in questions:
-                                st.caption(f"**{selected_question_id}:** {questions[selected_question_id]['text'][:100]}...")
-                            selected_question = selected_question_id
-
-                        with col2:
-                            # Free text input
-                            custom_question = st.text_input(
-                                "Or enter custom question:",
-                                placeholder="Enter your own question to compare chunks against...",
-                                key="chunk_similarity_custom",
-                            )
-
-                        # Determine which question to use
-                        query_text = None
-                        if custom_question.strip():
-                            query_text = custom_question.strip()
-                            st.info(f"Using custom question: {query_text[:100]}...")
-                        elif selected_question != "None":
-                            if selected_question in questions:
-                                query_text = questions[selected_question]["text"]
-                                st.info(f"Using question {selected_question}: {query_text[:100]}...")
-
-                        # Process chunks
-                        chunks_rows = []
-                        chunks_with_embeddings = [c for c in raw_chunks if c.get("embedding") is not None]
-
-                        if query_text and chunks_with_embeddings:
-                            # Compute similarity scores
-                            try:
-                                # Check if embeddings are available
-                                if not analyzer.analyzer.embeddings or analyzer.analyzer.use_backend_llm:
-                                    st.warning(
-                                        "Embeddings not available for similarity search. "
-                                        "Using backend mode or embeddings not initialized."
-                                    )
-                                    query_text = None
-                                else:
-                                    # Get query embedding
-                                    query_embedding = analyzer.analyzer.embeddings.get_text_embedding(query_text)
-                                    query_embedding = np.array(query_embedding, dtype=np.float32)
-
-                                    # Compute similarity for each chunk
-                                    similarities = []
-                                    for chunk in raw_chunks:
-                                        if chunk.get("embedding") is not None:
-                                            chunk_embedding = np.frombuffer(chunk["embedding"], dtype=np.float32)
-                                            # Compute cosine similarity
-                                            similarity = np.dot(query_embedding, chunk_embedding) / (
-                                                np.linalg.norm(query_embedding) * np.linalg.norm(chunk_embedding)
-                                            )
-                                            similarities.append(similarity)
-                                        else:
-                                            similarities.append(0.0)
-
-                                    # Sort chunks by similarity
-                                    chunk_similarity_pairs = list(zip(raw_chunks, similarities, strict=False))
-                                    chunk_similarity_pairs.sort(key=lambda x: x[1], reverse=True)
-
-                                    # Create rows with similarity scores
-                                    for i, (chunk, similarity) in enumerate(chunk_similarity_pairs):
-                                        chunk_row = {
-                                            "Rank": i + 1,
-                                            "Similarity": similarity,
-                                            "Text": chunk.get("text", chunk.get("chunk_text", "")),
-                                            "Has Embedding": chunk.get("embedding") is not None,
-                                            "Chunk Size": chunk.get("chunk_size", "N/A"),
-                                            "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
-                                        }
-                                        chunks_rows.append(chunk_row)
-
-                                    st.success(f"✓ Sorted {len(chunks_rows)} chunks by similarity to query")
-
-                            except Exception as e:
-                                st.error(f"Error computing similarity: {e!s}")
-                                logger.error(
-                                    f"Error computing similarity: {e!s}",
-                                    exc_info=True,
-                                )
-                                # Fall back to original display
-                                for i, chunk in enumerate(raw_chunks):
-                                    chunk_row = {
-                                        "Chunk #": i + 1,
-                                        "Text": chunk.get("text", chunk.get("chunk_text", "")),
-                                        "Has Embedding": chunk.get("embedding") is not None,
-                                        "Chunk Size": chunk.get("chunk_size", "N/A"),
-                                        "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
-                                    }
-                                    chunks_rows.append(chunk_row)
-
-                        else:
-                            # No query or no embeddings - show original order
-                            for i, chunk in enumerate(raw_chunks):
-                                chunk_row = {
-                                    "Chunk #": i + 1,
-                                    "Text": chunk.get("text", chunk.get("chunk_text", "")),
-                                    "Has Embedding": chunk.get("embedding") is not None,
-                                    "Chunk Size": chunk.get("chunk_size", "N/A"),
-                                    "Chunk Overlap": chunk.get("chunk_overlap", "N/A"),
-                                }
-                                chunks_rows.append(chunk_row)
-
-                            if query_text and not chunks_with_embeddings:
-                                st.warning(
-                                    "No chunks with embeddings found. Run Step 2 to generate embeddings for similarity search."
-                                )
-
-                        # Display chunks
-                        if chunks_rows:
-                            chunks_df = pd.DataFrame(chunks_rows)
-
-                            # Configure columns based on whether we have similarity scores
-                            if query_text and chunks_with_embeddings:
-                                column_config = {
-                                    "Rank": st.column_config.NumberColumn(
-                                        "Rank",
-                                        width="small",
-                                    ),
-                                    "Similarity": st.column_config.NumberColumn(
-                                        "Similarity",
-                                        format="%.4f",
-                                        width="small",
-                                    ),
-                                    "Text": st.column_config.TextColumn(
-                                        "Text",
-                                        width="large",
-                                    ),
-                                    "Has Embedding": st.column_config.CheckboxColumn(
-                                        "Has Embedding",
-                                    ),
-                                    "Chunk Size": st.column_config.NumberColumn(
-                                        "Chunk Size",
-                                        width="small",
-                                    ),
-                                    "Chunk Overlap": st.column_config.NumberColumn(
-                                        "Chunk Overlap",
-                                        width="small",
-                                    ),
-                                }
-                            else:
-                                column_config = {
-                                    "Chunk #": st.column_config.NumberColumn(
-                                        "Chunk #",
-                                        width="small",
-                                    ),
-                                    "Text": st.column_config.TextColumn(
-                                        "Text",
-                                        width="large",
-                                    ),
-                                    "Has Embedding": st.column_config.CheckboxColumn(
-                                        "Has Embedding",
-                                    ),
-                                    "Chunk Size": st.column_config.NumberColumn(
-                                        "Chunk Size",
-                                        width="small",
-                                    ),
-                                    "Chunk Overlap": st.column_config.NumberColumn(
-                                        "Chunk Overlap",
-                                        width="small",
-                                    ),
-                                }
-
-                            st.dataframe(
-                                data=chunks_df,
-                                use_container_width=True,
-                                hide_index=True,
-                                column_config=column_config,
-                            )
-
-                            st.info(f"✓ Found {len(chunks_rows)} total document chunks in this configuration.")
-                        else:
-                            st.warning("No chunks found. Run Step 1 to generate document chunks first.")
-
-                except Exception as e:
-                    logger.warning(f"Error displaying document chunks with similarity search: {e!s}")
-                    # Continue to show analysis results even if chunk display fails
-
-                # Get cached results
-                cached_results = analyzer.analyzer.cache_manager.get_analysis(
-                    file_path=file_path, config=selected_config["config"]
-                )
-
-                if cached_results:
-                    # Get questions data
-                    questions = analyzer.analyzer.questions
-
-                    # Process results into analysis rows
-                    analysis_rows = []
-                    chunks_rows = []
-
-                    for question_id, data in cached_results.items():
-                        try:
-                            # Create analysis row
-                            result = data.get("result", {})
-                            analysis_row = {
-                                "Question ID": question_id,
-                                "Question Text": (questions[question_id]["text"] if question_id in questions else question_id),
-                                "Analysis": result.get("ANSWER", ""),
-                                "Score": float(result.get("SCORE", 0)),
-                                "Key Evidence": "\n".join([e.get("text", "") for e in result.get("EVIDENCE", [])]),
-                                "Gaps": "\n".join(result.get("GAPS", [])),
-                                "Sources": ", ".join(map(str, result.get("SOURCES", []))),
-                            }
-                            analysis_rows.append(analysis_row)
-                            logger.debug(f"Added analysis row for {question_id}: {json.dumps(analysis_row, indent=2)}")
-
-                            # Process chunks if available
-                            if "chunks" in data:
-                                for chunk in data["chunks"]:
-                                    chunk_row = {
-                                        "Question ID": question_id,
-                                        "Text": chunk.get("text", ""),
-                                        "Vector Similarity": chunk.get("similarity_score", 0.0),
-                                        "LLM Score": chunk.get("llm_score", 0.0),
-                                        "Is Evidence": chunk.get("is_evidence", False),
-                                        "Position": chunk.get("chunk_order", 0),
-                                    }
-                                    chunks_rows.append(chunk_row)
-
-                        except Exception as e:
-                            logger.error(
-                                f"Error processing result for question {question_id}: {e!s}",
-                                exc_info=True,
-                            )
-                            continue
-
-                    # Create DataFrames
-                    if analysis_rows:
-                        analysis_df = pd.DataFrame(analysis_rows)
-                        chunks_df = pd.DataFrame(chunks_rows) if chunks_rows else pd.DataFrame()
-
-                        # Display results using the existing display function
-                        file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
-                        display_analysis_results(analysis_df, chunks_df, file_key)
-                        display_pdf_viewer(file_path, cached_results, questions)
-                    else:
-                        st.warning("No results found in stored for this configuration")
-                else:
-                    st.warning("No stored results found for this configuration")
+        if not file_configs:
+            st.warning("No stored analyses or cached document chunks found")
+            return
 
     except Exception as e:
         logger.error(f"Error displaying consolidated results: {e!s}", exc_info=True)
@@ -1370,6 +1172,39 @@ def get_current_settings(st) -> dict:
     }
 
 
+def get_max_processing_step() -> str:
+    """Return processing step key from Streamlit session state (Chunk/Embed/Map/Answer slider)."""
+    from report_analyst.core.analyzer import normalize_processing_step
+
+    return normalize_processing_step(st.session_state.get("processing_steps_slider", "Answer"))
+
+
+def selected_question_ids_from_editor(edited_df: pd.DataFrame) -> list[str]:
+    """Return QID values for rows checked in the question data editor."""
+    if edited_df.empty or "Select" not in edited_df.columns or "QID" not in edited_df.columns:
+        return []
+    selected = edited_df["Select"].fillna(False).astype(bool)
+    return edited_df.loc[selected, "QID"].astype(str).tolist()
+
+
+def processing_step_needs_questions_for(step: str) -> bool:
+    """True when the step runs question scoring/answer (Map or Answer)."""
+    from report_analyst.core.analyzer import normalize_processing_step
+
+    return normalize_processing_step(step) in ("map", "answer")
+
+
+def processing_step_needs_questions() -> bool:
+    return processing_step_needs_questions_for(get_max_processing_step())
+
+
+def is_partial_processing_step(step: str | None = None) -> bool:
+    """True for Chunk/Embed — pipeline stops before Map/Answer LLM work."""
+    if step is None:
+        step = get_max_processing_step()
+    return not processing_step_needs_questions_for(step)
+
+
 def update_analyzer_parameters():
     """Update analyzer parameters based on session state."""
     if "analyzer" not in st.session_state:
@@ -1423,6 +1258,172 @@ def update_analyzer_parameters():
         st.error(f"Error updating parameters: {e!s}")
 
 
+async def run_analysis(analyzer, file_path, selected_questions, progress_text, max_processing_step: str = "answer"):
+    """Run analysis and update the UI with progress"""
+    try:
+        from report_analyst.core.analyzer import PROCESSING_STEP_LABELS, normalize_processing_step
+
+        step_key = normalize_processing_step(max_processing_step)
+        partial = is_partial_processing_step(step_key)
+
+        config = {
+            "chunk_size": st.session_state.chunk_size,
+            "chunk_overlap": st.session_state.chunk_overlap,
+            "top_k": st.session_state.top_k,
+            "model": st.session_state.llm_model,
+            "question_set": st.session_state.question_set,
+        }
+        logger.info(f"[ANALYSIS] User triggered analysis for file: {file_path}")
+        logger.info(f"[ANALYSIS] Selected questions: {selected_questions}")
+        if "questions" in st.session_state:
+            logger.info(
+                "[ANALYSIS] Selected question texts: %s",
+                [st.session_state.questions[q]["text"] for q in selected_questions if q in st.session_state.questions],
+            )
+
+        force_recompute = st.session_state.get("force_recompute", False)
+
+        if partial:
+            logger.info(f"[CACHE] Skipping analysis_cache lookup for partial step: {step_key}")
+            if not force_recompute:
+                chunk_params = analyzer.analyzer.chunk_params
+                raw_chunks = analyzer.cache_manager.get_document_chunks(
+                    file_path=file_path,
+                    chunk_size=chunk_params["chunk_size"],
+                    chunk_overlap=chunk_params["chunk_overlap"],
+                )
+                needs_embed = step_key == "embed" and not any(c.get("embedding") is not None for c in raw_chunks)
+                if raw_chunks and not needs_embed:
+                    chunk_count, embedded_count = display_cached_document_chunks(
+                        analyzer,
+                        file_path,
+                        chunk_size=chunk_params["chunk_size"],
+                        chunk_overlap=chunk_params["chunk_overlap"],
+                    )
+                    label = PROCESSING_STEP_LABELS.get(step_key, step_key)
+                    if step_key == "embed" and embedded_count == 0:
+                        progress_text.warning(
+                            f"Found {chunk_count} chunks but none have embeddings yet. "
+                            "Run Embed again with a valid OPENAI_API_KEY."
+                        )
+                    else:
+                        progress_text.success(f"Found stored chunks ({chunk_count}) — {label} step already complete.")
+                    return
+        else:
+            logger.info(
+                f"[CACHE] Looking up cache for file: {file_path} with config: {config} and questions: {selected_questions}"
+            )
+            question_ids = selected_questions
+            if selected_questions and not all("_" in q for q in selected_questions):
+                question_ids = [f"{config['question_set']}_{q}" for q in selected_questions]
+            cached_results = analyzer.cache_manager.get_analysis(
+                file_path=file_path,
+                config=config,
+                question_ids=question_ids,
+            )
+            if cached_results and not force_recompute:
+                logger.info(f"[CACHE] Cache HIT for config: {config}")
+                progress_text.success("Found stored results!")
+                st.session_state.results = cached_results
+                logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
+                logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
+                return
+            logger.info(f"[CACHE] Cache MISS for config: {config}")
+
+        progress_text.info("Starting analysis...")
+
+        llm_scoring_enabled = st.session_state.get("new_llm_scoring", False)
+        progress_text.info(f"LLM scoring: {'Enabled' if llm_scoring_enabled else 'Disabled'}")
+        logger.info(f"Starting analysis with LLM scoring: {llm_scoring_enabled}")
+
+        all_results = {}
+        question_numbers = []
+        for q_id in selected_questions:
+            parts = q_id.split("_")
+            if len(parts) > 1:
+                try:
+                    question_numbers.append(int(parts[1]))
+                except ValueError:
+                    progress_text.warning(f"Invalid question ID format: {q_id}")
+            else:
+                progress_text.warning(f"Invalid question ID format: {q_id}")
+
+        pre_retrieved_chunks = st.session_state.get("backend_chunks")
+        step_failed = False
+        async for result in analyzer.process_document(
+            file_path=file_path,
+            selected_questions=question_numbers,
+            use_llm_scoring=st.session_state.get("new_llm_scoring", False),
+            force_recompute=st.session_state.get("force_recompute", False),
+            pre_retrieved_chunks=pre_retrieved_chunks,
+            max_processing_step=max_processing_step,
+        ):
+            if "error" in result:
+                step_failed = True
+                if is_api_key_missing_message(result["error"]):
+                    render_api_key_missing_alert(progress_text, result["error"])
+                else:
+                    progress_text.error(f"Error: {result['error']}")
+                continue
+
+            if "status" in result:
+                progress_text.info(result["status"])
+                continue
+
+            question_id = result.get("question_id")
+            if not question_id:
+                question_number = result.get("question_number")
+                if question_number:
+                    question_id = f"{st.session_state.question_set}_{question_number}"
+                else:
+                    continue
+
+            progress_text.info(f"Completed analysis for question {question_id}")
+            result_data = result.get("result", result)
+            all_results[question_id] = result_data
+
+        final_results = analyzer.cache_manager.get_analysis(
+            file_path=file_path, config=config, question_ids=list(all_results.keys())
+        )
+
+        if not final_results:
+            final_results = all_results
+
+        logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
+        st.session_state.results = final_results
+        logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
+
+        if partial:
+            if step_failed:
+                return
+            chunk_params = analyzer.analyzer.chunk_params
+            chunk_count, embedded_count = display_cached_document_chunks(
+                analyzer,
+                file_path,
+                chunk_size=chunk_params["chunk_size"],
+                chunk_overlap=chunk_params["chunk_overlap"],
+            )
+            label = PROCESSING_STEP_LABELS.get(step_key, step_key)
+            if step_key == "embed":
+                if embedded_count == 0:
+                    progress_text.error(
+                        "Embed step did not produce embeddings. "
+                        "Set a valid OPENAI_API_KEY in Settings (Embed uses OpenAI only, not Gemini)."
+                    )
+                else:
+                    progress_text.success(f"Completed Embed step ({embedded_count}/{chunk_count} chunks with embeddings).")
+            elif chunk_count:
+                progress_text.success(f"Completed {label} step ({chunk_count} chunks).")
+            else:
+                progress_text.warning(f"Completed {label} step, but no chunks were found in cache.")
+        else:
+            progress_text.success("Analysis complete!")
+
+    except Exception as e:
+        progress_text.error(f"Error during analysis: {e!s}")
+        logger.error(f"Error during analysis: {e!s}", exc_info=True)
+
+
 def main():
     """Main function for the Streamlit app"""
     try:
@@ -1445,8 +1446,11 @@ def main():
         if "use_llm_scoring" not in st.session_state:
             st.session_state.use_llm_scoring = False  # Default LLM scoring setting
 
+        if "force_recompute" not in st.session_state:
+            st.session_state.force_recompute = False  # Default recompute setting
+
         if "results" not in st.session_state:
-            st.session_state.results = {"answers": {}}
+            st.session_state.results = {}  # Initialize empty results
 
         if "current_file" not in st.session_state:
             st.session_state.current_file = None  # Initialize current file
@@ -3829,21 +3833,61 @@ def main():
 
                     fresh_viewer_results = {}
                     if analyze_clicked or reanalyze_clicked:
-                        # NOW sync the selection state from the widget
-                        # Get selected questions from the edited dataframe
-                        selected_questions = edited_df.loc[edited_df["Select"], "QID"].tolist()
+                        selected_questions = selected_question_ids_from_editor(edited_df)
 
-                        # Update session state for individual question checkboxes (for backward compatibility)
                         for q_id in questions.keys():
                             is_selected = q_id in selected_questions
                             st.session_state[f"individual_question_{q_id}"] = is_selected
 
-                        if not selected_questions:
+                        max_step = get_max_processing_step()
+                        needs_questions = processing_step_needs_questions()
+
+                        if needs_questions and not selected_questions:
                             st.warning("Please select at least one question to analyze.")
+                        elif is_partial_processing_step(max_step):
+                            try:
+                                update_analyzer_parameters()
+                                st.session_state.force_recompute = reanalyze_clicked
+                                progress_text = st.empty()
+                                is_backend = st.session_state.get("backend_chunks") is not None
+                                backend_uri = st.session_state.get("backend_resource_uri")
+                                if is_backend and backend_uri:
+                                    analysis_file_path = backend_uri
+                                else:
+                                    analysis_file_path = str(Path(file_path).resolve()) if file_path else file_path
+                                progress_text.info(f"Running {max_step} step...")
+                                asyncio.run(
+                                    run_analysis(
+                                        analyzer,
+                                        file_path=analysis_file_path,
+                                        selected_questions=[],
+                                        progress_text=progress_text,
+                                        max_processing_step=max_step,
+                                    )
+                                )
+                            except Exception as e:
+                                st.error(f"Error analyzing document: {e!s}")
                         else:
                             try:
-                                # Initialize progress display
+                                st.session_state.force_recompute = reanalyze_clicked
+
+                                config = {
+                                    "chunk_size": st.session_state.new_chunk_size,
+                                    "chunk_overlap": st.session_state.new_overlap,
+                                    "top_k": st.session_state.new_top_k,
+                                    "model": st.session_state.get("new_llm_model", st.session_state.llm_model),
+                                    "question_set": st.session_state.new_question_set,
+                                }
+
                                 progress_text = st.empty()
+
+                                is_backend = st.session_state.get("backend_chunks") is not None
+                                backend_uri = st.session_state.get("backend_resource_uri")
+
+                                if is_backend and backend_uri:
+                                    analysis_file_path = backend_uri
+                                else:
+                                    analysis_file_path = str(Path(file_path).resolve()) if file_path else file_path
 
                                 if reanalyze_clicked:
                                     progress_text.info(f"Reanalyzing {len(selected_questions)} questions...")
@@ -3856,10 +3900,10 @@ def main():
                                             use_llm_scoring=st.session_state.new_llm_scoring,
                                             single_call=st.session_state.new_batch_scoring,
                                             force_recompute=True,
+                                            max_processing_step=max_step,
                                         )
                                     )
                                 else:
-                                    # For normal analysis, check cache first
                                     cached_results = analyzer.analyzer.cache_manager.get_analysis(
                                         file_path=analysis_file_path,
                                         config=config,
@@ -3867,13 +3911,11 @@ def main():
                                     )
 
                                     if cached_results:
-                                        # Process cached results
-                                        st.session_state.results["answers"].update(cached_results)
+                                        for question_id, result in cached_results.items():
+                                            st.session_state.results["answers"][question_id] = result
 
-                                        # Generate file key for display
                                         file_key = generate_file_key(analysis_file_path, st)
 
-                                        # Update display
                                         analysis_df, chunks_df = create_analysis_dataframes(
                                             st.session_state.results["answers"],
                                             file_key,
@@ -3882,19 +3924,18 @@ def main():
                                         st.session_state.chunks_df = chunks_df
                                         st.session_state.analysis_complete = True
                                     else:
-                                        # Run analysis for uncached questions
                                         progress_text.info(f"Processing {len(selected_questions)} questions...")
 
                                         try:
-                                            # Run analysis for uncached questions
                                             asyncio.run(
                                                 analyze_document_and_display(
                                                     analyzer,
-                                                    file_path=analysis_file_path,  # Use URN for backend, file path for local
+                                                    file_path=analysis_file_path,
                                                     questions=questions,
                                                     selected_questions=selected_questions,
                                                     use_llm_scoring=st.session_state.new_llm_scoring,
                                                     single_call=st.session_state.new_batch_scoring,
+                                                    max_processing_step=max_step,
                                                 )
                                             )
 
@@ -3904,7 +3945,10 @@ def main():
                                             st.error(f"Error during analysis: {e!s}")
                                             st.exception(e)
 
-                                session_answers = st.session_state.results["answers"]
+                                results_bag = st.session_state.get("results") or {}
+                                session_answers = (
+                                    results_bag.get("answers", results_bag) if isinstance(results_bag, dict) else {}
+                                )
                                 all_results = {
                                     question_id: session_answers[question_id]
                                     for question_id in selected_questions
@@ -3927,28 +3971,33 @@ def main():
                                 )
                                 st.error(f"Error during analysis: {e!s}")
 
-                    viewer_results = fresh_viewer_results
-                    if not viewer_results:
-                        viewer_results = analyzer.analyzer.cache_manager.get_analysis(
-                            file_path=analysis_file_path,
-                            config=config,
+                    try:
+                        viewer_results = fresh_viewer_results
+                        if not viewer_results:
+                            viewer_results = analyzer.analyzer.cache_manager.get_analysis(
+                                file_path=analysis_file_path,
+                                config=config,
+                            )
+                        if viewer_results:
+                            raw_chunks = []
+                        elif is_backend:
+                            raw_chunks = st.session_state.get("backend_chunks") or []
+                        else:
+                            raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
+                                file_path=analysis_file_path,
+                                chunk_size=config["chunk_size"],
+                                chunk_overlap=config["chunk_overlap"],
+                            )
+                        display_pdf_viewer(
+                            str(analysis_file_path),
+                            viewer_results,
+                            questions,
+                            raw_chunks,
                         )
-                    if viewer_results:
-                        raw_chunks = []
-                    elif is_backend:
-                        raw_chunks = st.session_state.get("backend_chunks") or []
-                    else:
-                        raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
-                            file_path=analysis_file_path,
-                            chunk_size=config["chunk_size"],
-                            chunk_overlap=config["chunk_overlap"],
-                        )
-                    display_pdf_viewer(
-                        str(analysis_file_path),
-                        viewer_results,
-                        questions,
-                        raw_chunks,
-                    )
+                    except Exception as e:
+                        logger.error(f"Error displaying PDF viewer: {e!s}", exc_info=True)
+                        st.error(f"Error displaying PDF viewer: {e!s}")
+
                 else:
                     # Show helpful error message
                     if file_path is None:
@@ -4303,26 +4352,13 @@ def main():
                 # Get the database identifier for the selected question set
                 db_question_set = question_set_mapping.get(selected_set, selected_set)
 
-                # Get all available cache configurations
-                cache_configs = analyzer.analyzer.cache_manager.check_cache_status()
-
-                # Group configurations by file for the selected question set
-                if cache_configs:
-                    for config in cache_configs:
-                        if len(config) == 6:
-                            file_path, chunk_size, chunk_overlap, top_k, model, qs = config
-                            if qs == db_question_set:
-                                if file_path not in file_configs:
-                                    file_configs[file_path] = []
-                                file_configs[file_path].append(
-                                    {
-                                        "chunk_size": chunk_size,
-                                        "chunk_overlap": chunk_overlap,
-                                        "top_k": top_k,
-                                        "model": model,
-                                        "question_set": qs,
-                                    }
-                                )
+                # Get all available cache + document-chunk configurations
+                file_configs = build_all_results_file_configs(
+                    analyzer.analyzer.cache_manager,
+                    db_question_set,
+                    default_top_k=st.session_state.get("top_k", 10),
+                    default_model=st.session_state.get("llm_model", DEFAULT_LLM_MODEL),
+                )
 
                 with col2:
                     # Report selector in green container
