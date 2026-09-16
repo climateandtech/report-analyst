@@ -191,6 +191,7 @@ export default `
 .page-highlights {
   position: absolute;
   inset: 0;
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -226,4 +227,58 @@ export default `
 .message.error {
   color: #fecaca;
 }
-`;
+
+
+.text-layer {
+  position: absolute;
+  inset: 0;
+  user-select: text;
+}
+
+.text-layer span {
+  position: absolute;
+  color: transparent;
+  cursor: text;
+}
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  user-select: text;
+  z-index: 2;
+}
+  
+.stored-selections {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.stored-selection {
+  position: absolute;
+  background: #ffe60059;
+  border: 1px solid #b49600b3;
+  pointer-events: none;
+}
+#saved-tags {
+  margin-top: 16px;
+}
+
+.saved-tag {
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.saved-tag div {
+  margin-top: 4px;
+}
+
+.saved-tag:hover {
+  background: #0000000a;
+}`
