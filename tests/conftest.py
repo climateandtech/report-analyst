@@ -81,6 +81,17 @@ def pytest_configure(config):
     # Register custom markers
     config.addinivalue_line("markers", "postgres: mark test as requiring PostgreSQL")
     config.addinivalue_line("markers", "integration: mark test as integration test")
+    os.environ.setdefault("MPLBACKEND", "Agg")
+
+
+@pytest.fixture(autouse=True)
+def _reset_document_analyzer_singleton():
+    """Keep DocumentAnalyzer from leaking cache/LLM state across tests."""
+    from report_analyst.core.analyzer import DocumentAnalyzer
+
+    DocumentAnalyzer.reset_instance()
+    yield
+    DocumentAnalyzer.reset_instance()
 
 
 # =============================================================================
@@ -285,6 +296,7 @@ def mocked_report_analyzer():
         single_call=True,
         force_recompute=False,
         pre_retrieved_chunks=None,
+        max_processing_step="answer",
     ):
         calls.append(
             {
@@ -295,6 +307,7 @@ def mocked_report_analyzer():
                 "single_call": single_call,
                 "force_recompute": force_recompute,
                 "pre_retrieved_chunks": pre_retrieved_chunks,
+                "max_processing_step": max_processing_step,
             }
         )
 
@@ -326,6 +339,7 @@ def mocked_report_analyzer():
         single_call=True,
         force_recompute=False,
         pre_retrieved_chunks=None,
+        max_processing_step="answer",
     ):
         calls.append(
             {
@@ -335,6 +349,7 @@ def mocked_report_analyzer():
                 "single_call": single_call,
                 "force_recompute": force_recompute,
                 "pre_retrieved_chunks": pre_retrieved_chunks,
+                "max_processing_step": max_processing_step,
             }
         )
 
