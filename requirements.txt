@@ -8,7 +8,7 @@ aiosqlite==0.21.0
 alembic==1.15.1
 altair==5.5.0
 annotated-types==0.7.0
-anyio==4.8.0
+anyio==4.14.2
 asgiref==3.8.1
 attrs==25.1.0
 Authlib==1.6.12
