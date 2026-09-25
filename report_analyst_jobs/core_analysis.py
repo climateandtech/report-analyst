@@ -5,11 +5,10 @@ Essential analysis functions that can be used across different deployment scenar
 Clean, focused implementations without framework dependencies.
 """
 
-import json
 import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

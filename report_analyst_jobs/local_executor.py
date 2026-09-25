@@ -8,7 +8,7 @@ Executes jobs in-process without any message queuing.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from .interfaces import (
     ExecutionBackend,

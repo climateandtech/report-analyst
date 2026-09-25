@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import nats
-from nats.js import JetStreamContext
 
 logger = logging.getLogger(__name__)
 

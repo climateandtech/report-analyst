@@ -3,7 +3,7 @@
 import logging
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Tuple
 
 from llama_index.core import (
     Document,
@@ -11,7 +11,7 @@ from llama_index.core import (
     VectorStoreIndex,
     load_index_from_storage,
 )
-from llama_index.core.schema import NodeWithScore, TextNode
+from llama_index.core.schema import TextNode
 
 from .base import BaseVectorStore
 
