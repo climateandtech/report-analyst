@@ -176,12 +176,9 @@ async def get_consolidated_results(
 @app.get("/models", operation_id="get_models")
 async def get_models():
     """List available LLM models for analysis."""
-    return [
-        {"id": "gpt-4o-mini", "name": "GPT-4o Mini"},
-        {"id": "gpt-4o", "name": "GPT-4o"},
-        {"id": "gpt-4", "name": "GPT-4"},
-        {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo"},
-    ]
+    from report_analyst.core.llm_models import get_models_for_api
+
+    return get_models_for_api()
 
 
 def _get_temp_dir() -> str:

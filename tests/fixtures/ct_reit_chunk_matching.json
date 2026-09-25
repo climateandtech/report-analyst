@@ -1,0 +1,532 @@
+{
+  "fixture_version": 1,
+  "source": {
+    "repository": "tobischimanski/ClimRetrieve",
+    "report": "CT REIT 2022 ESG Report.pdf",
+    "report_sha256": "b850d80fcea07578106fa281b255f3d4f9b170430a2d1a77e44bb228764b75c3",
+    "labels_sha256": "f2bccde897ef33617f2515b1de0fbb32bc2bc7945814b2fa7ffc674ca6223118"
+  },
+  "question": "Does the company have any engagements with industry peers in relation to climate change?",
+  "ground_truth": {
+    "text": "Sponsorship of industry events",
+    "context": "Sponsorship of industry events",
+    "page": 26,
+    "source_from": "table",
+    "answer": "[[YES]] The company briefly mentions sponsoring industry events as part of stakeholder engagement, though it does not mention the nature of these events.",
+    "relevance_score": 2.0,
+    "unsure_flag": "unsure",
+    "addressed_directly": "indirectly"
+  },
+  "generation": {
+    "embedding_model": "text-embedding-ada-002",
+    "chunk_sizes": [
+      200,
+      400
+    ],
+    "chunk_overlap": 20,
+    "stored_vectors": false
+  },
+  "chunks": {
+    "200": [
+      {
+        "document_chunk_index": 4,
+        "page": 2,
+        "text": "ESG remains a key pillar of CT REIT’s overall strategy. As we continue to hone our ability to measure and benchmark our performance, our talented teams and engaged Board of Trustees are focused on sustainability, social outcomes, and good governance, all of which continue to be integrated into our business. I want to thank all our stakeholders for the trust that they have placed in us as we work towards improving our performance, mitigating our impacts, and refining our disclosure, and as we continue to walk the path along our ESG journey. Sincerely, Kevin Salsberg President & Chief Executive Officer",
+        "question_similarity": 0.78792119,
+        "ground_truth_similarity": 0.7332378
+      },
+      {
+        "document_chunk_index": 5,
+        "page": 3,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 3 2022 ESG Highlights Conducted energy and water audits across the portfolio. Began construction of our first net zero energy and net zero carbon project, a 350,000 square foot distribution centre in Calgary, Alberta. To date, together with CTC, 386 electric vehicle charging stations have been installed, at 92 CT REIT properties. In the past year, 100% of our employees completed ESG related training. Formed our Social Engagement Committee. Our Board of Trustees approved our new Diversity Policy. LAND ACKNOWLEDGEMENT We acknowledge that long before Canada was a country, strong nations and cultures existed here – and continue to exist.",
+        "question_similarity": 0.81522226,
+        "ground_truth_similarity": 0.7427991
+      },
+      {
+        "document_chunk_index": 6,
+        "page": 3,
+        "text": "The Canadian lands on which CT REIT properties are located have been the site of human activity for 15,000 years. Today these lands and lakes continue to be home to many First Nations, Inuit and Métis communities from across Turtle Island, also known as North America. Our home office, located in what is currently known as Toronto, is situated on the traditional territory of the Anishinaabeg, Huron-Wendat and the Haudenosaunee Nations. This location is covered by Treaty 13, signed with the Mississaugas of the Credit, and the Williams Treaties, signed with multiple Mississauga and Chippewa bands. We are grateful that we can live and work here, and we are committed to building and sustaining a relationship with Indigenous peoples based on respect, dignity, trust and cooperation.",
+        "question_similarity": 0.74153954,
+        "ground_truth_similarity": 0.70458841
+      },
+      {
+        "document_chunk_index": 12,
+        "page": 5,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 5 CT REIT ESG Timeline 2013 CT REIT’s Initial Public Offering takes place with strong governance practices in place. 2016 Acquired the 1.4-million-square-foot Bolton Distribution Centre. Built with many ground-breaking, environmentally sustainable features, the state-of-the-art facility achieved LEED Gold certiﬁcation by the Canada Green Building Council. 2020 Amid the COVID-19 pandemic, we supported our tenants and provided rent relief, implemented enhanced cleaning protocols, and delivered sanitizing supplies.",
+        "question_similarity": 0.79491329,
+        "ground_truth_similarity": 0.73488975
+      },
+      {
+        "document_chunk_index": 13,
+        "page": 5,
+        "text": "Also in 2020: • Exterior LED retroﬁts were conducted at over 90% of our properties • Our Sustainability Committee was formed 2021 First GRESB submission. Also in 2021: • Materiality Assessment conducted • Climate Risk Assessment conducted • Conducted HVAC motor retrofits at over 90% of our properties 2022 Inaugural ESG Report published outlining our 2021 activities.",
+        "question_similarity": 0.81516445,
+        "ground_truth_similarity": 0.74926859
+      },
+      {
+        "document_chunk_index": 14,
+        "page": 5,
+        "text": "Also in 2022: • Our GRESB submission became publicly available • Donation made in support of the development of a multi-sport court in Welland, Ontario supporting Jumpstart • Construction of our ﬁrst Net Zero distribution centre began 2023 First BOMA BEST Silver certiﬁcations achieved at eight enclosed and open-air retail properties. Also in 2023: • Our new distribution centre was awarded the Zero Carbon Building – Design Standard certification • Adoption of Board Diversity Policy • Adoption of Sustainable Investment Corporate Policy 2024 & beyond Ongoing development of our ESG Strategy with a focus on reducing our GHG emissions, fostering talent, supporting communities and good governance. Expansion of BOMA BEST certification program.",
+        "question_similarity": 0.78185523,
+        "ground_truth_similarity": 0.76304543
+      },
+      {
+        "document_chunk_index": 15,
+        "page": 6,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 6 About This Report This report contains information about CT REIT’s ESG initiatives. It describes our ESG strategy and philosophy and approach to proactively addressing the environmental and social challenges facing our industry and country. SCOPE Our 2022 ESG Report is focused on the activities and outcomes of CT REIT during the 2022 fiscal year. This report also includes work that commenced in 2022 but was completed in 2023. Unless otherwise indicated, all references to employees in this report include all permanent employees of CT REIT. FORWARD-LOOKING INFORMATION Certain statements made in this ESG Report, including those related to our ESG strategy and objectives, may constitute forward-looking information under applicable securities laws.",
+        "question_similarity": 0.7994014,
+        "ground_truth_similarity": 0.72785908
+      },
+      {
+        "document_chunk_index": 21,
+        "page": 7,
+        "text": "As we progress along our ESG journey, we are monitoring regulatory developments and reviewing the applicability of other ESG related frameworks and standards, including the Sustainability Accounting Standards Board (SASB) and the International Sustainability Standards Board (ISSB) standards.",
+        "question_similarity": 0.79139036,
+        "ground_truth_similarity": 0.75056297
+      },
+      {
+        "document_chunk_index": 22,
+        "page": 8,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 8 Our Approach to ESG Governance Business Ethics Risk Management Privacy & Data Security Social Community Impact Diversity, Inclusion & Belonging Talent & Culture Environmental Climate Change Sustainable Building Design Operational Efficiency PRIORITY ESG TOPICS We focus our efforts on ESG topics that offer the greatest potential for positive impact on both our business and on the communities in which we operate. These topics rank high in terms of importance to our overall strategy, to key stakeholders and to our ability to leverage our enterprise capabilities to create meaningful change. In 2021, the REIT conducted a materiality assessment to identify, refine and prioritize the ESG topics that may impact our business and are important to our key stakeholders.",
+        "question_similarity": 0.81853896,
+        "ground_truth_similarity": 0.74226767
+      },
+      {
+        "document_chunk_index": 23,
+        "page": 8,
+        "text": "The assessment included external research and benchmarking, a focused stakeholder engagement process, internal analysis and discussion, and alignment with senior leadership. The results of the assessment informed our ESG strategy and priorities, which generally align with those of CTC, our most significant tenant, who prides itself on being an integral part of Canadian communities. This report outlines our approach to ESG topics identified as being the most relevant to our strategy and important to our stakeholders. ESG Topics",
+        "question_similarity": 0.79659253,
+        "ground_truth_similarity": 0.74054211
+      },
+      {
+        "document_chunk_index": 24,
+        "page": 9,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 9 Environmental As a pillar in the communities in which we operate, we can lead change not only by reducing our greenhouse gas emissions but also by leveraging our knowledge, innovation, and relationships to empower our tenants and partners to improve sustainability. At CT REIT, addressing climate change, improving operational efficiency, and focusing on sustainable building design are integral to how we conduct our business and provide many opportunities to improve operational performance and reduce our environmental impact.",
+        "question_similarity": 0.81873649,
+        "ground_truth_similarity": 0.72679347
+      },
+      {
+        "document_chunk_index": 25,
+        "page": 10,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 10 CT REIT is committed to limiting our environmental footprint. Our existing initiatives further our efforts to conduct our operations in a manner that reduces our greenhouse gas emissions and conserves energy and water. By understanding the business risks of climate change, we are better positioned for the future, to understand and mitigate risks and to assess potential opportunities. We continue to make ongoing investments, as well as find new ways to work with our partners to reduce operational emissions and limit our footprint. The vast majority of CT REIT’s properties are single-tenanted, net-leased assets, where the tenant controls much, if not all, of the activities at the property, including the consumption of energy and water, as well as the resulting GHG emissions.",
+        "question_similarity": 0.81332034,
+        "ground_truth_similarity": 0.72280669
+      },
+      {
+        "document_chunk_index": 26,
+        "page": 10,
+        "text": "CT REIT has therefore focused its efforts on those aspects of its operations over which it has influence or control including: the energy usage of the common areas of our properties, the design and construction of new development projects, and collaborating with tenants to improve the overall operations at our properties. Following the release of the TCFD recommendations, CT REIT worked with a third-party consultant to better understand the potential implications of climate change on the REIT’s portfolio and conducted a climate risk and opportunity assessment. This exercise included scenario analyses which now inform CT REIT’s decision-making regarding investments on an ongoing basis. REDUCING THE GHG INTENSITY OF OUR BUILDINGS We continue to work on reducing our Scope 1 and 2 emissions by focusing on key areas of impact such as how we heat, cool, and light our buildings.",
+        "question_similarity": 0.8222068,
+        "ground_truth_similarity": 0.72649455
+      },
+      {
+        "document_chunk_index": 27,
+        "page": 10,
+        "text": "Our pathway to reducing our heating, cooling, and lighting-related emissions relies on proven technologies, with new technologies, greening of the energy grid, and the purchase of renewable energy and/or carbon offsets being potential considerations to fill certain gaps. We are also developing plans to mitigate the carbon impacts of new development projects that we undertake at our properties. For example, our first net zero (both net zero energy and net zero carbon) project is a state-of-the-art distribution centre being constructed for CTC in Calgary, Alberta, which is expected to be completed in 2023. Once completed, the building is expected to generate as much energy as it consumes on an annual basis. TCFD RESPONSE The recommendations set out by the Task Force for Climate-related Financial Disclosures (TCFD) provide a framework for reporting on the risks associated with climate change.",
+        "question_similarity": 0.82874733,
+        "ground_truth_similarity": 0.73408532
+      },
+      {
+        "document_chunk_index": 28,
+        "page": 10,
+        "text": "CT REIT believes in the importance of working to align with TCFD’s four elements of the recommendations: governance, strategy, risk management and metrics. We are working on development plans to address these recommendations and to better understand the risks and opportunities posed by climate change events, such as floods, forest fires and rising temperatures on our business, and provide transparent disclosures on our progress. Climate Change",
+        "question_similarity": 0.82348788,
+        "ground_truth_similarity": 0.74128783
+      },
+      {
+        "document_chunk_index": 29,
+        "page": 11,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 11 Sustainable Building Design We are committed to reducing our environmental impact through continued improvements to both building design and construction and where possible pursuing green building certifications such as LEED, Net Zero Carbon and Net Zero Energy. The design process includes consideration of compliance with applicable zoning and building requirements and/or certifications, as well as the needs and impact on the local economy. Commencing in 2024, together with CTC, we intend to build new Canadian Tire stores to CTC’s net zero ready prototype. These net zero ready stores will be significantly more energy efficient than previous prototypes and will have the capacity to become fully net zero with the addition of on-site solar panels.",
+        "question_similarity": 0.80305904,
+        "ground_truth_similarity": 0.72814637
+      },
+      {
+        "document_chunk_index": 33,
+        "page": 12,
+        "text": "AIR-SOURCE HEAT PUMP INVESTMENT Planning began in 2022 for a 2023 pilot to transition one of our retail properties from rooftop heating to air-source heat pumps. Air-source heat pumps are more efficient, relying on electricity to generate heat instead of natural gas. As most of our Scope 1 and 2 emissions result from the use of natural gas to heat our properties, focusing on the electrification of our heating systems will significantly reduce our carbon footprint, contributing to a more sustainable future. As we continue our efforts to reduce emissions from our existing properties, we proactively review the lifecycle of our systems and equipment and, where possible, invest in Heating, Ventilation and Air Conditioning (HVAC) system retrofits, improved thermal performance and other energy efficiency initiatives.",
+        "question_similarity": 0.77382427,
+        "ground_truth_similarity": 0.71674663
+      },
+      {
+        "document_chunk_index": 34,
+        "page": 12,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 12 Operational Efficiency We are committed to reducing our carbon footprint and improving the operational performance of our portfolio. Examples of such commitment include managing energy usage, focusing on waste diversion, and continuing to support the installation of EV charging stations at our properties. We have also established more sustainable processes throughout our operations and, where possible, have used more environmentally sustainable materials. We continue to collaborate with partners and tenants to leverage new technologies to create additional efficiencies and cost savings over time. We invest in initiatives and seek opportunities that support the ongoing evolution of our business and our goal to improve operational efficiencies. Examples include: • Energy, Water, and Indoor Air Quality audits – conducted across several properties as part of our BOMA BEST certification projects.",
+        "question_similarity": 0.81564081,
+        "ground_truth_similarity": 0.73740423
+      },
+      {
+        "document_chunk_index": 35,
+        "page": 12,
+        "text": "• Begun implementation of new initiatives to improve waste diversion, including the introduction of new collection streams and tenant education materials across properties within our operationally controlled portfolio. • Installation and improvement of smart building monitoring systems at selected properties. OPERATIONAL CONTROL Areas within those properties where we have Operational Control are common areas and other landlord-controlled areas, such as: parking lots, mechanical and other maintenance rooms, storage rooms, vestibules, interior hallways and public washrooms in enclosed shopping centres, and property management offices.",
+        "question_similarity": 0.75161409,
+        "ground_truth_similarity": 0.71784407
+      },
+      {
+        "document_chunk_index": 44,
+        "page": 16,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 16 Community Impact We are committed to supporting opportunities for all by investing in those communities in which we operate and which are an integral part of our continued success. SUPPORTING INCLUSIVE PLAY SPACES CT REIT is committed to supporting the Canadian Tire Jumpstart Charities (Jumpstart), which have been assisting kids overcome the financial and accessibility barriers to sport and play for their kids since 2005. In 2022, Jumpstart provided funding to over 700 community sport and recreation organizations in Canada, creating opportunities for over 440,000 kids in the process – the most in any single year to date. Learn more about Jumpstart’s work here: 2022 Annual Report.",
+        "question_similarity": 0.78670192,
+        "ground_truth_similarity": 0.74608046
+      },
+      {
+        "document_chunk_index": 45,
+        "page": 16,
+        "text": "Learn more about Jumpstart’s work here: 2022 Annual Report. SUPPORTING OUR COMMUNITIES In addition to monetary donations, we know that volunteering our time, skills and expertise can help support local communities. Supporting employee voluntarism builds a stronger culture of giving and provides opportunities for our employees to gain a better understanding of the needs and challenges facing our communities. In 2022, an employee volunteer program, Community Changemakers, was launched. The program provides employees with the opportunity to use 10 hours of paid time off per year to support Jumpstart, Jumpstart beneficiaries as well as other community organizations.",
+        "question_similarity": 0.74406898,
+        "ground_truth_similarity": 0.75514555
+      },
+      {
+        "document_chunk_index": 46,
+        "page": 16,
+        "text": "COMMUNITY OUTREACH SPOTLIGHT Through our efforts, we were able to raise nearly $120,000 for: • Jumpstart • Cancer Foundation of Saskatchewan • Dress for Success • Salvation Army • Juvenile Diabetes Research Foundation • Princess Margaret Hospital • Crohn’s and Colitis Canada CT REIT team at the Ride for Life event in support of the Juvenile Diabetes Research Foundation COMMUNITY OUTREACH SPOTLIGHT Inclusive multi-sport court in Welland, Ontario In 2021, as part of its partnership with Jumpstart, CT REIT committed $100,000, payable over two years, to support the construction of inclusive play space within some of the communities in which CT REIT operates, with the inaugural project being a new multi-sport court and inclusive splash pad in Welland, Ontario.",
+        "question_similarity": 0.74142855,
+        "ground_truth_similarity": 0.75219262
+      },
+      {
+        "document_chunk_index": 47,
+        "page": 17,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 17 SUPPORTING DIVERSE EMERGING LEADERS IN REAL ESTATE Together with the Toronto Metropolitan University and Ted Rogers School of Management, the REIT established a 5-year partnership through to 2027 that includes financial support through a scholarship, industry experience through a paid internship and engagement through mentorship opportunities with members of CT REIT’s management team. The annual real estate award recognizes two full-time students, enrolled in the Real Estate Management Program at Ted Rogers School of Management who self-identify as Black, Indigenous, or People of Color and demonstrate academic achievement and leadership through involvement in the community.",
+        "question_similarity": 0.79166007,
+        "ground_truth_similarity": 0.75615609
+      },
+      {
+        "document_chunk_index": 48,
+        "page": 17,
+        "text": "The primary goal of the award is to encourage diversity, lower barriers to entry into the commercial real estate industry and support emerging real estate leaders. LEVERAGING OUR PROPERTIES TO SUPPORT COMMUNITIES CT REIT has established an urban beekeeping program with the help of our partner, Alvéole. The program has enabled us to increase engagement within communities in which we operate, raise awareness about environmental issues, and produce some great tasting honey! The program is in place at seven CT REIT locations and each beehive generates about 100 jars of honey annually which are shared with the local community. ENGAGING TENANTS IN CONVERSATION CT REIT is committed to engaging with our tenants to develop strong partnerships and healthy communities.",
+        "question_similarity": 0.77216047,
+        "ground_truth_similarity": 0.76619732
+      },
+      {
+        "document_chunk_index": 49,
+        "page": 17,
+        "text": "Throughout 2022, we hosted and facilitated several tenant engagement events across our portfolio, as well as distributed newsletters and launched new contests, promotions, and local social media campaigns. We believe that tenant feedback is an integral part of our client service model. We are better when we work together with our tenants to understand their needs and to deliver a level of service that exceeds their expectations. As part of our broader tenant engagement program, CT REIT conducted a survey with our tenants, requesting feedback on the services and programs we offer. The survey results provided critical insight to help us improve performance and maintain operational excellence. PROJECT SPOTLIGHT Earth Day community cleanup In 2022, we held our first community cleanup event to celebrate Earth Day. With participation from across Canada, our teams collected 60 bags of debris totalling approximately 900 pounds.",
+        "question_similarity": 0.79419154,
+        "ground_truth_similarity": 0.76899534
+      },
+      {
+        "document_chunk_index": 50,
+        "page": 18,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 18 BELONGING The environment that fosters individual authenticity and common purpose to unlock engagement and performance EQUITY Ensuring that people have access to opportunities and resources that meet their needs INCLUSION The participation and integration of different perspectives, views, and ideas DIVERSITY The representation of the visible and non visible ways in which people may differ Diversity, Inclusion & Belonging We are committed to creating a culture where belonging is a must and diversity, inclusion and equity are a part of everything we do. Societies that prioritize equity and inclusion have a proven track record of flourishing and bringing out the best in their individuals and communities.",
+        "question_similarity": 0.79812324,
+        "ground_truth_similarity": 0.74339521
+      },
+      {
+        "document_chunk_index": 66,
+        "page": 23,
+        "text": "OVERSIGHT CT REIT’s Board of Trustees is responsible for the stewardship of the REIT and acts in the best interest of the REIT and its Unitholders. The Board oversees management’s decisions with respect to the REIT’s strategic planning, capital planning, investment and funding strategy, planning for growth, succession planning, talent management, distributions, financial reporting and disclosure, fundamental policies, the control environment, the management of enterprise risk, and ESG matters and initiatives. AUDIT COMMITTEE Financial statements and related disclosures; internal control over financial reporting, and disclosure controls and procedures; enterprise risk management, including Code of Conduct compliance; and internal and external auditor oversight.",
+        "question_similarity": 0.73956662,
+        "ground_truth_similarity": 0.71641231
+      },
+      {
+        "document_chunk_index": 67,
+        "page": 23,
+        "text": "GOVERNANCE, COMPENSATION AND NOMINATING COMMITTEE Corporate governance policies and practices; ESG initiatives and related disclosures; board and committee composition and related performance assessments; trustee education and orientation; trustee remuneration; related party transactions process; executive compensation, including compensation design, plans, policies, procedures, and practices; talent management succession planning; and workforce diversity and inclusion. INVESTMENT COMMITTEE Investment plan and property portfolio, including related investment policies, performance, and proposals; environmental management program and related compliance policy; and environmental sustainability and reporting. See pages 26 to 31 of our 2022 Management Information Circular for a report by each Committee on its purpose and responsibilities under their respective mandates and an update of each Committees’ activities in 2022.",
+        "question_similarity": 0.790021,
+        "ground_truth_similarity": 0.75170851
+      },
+      {
+        "document_chunk_index": 68,
+        "page": 23,
+        "text": "Our Declaration of Trust incorporates a governance framework that ensures Board independence and addresses, among other matters, conflicts of interest and related party transactions. The Board believes that overseeing the REIT’s development, maintenance of, and approach to good corporate governance is essential to its role and is committed to developing strong corporate governance policies and practices that reflect our unique circumstances, which continue to be enhanced, as required, to adapt to the REIT’s business needs and respond to evolving internal and external environments. The Board has delegated a number of its responsibilities to its three standing committees, as permitted by the REIT’s Declaration of Trust, to enable the Board to operate more efficiently and to focus on the more significant business and strategic issues affecting the REIT. This approach to committee delegation also empowers each of the committees to focus on key areas of accountability. Key areas of responsibility for each committee are listed below:",
+        "question_similarity": 0.75305301,
+        "ground_truth_similarity": 0.71601444
+      },
+      {
+        "document_chunk_index": 75,
+        "page": 25,
+        "text": "All trustees and employees are also expected to annually acknowledge and confirm that they have read and understand the Code of Conduct and are responsible for complying with it. In addition, biennial Code of Conduct training is required by all employees of the REIT. External consultants and contractors engaged to provide services to the REIT are expected to demonstrate an understanding and compliance with the standards and expectations set out in the Code. In 2022, 100% of our trustees and employees completed the annual sign-off of the Code of Conduct.",
+        "question_similarity": 0.76387161,
+        "ground_truth_similarity": 0.73226857
+      },
+      {
+        "document_chunk_index": 76,
+        "page": 26,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 26 STAKEHOLDER ENGAGEMENT We believe that maintaining open lines of communication with our stakeholders on key matters ensures continued trust and confidence. Our Board and management have worked to develop a trusted relationship with our stakeholders including our Unitholders, employees, tenants, and the investment community. CT REIT’s stakeholder engagement activities and communications in 2022 include: ENGAGEMENT TYPE INVESTORS TENANTS EMPLOYEES COMMUNITY Environmental and sustainability surveys x x Community engagement for development planning x Compensation and benefits x Donations and volunteering x x x Intranet/employee resource groups x Space donation for community events x x Social community events x x x Town hall",
+        "question_similarity": 0.81474507,
+        "ground_truth_similarity": 0.75993478
+      },
+      {
+        "document_chunk_index": 77,
+        "page": 26,
+        "text": "for community events x x Social community events x x x Town hall communications x Website x x x x Annual meetings x x x Annual and quarterly reports x x Code of Conduct x x External conferences x x x x Investor meetings x Investor relations dedicated e-mail address x Management information circulars x x Media Releases x x x x Sponsorship of industry events x x x Quarterly conference calls x x Media Releases x x x x Sponsorship of industry events x x x",
+        "question_similarity": 0.78069365,
+        "ground_truth_similarity": 0.82750309
+      },
+      {
+        "document_chunk_index": 78,
+        "page": 27,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 27 Effective management of risk is a key priority for the Board and management. The Board oversees the implementation by management of the Enterprise Risk Management (“ERM”) Policy and Framework that outlines the REIT’s approach to effective risk management. The ERM Framework addresses the identification, assessment, monitoring, mitigation and reporting on the REIT’s key and emerging risks through policies and the implementation of systems and controls to manage these risks. The REIT’s ERM Framework is designed to provide an integrated approach to the management of risks in a disciplined manner to safeguard the REIT’s Risks and responsibilities related to data privacy, including the ethical use, management and security of data extends to our employee, tenant, and corporate information.",
+        "question_similarity": 0.77474856,
+        "ground_truth_similarity": 0.72546083
+      },
+      {
+        "document_chunk_index": 81,
+        "page": 27,
+        "text": "Additional information on the REIT’s ERM Framework and key risks is included in section 4 of CT REIT’s Annual Information Form for the year ended December 31, 2022, and in section 12 of CT REIT’s Management’s Discussion and Analysis for the year ended December 31, 2022. CT REIT acknowledges that cybersecurity is more than just a technology challenge, but a business imperative that relies on each employee playing an important role to ensure the REIT maintains constant vigilance. By building a culture of cyber security awareness within the REIT, along with integrated policies and standards, an embedded multi-layered set of controls and round-the-clock monitoring in conjunction with CTC, we ensure that the REIT remains resilient against cyberattacks.",
+        "question_similarity": 0.75696915,
+        "ground_truth_similarity": 0.71555728
+      },
+      {
+        "document_chunk_index": 82,
+        "page": 27,
+        "text": "Together, with the support of CTC, we are staying ahead of threats to our organization through integrated policies, an embedded multi-layered set of controls, training, and round-the-clock monitoring. Risk Management Privacy & Data Security",
+        "question_similarity": 0.75803375,
+        "ground_truth_similarity": 0.75375336
+      },
+      {
+        "document_chunk_index": 83,
+        "page": 28,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 28 Glossary Term Definition Board Refers to the CT REIT Board of Trustees. BOMA BEST BOMA BEST Sustainable Buildings certification recognizes excellence in energy and environmental management and performance in commercial real estate. The Program is managed by the Building Owners and Managers Association of Canada (BOMA Canada) and delivered by the eleven Local BOMA Associations throughout Canada. Canadian Tire Refers to the general merchandise retail and services business carried on under the Canadian Tire name and trademarks. CT REIT or the REIT Refers to the business carried on by CT Real Estate Investment Trust and its subsidiaries. CTC Refers to Canadian Tire Corporation, Limited, its predecessor corporations and all entities controlled by it and their collective businesses, unless the context otherwise requires.",
+        "question_similarity": 0.76828325,
+        "ground_truth_similarity": 0.72450733
+      }
+    ],
+    "400": [
+      {
+        "document_chunk_index": 0,
+        "page": 1,
+        "text": "CT Real Estate Investment Trust 2022 Environmental, Social and Governance Report Welland, Ontario",
+        "question_similarity": 0.78247815,
+        "ground_truth_similarity": 0.73265946
+      },
+      {
+        "document_chunk_index": 1,
+        "page": 2,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 2 Message from the President & CEO I am very pleased with the progress CT REIT has made with respect to reducing our environmental impact, improving social outcomes, and continuing our track record of strong governance. Our second Environmental, Social and Governance (ESG) report provides us with an opportunity to publicly share our achievements, efforts and the results associated with this work with you, our stakeholders. We remain committed to our ESG strategic pillar, which guides our interactions with the environment, our employees, and the communities in which we operate, and which also supports the continued development of governance best practices. We will continue to communicate our progress and position ourselves to better understand our ESG-related impacts, while working towards improving our key focus areas over the long term. Our commitment to make meaningful and impactful changes through the decisions we make and how we run our business is ongoing. In 2022, we started construction on our new net zero distribution centre in Calgary, Alberta. This is CT REIT’s first net zero development, and one of the first such projects to achieve the Net Zero Carbon – Design Standard certification from the Canada Green Building Council. Alongside Canadian Tire Corporation, Limited (CTC), we will aim to construct all new Canadian Tire stores to a net zero ready standard, commencing in 2024. Real change requires commitment and investment, and both CT REIT and CTC are devoting the time, resources and capital towards sustainable development, a key component of our ESG strategy. We are equally focused on improving social outcomes for our employees, tenants, and the communities in which we operate.",
+        "question_similarity": 0.80154681,
+        "ground_truth_similarity": 0.72621626
+      },
+      {
+        "document_chunk_index": 2,
+        "page": 2,
+        "text": "In 2022, we created a new Social Engagement Committee to align with the priorities of our employees, and to ensure that learning, engagement, personal development and philanthropy remain key areas of focus for CT REIT. CT REIT was established in 2013 with an emphasis on strong governance principles and ethical business conduct. As we continue to grow and evolve, so too does our approach to governance. For example, our Board of Trustees recently adopted a board diversity policy that reflects evolving best practices. ESG remains a key pillar of CT REIT’s overall strategy. As we continue to hone our ability to measure and benchmark our performance, our talented teams and engaged Board of Trustees are focused on sustainability, social outcomes, and good governance, all of which continue to be integrated into our business. I want to thank all our stakeholders for the trust that they have placed in us as we work towards improving our performance, mitigating our impacts, and refining our disclosure, and as we continue to walk the path along our ESG journey. Sincerely, Kevin Salsberg President & Chief Executive Officer",
+        "question_similarity": 0.78405803,
+        "ground_truth_similarity": 0.73755479
+      },
+      {
+        "document_chunk_index": 6,
+        "page": 4,
+        "text": "PROPERTIES BY REGION1,2 % of Total Annualized Base Minimum Rent 28.5% Western Canada 7.6% Atlantic Canada 20.4% Quebec 43.5% Ontario The data presented on this page is as of December 31st, 2022. Any capitalized term not defined in this ESG Report can be found in the Glossary of Terms in the REIT’s 2022 AIF filed on SEDAR at www.sedarplus.ca and on CT REIT’s website at www.ctreit.com under the tab “Investors” in the Financial Reporting section.",
+        "question_similarity": 0.73768479,
+        "ground_truth_similarity": 0.70504564
+      },
+      {
+        "document_chunk_index": 7,
+        "page": 5,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 5 CT REIT ESG Timeline 2013 CT REIT’s Initial Public Offering takes place with strong governance practices in place. 2016 Acquired the 1.4-million-square-foot Bolton Distribution Centre. Built with many ground-breaking, environmentally sustainable features, the state-of-the-art facility achieved LEED Gold certiﬁcation by the Canada Green Building Council. 2020 Amid the COVID-19 pandemic, we supported our tenants and provided rent relief, implemented enhanced cleaning protocols, and delivered sanitizing supplies. Also in 2020: • Exterior LED retroﬁts were conducted at over 90% of our properties • Our Sustainability Committee was formed 2021 First GRESB submission. Also in 2021: • Materiality Assessment conducted • Climate Risk Assessment conducted • Conducted HVAC motor retrofits at over 90% of our properties 2022 Inaugural ESG Report published outlining our 2021 activities. Also in 2022: • Our GRESB submission became publicly available • Donation made in support of the development of a multi-sport court in Welland, Ontario supporting Jumpstart • Construction of our ﬁrst Net Zero distribution centre began 2023 First BOMA BEST Silver certiﬁcations achieved at eight enclosed and open-air retail properties.",
+        "question_similarity": 0.80453622,
+        "ground_truth_similarity": 0.73994178
+      },
+      {
+        "document_chunk_index": 8,
+        "page": 5,
+        "text": "Also in 2023: • Our new distribution centre was awarded the Zero Carbon Building – Design Standard certification • Adoption of Board Diversity Policy • Adoption of Sustainable Investment Corporate Policy 2024 & beyond Ongoing development of our ESG Strategy with a focus on reducing our GHG emissions, fostering talent, supporting communities and good governance. Expansion of BOMA BEST certification program.",
+        "question_similarity": 0.80258036,
+        "ground_truth_similarity": 0.76029789
+      },
+      {
+        "document_chunk_index": 9,
+        "page": 6,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 6 About This Report This report contains information about CT REIT’s ESG initiatives. It describes our ESG strategy and philosophy and approach to proactively addressing the environmental and social challenges facing our industry and country. SCOPE Our 2022 ESG Report is focused on the activities and outcomes of CT REIT during the 2022 fiscal year. This report also includes work that commenced in 2022 but was completed in 2023. Unless otherwise indicated, all references to employees in this report include all permanent employees of CT REIT. FORWARD-LOOKING INFORMATION Certain statements made in this ESG Report, including those related to our ESG strategy and objectives, may constitute forward-looking information under applicable securities laws. Such statements include, but are not limited to, the REIT’s intention to build new Canadian Tire stores to CTC’s net zero ready prototype. CT REIT is not required under securities laws to prepare or file this ESG Report, and the information contained herein should therefore not be read as necessarily rising to the same level of materiality of disclosure required in our securities law filings. These statements are being provided for the purpose of assisting readers in understanding our approach to key ESG topics, and in obtaining a better understanding of our anticipated operating environment. Readers are cautioned that such information may not be appropriate for other purposes.",
+        "question_similarity": 0.79841471,
+        "ground_truth_similarity": 0.72327894
+      },
+      {
+        "document_chunk_index": 11,
+        "page": 7,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 7 GOOD GOVERNANCE Striving for best practices on behalf of all stakeholders. SUPPORTING COMMUNITIES Reinvesting and contributing to the neighbourhoods in which we operate. REDUCING GREENHOUSE GAS EMISSIONS Reducing our carbon footprint and supporting CTC’s emissions reduction strategy through the development of new net zero ready stores and distribution centres, as well as retrofitting existing stores. TALENT Fostering diversity, inclusion, and development amongst our people. Our Approach to ESG CT REIT’s strategic imperatives are rooted in being Canada’s premier net lease REIT. It is important that our ESG strategy and related initiatives align with that of our key stakeholders, including our most significant tenant and majority unitholder, CTC. We continue to advance our ESG strategy, embedding it in all aspects of our business, and driving initiatives to support it, from our building operations and property development to our tenant and employee engagement activities. OUR ESG PILLAR Our focus areas under our ESG strategic pillar help guide our interactions with our environment, our employees and the communities in which we operate, and support the continued development of governance best practices. This focus on, and investment in, ESG initiatives will also help drive long-term value for our stakeholders by managing applicable risks, fostering innovation, generating new revenue streams, and strengthening the environmental, social and governance systems on which our business relies.",
+        "question_similarity": 0.79812771,
+        "ground_truth_similarity": 0.73165613
+      },
+      {
+        "document_chunk_index": 12,
+        "page": 7,
+        "text": "As we progress along our ESG journey, we are monitoring regulatory developments and reviewing the applicability of other ESG related frameworks and standards, including the Sustainability Accounting Standards Board (SASB) and the International Sustainability Standards Board (ISSB) standards.",
+        "question_similarity": 0.79139036,
+        "ground_truth_similarity": 0.75056297
+      },
+      {
+        "document_chunk_index": 13,
+        "page": 8,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 8 Our Approach to ESG Governance Business Ethics Risk Management Privacy & Data Security Social Community Impact Diversity, Inclusion & Belonging Talent & Culture Environmental Climate Change Sustainable Building Design Operational Efficiency PRIORITY ESG TOPICS We focus our efforts on ESG topics that offer the greatest potential for positive impact on both our business and on the communities in which we operate. These topics rank high in terms of importance to our overall strategy, to key stakeholders and to our ability to leverage our enterprise capabilities to create meaningful change. In 2021, the REIT conducted a materiality assessment to identify, refine and prioritize the ESG topics that may impact our business and are important to our key stakeholders. The assessment included external research and benchmarking, a focused stakeholder engagement process, internal analysis and discussion, and alignment with senior leadership. The results of the assessment informed our ESG strategy and priorities, which generally align with those of CTC, our most significant tenant, who prides itself on being an integral part of Canadian communities. This report outlines our approach to ESG topics identified as being the most relevant to our strategy and important to our stakeholders. ESG Topics",
+        "question_similarity": 0.81498194,
+        "ground_truth_similarity": 0.74190903
+      },
+      {
+        "document_chunk_index": 14,
+        "page": 9,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 9 Environmental As a pillar in the communities in which we operate, we can lead change not only by reducing our greenhouse gas emissions but also by leveraging our knowledge, innovation, and relationships to empower our tenants and partners to improve sustainability. At CT REIT, addressing climate change, improving operational efficiency, and focusing on sustainable building design are integral to how we conduct our business and provide many opportunities to improve operational performance and reduce our environmental impact.",
+        "question_similarity": 0.81874722,
+        "ground_truth_similarity": 0.72674692
+      },
+      {
+        "document_chunk_index": 15,
+        "page": 10,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 10 CT REIT is committed to limiting our environmental footprint. Our existing initiatives further our efforts to conduct our operations in a manner that reduces our greenhouse gas emissions and conserves energy and water. By understanding the business risks of climate change, we are better positioned for the future, to understand and mitigate risks and to assess potential opportunities. We continue to make ongoing investments, as well as find new ways to work with our partners to reduce operational emissions and limit our footprint. The vast majority of CT REIT’s properties are single-tenanted, net-leased assets, where the tenant controls much, if not all, of the activities at the property, including the consumption of energy and water, as well as the resulting GHG emissions. CT REIT has therefore focused its efforts on those aspects of its operations over which it has influence or control including: the energy usage of the common areas of our properties, the design and construction of new development projects, and collaborating with tenants to improve the overall operations at our properties. Following the release of the TCFD recommendations, CT REIT worked with a third-party consultant to better understand the potential implications of climate change on the REIT’s portfolio and conducted a climate risk and opportunity assessment. This exercise included scenario analyses which now inform CT REIT’s decision-making regarding investments on an ongoing basis. REDUCING THE GHG INTENSITY OF OUR BUILDINGS We continue to work on reducing our Scope 1 and 2 emissions by focusing on key areas of impact such as how we heat, cool, and light our buildings.",
+        "question_similarity": 0.8180213,
+        "ground_truth_similarity": 0.71991956
+      },
+      {
+        "document_chunk_index": 16,
+        "page": 10,
+        "text": "Our pathway to reducing our heating, cooling, and lighting-related emissions relies on proven technologies, with new technologies, greening of the energy grid, and the purchase of renewable energy and/or carbon offsets being potential considerations to fill certain gaps. We are also developing plans to mitigate the carbon impacts of new development projects that we undertake at our properties. For example, our first net zero (both net zero energy and net zero carbon) project is a state-of-the-art distribution centre being constructed for CTC in Calgary, Alberta, which is expected to be completed in 2023. Once completed, the building is expected to generate as much energy as it consumes on an annual basis. TCFD RESPONSE The recommendations set out by the Task Force for Climate-related Financial Disclosures (TCFD) provide a framework for reporting on the risks associated with climate change. CT REIT believes in the importance of working to align with TCFD’s four elements of the recommendations: governance, strategy, risk management and metrics. We are working on development plans to address these recommendations and to better understand the risks and opportunities posed by climate change events, such as floods, forest fires and rising temperatures on our business, and provide transparent disclosures on our progress. Climate Change",
+        "question_similarity": 0.83595961,
+        "ground_truth_similarity": 0.73383647
+      },
+      {
+        "document_chunk_index": 17,
+        "page": 11,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 11 Sustainable Building Design We are committed to reducing our environmental impact through continued improvements to both building design and construction and where possible pursuing green building certifications such as LEED, Net Zero Carbon and Net Zero Energy. The design process includes consideration of compliance with applicable zoning and building requirements and/or certifications, as well as the needs and impact on the local economy. Commencing in 2024, together with CTC, we intend to build new Canadian Tire stores to CTC’s net zero ready prototype. These net zero ready stores will be significantly more energy efficient than previous prototypes and will have the capacity to become fully net zero with the addition of on-site solar panels. The net zero ready stores will feature enhanced construction details such as thicker insulation that will improve building envelope tightness, reducing the need for heating and cooling. Air-source heat pumps may also be installed, where appropriate, which can further reduce carbon emissions given their efficiency and reliance on electricity rather than natural gas to generate heat. GREEN BUILDING CERTIFICATION PROGRAMS What is LEED? The Leadership in Energy and Environmental Design standard is an internationally recognized symbol of sustainability excellence and green building leadership. What is Building Owners and Managers Association (BOMA) BEST? A certification program that encourages smart and sustainable solutions for existing buildings, promoting health, efficiency, cost-effectiveness, and low-carbon performance. What is WELL Health & Safety? An evidence-based, third-party verified rating for all new and existing buildings focusing on operational policies, maintenance protocols, stakeholder engagement and emergency plans.",
+        "question_similarity": 0.7962724,
+        "ground_truth_similarity": 0.73217571
+      },
+      {
+        "document_chunk_index": 20,
+        "page": 12,
+        "text": "• Begun implementation of new initiatives to improve waste diversion, including the introduction of new collection streams and tenant education materials across properties within our operationally controlled portfolio. • Installation and improvement of smart building monitoring systems at selected properties. OPERATIONAL CONTROL Areas within those properties where we have Operational Control are common areas and other landlord-controlled areas, such as: parking lots, mechanical and other maintenance rooms, storage rooms, vestibules, interior hallways and public washrooms in enclosed shopping centres, and property management offices.",
+        "question_similarity": 0.75182486,
+        "ground_truth_similarity": 0.71830207
+      },
+      {
+        "document_chunk_index": 21,
+        "page": 13,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 13 ENVIRONMENTAL PERFORMANCE The following environmental performance data is for the areas of our properties under our Operational Control. In 2022, the REIT had Operational Control over approximately 10% of our portfolio by number of properties. Certain data presented in this section received limited data assurance by an external third-party following industry standard ISAE3000/3410. CT REIT’s approach to energy consumption and carbon emissions performance We track energy consumption data and associated greenhouse gas emissions for properties within our Operational Control. At CT REIT, our energy conservation initiatives underway at various operationally controlled properties include: • Monitoring our energy consumption via check meters. • Conducting energy audits to determine potential opportunities for implementation of additional conservation measures. • Upgrading our lighting fixtures, building envelopes, and HVAC equipment to improve energy use efficiency. WHAT IS SCOPE 1, 2, AND 3? SCOPE 1: Emissions that are direct emissions from the combustion of on-site and mobile fuels that occur at, or are associated with, facilities and operations under the REIT’s Operational Control. The charts above captures these emissions. \u0007 SCOPE 2: Emissions that are indirect and occur off-site from the production of energy, such as electricity, which is then purchased for use at facilities and operations under the REIT’s Operational Control. The charts above captures these emissions.",
+        "question_similarity": 0.805426,
+        "ground_truth_similarity": 0.72225267
+      },
+      {
+        "document_chunk_index": 22,
+        "page": 13,
+        "text": "The charts above captures these emissions. \u0007 SCOPE 3: Emissions that are indirect emissions from CT REIT’s value chain that are not under our Operational Control (e.g., consumption of natural gas and electricity by our tenants within our properties, emissions associated with waste generated that is sent to landfill). Scope 3 emissions aren’t included in the figures shown above. TOTAL ENERGY CONSUMPTION AND GHG EMISSIONS Energy consumption GHG emissions Energy consumption GHG emissions LIKE-FOR-LIKE ENERGY CONSUMPTION AND GHG EMISSIONS 8.7 5.8 1,118.4 579.2 2020 2020 8.8 5.8 1,004.3 492.4 2021 2021 16.8 8.5 1,817.8 643.2 20221 2022 Energy consumption (millions ekWh) Energy consumption (millions ekWh) GHG emissions (t CO2e) GHG emissions (t CO2e) 0 0 5 5 10 10 20 20 15 15 0 0 1,000 1,000 2,000 2,000 “Like-for-Like” includes assets that were owned and managed between January 1, 2020 to December 31, 2022 which includes comparative data in each reported year from 2020 to 2022. “Total” data includes assets which were owned and managed partly or wholly during the same period without any adjustments. 1. This symbol identifies third-party limited assurance of the current year data.",
+        "question_similarity": 0.79178429,
+        "ground_truth_similarity": 0.71675104
+      },
+      {
+        "document_chunk_index": 24,
+        "page": 14,
+        "text": "Upgrades may include changing water fixtures to low flow equipment to improve our water use efficiency. • Planting drought resistant plants at our properties that are native to their environment, more resilient and require less watering. WASTE & RECYCLING CT REIT’s approach to waste diversion We track waste metrics for properties within our Operational Control. The data monitored and collected includes waste diversion data. At CT REIT, our waste management initiatives at certain operationally controlled properties include: • Implementing integrated monthly waste diversion reporting to monitor, optimize and customize waste management practices. • Conducting annual waste audits to identify opportunities for improvement. • Implementing new waste collection programs including mixed containers and organics. CT REIT–Controlled Waste Diversion 43.7% 44.8% 43.9% 20221",
+        "question_similarity": 0.76356399,
+        "ground_truth_similarity": 0.69883007
+      },
+      {
+        "document_chunk_index": 25,
+        "page": 15,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 15 Social We believe people are at the heart of strong businesses and communities. The talent and dedication of our employees are the driving force that brings our ESG strategy and related initiatives to life. We support and give back to the communities in which we operate.",
+        "question_similarity": 0.80094343,
+        "ground_truth_similarity": 0.73751128
+      },
+      {
+        "document_chunk_index": 26,
+        "page": 16,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 16 Community Impact We are committed to supporting opportunities for all by investing in those communities in which we operate and which are an integral part of our continued success. SUPPORTING INCLUSIVE PLAY SPACES CT REIT is committed to supporting the Canadian Tire Jumpstart Charities (Jumpstart), which have been assisting kids overcome the financial and accessibility barriers to sport and play for their kids since 2005. In 2022, Jumpstart provided funding to over 700 community sport and recreation organizations in Canada, creating opportunities for over 440,000 kids in the process – the most in any single year to date. Learn more about Jumpstart’s work here: 2022 Annual Report. SUPPORTING OUR COMMUNITIES In addition to monetary donations, we know that volunteering our time, skills and expertise can help support local communities. Supporting employee voluntarism builds a stronger culture of giving and provides opportunities for our employees to gain a better understanding of the needs and challenges facing our communities. In 2022, an employee volunteer program, Community Changemakers, was launched. The program provides employees with the opportunity to use 10 hours of paid time off per year to support Jumpstart, Jumpstart beneficiaries as well as other community organizations.",
+        "question_similarity": 0.77928579,
+        "ground_truth_similarity": 0.74835604
+      },
+      {
+        "document_chunk_index": 27,
+        "page": 16,
+        "text": "COMMUNITY OUTREACH SPOTLIGHT Through our efforts, we were able to raise nearly $120,000 for: • Jumpstart • Cancer Foundation of Saskatchewan • Dress for Success • Salvation Army • Juvenile Diabetes Research Foundation • Princess Margaret Hospital • Crohn’s and Colitis Canada CT REIT team at the Ride for Life event in support of the Juvenile Diabetes Research Foundation COMMUNITY OUTREACH SPOTLIGHT Inclusive multi-sport court in Welland, Ontario In 2021, as part of its partnership with Jumpstart, CT REIT committed $100,000, payable over two years, to support the construction of inclusive play space within some of the communities in which CT REIT operates, with the inaugural project being a new multi-sport court and inclusive splash pad in Welland, Ontario.",
+        "question_similarity": 0.74142855,
+        "ground_truth_similarity": 0.75219262
+      },
+      {
+        "document_chunk_index": 28,
+        "page": 17,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 17 SUPPORTING DIVERSE EMERGING LEADERS IN REAL ESTATE Together with the Toronto Metropolitan University and Ted Rogers School of Management, the REIT established a 5-year partnership through to 2027 that includes financial support through a scholarship, industry experience through a paid internship and engagement through mentorship opportunities with members of CT REIT’s management team. The annual real estate award recognizes two full-time students, enrolled in the Real Estate Management Program at Ted Rogers School of Management who self-identify as Black, Indigenous, or People of Color and demonstrate academic achievement and leadership through involvement in the community. The primary goal of the award is to encourage diversity, lower barriers to entry into the commercial real estate industry and support emerging real estate leaders. LEVERAGING OUR PROPERTIES TO SUPPORT COMMUNITIES CT REIT has established an urban beekeeping program with the help of our partner, Alvéole. The program has enabled us to increase engagement within communities in which we operate, raise awareness about environmental issues, and produce some great tasting honey! The program is in place at seven CT REIT locations and each beehive generates about 100 jars of honey annually which are shared with the local community. ENGAGING TENANTS IN CONVERSATION CT REIT is committed to engaging with our tenants to develop strong partnerships and healthy communities. Throughout 2022, we hosted and facilitated several tenant engagement events across our portfolio, as well as distributed newsletters and launched new contests, promotions, and local social media campaigns. We believe that tenant feedback is an integral part of our client service model.",
+        "question_similarity": 0.79842204,
+        "ground_truth_similarity": 0.7597003
+      },
+      {
+        "document_chunk_index": 29,
+        "page": 17,
+        "text": "We believe that tenant feedback is an integral part of our client service model. We are better when we work together with our tenants to understand their needs and to deliver a level of service that exceeds their expectations. As part of our broader tenant engagement program, CT REIT conducted a survey with our tenants, requesting feedback on the services and programs we offer. The survey results provided critical insight to help us improve performance and maintain operational excellence. PROJECT SPOTLIGHT Earth Day community cleanup In 2022, we held our first community cleanup event to celebrate Earth Day. With participation from across Canada, our teams collected 60 bags of debris totalling approximately 900 pounds.",
+        "question_similarity": 0.78312534,
+        "ground_truth_similarity": 0.74875855
+      },
+      {
+        "document_chunk_index": 30,
+        "page": 18,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 18 BELONGING The environment that fosters individual authenticity and common purpose to unlock engagement and performance EQUITY Ensuring that people have access to opportunities and resources that meet their needs INCLUSION The participation and integration of different perspectives, views, and ideas DIVERSITY The representation of the visible and non visible ways in which people may differ Diversity, Inclusion & Belonging We are committed to creating a culture where belonging is a must and diversity, inclusion and equity are a part of everything we do. Societies that prioritize equity and inclusion have a proven track record of flourishing and bringing out the best in their individuals and communities. Inclusive, equitable societies are stronger and more resilient and provide greater opportunities for personal and community growth. OUR APPROACH At CT REIT, we are committed to confronting and breaking down barriers so that diversity, inclusion and belonging (DIB) is an authentic, valued, and embedded part of who we are. We are committed to an equitable and inclusive culture that represents our people, our tenants and their customers, and the communities in which our properties are located. This commitment is supported by CT REIT and CTC’s collective DIB strategy that serves to foster an environment where everyone feels a sense of belonging. Belonging promotes an environment where all are welcome and diverse voices are sought, new viewpoints are considered, and accessible and fair opportunities and experiences are actively created.",
+        "question_similarity": 0.77035087,
+        "ground_truth_similarity": 0.72370923
+      },
+      {
+        "document_chunk_index": 31,
+        "page": 18,
+        "text": "CT REIT benefits from leveraging CTC’s comprehensive DIB resources, participating in employee resource groups, DIB surveys, and courageous conversations, all in support of the collective DIB strategy which is integrated into our day-to-day operations.",
+        "question_similarity": 0.75719911,
+        "ground_truth_similarity": 0.74665093
+      },
+      {
+        "document_chunk_index": 32,
+        "page": 19,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 19 DIVERSITY Diversity at all levels within our organization is part of our connection to a stronger workforce. In 2023, CT REIT’s Board of Trustees adopted a Board Diversity Policy and set a target to have female representation of at least 30% on the Board. Gender diversity is represented throughout our organization with women representing 52% of all employees at all levels and 75% of senior executives. Senior Executives includes: C-suite executives and Senior Vice President level employees. All Management includes: Vice President, Associate Vice President, and Manager-level employees. Team Members include individual contributor level employees. All employees comprise of 58 people as of Dec 31, 2022. INCLUSION An inclusive and welcoming workplace is critical to ensuring that equity-deserving employees thrive in their roles and choose to stay with CT REIT long term. Our commitment to DIB is grounded in the belief that every employee deserves to feel valued, respected and supported. Initiatives and opportunities to support the retention of employees from equity-deserving backgrounds, have been developed for CTC and its subsidiaries including CT REIT. Such initiatives include CivicMatch (in partnership with the CivicAction Leadership Foundation) which connects senior leaders with rising leaders from equity-deserving backgrounds for mentorship, networking, and coaching. BELONGING Belonging is a necessary aspect of life: when people feel like they belong, they can fully be their best selves with their colleagues, customers and communities. Through our annual DIB survey, first implemented in 2020, we collect valuable insights and measure the feeling of belonging across the organization.",
+        "question_similarity": 0.77737027,
+        "ground_truth_similarity": 0.72969687
+      },
+      {
+        "document_chunk_index": 36,
+        "page": 21,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 21 SUPPORTING OUR EMPLOYEES’ WELL- BEING At CT REIT we prioritize employees and their families. We continually introduce and evaluate programs to ensure they serve our employees’ and their families’ wellness. For instance, we harmonized our Flex Days Program in 2022, offering employees eight paid days off a year. Employees can take the time when it is important and best supports them to address personal illness, focus on personal well-being and disconnect from work, address family emergencies, or recognize a cultural day of significance. In addition, we provide our employees with access to services such as virtual healthcare, employee assistance programs, and mental health support programs. INVESTING IN THE FUTURE We are investing in our talent, both for today and the years to come. As part of this investment, we are focused on building a talent pool with the right skills and capabilities to support our future business outcomes. We believe that an integral part of cultivating a positive work culture is to focus on our talent and learning ecosystem. By developing our employees to achieve their fullest potential, we are better positioned to execute our strategic initiatives. At CT REIT, we encourage our employees to take personal ownership of their development with the support of people leaders. Individual development planning is an ongoing process of identifying meaningful development goals in service of our employees’ success in both their current roles and their longer-term career aspirations. A variety of resources and tools are available to enable our employees’ development, including targeted development opportunities, self-assessment tools, 360-degree feedback and personal coaching.",
+        "question_similarity": 0.77888048,
+        "ground_truth_similarity": 0.74619985
+      },
+      {
+        "document_chunk_index": 37,
+        "page": 21,
+        "text": "The TLA offers numerous on-demand learning experiences that employees can access in support of their development, including the enhancement of individual and team effectiveness, role- specific and organizational capabilities, and leadership development and growth programs. In 2022, many employees leveraged the TLA and participated in several programs, such as cybersecurity awareness training, ways to improve mental health at work, leadership and effective communication, among others. Such employee engagement opportunities have been shown to increase job satisfaction and earning potential, while strengthening the skill set of our employees and the competitiveness of our enterprise. >300 interactions with pieces of learning content 32 different on-demand experiences and learning programs were accessed INITIATIVE SPOTLIGHT Ken Silver Legacy Award In 2022, we established the Ken Silver Legacy Award (in honour of CT REIT’s first Chief Executive Officer) to recognize, on an annual basis, an employee who reflects CT REIT’s culture and values, and who has been a key contributor to our success.",
+        "question_similarity": 0.76213938,
+        "ground_truth_similarity": 0.75530607
+      },
+      {
+        "document_chunk_index": 38,
+        "page": 22,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 22 Governance Our success in operating with accountability and transparency is directly tied to our governance practices. With sound policies and practices, our good corporate governance foundation allows us to protect the trust of our stakeholders.",
+        "question_similarity": 0.7963894,
+        "ground_truth_similarity": 0.7333827
+      },
+      {
+        "document_chunk_index": 44,
+        "page": 25,
+        "text": "CODE OF CONDUCT To ensure a clear understanding and consistent level of commitment to ethical business practices, CT REIT has adopted a Code of Conduct which formally addresses the ethical business standards and expectations of the REIT’s trustees, employees and those individuals who act on behalf of the REIT (such as independent contractors) with respect to the compliance with laws and a commitment to integrity, honesty and respect when dealing with each other, business partners and communities. Our Code of Conduct is based upon our Core Values, which we pride ourselves on living to ensure we continuously strive to be a socially responsible organization. See the REIT’s Code of Conduct. Our onboarding process requires new trustees and employees to review and sign off on the Code of Conduct. All trustees and employees are also expected to annually acknowledge and confirm that they have read and understand the Code of Conduct and are responsible for complying with it. In addition, biennial Code of Conduct training is required by all employees of the REIT. External consultants and contractors engaged to provide services to the REIT are expected to demonstrate an understanding and compliance with the standards and expectations set out in the Code. In 2022, 100% of our trustees and employees completed the annual sign-off of the Code of Conduct.",
+        "question_similarity": 0.7484799,
+        "ground_truth_similarity": 0.71722716
+      },
+      {
+        "document_chunk_index": 45,
+        "page": 26,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 26 STAKEHOLDER ENGAGEMENT We believe that maintaining open lines of communication with our stakeholders on key matters ensures continued trust and confidence. Our Board and management have worked to develop a trusted relationship with our stakeholders including our Unitholders, employees, tenants, and the investment community. CT REIT’s stakeholder engagement activities and communications in 2022 include: ENGAGEMENT TYPE INVESTORS TENANTS EMPLOYEES COMMUNITY Environmental and sustainability surveys x x Community engagement for development planning x Compensation and benefits x Donations and volunteering x x x Intranet/employee resource groups x Space donation for community events x x Social community events x x x Town hall communications x Website x x x x Annual meetings x x x Annual and quarterly reports x x Code of Conduct x x External conferences x x x x Investor meetings x Investor relations dedicated e-mail address x Management information circulars x x Media Releases x x x x Sponsorship of industry events x x x Quarterly conference calls x x Media Releases x x x x Sponsorship of industry events x x x",
+        "question_similarity": 0.81551796,
+        "ground_truth_similarity": 0.76394236
+      },
+      {
+        "document_chunk_index": 46,
+        "page": 27,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 27 Effective management of risk is a key priority for the Board and management. The Board oversees the implementation by management of the Enterprise Risk Management (“ERM”) Policy and Framework that outlines the REIT’s approach to effective risk management. The ERM Framework addresses the identification, assessment, monitoring, mitigation and reporting on the REIT’s key and emerging risks through policies and the implementation of systems and controls to manage these risks. The REIT’s ERM Framework is designed to provide an integrated approach to the management of risks in a disciplined manner to safeguard the REIT’s Risks and responsibilities related to data privacy, including the ethical use, management and security of data extends to our employee, tenant, and corporate information. Our privacy program is embedded in all areas of the business and integrated with CTC. TRANSPARENCY WITH INFORMATION The protection of personal information and data privacy is managed at the enterprise-level and CT REIT adheres and is bound by CTC’s Privacy Policy and procedures to protect the personal information of its stakeholders. reputation, support the achievement of the REIT’s growth strategy and objectives, preserve and enhance Unitholder value, and to support business planning and operations by providing a cross-functional perspective to risk management, integrated with strategic planning and reporting processes. Through its delegated authority, the Audit Committee assists the Board with oversight of the REIT’s enterprise risk management processes.",
+        "question_similarity": 0.77061498,
+        "ground_truth_similarity": 0.72247082
+      },
+      {
+        "document_chunk_index": 47,
+        "page": 27,
+        "text": "The Audit Committee reports quarterly to the Board on management’s assessment of key risks, risk ratings and mitigation plans (where appropriate), The data privacy program is centred on trust and transparency and works together with the REIT’s cyber security program to ensure that any data we receive is sufficiently protected. WE TAKE CYBERSECURITY SERIOUSLY We are committed to safeguarding the REIT’s assets, information, and reputation. We ensure that training on our risk management and cybersecurity programs are part of our employee onboarding process and employees are also required to review the policies and complete a training module annually. In 2022, 100% of REIT employees were assigned and completed this cyber training. and makes recommendations to the Board regarding any changes to the ERM Policy and Framework, risk appetite statement and other policies that govern the REIT’s risks. Additional information on the REIT’s ERM Framework and key risks is included in section 4 of CT REIT’s Annual Information Form for the year ended December 31, 2022, and in section 12 of CT REIT’s Management’s Discussion and Analysis for the year ended December 31, 2022. CT REIT acknowledges that cybersecurity is more than just a technology challenge, but a business imperative that relies on each employee playing an important role to ensure the REIT maintains constant vigilance. By building a culture of cyber security awareness within the REIT, along with integrated policies and standards, an embedded multi-layered set of controls and round-the-clock monitoring in conjunction with CTC, we ensure that the REIT remains resilient against cyberattacks.",
+        "question_similarity": 0.75064087,
+        "ground_truth_similarity": 0.70910829
+      },
+      {
+        "document_chunk_index": 48,
+        "page": 27,
+        "text": "Together, with the support of CTC, we are staying ahead of threats to our organization through integrated policies, an embedded multi-layered set of controls, training, and round-the-clock monitoring. Risk Management Privacy & Data Security",
+        "question_similarity": 0.75803375,
+        "ground_truth_similarity": 0.75375336
+      },
+      {
+        "document_chunk_index": 49,
+        "page": 28,
+        "text": "Overview Environmental CT REIT 2022 Environmental, Social and Governance Report Social Governance Glossary Appendix 28 Glossary Term Definition Board Refers to the CT REIT Board of Trustees. BOMA BEST BOMA BEST Sustainable Buildings certification recognizes excellence in energy and environmental management and performance in commercial real estate. The Program is managed by the Building Owners and Managers Association of Canada (BOMA Canada) and delivered by the eleven Local BOMA Associations throughout Canada. Canadian Tire Refers to the general merchandise retail and services business carried on under the Canadian Tire name and trademarks. CT REIT or the REIT Refers to the business carried on by CT Real Estate Investment Trust and its subsidiaries. CTC Refers to Canadian Tire Corporation, Limited, its predecessor corporations and all entities controlled by it and their collective businesses, unless the context otherwise requires. DIB Refers to diversity, inclusion and belonging. ESG Refers to “environmental, social and governance,” and encompasses the range of issues a company manages that are related to sustainable development, including environmental protection, social responsibility, and good governance. GCN Governance, Compensation & Nominating Committee. GHG Greenhouse Gases. ISAE 3000/3410 International Standards on Assurance Engagements/Assurance engagements on greenhouse gas statements. Jumpstart Refers to Canadian Tire Jumpstart Charities. LEED Leadership in Energy and Environmental Design is a green building certification program used worldwide that includes a set of rating systems for the design, construction, operation, and maintenance of green buildings, which aims to help building owners and operators be environmentally responsible and use resources efficiently. TCFD Task Force on Climate-Related Financial Disclosures. TLA Triangle Learning Academy.",
+        "question_similarity": 0.79043204,
+        "ground_truth_similarity": 0.73538601
+      }
+    ]
+  }
+}

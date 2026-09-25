@@ -6,9 +6,9 @@ Tests that the app loads correctly with file upload capabilities.
 from streamlit.testing.v1 import AppTest
 
 
-def test_app_loads_with_upload_capability():
+def test_app_loads_with_upload_capability(streamlit_app_path):
     """Test that app loads without errors and has upload functionality"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page to check for title
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -21,9 +21,9 @@ def test_app_loads_with_upload_capability():
     assert len(at.expander) > 0, "App should have expanders"
 
 
-def test_app_has_file_related_ui():
+def test_app_has_file_related_ui(streamlit_app_path):
     """Test that app has file-related UI elements"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page where file selectbox might be located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)

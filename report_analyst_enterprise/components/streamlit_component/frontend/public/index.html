@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDF viewer with chunks</title>
+    <style>
+      html,
+      body,
+      #root {
+        margin: 0;
+        min-height: 100%;
+        width: 100%;
+      }
+
+      body {
+        background: transparent;
+        font-family: system-ui, sans-serif;
+      }
+
+      .source-error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 0.5rem;
+        color: #991b1b;
+        margin: 1rem;
+        padding: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" aria-live="polite"></div>
+    <script type="module">
+      import "./pdf-viewer.es.js";
+
+      const root = document.getElementById("root");
+      let viewer;
+
+      function sendMessage(type, payload = {}) {
+        window.parent.postMessage(
+          { isStreamlitMessage: true, type, ...payload },
+          "*",
+        );
+      }
+
+      function setFrameHeight(requestedHeight) {
+        sendMessage("streamlit:setFrameHeight", {
+          height: requestedHeight || 800,
+        });
+      }
+
+      function showSourceError(message, height) {
+        viewer = undefined;
+        root.replaceChildren();
+        const error = document.createElement("div");
+        error.className = "source-error";
+        error.setAttribute("role", "alert");
+        error.textContent = message;
+        root.append(error);
+        setFrameHeight(height);
+      }
+
+      function render(args = {}) {
+        if (args.sourceError) {
+          showSourceError(args.sourceError, args.height);
+          return;
+        }
+
+        if (!args.pdfData) {
+          showSourceError("The PDF could not be loaded because its source is unavailable.", args.height);
+          return;
+        }
+
+        if (!viewer) {
+          root.replaceChildren();
+          viewer = document.createElement("pdf-viewer-with-chunks");
+          root.append(viewer);
+        }
+
+        viewer.setPdfData(args.pdfData);
+        viewer.setChunks(args.chunks);
+        viewer.setQuestions(args.questions);
+        setFrameHeight(args.height);
+      }
+
+      window.addEventListener("message", (event) => {
+        if (event.data?.type === "streamlit:render") {
+          render(event.data.args);
+        }
+      });
+
+      sendMessage("streamlit:componentReady", { apiVersion: 1 });
+      setFrameHeight(800);
+    </script>
+  </body>
+</html>

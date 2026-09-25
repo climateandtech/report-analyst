@@ -6,9 +6,9 @@ Tests that the slider exists, is interactive, and controls step selection.
 from streamlit.testing.v1 import AppTest
 
 
-def test_processing_steps_slider_exists():
+def test_processing_steps_slider_exists(streamlit_app_path):
     """Test that Processing Steps slider is present"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
@@ -28,9 +28,9 @@ def test_processing_steps_slider_exists():
     # without causing format_func issues. The important thing is the app loads correctly.
 
 
-def test_processing_steps_slider_interactive():
+def test_processing_steps_slider_interactive(streamlit_app_path):
     """Test that Processing Steps slider is interactive"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
@@ -50,22 +50,15 @@ def test_processing_steps_slider_interactive():
     # in AppTest. The important thing is the app loads correctly and the page structure is there.
 
 
-def test_processing_steps_displayed():
+def test_processing_steps_displayed(streamlit_app_path):
     """Test that Processing Steps are displayed with correct labels"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
 
     # Check that Processing Steps section exists
     # This is verified by the app loading without errors
     assert not at.exception, "App should load without errors"
-
-    # Check for Processing Steps heading
-    has_processing_steps = False
-    for header in at.header:
-        if "Processing Steps" in str(header.value):
-            has_processing_steps = True
-            break
 
     # Processing Steps might only show when a file is selected
     # So we just verify the app loads correctly

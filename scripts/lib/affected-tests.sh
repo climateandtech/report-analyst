@@ -211,6 +211,14 @@ qg_run_affected_pytest() {
     fi
   fi
 
+  # Per-module --cov=pkg.mod can reload NumPy under coverage tracing and break
+  # SciPy/sklearn (and sometimes pydantic RootModel MRO) at collection time.
+  # Package-level --cov matches CI and still yields per-file rows in coverage.json
+  # for qg_run_coverage_regression.
+  if [[ ${#QG_AFFECTED_COV[@]} -gt 0 ]]; then
+    QG_AFFECTED_COV=("--cov=${app_prefix}")
+  fi
+
   local -a cov_args=()
   local cov_dir="$backend_root/.qg-coverage"
   if qg_pytest_cov_available "$py" && [[ ${#QG_AFFECTED_COV[@]} -gt 0 ]]; then

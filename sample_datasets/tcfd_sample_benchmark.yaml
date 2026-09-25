@@ -1,0 +1,77 @@
+dataset_id: "tcfd_sample_v1"
+name: "TCFD Sample Benchmark Dataset"
+description: "Sample dataset for testing TCFD question benchmarking"
+version: "1.0"
+question_set: "tcfd"
+created_at: "2024-01-15"
+questions:
+  - question_id: "tcfd_1"
+    question_text: "What are the climate-related risks that the organization has identified over the short, medium, and long term?"
+    ground_truth_chunks:
+      - chunk_id: "chunk_001"
+        relevance_score: 1.0
+        is_evidence: true
+        evidence_order: 1
+        annotation_notes: "Contains specific climate risk identification and timeframes"
+      - chunk_id: "chunk_015"
+        relevance_score: 0.9
+        is_evidence: true
+        evidence_order: 2
+        annotation_notes: "Details risk assessment methodology"
+      - chunk_id: "chunk_042"
+        relevance_score: 0.3
+        is_evidence: false
+        annotation_notes: "Mentions climate risks but lacks specificity"
+      - chunk_id: "chunk_067"
+        relevance_score: 0.0
+        is_evidence: false
+        annotation_notes: "Unrelated content about financial performance"
+  
+  - question_id: "tcfd_2"
+    question_text: "How do climate-related risks and opportunities influence the organization's strategy and financial planning?"
+    ground_truth_chunks:
+      - chunk_id: "chunk_023"
+        relevance_score: 1.0
+        is_evidence: true
+        evidence_order: 1
+        annotation_notes: "Direct discussion of climate impact on strategy"
+      - chunk_id: "chunk_034"
+        relevance_score: 0.8
+        is_evidence: true
+        evidence_order: 2
+        annotation_notes: "Financial planning considerations for climate risks"
+      - chunk_id: "chunk_089"
+        relevance_score: 0.6
+        is_evidence: false
+        annotation_notes: "General strategic planning discussion"
+      - chunk_id: "chunk_105"
+        relevance_score: 0.0
+        is_evidence: false
+        annotation_notes: "Operational details unrelated to climate strategy"
+  
+  - question_id: "tcfd_3"
+    question_text: "What are the organization's processes for identifying, assessing, and managing climate-related risks?"
+    ground_truth_chunks:
+      - chunk_id: "chunk_012"
+        relevance_score: 1.0
+        is_evidence: true
+        evidence_order: 1
+        annotation_notes: "Detailed risk management process description"
+      - chunk_id: "chunk_028"
+        relevance_score: 0.9
+        is_evidence: true
+        evidence_order: 2
+        annotation_notes: "Risk assessment methodology and tools"
+      - chunk_id: "chunk_055"
+        relevance_score: 0.7
+        is_evidence: true
+        evidence_order: 3
+        annotation_notes: "Governance structure for risk management"
+      - chunk_id: "chunk_078"
+        relevance_score: 0.4
+        is_evidence: false
+        annotation_notes: "General risk management discussion"
+      - chunk_id: "chunk_091"
+        relevance_score: 0.0
+        is_evidence: false
+        annotation_notes: "IT risk management - not climate related"

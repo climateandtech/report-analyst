@@ -1,0 +1,32 @@
+name: ClimRetrieve Complete Six-Question Benchmark
+shortcut: climretr
+description: Six ClimRetrieve questions annotated across all eight listed reports.
+documents:
+  - 2022 Microsoft Environmental Sustainability Report.pdf
+  - 2023 Lloyds sustainability report.pdf
+  - Deloitte 2023 Global Impact Report.pdf
+  - HSBC Annual Holdings and Accounts Report 2023.pdf
+  - Netflix ESG Report 2022.pdf
+  - New Look sustainability report .pdf
+  - Qantas 2023 Sustainability Report .pdf
+  - Westpac 2023 climate report.pdf
+questions:
+  - id: climretr_11
+    text: Do the environmental/sustainability targets set by the company reference external climate change adaptation goals/targets?
+    guidelines: &classification |-
+      - ANSWER type: classification — exactly one of Yes / No / Unclear / Not disclosed
+  - id: climretr_12
+    text: Do the environmental/sustainability targets set by the company align with external climate change adaptation goals/targets?
+    guidelines: *classification
+  - id: climretr_13
+    text: Does the company report short-term actions taken or planned to reduce its waste generation?
+    guidelines: *classification
+  - id: climretr_14
+    text: Does the company report a plan to engage with downstream partners on water consumption or water pollution?
+    guidelines: *classification
+  - id: climretr_15
+    text: Does the company identify any impacts of its business activities on the environment?
+    guidelines: *classification
+  - id: climretr_16
+    text: Does the company have a strategy on waste management?
+    guidelines: *classification
