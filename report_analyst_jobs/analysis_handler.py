@@ -148,7 +148,7 @@ class DocumentAnalysisHandler(JobHandler):
                     {
                         "question_id": question_id,
                         "question_text": question_data["text"],
-                        "answer": f"Analysis failed: {str(e)}",
+                        "answer": f"Analysis failed: {e!s}",
                         "evidence_chunks": [],
                         "confidence_score": 0.0,
                         "error": str(e),
@@ -286,7 +286,7 @@ class ProgressReportingAnalysisHandler(DocumentAnalysisHandler):
 
         except Exception as e:
             if self.progress_callback:
-                await self.progress_callback(job.job_id, 0.0, f"Analysis failed: {str(e)}")
+                await self.progress_callback(job.job_id, 0.0, f"Analysis failed: {e!s}")
 
             return JobResult(job_id=job.job_id, status=JobStatus.FAILED, error=str(e))
 

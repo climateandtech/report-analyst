@@ -78,7 +78,7 @@ class S3UploadService:
                 logger.info("Connected to NATS with JetStream")
             except Exception as e:
                 logger.error(f"Failed to connect to NATS: {e}")
-                raise S3UploadServiceError(f"NATS connection failed: {str(e)}")
+                raise S3UploadServiceError(f"NATS connection failed: {e!s}")
 
     async def close(self):
         """Close NATS connection if open"""
@@ -161,7 +161,7 @@ class S3UploadService:
                 await self._cleanup_s3_object(s3_key)
             except Exception as cleanup_e:
                 logger.warning(f"Failed to cleanup S3 object: {cleanup_e}")
-            raise S3UploadServiceError(f"S3+NATS upload failed: {str(e)}")
+            raise S3UploadServiceError(f"S3+NATS upload failed: {e!s}")
 
     async def _upload_to_s3(self, file_bytes: bytes, s3_key: str, filename: str) -> str:
         """Upload file to S3 and return URL"""
@@ -201,7 +201,7 @@ class S3UploadService:
 
         except Exception as e:
             logger.error(f"S3 upload failed: {e}")
-            raise S3UploadServiceError(f"S3 upload failed: {str(e)}")
+            raise S3UploadServiceError(f"S3 upload failed: {e!s}")
 
     def _get_s3_bucket(self) -> str:
         """Get S3 bucket name from config or environment (matches backend/PDF service)"""

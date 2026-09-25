@@ -51,16 +51,16 @@ class DocumentProcessor:
                 print(f"Successfully opened PDF with {page_count} pages")
                 doc.close()
             except Exception as e:
-                print(f"Failed to verify PDF: {str(e)}")
+                print(f"Failed to verify PDF: {e!s}")
                 if dest_path.exists():
                     dest_path.unlink()
-                raise ValueError(f"Invalid PDF file: {str(e)}")
+                raise ValueError(f"Invalid PDF file: {e!s}")
 
             # Extract metadata
             metadata = await self._extract_metadata(dest_path, safe_filename)
             return {"document_id": document_id, "metadata": metadata}
         except Exception as e:
-            print(f"Error processing upload: {str(e)}")
+            print(f"Error processing upload: {e!s}")
             if "dest_path" in locals() and dest_path.exists():
                 dest_path.unlink()  # Clean up on error
             raise
