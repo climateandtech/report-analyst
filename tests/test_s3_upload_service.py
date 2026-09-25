@@ -6,8 +6,7 @@ Currently has 0% coverage - adding comprehensive tests.
 """
 
 import os
-import tempfile
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 

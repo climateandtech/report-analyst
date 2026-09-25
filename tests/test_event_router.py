@@ -5,7 +5,7 @@ Tests the simple table-based event routing system.
 """
 
 import json
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 import pytest
 

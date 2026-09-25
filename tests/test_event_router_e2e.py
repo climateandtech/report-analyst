@@ -13,7 +13,7 @@ Tests the complete flow:
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 import yaml

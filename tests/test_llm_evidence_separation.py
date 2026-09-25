@@ -13,14 +13,11 @@ to evidence determination. The acceptance criteria are:
 This addresses the user requirement: "llm score is independent from is evidence"
 """
 
-import json
 import os
 import sys
 import tempfile
-from pathlib import Path
 
 import pytest
-from sqlalchemy import inspect, text
 
 # Add the app directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

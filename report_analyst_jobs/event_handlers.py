@@ -5,7 +5,6 @@ Handler functions that can be referenced in event_routing.yaml
 """
 
 import logging
-from typing import Any, Dict
 
 from report_analyst_jobs.event_router import EventContext
 from report_analyst_jobs.nats_integration import DocumentReadyEvent
