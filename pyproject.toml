@@ -25,6 +25,7 @@ include = ["report_analyst", "report_analyst.*"]
 [tool.isort]
 profile = "black"
 line_length = 127
+known_third_party = ["alembic"]
 skip = [".git", ".hg", "venv", "venv2", "node_modules", "report_analyst_enterprise", "__pycache__", "htmlcov", "*.egg-info", "report_analyst/core/benchmark/02_classification_calibration.py"]
 
 [tool.black]
