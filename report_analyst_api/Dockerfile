@@ -1,4 +1,5 @@
-# FastAPI service for ct-platform /report-analyst-api proxy (port 8001)
+# Deprecated for deploy — use repository root Dockerfile + REPORT_ANALYST_RUNTIME=enterprise.
+# FastAPI service (report_analyst_api module)
 FROM python:3.12-slim
 
 WORKDIR /app
