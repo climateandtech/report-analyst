@@ -111,9 +111,9 @@ from report_analyst_jobs.search_backend_integration import notify_document_ready
 # In your embed_chunks_service function (or wherever PDF processing completes):
 def embed_chunks_service(db: Session, resource_id: uuid.UUID, batch_size: int = 10):
     logging.info(f"Starting embed_chunks_service for resource_id: {resource_id}")
-    
+
     # ... existing embedding logic ...
-    
+
     # After successful embedding, notify NATS
     try:
         resource = crud.get_resource(db, resource_id)
@@ -128,15 +128,15 @@ def embed_chunks_service(db: Session, resource_id: uuid.UUID, batch_size: int = 
     except Exception as e:
         logging.error(f"Failed to notify NATS: {e}")
         # Continue - this is not critical for the main processing
-    
+
     return True
 
 # Alternative async version for async services:
 async def embed_chunks_service_async(db: Session, resource_id: uuid.UUID, batch_size: int = 10):
     logging.info(f"Starting embed_chunks_service for resource_id: {resource_id}")
-    
+
     # ... existing embedding logic ...
-    
+
     # After successful embedding, notify NATS
     try:
         resource = crud.get_resource(db, resource_id)
@@ -151,6 +151,6 @@ async def embed_chunks_service_async(db: Session, resource_id: uuid.UUID, batch_
     except Exception as e:
         logging.error(f"Failed to notify NATS: {e}")
         # Continue - this is not critical for the main processing
-    
+
     return True
 """

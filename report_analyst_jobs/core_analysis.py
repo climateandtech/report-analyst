@@ -175,11 +175,11 @@ def _analyze_question(question: str, context: str, config: AnalysisConfig) -> st
 
     answer = f"""
     Question: {question}
-    
+
     Analysis based on the document content:
-    
+
     {context[:500]}...
-    
+
     [This is a placeholder analysis. In production, this would use the configured LLM model ({config.model}) to provide a detailed analysis.]
     """
 
