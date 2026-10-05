@@ -195,7 +195,7 @@ tiktoken==0.9.0
 tokenizers==0.21.0
 toml==0.10.2
 tomlkit==0.13.2
-tornado==6.5.8
+tornado==6.5.10
 tqdm==4.67.1
 typer==0.15.1
 typing-inspect==0.9.0
