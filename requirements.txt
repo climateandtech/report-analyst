@@ -202,7 +202,7 @@ typing-inspect==0.9.0
 typing_extensions==4.12.2
 tzdata==2025.1
 tzlocal==5.2
-urllib3==2.7.0
+urllib3==2.8.0
 uvicorn==0.52.4
 uvloop==0.21.0
 validators==0.34.0
