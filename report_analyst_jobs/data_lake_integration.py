@@ -157,7 +157,7 @@ class DataLakeClient:
             async with session.post(f"{self.backend_url}/resources/", json=resource_data) as response:
                 if response.status == 200:
                     resource = await response.json()
-                    logger.info(f"Uploaded document to data lake with metadata")
+                    logger.info("Uploaded document to data lake with metadata")
                     return resource["id"]
                 else:
                     raise Exception(f"Failed to upload document: {response.status}")
