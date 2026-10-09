@@ -32,6 +32,27 @@ class PdfViewerWithChunks extends HTMLElement {
     this._renderId = 0;
     this._lastRenderedWidth = 0;
     this._resizeObserver = null;
+    this._selectedAnchors = [];
+    this._documentId = null;
+    this._taggingSelections = [];
+    this._taxonomyOptions = [
+      {
+        id: "climate_change_mitigation",
+        label: "Climate Change Mitigation",
+      },
+      {
+        id: "water_resources",
+        label: "Water Resources",
+      },
+      {
+        id: "biodiversity",
+        label: "Biodiversity",
+      },
+    ];
+    this._selectedTaxonomyId = null;
+    this._selectedValue = null;
+    this._currentSourceAnchor = null;
+    this._taggingSelections = []; 
   }
 
   connectedCallback() {
@@ -49,6 +70,7 @@ class PdfViewerWithChunks extends HTMLElement {
     if (data === this._pdfData) return;
     this.resetPdfDocument();
     this._pdfData = data || null;
+    this._documentId = this._pdfData ? `document-${Date.now()}` : null;
     if (this.isConnected) void this.loadAndRenderPdf();
   }
 
@@ -135,8 +157,35 @@ class PdfViewerWithChunks extends HTMLElement {
               <span id="evidence-filter-label">Show evidence only</span>
             </label>
           </div>
+          <label for="taxonomy-select">Taxonomy</label>
+
+        <select id="taxonomy-select">
+          <option value="">Select taxonomy</option>
+
+          ${this._taxonomyOptions
+            .map(
+              (option) => `
+                <option value="${option.id}">
+                  ${option.label}
+                </option>
+              `,
+            )
+            .join("")}
+        </select>
+        <label for="tag-value">Value</label>
+
+        <input
+          id="tag-value"
+          type="text"
+          placeholder="Enter value"
+        />
+        <button id="save-tag" type="button">
+          Save Tag
+        </button>
+        <div id="saved-tags"></div>
           <div class="chunks-list"></div>
         </aside>
+        
         <main class="viewer">
           <div class="viewer-controls">
             <button id="prev-page" type="button">Previous</button>
@@ -148,6 +197,7 @@ class PdfViewerWithChunks extends HTMLElement {
           <div id="viewer-content" class="viewer-content"></div>
         </main>
       </div>
+      
     `;
 
     this.bindEvents();
@@ -177,6 +227,140 @@ class PdfViewerWithChunks extends HTMLElement {
     this.shadowRoot.getElementById("next-page").addEventListener("click", () => {
       void this.navigateToPage(this._currentPage + 1);
     });
+    // POC XBRL Selection Tagging
+    this.shadowRoot.getElementById("viewer-content").addEventListener("mouseup", () => {
+      console.log("Mouse Up Event register")
+      const selection = this.shadowRoot.getSelection?.() ?? window.getSelection();
+
+      if (!selection || selection.isCollapsed) return;
+
+      const selectedText = selection.toString();
+      const range = selection.getRangeAt(0).cloneRange();
+      
+      const pageContainer = this.shadowRoot.querySelector(".page-container");
+
+      if (!pageContainer) return;
+
+      const pageRect = pageContainer.getBoundingClientRect();
+
+      const rects = Array.from(range.getClientRects())
+        .map((rect) => ({
+          x: rect.left - pageRect.left,
+          y: rect.top - pageRect.top,
+          width: rect.width,
+          height: rect.height,
+        }))
+        .filter((rect, index, array) =>
+          index === array.findIndex((other) =>
+            Math.abs(other.x - rect.x) < 0.5 &&
+            Math.abs(other.y - rect.y) < 0.5 &&
+            Math.abs(other.width - rect.width) < 0.5 &&
+            Math.abs(other.height - rect.height) < 0.5
+          )
+        );
+
+      const sourceAnchor = {
+        document_id: this._documentId,
+        page: this._currentPage,
+        selected_text: selectedText,
+        span_start: range.startOffset,
+        span_end: range.endOffset,
+        rects,
+      };
+      this._selectedAnchors.push(sourceAnchor);
+      
+      this.renderStoredSelections();
+      // console.log("Selected text:", selectedText);
+      // console.log("Start offset:", range.startOffset);
+      // console.log("End offset:", range.endOffset);
+      // console.log("Rects:", rects);
+      this._currentSourceAnchor = sourceAnchor;
+
+      console.log("Source Anchor:", sourceAnchor);
+    });
+
+    this.shadowRoot.getElementById("taxonomy-select")?.addEventListener("change", (event) => {
+      this._selectedTaxonomyId = event.target.value || null;
+      console.log(
+        "Selected Taxonomy:",
+        this._selectedTaxonomyId,
+      );
+    });
+
+    this.shadowRoot.getElementById("tag-value")?.addEventListener("input", (event) => {
+      this._selectedValue = event.target.value || null;
+      console.log(
+        "Selected Value:",
+        this._selectedValue,
+      );
+    });
+    this.shadowRoot.getElementById("save-tag")?.addEventListener("click", () => {
+      if (!this._currentSourceAnchor) {
+        console.log("No source selection available");
+        return;
+      }
+
+      if (!this._selectedTaxonomyId) {
+        console.log("No taxonomy selected");
+        return;
+      }
+
+      if (!this._selectedValue) {
+        console.log("No value entered");
+        return;
+      }
+
+      const taggingSelection = {
+        source_anchor: this._currentSourceAnchor,
+        osa_question_id: this._selectedQuestionId || null,
+        taxonomy_id: this._selectedTaxonomyId,
+        value: this._selectedValue,
+      };
+
+      this._taggingSelections.push(taggingSelection);
+
+      console.log("Saved Tag:", taggingSelection);
+      console.log("All Tags:", this._taggingSelections);
+      this.renderSavedTags();
+    });
+  }
+
+  renderStoredSelections() {
+    const pageContainer =
+      this.shadowRoot?.querySelector(".page-container");
+
+    if (!pageContainer) return;
+
+    let layer =
+      pageContainer.querySelector(".stored-selections");
+
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.className = "stored-selections";
+      pageContainer.append(layer);
+    }
+
+    layer.replaceChildren();
+
+    const anchorsForCurrentPage =
+      this._selectedAnchors.filter(
+        (anchor) => anchor.page === this._currentPage,
+      );
+
+    for (const anchor of anchorsForCurrentPage) {
+      for (const rect of anchor.rects) {
+        const highlight = document.createElement("div");
+
+        highlight.className = "stored-selection";
+
+        highlight.style.left = `${rect.x}px`;
+        highlight.style.top = `${rect.y}px`;
+        highlight.style.width = `${rect.width}px`;
+        highlight.style.height = `${rect.height}px`;
+
+        layer.append(highlight);
+      }
+    }
   }
 
   renderQuestionOptions() {
@@ -351,6 +535,7 @@ class PdfViewerWithChunks extends HTMLElement {
       const viewport = page.getViewport({ scale });
       const canvas = await this.renderPage(page, viewport);
       const textItems = await this.readTextItems(page);
+      const textLayer = await this.renderTextLayer(textItems, viewport);
       if (renderId !== this._renderId) return;
 
       this._currentPage = pageNumber;
@@ -359,10 +544,12 @@ class PdfViewerWithChunks extends HTMLElement {
       const pageContainer = document.createElement("div");
       pageContainer.className = "page-container";
       pageContainer.append(canvas);
+      pageContainer.append(textLayer);
 
       const highlights = this.renderHighlights(textItems, viewport, pageNumber);
       if (highlights.childElementCount) pageContainer.append(highlights);
       content.replaceChildren(pageContainer);
+      this.renderStoredSelections();
     } catch (error) {
       if (renderId === this._renderId) {
         this.showMessage(`Error rendering page: ${error.message}`, "error");
@@ -426,6 +613,95 @@ class PdfViewerWithChunks extends HTMLElement {
       }
     }
     return layer;
+  }
+
+  renderTextLayer(textItems, viewport) {
+    const layer = document.createElement("div");
+    layer.className = "text-layer";
+
+    layer.style.width = `${viewport.width}px`;
+    layer.style.height = `${viewport.height}px`;
+
+    for (const item of textItems) {
+      if (!item.str) continue;
+
+      const span = document.createElement("span");
+      span.textContent = item.str;
+
+      const transform = pdfjsLib.Util.transform(
+        viewport.transform,
+        item.transform,
+      );
+
+      const fontHeight = Math.hypot(
+        transform[2],
+        transform[3],
+      );
+
+      span.style.position = "absolute";
+      span.style.left = `${transform[4]}px`;
+      span.style.top = `${transform[5] - fontHeight}px`;
+      span.style.fontSize = `${fontHeight}px`;
+      span.style.transformOrigin = "0 0";
+      span.style.whiteSpace = "pre";
+
+      layer.append(span);
+
+      // Browser-rendered width
+      const renderedWidth = span.getBoundingClientRect().width;
+
+      // Width that PDF.js says this text item should have
+      const expectedWidth = item.width * viewport.scale;
+
+      if (renderedWidth > 0 && expectedWidth > 0) {
+        const scaleX = expectedWidth / renderedWidth;
+        span.style.transform = `scaleX(${scaleX})`;
+      }
+    }
+
+    return layer;
+  }
+
+  renderSavedTags() {
+    const container = this.shadowRoot.getElementById("saved-tags");
+
+    if (!container) return;
+
+    container.replaceChildren();
+
+    if (this._taggingSelections.length === 0) {
+      container.textContent = "No saved tags";
+      return;
+    }
+
+    for (const [index, tag] of this._taggingSelections.entries()) {
+      const item = document.createElement("div");
+      item.className = "saved-tag";
+      item.dataset.index = index;
+      item.style.cursor = "pointer";
+
+      item.addEventListener("click", async () => {
+        const tag = this._taggingSelections[index];
+
+        if (!tag) return;
+
+        this._currentPage = tag.source_anchor.page;
+
+        await this.renderCurrentPage();
+
+        console.log("Revisited Tag:", tag);
+      });
+      
+      item.innerHTML = `
+        <strong>Tag ${index + 1}</strong>
+        <div>Page: ${tag.source_anchor.page}</div>
+        <div>Taxonomy: ${tag.taxonomy_id}</div>
+        <div>Value: ${tag.value}</div>
+        <div>Text: ${tag.source_anchor.selected_text}</div>
+      `;
+
+      container.append(item);
+    }
   }
 
   findChunkTextPositions(textItems, chunkText, viewport) {
