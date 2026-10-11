@@ -66,7 +66,7 @@ def get_current_revision(database_url: Optional[str] = None) -> Optional[str]:
             current_rev = context.get_current_revision()
             return current_rev
     except Exception as e:
-        logger.error(f"Error getting current revision: {str(e)}")
+        logger.error(f"Error getting current revision: {e!s}")
         return None
 
 
@@ -83,7 +83,7 @@ def get_head_revision() -> Optional[str]:
         head = script.get_current_head()
         return head
     except Exception as e:
-        logger.error(f"Error getting head revision: {str(e)}")
+        logger.error(f"Error getting head revision: {e!s}")
         return None
 
 
@@ -111,7 +111,7 @@ def needs_migration(database_url: Optional[str] = None) -> bool:
 
         return current_rev != head_rev
     except Exception as e:
-        logger.error(f"Error checking migration status: {str(e)}")
+        logger.error(f"Error checking migration status: {e!s}")
         return False
 
 
@@ -136,7 +136,7 @@ def check_migration_status(database_url: Optional[str] = None) -> dict:
             "needs_migration": needs_migration(database_url),
         }
     except Exception as e:
-        logger.error(f"Error checking migration status: {str(e)}")
+        logger.error(f"Error checking migration status: {e!s}")
         return {
             "current_revision": None,
             "head_revision": None,
@@ -163,5 +163,5 @@ def run_migrations(database_url: Optional[str] = None, revision: str = "head") -
         logger.info(f"Successfully upgraded database to revision: {revision}")
         return True
     except Exception as e:
-        logger.error(f"Error running migrations: {str(e)}")
+        logger.error(f"Error running migrations: {e!s}")
         return False

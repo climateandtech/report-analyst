@@ -106,7 +106,7 @@ class ChunkRetrievalStep(WorkflowStep):
             return context
 
         except Exception as e:
-            logger.error(f"[WORKFLOW] Error in chunk retrieval: {str(e)}")
+            logger.error(f"[WORKFLOW] Error in chunk retrieval: {e!s}")
             raise
 
 
@@ -150,7 +150,7 @@ class LLMScoringStep(WorkflowStep):
             return context
 
         except Exception as e:
-            logger.error(f"[WORKFLOW] Error in LLM scoring: {str(e)}")
+            logger.error(f"[WORKFLOW] Error in LLM scoring: {e!s}")
             raise
 
 
@@ -196,7 +196,7 @@ class QuestionAnalysisStep(WorkflowStep):
             return context
 
         except Exception as e:
-            logger.error(f"[WORKFLOW] Error in question analysis: {str(e)}")
+            logger.error(f"[WORKFLOW] Error in question analysis: {e!s}")
             raise
 
 
@@ -235,7 +235,7 @@ class EvidenceAssignmentStep(WorkflowStep):
             return context
 
         except Exception as e:
-            logger.error(f"[WORKFLOW] Error in evidence assignment: {str(e)}")
+            logger.error(f"[WORKFLOW] Error in evidence assignment: {e!s}")
             raise
 
 

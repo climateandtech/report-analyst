@@ -53,7 +53,7 @@ async def upload_document(file: UploadFile = File(...)):
             "document_id": result["document_id"],
         }
     except Exception as e:
-        logger.error(f"Error uploading document: {str(e)}")
+        logger.error(f"Error uploading document: {e!s}")
         raise HTTPException(status_code=400, detail=str(e))
 
 

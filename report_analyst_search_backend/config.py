@@ -206,7 +206,7 @@ def _test_connections(backend_url: str, use_centralized_llm: bool, nats_url: str
             st.sidebar.info("NATS connection test not implemented yet")
 
     except Exception as e:
-        st.sidebar.error(f"Connection error: {str(e)}")
+        st.sidebar.error(f"Connection error: {e!s}")
 
 
 def display_config_status(config: BackendConfig):
