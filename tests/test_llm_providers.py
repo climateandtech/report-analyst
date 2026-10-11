@@ -31,3 +31,15 @@ def test_get_llm_requires_google_api_key(monkeypatch):
 
     with pytest.raises(ValueError, match="GOOGLE_API_KEY"):
         llm_providers.get_llm("gemini-2.5-flash")
+
+
+def test_get_llm_openai_uses_fail_fast_retries(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    openai_cls = Mock()
+    monkeypatch.setattr(llm_providers, "OpenAI", openai_cls)
+
+    llm_providers.get_llm("gpt-4o-mini")
+
+    kwargs = openai_cls.call_args.kwargs
+    assert kwargs["timeout"] == llm_providers.OPENAI_REQUEST_TIMEOUT_SECONDS
+    assert kwargs["max_retries"] == llm_providers.OPENAI_MAX_RETRIES
