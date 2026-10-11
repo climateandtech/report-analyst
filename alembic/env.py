@@ -34,7 +34,7 @@ config.set_main_option("sqlalchemy.url", database_url)
 from datetime import datetime
 
 # Combine metadata from database_schema and file_storage
-from sqlalchemy import Column, DateTime, LargeBinary, MetaData, String, Table, Text
+from sqlalchemy import Column, DateTime, LargeBinary, String, Table, Text
 
 # Use the database_schema metadata as base
 target_metadata = db_metadata

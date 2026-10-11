@@ -1,5 +1,4 @@
 import pandas as pd
-import pytest
 
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,

@@ -13,7 +13,6 @@ Usage in search backend services.py:
 
 import asyncio
 import logging
-from typing import Optional
 
 from .nats_integration import NATSSearchBackendPublisher
 

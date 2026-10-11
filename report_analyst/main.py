@@ -1,11 +1,8 @@
 import logging
-import pdb
-from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from .core.analyzer import DocumentAnalyzer
 from .core.document_processor import DocumentProcessor

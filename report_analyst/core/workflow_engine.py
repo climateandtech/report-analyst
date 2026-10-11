@@ -8,11 +8,10 @@ This engine orchestrates the analysis process in clean, separate steps:
 4. Evidence Assignment: Update chunks with evidence flags
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 

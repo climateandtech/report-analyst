@@ -16,11 +16,10 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 import nats
-from nats.js import JetStreamContext
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

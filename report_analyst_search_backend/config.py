@@ -6,7 +6,7 @@ Centralized configuration management for all backend integration features.
 
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import streamlit as st
 

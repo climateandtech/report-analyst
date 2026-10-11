@@ -19,7 +19,6 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 import nats
 import yaml
-from nats.js import JetStreamContext
 
 logger = logging.getLogger(__name__)
 

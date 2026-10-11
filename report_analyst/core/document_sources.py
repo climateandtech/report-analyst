@@ -5,7 +5,6 @@ This module defines abstract interfaces for document processing and chunk retrie
 Different implementations can be provided by separate modules.
 """
 
-import uuid
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union

@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional, Union
 
 import aiohttp
 import nats
-from nats.js import JetStreamContext
 
 from .external_service_handler import ExternalServiceReadyEvent
 
