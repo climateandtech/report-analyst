@@ -1,4 +1,5 @@
-# Enterprise image: core Streamlit app + report_analyst_enterprise (Postgres/pgvector)
+# Deprecated for deploy — use repository root Dockerfile + REPORT_ANALYST_RUNTIME.
+# Enterprise Streamlit image (report_analyst_enterprise module + core RPL app)
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -13,21 +14,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Core Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Enterprise Python dependencies
 COPY report_analyst_enterprise/requirements.txt report_analyst_enterprise/requirements.txt
 RUN pip install --no-cache-dir -r report_analyst_enterprise/requirements.txt
 
-# Application code (core + enterprise)
 COPY report_analyst/ report_analyst/
 COPY report_analyst_enterprise/ report_analyst_enterprise/
+COPY report_analyst_search_backend/ report_analyst_search_backend/
 COPY prompts/ prompts/
 COPY .streamlit/ .streamlit/
 
-# Alembic for migrations (when USE_ALEMBIC_MIGRATIONS=true and DATABASE_URL set)
 COPY alembic.ini .
 COPY alembic/ alembic/
 
