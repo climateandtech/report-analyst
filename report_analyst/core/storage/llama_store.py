@@ -27,6 +27,7 @@ class LlamaVectorStore(BaseVectorStore):
         Args:
             storage_path (Path): Path to store vector store files
         """
+        super().__init__()
         self.storage_path = Path(storage_path).resolve()
         self.store = None
         self.storage_context = None
