@@ -10,16 +10,21 @@ exclude_docs: |
 
 theme:
   name: material
+  logo: assets/favicon.svg
+  favicon: assets/favicon.svg
   palette:
     - scheme: default
       primary: deep purple
       accent: deep purple
   features:
-    - navigation.expand
+    - navigation.tabs
     - navigation.sections
     - search.suggest
     - content.code.copy
     - toc.follow
+
+extra:
+  generator: false
 
 plugins:
   - search
@@ -46,6 +51,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Product site: https://opensustainabilityanalyst.com/en
   - Guides:
       - Report analysis: guides/report-analysis.md
       - Parameters: guides/parameters.md
@@ -53,15 +59,15 @@ nav:
       - Chunk highlighting: guides/chunk-highlighting.md
       - Benchmarking: guides/benchmarking.md
   - API reference:
-      - Core and enterprise: reference/index.md
-      - Core:
+      - Overview: reference/index.md
+      - Core modules:
           - Question sets: reference/question-sets.md
           - Documents and chunks: reference/documents.md
           - Analysis workflow: reference/workflow.md
           - Benchmark models: reference/benchmark-models.md
           - Evaluation engine: reference/evaluation-engine.md
           - Loading results: reference/retrieval-results.md
-      - Enterprise:
+      - Enterprise modules:
           - PDF viewer: reference/pdf-viewer.md
           - pgvector: reference/pgvector.md
           - REST API models: reference/api-schemas.md
