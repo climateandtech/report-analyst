@@ -1,0 +1,67 @@
+site_name: Open Sustainability Analyst
+site_description: Guides and generated API reference for Open Sustainability Analyst.
+site_url: https://climateandtech.github.io/report-analyst/
+repo_url: https://github.com/climateandtech/report-analyst
+repo_name: climateandtech/report-analyst
+edit_uri: edit/main/documentation/
+docs_dir: documentation
+exclude_docs: |
+  snippets/**
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: deep purple
+  features:
+    - navigation.expand
+    - navigation.sections
+    - search.suggest
+    - content.code.copy
+    - toc.follow
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            members_order: source
+            filters:
+              - "!^_"
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: documentation
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Guides:
+      - Report analysis: guides/report-analysis.md
+      - Parameters: guides/parameters.md
+      - Question sets: guides/question-sets.md
+      - Chunk highlighting: guides/chunk-highlighting.md
+      - Benchmarking: guides/benchmarking.md
+  - API reference:
+      - Core and enterprise: reference/index.md
+      - Core:
+          - Question sets: reference/question-sets.md
+          - Documents and chunks: reference/documents.md
+          - Analysis workflow: reference/workflow.md
+          - Benchmark models: reference/benchmark-models.md
+          - Evaluation engine: reference/evaluation-engine.md
+          - Loading results: reference/retrieval-results.md
+      - Enterprise:
+          - PDF viewer: reference/pdf-viewer.md
+          - pgvector: reference/pgvector.md
+          - REST API models: reference/api-schemas.md
