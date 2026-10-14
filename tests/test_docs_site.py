@@ -35,9 +35,7 @@ def test_mkdocs_nav_pages_exist():
     assert (docs_dir / "assets/favicon.svg").is_file()
     assert "opensustainabilityanalyst.com" in (docs_dir / "index.md").read_text()
 
-    reference_pages = [
-        page for page in local_pages if page.startswith("reference/") and page != "reference/index.md"
-    ]
+    reference_pages = [page for page in local_pages if page.startswith("reference/") and page != "reference/index.md"]
     assert reference_pages
     unlabeled = [
         page
