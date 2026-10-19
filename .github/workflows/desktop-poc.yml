@@ -1,14 +1,66 @@
-name: Desktop POC
+name: Desktop
 
 on:
   push:
     branches: [desktop-poc]
+    tags: ["desktop-v*"]
   workflow_dispatch:
 
 jobs:
-  windows-prefix:
+  mac-dmg:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Mac Python prefix
+        run: bash desktop/build_python.sh
+
+      - name: Install Electron
+        working-directory: desktop
+        run: npm ci
+
+      - name: Write the notary API key
+        if: ${{ secrets.APPLE_API_KEY != '' }}
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: printf '%s\n' "$APPLE_API_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Pack the DMG and zip
+        working-directory: desktop
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$CSC_LINK" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD
+          fi
+          if [ -n "$APPLE_API_KEY_ID" ] && [ -n "$APPLE_API_ISSUER" ] && [ -f "$RUNNER_TEMP/AuthKey.p8" ]; then
+            export APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
+          else
+            unset APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER
+          fi
+          if [[ "$GITHUB_REF" == refs/tags/desktop-v* ]]; then
+            npx electron-builder --mac --publish always
+          else
+            npx electron-builder --mac
+          fi
+
+      - name: Upload the DMG and zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-sustainability-analyst-mac
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*mac.zip
+          if-no-files-found: error
+
+  windows-installer:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -26,15 +78,23 @@ jobs:
 
       - name: Install Electron
         working-directory: desktop
-        run: npm install
+        run: npm ci
 
-      - name: Pack unpacked Electron app
+      - name: Pack the NSIS installer
         working-directory: desktop
-        run: npx electron-builder --dir --win
+        shell: bash
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          if [ -z "$WIN_CSC_LINK" ]; then
+            unset WIN_CSC_LINK WIN_CSC_KEY_PASSWORD
+          fi
+          npx electron-builder --win
 
-      - name: Upload unpacked app
+      - name: Upload the installer
         uses: actions/upload-artifact@v4
         with:
-          name: open-sustainability-analyst-windows-unpacked
-          path: desktop/dist/win-unpacked
+          name: open-sustainability-analyst-windows
+          path: desktop/dist/*.exe
           if-no-files-found: error

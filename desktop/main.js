@@ -100,13 +100,12 @@ function remoteContent() {
     remote.fetchText(remote.NOTICES_URL).catch(() => null),
   ]).then(([releaseText, noticesText]) => {
     const decision = remote.releaseDecision(app.getVersion(), remote.parseRelease(releaseText));
-    const filePath = remote.statePath();
+    const filePath = noticeStatePath();
     const state = remote.readState(filePath);
     return {
       decision,
       filePath,
       state,
-      offer: remote.shouldOfferUpdate(decision, state) ? decision : null,
       notices: remote.activeNotices(
         remote.parseNotices(noticesText),
         new Date(),
@@ -157,13 +156,42 @@ async function showChoice(title, message, url, confirmLabel) {
   }
 }
 
+function noticeStatePath() {
+  if (process.mas) {
+    return path.join(app.getPath("userData"), "remote-state.json");
+  }
+  return remote.statePath();
+}
+
+function pythonEnv() {
+  const env = {
+    ...process.env,
+    PYTHONDONTWRITEBYTECODE: "1",
+    PYTHONNOUSERSITE: "1",
+  };
+  if (process.mas) {
+    env.OSA_APP_DATA_DIR = app.getPath("userData");
+  }
+  return env;
+}
+
+function startAutoUpdate() {
+  if (!app.isPackaged || process.mas) {
+    return;
+  }
+  const { autoUpdater } = require("electron-updater");
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on("error", (error) => {
+    console.error(`update check failed: ${error}`);
+  });
+  autoUpdater.checkForUpdates().catch((error) => {
+    console.error(`update check failed: ${error}`);
+  });
+}
+
 async function showOptionalRemote(content) {
   let state = content.state;
-  if (content.offer) {
-    await showChoice("Update available", content.offer.message, content.offer.url, "Download");
-    state = remote.withDismissedUpdate(state, content.offer.version);
-    remote.saveState(content.filePath, state);
-  }
   for (const notice of content.notices) {
     await showChoice("Open Sustainability Analyst", notice.message, notice.url, "Open");
     state = remote.withDismissedNotice(state, notice.id);
@@ -193,11 +221,7 @@ async function openWindow() {
   pythonProcess = spawn(binary, [script], {
     cwd: repoDir(),
     windowsHide: true,
-    env: {
-      ...process.env,
-      PYTHONDONTWRITEBYTECODE: "1",
-      PYTHONNOUSERSITE: "1",
-    },
+    env: pythonEnv(),
   });
   pythonProcess.stderr.on("data", (chunk) => {
     process.stderr.write(chunk);
@@ -225,6 +249,7 @@ async function openWindow() {
   } catch (error) {
     console.error(error);
   }
+  startAutoUpdate();
 }
 
 app.on("before-quit", stopPython);

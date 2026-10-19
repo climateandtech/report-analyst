@@ -43,6 +43,12 @@ def test_app_data_dir_uses_os_locations(run_app):
     ) / "Open Sustainability Analyst"
 
 
+def test_app_data_dir_honors_the_sandbox_container(run_app, tmp_path):
+    """The Mac App Store build passes its container path instead of the home folder."""
+    container = tmp_path / "container"
+    assert run_app.app_data_dir("darwin", {"OSA_APP_DATA_DIR": str(container)}, Path("/Users/analyst")) == container
+
+
 def test_bundled_python_matches_standalone_layout(run_app):
     prefix = Path("/opt/osa/python")
     assert run_app.bundled_python(prefix, "darwin") == prefix / "bin" / "python3"

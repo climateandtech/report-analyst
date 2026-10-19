@@ -30,6 +30,9 @@ def app_data_dir(
     platform_name = sys.platform if platform_name is None else platform_name
     environ = os.environ if environ is None else environ
     home = Path.home() if home is None else home
+    configured = environ.get("OSA_APP_DATA_DIR")
+    if configured:
+        return Path(configured)
     if platform_name == "win32":
         base = environ.get("APPDATA") or str(home / "AppData" / "Roaming")
         return Path(base) / APP_DATA_DIR_NAME
