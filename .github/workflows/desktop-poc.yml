@@ -1,0 +1,40 @@
+name: Desktop POC
+
+on:
+  push:
+    branches: [desktop-poc]
+  workflow_dispatch:
+
+jobs:
+  windows-prefix:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Windows Python prefix
+        shell: bash
+        run: bash desktop/build_python.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Import numpy and fitz from a moved prefix
+        shell: bash
+        run: python desktop/smoke_relocate.py
+
+      - name: Install Electron
+        working-directory: desktop
+        run: npm install
+
+      - name: Pack unpacked Electron app
+        working-directory: desktop
+        run: npx electron-builder --dir --win
+
+      - name: Upload unpacked app
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-sustainability-analyst-windows-unpacked
+          path: desktop/dist/win-unpacked
+          if-no-files-found: error

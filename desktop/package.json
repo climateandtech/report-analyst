@@ -1,0 +1,68 @@
+{
+  "name": "open-sustainability-analyst",
+  "version": "0.8.0",
+  "private": true,
+  "description": "Desktop window for the Open Sustainability Analyst Streamlit app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "34.3.0",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.climateandtech.open-sustainability-analyst",
+    "productName": "Open Sustainability Analyst",
+    "asar": true,
+    "files": [
+      "main.js",
+      "remote-manifest.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "run_app.py",
+        "to": "run_app.py"
+      },
+      {
+        "from": "python",
+        "to": "python"
+      },
+      {
+        "from": "../report_analyst",
+        "to": "report_analyst",
+        "filter": ["**/*", "!**/__pycache__/**"]
+      },
+      {
+        "from": "../report_analyst_enterprise",
+        "to": "report_analyst_enterprise",
+        "filter": ["**/*", "!**/__pycache__/**"]
+      },
+      {
+        "from": "../prompts",
+        "to": "prompts"
+      },
+      {
+        "from": "../.streamlit",
+        "to": ".streamlit"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "icon": "build/icon.png",
+    "mac": {
+      "icon": "build/icon.icns",
+      "target": [
+        "dir"
+      ]
+    },
+    "win": {
+      "target": [
+        "dir"
+      ]
+    }
+  }
+}
