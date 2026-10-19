@@ -1,0 +1,96 @@
+{
+  "name": "open-sustainability-analyst",
+  "version": "0.8.0",
+  "private": true,
+  "description": "Desktop window for the Open Sustainability Analyst Streamlit app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --mac",
+    "pack:win": "electron-builder --win",
+    "pack:mas": "electron-builder --mac mas"
+  },
+  "dependencies": {
+    "electron-updater": "6.6.2"
+  },
+  "devDependencies": {
+    "electron": "34.3.0",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.climateandtech.open-sustainability-analyst",
+    "productName": "Open Sustainability Analyst",
+    "asar": true,
+    "afterPack": "sign_python.js",
+    "files": [
+      "main.js",
+      "remote-manifest.js",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "climateandtech",
+      "repo": "report-analyst"
+    },
+    "extraResources": [
+      {
+        "from": "run_app.py",
+        "to": "run_app.py"
+      },
+      {
+        "from": "python",
+        "to": "python"
+      },
+      {
+        "from": "../report_analyst",
+        "to": "report_analyst",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**"
+        ]
+      },
+      {
+        "from": "../report_analyst_enterprise",
+        "to": "report_analyst_enterprise",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**"
+        ]
+      },
+      {
+        "from": "../prompts",
+        "to": "prompts"
+      },
+      {
+        "from": "../.streamlit",
+        "to": ".streamlit"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "icon": "build/icon.png",
+    "mac": {
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "mas": {
+      "entitlements": "build/entitlements.mas.plist",
+      "entitlementsInherit": "build/entitlements.mas.plist"
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis"
+      ]
+    }
+  }
+}

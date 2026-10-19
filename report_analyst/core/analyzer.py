@@ -19,6 +19,7 @@ from llama_index.readers.file import PyMuPDFReader
 
 from .api_key_manager import APIKeyManager
 from .cache_manager import CacheManager
+from .database_manager import storage_root
 from .llm_providers import get_llm
 from .prompt_manager import PromptManager
 from .storage import LlamaVectorStore
@@ -123,8 +124,8 @@ class DocumentAnalyzer:
             return
 
         self.prompt_manager = PromptManager()
-        # Use absolute paths for storage
-        self.storage_path = Path(__file__).parent.parent.parent / "storage"
+        # Unset STORAGE_PATH keeps repository storage/. A set value overrides it.
+        self.storage_path = storage_root()
         self.cache_path = self.storage_path / "cache"
         self.llm_cache_path = self.storage_path / "llm_cache"
 

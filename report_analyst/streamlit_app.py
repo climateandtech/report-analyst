@@ -21,6 +21,7 @@ from pandas.api.types import (
     is_numeric_dtype,
     is_object_dtype,
 )
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 from streamlit_card import card
 
 # Add parent directory to path for backend integration
@@ -38,11 +39,29 @@ try:
 except ImportError:
     BACKEND_INTEGRATION_AVAILABLE = False
 
+
+def _log_file() -> str:
+    """Return the log path. Unset OSA_LOG_FILE keeps the working-directory app.log."""
+    configured = os.getenv("OSA_LOG_FILE")
+    if not configured:
+        return "app.log"
+    path = Path(configured)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return str(path)
+
+
+def local_temp_dir() -> Path:
+    """Return the upload directory. Unset OSA_TEMP_DIR keeps ./temp."""
+    path = Path(os.getenv("OSA_TEMP_DIR", "temp"))
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("app.log")],
+    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler(_log_file())],
 )
 logger = logging.getLogger(__name__)
 
@@ -57,6 +76,18 @@ def log_analysis_step(message: str, level: str = "info"):
 
 
 def render_api_key_missing_alert(container, message: str, prefix: str = "Error:") -> None:
+    """Show the missing-key banner once per script run.
+
+    Parameter widgets share one callback. Each changed widget would otherwise
+    paint this banner again, so a single interaction can stack copies.
+    """
+    ctx = get_script_run_ctx()
+    if ctx is not None:
+        run_token = id(ctx.cursors)
+        if getattr(ctx, "_osa_api_key_alert_token", None) == run_token:
+            return
+        ctx._osa_api_key_alert_token = run_token
+
     escaped_prefix = html.escape(prefix)
     escaped_message = html.escape(message).replace(
         " For permanent access:",
@@ -180,7 +211,7 @@ class ReportAnalyzer:
 
     def __init__(self):
         """Initialize the analyzer"""
-        self.temp_dir = Path("temp")
+        self.temp_dir = local_temp_dir()
         self.temp_dir.mkdir(exist_ok=True)
 
         # Initialize the real document analyzer
@@ -385,7 +416,7 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
                 logger.warning(f"PostgreSQL file storage failed: {e!s}, falling back to local")
 
         # Fallback to local file storage
-        file_path = Path("temp") / uploaded_file.name
+        file_path = local_temp_dir() / uploaded_file.name
         file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "wb") as f:
             f.write(file_bytes)
@@ -787,7 +818,7 @@ def get_uploaded_files_history(backend_config=None) -> List[Dict]:
     """Get list of files for Streamlit dropdown (UI adapter)"""
     from report_analyst.core.report_data_client import ReportDataClient
 
-    client = ReportDataClient()
+    client = ReportDataClient(temp_dir=local_temp_dir())
 
     # Collect backend configs (could be multiple backends in future)
     backend_configs = (
@@ -1385,7 +1416,6 @@ def update_analyzer_parameters():
     available_models = get_available_llm_models()
 
     if not available_models:
-        render_api_key_missing_alert(st, get_api_key_setup_message(), "")
         return
 
     # Validate selected model availability
@@ -2998,6 +3028,11 @@ def main():
                 st.info(
                     f"**Type:** {database_type}\n\n**Path:** `{db_path}`\n\n"
                     f"*Configure via `STORAGE_PATH` environment variable*"
+                )
+            elif database_url.startswith("sqlite"):
+                db_path = database_url.removeprefix("sqlite:///")
+                st.info(
+                    f"**Type:** SQLite\n\n**Path:** `{db_path}`\n\n" f"*Configure via `DATABASE_URL` environment variable*"
                 )
             else:
                 # FIXME do we need this

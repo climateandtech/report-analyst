@@ -70,6 +70,11 @@ report_analyst_enterprise/components/web/node_modules/
 report_analyst_enterprise/components/web/dist/
 report_analyst_enterprise/components/streamlit_component/frontend/build/
 node_modules
+
+# Desktop POC: bundled CPython and Electron output are built locally
+desktop/python/
+desktop/osa-prefix-*/
+desktop/dist/
 Agents.md
 report-analyst.code-workspace
 .vscode/launch.json

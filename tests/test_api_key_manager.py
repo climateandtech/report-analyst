@@ -173,9 +173,12 @@ def test_api_key_is_used_by_llm_provider():
             from report_analyst.core.llm_providers import get_llm
 
             get_llm("gpt-4o-mini")
-        except (ValueError, Exception):
-            # Expected to fail, but we check that it tried to read OPENAI_API_KEY
-            pass
+        except ValueError:
+            # A fake key is rejected. The assertion below checks the env read.
+            rejected = True
+        else:
+            rejected = False
+        assert rejected or "OPENAI_API_KEY" in accessed_keys
 
         # Verify it tried to read the API key from environment
         assert "OPENAI_API_KEY" in accessed_keys, "get_llm should read OPENAI_API_KEY from environment"
@@ -209,3 +212,30 @@ def test_api_key_from_session_state_overrides_env():
 
     # Clean up
     del os.environ["OPENAI_API_KEY"]
+
+
+def test_api_key_missing_alert_renders_once_per_script_run(monkeypatch):
+    """Repeated calls in one Streamlit run paint the banner a single time."""
+    from report_analyst.streamlit_app import render_api_key_missing_alert
+
+    class Ctx:
+        def __init__(self):
+            self.cursors = {}
+
+    ctx = Ctx()
+    monkeypatch.setattr("report_analyst.streamlit_app.get_script_run_ctx", lambda: ctx)
+    painted: list[str] = []
+
+    class Container:
+        def markdown(self, body, unsafe_allow_html=False):
+            painted.append(body)
+
+    container = Container()
+    message = "Your API key is missing."
+    render_api_key_missing_alert(container, message, "")
+    render_api_key_missing_alert(container, message, "")
+    assert len(painted) == 1
+
+    ctx.cursors = {}
+    render_api_key_missing_alert(container, message, "")
+    assert len(painted) == 2
