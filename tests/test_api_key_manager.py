@@ -173,9 +173,12 @@ def test_api_key_is_used_by_llm_provider():
             from report_analyst.core.llm_providers import get_llm
 
             get_llm("gpt-4o-mini")
-        except (ValueError, Exception):
-            # Expected to fail, but we check that it tried to read OPENAI_API_KEY
-            pass
+        except ValueError:
+            # A fake key is rejected. The assertion below checks the env read.
+            rejected = True
+        else:
+            rejected = False
+        assert rejected or "OPENAI_API_KEY" in accessed_keys
 
         # Verify it tried to read the API key from environment
         assert "OPENAI_API_KEY" in accessed_keys, "get_llm should read OPENAI_API_KEY from environment"

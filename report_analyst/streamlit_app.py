@@ -39,6 +39,7 @@ try:
 except ImportError:
     BACKEND_INTEGRATION_AVAILABLE = False
 
+
 def _log_file() -> str:
     """Return the log path. Unset OSA_LOG_FILE keeps the working-directory app.log."""
     configured = os.getenv("OSA_LOG_FILE")
@@ -3031,8 +3032,7 @@ def main():
             elif database_url.startswith("sqlite"):
                 db_path = database_url.removeprefix("sqlite:///")
                 st.info(
-                    f"**Type:** SQLite\n\n**Path:** `{db_path}`\n\n"
-                    f"*Configure via `DATABASE_URL` environment variable*"
+                    f"**Type:** SQLite\n\n**Path:** `{db_path}`\n\n" f"*Configure via `DATABASE_URL` environment variable*"
                 )
             else:
                 # FIXME do we need this

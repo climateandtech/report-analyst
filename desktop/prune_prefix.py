@@ -24,11 +24,7 @@ def site_packages_dirs(prefix: Path) -> list[Path]:
         direct = lib / "site-packages"
         if direct.is_dir() and not direct.is_symlink():
             found.append(direct)
-        found.extend(
-            path
-            for path in lib.glob("python*/site-packages")
-            if path.is_dir() and not path.is_symlink()
-        )
+        found.extend(path for path in lib.glob("python*/site-packages") if path.is_dir() and not path.is_symlink())
     return found
 
 
@@ -50,9 +46,7 @@ def _is_named_test_suite(path: Path) -> bool:
 
 
 def _is_pip_metadata(name: str) -> bool:
-    return name.startswith("pip-") and (
-        name.endswith(".dist-info") or name.endswith(".egg-info")
-    )
+    return name.startswith("pip-") and (name.endswith(".dist-info") or name.endswith(".egg-info"))
 
 
 def _pycache_dirs(prefix: Path) -> list[Path]:

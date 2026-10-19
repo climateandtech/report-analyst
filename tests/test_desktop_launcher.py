@@ -38,9 +38,10 @@ def test_app_data_dir_uses_os_locations(run_app):
         home / "Library" / "Application Support" / "Open Sustainability Analyst"
     )
     windows_env = {"APPDATA": r"C:\Users\analyst\AppData\Roaming"}
-    assert run_app.app_data_dir("win32", windows_env, home) == Path(
-        r"C:\Users\analyst\AppData\Roaming"
-    ) / "Open Sustainability Analyst"
+    assert (
+        run_app.app_data_dir("win32", windows_env, home)
+        == Path(r"C:\Users\analyst\AppData\Roaming") / "Open Sustainability Analyst"
+    )
 
 
 def test_app_data_dir_honors_the_sandbox_container(run_app, tmp_path):
@@ -118,10 +119,7 @@ def test_remote_manifests_are_version_and_notice_files():
 
 
 def test_desktop_requirements_omit_server_only_packages():
-    pinned = "\n".join(
-        line.split("#", 1)[0].strip().lower()
-        for line in REQUIREMENTS.read_text(encoding="utf-8").splitlines()
-    )
+    pinned = "\n".join(line.split("#", 1)[0].strip().lower() for line in REQUIREMENTS.read_text(encoding="utf-8").splitlines())
     for name in FORBIDDEN:
         assert name not in pinned
     assert "streamlit==" in pinned

@@ -58,6 +58,8 @@ describe("PDF.js browser compatibility", () => {
     globalThis.DOMMatrix = class DOMMatrix {};
     globalThis.Path2D = class Path2D {};
 
+    const { installPdfjsPolyfills } = await import("./pdfjs-map-polyfill.js");
+    installPdfjsPolyfills();
     await import(
       "../../streamlit_component/frontend/public/pdf-viewer.es.js"
     );
@@ -75,7 +77,8 @@ describe("PDF.js browser compatibility", () => {
     delete Uint8Array.prototype.toBase64;
     delete Uint8Array.fromBase64;
 
-    await import(`./pdfjs-map-polyfill.js?bytes=${Date.now()}`);
+    const { installPdfjsPolyfills } = await import("./pdfjs-map-polyfill.js");
+    installPdfjsPolyfills();
 
     const hello = new Uint8Array([72, 101, 108, 108, 111]);
     expect(hello.toHex()).toBe("48656c6c6f");
