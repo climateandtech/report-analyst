@@ -929,19 +929,23 @@ def display_pdf_viewer(
     questions: Dict[str, Dict],
     raw_chunks: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
-    chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in results.items()}
-    questions_data = {question_id: question.get("text", question_id) for question_id, question in questions.items()}
+    chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in (results or {}).items()}
+    questions_data = {question_id: question.get("text", question_id) for question_id, question in (questions or {}).items()}
     viewer_key = Path(str(file_path)).stem or "analysis"
 
     with st.expander("PDF Viewer with Chunks", expanded=True):
-        pdf_viewer(
-            pdf_path=str(file_path),
-            chunks_data=chunks_by_question,
-            questions_data=questions_data,
-            unmapped_chunks=raw_chunks,
-            key=f"pdf_viewer_{viewer_key}",
-            height=800,
-        )
+        try:
+            pdf_viewer(
+                pdf_path=str(file_path),
+                chunks_data=chunks_by_question,
+                questions_data=questions_data,
+                unmapped_chunks=raw_chunks,
+                key=f"pdf_viewer_{viewer_key}",
+                height=800,
+            )
+        except Exception as e:
+            logger.error(f"Error rendering PDF viewer: {e!s}", exc_info=True)
+            st.error(f"Error rendering PDF viewer: {e!s}")
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
@@ -3927,28 +3931,32 @@ def main():
                                 )
                                 st.error(f"Error during analysis: {e!s}")
 
-                    viewer_results = fresh_viewer_results
-                    if not viewer_results:
-                        viewer_results = analyzer.analyzer.cache_manager.get_analysis(
-                            file_path=analysis_file_path,
-                            config=config,
+                    try:
+                        viewer_results = fresh_viewer_results
+                        if not viewer_results:
+                            viewer_results = analyzer.analyzer.cache_manager.get_analysis(
+                                file_path=analysis_file_path,
+                                config=config,
+                            )
+                        if viewer_results:
+                            raw_chunks = []
+                        elif is_backend:
+                            raw_chunks = st.session_state.get("backend_chunks") or []
+                        else:
+                            raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
+                                file_path=analysis_file_path,
+                                chunk_size=config["chunk_size"],
+                                chunk_overlap=config["chunk_overlap"],
+                            )
+                        display_pdf_viewer(
+                            str(analysis_file_path),
+                            viewer_results,
+                            questions,
+                            raw_chunks,
                         )
-                    if viewer_results:
-                        raw_chunks = []
-                    elif is_backend:
-                        raw_chunks = st.session_state.get("backend_chunks") or []
-                    else:
-                        raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
-                            file_path=analysis_file_path,
-                            chunk_size=config["chunk_size"],
-                            chunk_overlap=config["chunk_overlap"],
-                        )
-                    display_pdf_viewer(
-                        str(analysis_file_path),
-                        viewer_results,
-                        questions,
-                        raw_chunks,
-                    )
+                    except Exception as e:
+                        logger.error(f"Error displaying PDF viewer: {e!s}", exc_info=True)
+                        st.error(f"Error displaying PDF viewer: {e!s}")
                 else:
                     # Show helpful error message
                     if file_path is None:

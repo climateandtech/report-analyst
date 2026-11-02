@@ -138,3 +138,20 @@ def test_display_pdf_viewer_opens_without_analysis():
     component.assert_called_once()
     assert component.call_args.kwargs["chunks_data"] == {}
     assert component.call_args.kwargs["unmapped_chunks"] == []
+
+
+def test_display_pdf_viewer_survives_component_errors():
+    with (
+        patch("report_analyst.streamlit_app.st.expander", return_value=nullcontext()),
+        patch("report_analyst.streamlit_app.pdf_viewer", side_effect=RuntimeError("boom")),
+        patch("report_analyst.streamlit_app.st.error") as error,
+    ):
+        display_pdf_viewer(
+            file_path="report.pdf",
+            results=None,
+            questions=None,
+            raw_chunks=None,
+        )
+
+    error.assert_called_once()
+    assert "Error rendering PDF viewer" in error.call_args.args[0]
