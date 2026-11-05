@@ -111,6 +111,20 @@ chunk_relevance = Table(
     UniqueConstraint("question_analysis_id", "document_chunk_id"),
 )
 
+# PDF source annotations used to retain evidence for structured facts
+source_annotations = Table(
+    "source_annotations",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("document_id", Text, nullable=False),
+    Column("page", Integer, nullable=False),
+    Column("span_start", Integer, nullable=False),
+    Column("span_end", Integer, nullable=False),
+    Column("selected_text", Text, nullable=False),
+    Column("rects", Text, nullable=False),
+    Column("created_at", DateTime, default=datetime.now),
+)
+
 # Indexes (defined separately for clarity)
 # Note: SQLAlchemy doesn't support "IF NOT EXISTS" in CREATE INDEX directly,
 # so we'll handle these in init_db() using raw SQL
@@ -119,4 +133,5 @@ indexes = [
     "CREATE INDEX IF NOT EXISTS idx_file_path ON document_chunks(file_path)",
     # Index on chunk parameters
     "CREATE INDEX IF NOT EXISTS idx_chunk_params ON document_chunks(chunk_size, chunk_overlap)",
+    "CREATE INDEX IF NOT EXISTS idx_source_annotations_document_id ON source_annotations(document_id)",
 ]
