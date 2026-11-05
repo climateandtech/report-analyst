@@ -74,10 +74,18 @@
         if (!viewer) {
           root.replaceChildren();
           viewer = document.createElement("pdf-viewer-with-chunks");
+          viewer.addEventListener("source-annotation-change", (event) => {
+            sendMessage("streamlit:setComponentValue", {
+              value: event.detail,
+              dataType: "json",
+            });
+          });
           root.append(viewer);
         }
 
         viewer.setPdfData(args.pdfData);
+        viewer.setDocumentId(args.documentId);
+        viewer.setAnnotations(args.annotations);
         viewer.setChunks(args.chunks);
         viewer.setQuestions(args.questions);
         setFrameHeight(args.height);
