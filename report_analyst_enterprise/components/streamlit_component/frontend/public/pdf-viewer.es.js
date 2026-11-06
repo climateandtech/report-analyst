@@ -1,6 +1,6 @@
 import "./pdfjs-map-polyfill.js";
 //#region src/pdf-viewer.styles.js
-var e = "\n:host {\n  display: block;\n  height: 100vh;\n  font-family: system-ui, sans-serif;\n}\n\n.container {\n  display: flex;\n  width: 100%;\n  height: 100%;\n  min-width: 0;\n  background: #f5f5f5;\n}\n\n.sidebar {\n  display: flex;\n  flex: 0 0 clamp(220px, 32%, 350px);\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: white;\n  border-right: 1px solid #e0e0e0;\n}\n\n.sidebar-header {\n  padding: 16px;\n  background: #fafafa;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.sidebar-header h3 {\n  margin: 0 0 12px;\n  font-size: 16px;\n}\n\n.question-select {\n  width: 100%;\n  margin-bottom: 12px;\n  padding: 8px;\n}\n\n.evidence-filter {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  color: #666;\n  font-size: 14px;\n}\n\n.chunks-list {\n  flex: 1;\n  overflow-y: auto;\n  padding: 8px;\n}\n\n.empty {\n  padding: 16px;\n  color: #777;\n  text-align: center;\n}\n\n.chunk-item {\n  margin-bottom: 8px;\n  padding: 12px;\n  background: white;\n  border: 1px solid #e0e0e0;\n  border-radius: 6px;\n  cursor: pointer;\n}\n\n.chunk-item:hover {\n  border-color: #4313c8;\n  box-shadow: 0 2px 4px rgba(67, 19, 200, 0.1);\n}\n\n.chunk-item.evidence {\n  background: #f8f7ff;\n  border-left: 4px solid #4313c8;\n}\n\n.chunk-header,\n.badges,\n.chunk-scores {\n  display: flex;\n  align-items: center;\n}\n\n.chunk-header {\n  justify-content: space-between;\n  margin-bottom: 8px;\n}\n\n.chunk-title {\n  color: #333;\n  font-size: 14px;\n  font-weight: 600;\n}\n\n.badges {\n  gap: 4px;\n}\n\n.badge {\n  padding: 2px 8px;\n  border-radius: 12px;\n  background: #e0e0e0;\n  color: #666;\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.badge.evidence {\n  background: #4313c8;\n  color: white;\n}\n\n.chunk-text {\n  display: -webkit-box;\n  overflow: hidden;\n  color: #666;\n  font-size: 13px;\n  line-height: 1.5;\n  -webkit-box-orient: vertical;\n  -webkit-line-clamp: 3;\n}\n\n.chunk-scores {\n  gap: 12px;\n  margin-top: 8px;\n  color: #888;\n  font-size: 11px;\n}\n\n.viewer {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: #525252;\n}\n\n.viewer-controls {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 12px 16px;\n  background: white;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.viewer-controls button {\n  padding: 6px 12px;\n  background: white;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  cursor: pointer;\n}\n\n.viewer-controls button:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n\n.page-info {\n  color: #666;\n  font-size: 14px;\n}\n\n.viewer-content {\n  display: flex;\n  flex: 1;\n  align-items: flex-start;\n  justify-content: center;\n  overflow: auto;\n  padding: 20px;\n}\n\n.page-container {\n  position: relative;\n  flex: none;\n  background: white;\n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);\n}\n\n.page-canvas {\n  display: block;\n}\n\n.page-highlights {\n  position: absolute;\n  inset: 0;\n  pointer-events: none;\n}\n\n.highlight {\n  position: absolute;\n  z-index: 1;\n  background: transparent;\n  border: 1px solid rgba(67, 19, 200, 0.35);\n  border-radius: 2px;\n  pointer-events: auto;\n  transition: background-color 0.15s ease, border-color 0.15s ease;\n}\n\n.highlight:hover {\n  background: rgba(67, 19, 200, 0.2);\n  border-color: rgba(67, 19, 200, 0.75);\n}\n\n.highlight.evidence {\n  border-color: #4313c8;\n}\n\n.highlight.evidence:hover {\n  background: rgba(67, 19, 200, 0.3);\n}\n\n.message {\n  margin: auto;\n  color: #eee;\n  font-size: 14px;\n}\n\n.message.error {\n  color: #fecaca;\n}\n", t = typeof process == "object" && process + "" == "[object process]" && !process.versions.nw && !(process.versions.electron && process.type && process.type !== "browser"), n = [
+var e = "\n:host {\n  display: block;\n  height: 100vh;\n  font-family: system-ui, sans-serif;\n}\n\n.container {\n  display: flex;\n  width: 100%;\n  height: 100%;\n  min-width: 0;\n  background: #f5f5f5;\n}\n\n.sidebar {\n  display: flex;\n  flex: 0 0 clamp(220px, 32%, 350px);\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: white;\n  border-right: 1px solid #e0e0e0;\n}\n\n.sidebar-header {\n  padding: 16px;\n  background: #fafafa;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.sidebar-header h3 {\n  margin: 0 0 12px;\n  font-size: 16px;\n}\n\n.question-select {\n  width: 100%;\n  margin-bottom: 12px;\n  padding: 8px;\n}\n\n.evidence-filter {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  color: #666;\n  font-size: 14px;\n}\n\n.chunks-list {\n  flex: 1;\n  overflow-y: auto;\n  padding: 8px;\n}\n\n.empty {\n  padding: 16px;\n  color: #777;\n  text-align: center;\n}\n\n.chunk-item {\n  margin-bottom: 8px;\n  padding: 12px;\n  background: white;\n  border: 1px solid #e0e0e0;\n  border-radius: 6px;\n  cursor: pointer;\n}\n\n.chunk-item:hover {\n  border-color: #4313c8;\n  box-shadow: 0 2px 4px rgba(67, 19, 200, 0.1);\n}\n\n.chunk-item.evidence {\n  background: #f8f7ff;\n  border-left: 4px solid #4313c8;\n}\n\n.chunk-header,\n.badges,\n.chunk-scores {\n  display: flex;\n  align-items: center;\n}\n\n.chunk-header {\n  justify-content: space-between;\n  margin-bottom: 8px;\n}\n\n.chunk-title {\n  color: #333;\n  font-size: 14px;\n  font-weight: 600;\n}\n\n.badges {\n  gap: 4px;\n}\n\n.badge {\n  padding: 2px 8px;\n  border-radius: 12px;\n  background: #e0e0e0;\n  color: #666;\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.badge.evidence {\n  background: #4313c8;\n  color: white;\n}\n\n.chunk-text {\n  display: -webkit-box;\n  overflow: hidden;\n  color: #666;\n  font-size: 13px;\n  line-height: 1.5;\n  -webkit-box-orient: vertical;\n  -webkit-line-clamp: 3;\n}\n\n.chunk-scores {\n  gap: 12px;\n  margin-top: 8px;\n  color: #888;\n  font-size: 11px;\n}\n\n.viewer {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: #525252;\n}\n\n.viewer-controls {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 12px 16px;\n  background: white;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.viewer-controls button {\n  padding: 6px 12px;\n  background: white;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  cursor: pointer;\n}\n\n.viewer-controls button:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n\n.page-info {\n  color: #666;\n  font-size: 14px;\n}\n\n.viewer-content {\n  display: flex;\n  flex: 1;\n  align-items: flex-start;\n  justify-content: center;\n  overflow: auto;\n  padding: 20px;\n}\n\n.page-container {\n  position: relative;\n  flex: none;\n  background: white;\n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);\n}\n\n.page-canvas {\n  display: block;\n}\n\n.page-highlights {\n  position: absolute;\n  inset: 0;\n  z-index: 3;\n  pointer-events: none;\n}\n\n.highlight {\n  position: absolute;\n  z-index: 1;\n  background: transparent;\n  border: 1px solid rgba(67, 19, 200, 0.35);\n  border-radius: 2px;\n  pointer-events: auto;\n  transition: background-color 0.15s ease, border-color 0.15s ease;\n}\n\n.highlight:hover {\n  background: rgba(67, 19, 200, 0.2);\n  border-color: rgba(67, 19, 200, 0.75);\n}\n\n.highlight.evidence {\n  border-color: #4313c8;\n}\n\n.highlight.evidence:hover {\n  background: rgba(67, 19, 200, 0.3);\n}\n\n.message {\n  margin: auto;\n  color: #eee;\n  font-size: 14px;\n}\n\n.message.error {\n  color: #fecaca;\n}\n\n\n.text-layer {\n  position: absolute;\n  inset: 0;\n  user-select: text;\n}\n\n.text-layer span {\n  position: absolute;\n  color: transparent;\n  cursor: text;\n}\n.textLayer {\n  position: absolute;\n  inset: 0;\n  overflow: hidden;\n  line-height: 1;\n  user-select: text;\n  z-index: 2;\n}\n  \n.stored-selections {\n  position: absolute;\n  inset: 0;\n  z-index: 4;\n  pointer-events: none;\n}\n\n.stored-selection {\n  position: absolute;\n  background: rgba(255, 230, 0, 0.35);\n  border: 1px solid rgba(180, 150, 0, 0.7);\n  pointer-events: none;\n}\n#saved-tags {\n  margin-top: 16px;\n}\n\n.saved-tag {\n  padding: 10px;\n  margin-bottom: 10px;\n  border: 1px solid #ccc;\n  border-radius: 6px;\n  font-size: 14px;\n}\n\n.saved-tag div {\n  margin-top: 4px;\n}\n.saved-tag {\n  cursor: pointer;\n}\n\n.saved-tag:hover {\n  background: rgba(0, 0, 0, 0.04);\n}", t = typeof process == "object" && process + "" == "[object process]" && !process.versions.nw && !(process.versions.electron && process.type && process.type !== "browser"), n = [
 	Infinity,
 	Infinity,
 	-Infinity,
@@ -16354,7 +16354,20 @@ function oa(e) {
 }
 var sa = class extends HTMLElement {
 	constructor() {
-		super(), this.attachShadow({ mode: "open" }), this._pdfData = null, this._pdfDoc = null, this._loadingTask = null, this._chunks = [], this._questions = [], this._selectedQuestionId = null, this._showEvidenceOnly = !1, this._currentPage = 1, this._renderId = 0, this._lastRenderedWidth = 0, this._resizeObserver = null;
+		super(), this.attachShadow({ mode: "open" }), this._pdfData = null, this._pdfDoc = null, this._loadingTask = null, this._chunks = [], this._questions = [], this._selectedQuestionId = null, this._showEvidenceOnly = !1, this._currentPage = 1, this._renderId = 0, this._lastRenderedWidth = 0, this._resizeObserver = null, this._selectedAnchors = [], this._documentId = null, this._taggingSelections = [], this._taxonomyOptions = [
+			{
+				id: "climate_change_mitigation",
+				label: "Climate Change Mitigation"
+			},
+			{
+				id: "water_resources",
+				label: "Water Resources"
+			},
+			{
+				id: "biodiversity",
+				label: "Biodiversity"
+			}
+		], this._selectedTaxonomyId = null, this._selectedValue = null, this._currentSourceAnchor = null, this._taggingSelections = [];
 	}
 	connectedCallback() {
 		this.render(), this.observeViewerSize();
@@ -16363,7 +16376,7 @@ var sa = class extends HTMLElement {
 		this._resizeObserver?.disconnect(), this._resizeObserver = null, this.resetPdfDocument();
 	}
 	setPdfData(e) {
-		e !== this._pdfData && (this.resetPdfDocument(), this._pdfData = e || null, this.isConnected && this.loadAndRenderPdf());
+		e !== this._pdfData && (this.resetPdfDocument(), this._pdfData = e || null, this._documentId = this._pdfData ? `document-${Date.now()}` : null, this.isConnected && this.loadAndRenderPdf());
 	}
 	setChunks(e) {
 		this._chunks = Array.isArray(e) ? e : [], this._selectedQuestionId === ia && !this._chunks.some((e) => !e.question_id) && (this._selectedQuestionId = null), this.renderQuestionOptions(), this.updateFilters();
@@ -16406,8 +16419,31 @@ var sa = class extends HTMLElement {
               <span id="evidence-filter-label">Show evidence only</span>
             </label>
           </div>
+          <label for="taxonomy-select">Taxonomy</label>
+
+        <select id="taxonomy-select">
+          <option value="">Select taxonomy</option>
+
+          ${this._taxonomyOptions.map((e) => `
+                <option value="${e.id}">
+                  ${e.label}
+                </option>
+              `).join("")}
+        </select>
+        <label for="tag-value">Value</label>
+
+        <input
+          id="tag-value"
+          type="text"
+          placeholder="Enter value"
+        />
+        <button id="save-tag" type="button">
+          Save Tag
+        </button>
+        <div id="saved-tags"></div>
           <div class="chunks-list"></div>
         </aside>
+        
         <main class="viewer">
           <div class="viewer-controls">
             <button id="prev-page" type="button">Previous</button>
@@ -16419,6 +16455,7 @@ var sa = class extends HTMLElement {
           <div id="viewer-content" class="viewer-content"></div>
         </main>
       </div>
+      
     `, this.bindEvents(), this.renderQuestionOptions(), this.updateFilters(), this.updatePageControls();
 	}
 	bindEvents() {
@@ -16435,7 +16472,62 @@ var sa = class extends HTMLElement {
 			this.navigateToPage(this._currentPage - 1);
 		}), this.shadowRoot.getElementById("next-page").addEventListener("click", () => {
 			this.navigateToPage(this._currentPage + 1);
+		}), this.shadowRoot.getElementById("viewer-content").addEventListener("mouseup", () => {
+			console.log("Mouse Up Event register");
+			let e = this.shadowRoot.getSelection?.() ?? window.getSelection();
+			if (!e || e.isCollapsed) return;
+			let t = e.toString(), n = e.getRangeAt(0).cloneRange(), r = this.shadowRoot.querySelector(".page-container");
+			if (!r) return;
+			let i = r.getBoundingClientRect(), a = Array.from(n.getClientRects()).map((e) => ({
+				x: e.left - i.left,
+				y: e.top - i.top,
+				width: e.width,
+				height: e.height
+			})).filter((e, t, n) => t === n.findIndex((t) => Math.abs(t.x - e.x) < .5 && Math.abs(t.y - e.y) < .5 && Math.abs(t.width - e.width) < .5 && Math.abs(t.height - e.height) < .5)), o = {
+				document_id: this._documentId,
+				page: this._currentPage,
+				selected_text: t,
+				span_start: n.startOffset,
+				span_end: n.endOffset,
+				rects: a
+			};
+			this._selectedAnchors.push(o), this.renderStoredSelections(), this._currentSourceAnchor = o, console.log("Source Anchor:", o);
+		}), this.shadowRoot.getElementById("taxonomy-select")?.addEventListener("change", (e) => {
+			this._selectedTaxonomyId = e.target.value || null, console.log("Selected Taxonomy:", this._selectedTaxonomyId);
+		}), this.shadowRoot.getElementById("tag-value")?.addEventListener("input", (e) => {
+			this._selectedValue = e.target.value || null, console.log("Selected Value:", this._selectedValue);
+		}), this.shadowRoot.getElementById("save-tag")?.addEventListener("click", () => {
+			if (!this._currentSourceAnchor) {
+				console.log("No source selection available");
+				return;
+			}
+			if (!this._selectedTaxonomyId) {
+				console.log("No taxonomy selected");
+				return;
+			}
+			if (!this._selectedValue) {
+				console.log("No value entered");
+				return;
+			}
+			let e = {
+				source_anchor: this._currentSourceAnchor,
+				osa_question_id: this._selectedQuestionId || null,
+				taxonomy_id: this._selectedTaxonomyId,
+				value: this._selectedValue
+			};
+			this._taggingSelections.push(e), console.log("Saved Tag:", e), console.log("All Tags:", this._taggingSelections), this.renderSavedTags();
 		});
+	}
+	renderStoredSelections() {
+		let e = this.shadowRoot?.querySelector(".page-container");
+		if (!e) return;
+		let t = e.querySelector(".stored-selections");
+		t || (t = document.createElement("div"), t.className = "stored-selections", e.append(t)), t.replaceChildren();
+		let n = this._selectedAnchors.filter((e) => e.page === this._currentPage);
+		for (let e of n) for (let n of e.rects) {
+			let e = document.createElement("div");
+			e.className = "stored-selection", e.style.left = `${n.x}px`, e.style.top = `${n.y}px`, e.style.width = `${n.width}px`, e.style.height = `${n.height}px`, t.append(e);
+		}
 	}
 	renderQuestionOptions() {
 		let e = this.shadowRoot?.getElementById("question-select");
@@ -16528,13 +16620,13 @@ var sa = class extends HTMLElement {
 		try {
 			let n = await this.loadPdf(), r = Math.min(Math.max(this._currentPage, 1), n.numPages), i = await n.getPage(r), a = i.getViewport({ scale: 1 }), o = e.clientWidth;
 			this._lastRenderedWidth = o;
-			let s = this.getFitScale(a.width, o), c = i.getViewport({ scale: s }), l = await this.renderPage(i, c), u = await this.readTextItems(i);
+			let s = this.getFitScale(a.width, o), c = i.getViewport({ scale: s }), l = await this.renderPage(i, c), u = await this.readTextItems(i), d = await this.renderTextLayer(u, c);
 			if (t !== this._renderId) return;
 			this._currentPage = r, this.updatePageControls();
-			let d = document.createElement("div");
-			d.className = "page-container", d.append(l);
-			let f = this.renderHighlights(u, c, r);
-			f.childElementCount && d.append(f), e.replaceChildren(d);
+			let f = document.createElement("div");
+			f.className = "page-container", f.append(l), f.append(d);
+			let p = this.renderHighlights(u, c, r);
+			p.childElementCount && f.append(p), e.replaceChildren(f), this.renderStoredSelections();
 		} catch (e) {
 			t === this._renderId && this.showMessage(`Error rendering page: ${e.message}`, "error");
 		}
@@ -16580,6 +16672,45 @@ var sa = class extends HTMLElement {
 			}
 		}
 		return r;
+	}
+	renderTextLayer(e, t) {
+		let n = document.createElement("div");
+		n.className = "text-layer", n.style.width = `${t.width}px`, n.style.height = `${t.height}px`;
+		for (let r of e) {
+			if (!r.str) continue;
+			let e = document.createElement("span");
+			e.textContent = r.str;
+			let i = F.transform(t.transform, r.transform), a = Math.hypot(i[2], i[3]);
+			e.style.position = "absolute", e.style.left = `${i[4]}px`, e.style.top = `${i[5] - a}px`, e.style.fontSize = `${a}px`, e.style.transformOrigin = "0 0", e.style.whiteSpace = "pre", n.append(e);
+			let o = e.getBoundingClientRect().width, s = r.width * t.scale;
+			if (o > 0 && s > 0) {
+				let t = s / o;
+				e.style.transform = `scaleX(${t})`;
+			}
+		}
+		return n;
+	}
+	renderSavedTags() {
+		let e = this.shadowRoot.getElementById("saved-tags");
+		if (e) {
+			if (e.replaceChildren(), this._taggingSelections.length === 0) {
+				e.textContent = "No saved tags";
+				return;
+			}
+			for (let [t, n] of this._taggingSelections.entries()) {
+				let r = document.createElement("div");
+				r.className = "saved-tag", r.dataset.index = t, r.style.cursor = "pointer", r.addEventListener("click", async () => {
+					let e = this._taggingSelections[t];
+					e && (this._currentPage = e.source_anchor.page, await this.renderCurrentPage(), console.log("Revisited Tag:", e));
+				}), r.innerHTML = `
+        <strong>Tag ${t + 1}</strong>
+        <div>Page: ${n.source_anchor.page}</div>
+        <div>Taxonomy: ${n.taxonomy_id}</div>
+        <div>Value: ${n.value}</div>
+        <div>Text: ${n.source_anchor.selected_text}</div>
+      `, e.append(r);
+			}
+		}
 	}
 	findChunkTextPositions(e, t, n) {
 		let r = oa(t);
