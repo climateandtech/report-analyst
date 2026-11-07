@@ -74,12 +74,12 @@ def test_process_document_with_all_keywords():
 #         os.environ["TEMP_DIR"] = str(temp_dir)
 
 
-def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp):
+def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp, streamlit_app_path):
     report_analyzer, calls = mocked_report_analyzer
 
     assert test_pdf_in_app_temp.exists()
 
-    at = AppTest.from_file(str(PROJECT_ROOT / "report_analyst/streamlit_app.py"))
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.session_state["analyzer"] = report_analyzer
 
@@ -107,12 +107,14 @@ def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_
     assert any(expander.label == "PDF Viewer with Chunks" for expander in at.expander)
 
 
-def test_reanalyze_button_forces_recompute_without_cache_lookup(mocked_report_analyzer, test_pdf_in_app_temp):
+def test_reanalyze_button_forces_recompute_without_cache_lookup(
+    mocked_report_analyzer, test_pdf_in_app_temp, streamlit_app_path
+):
     report_analyzer, calls = mocked_report_analyzer
 
     assert test_pdf_in_app_temp.exists()
 
-    at = AppTest.from_file(str(PROJECT_ROOT / "report_analyst/streamlit_app.py"))
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.session_state["analyzer"] = report_analyzer
 

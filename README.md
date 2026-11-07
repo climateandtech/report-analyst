@@ -10,6 +10,8 @@ This project is part of the **OpenSustainability Analysis Framework** by Climate
 
 > **Tagline:** *Democratizing sustainability report analysis with modern technology.*
 
+Documentation is published with Material for MkDocs to [GitHub Pages](https://climateandtech.github.io/report-analyst/). Build it locally with `pip install -r requirements-docs.txt` and `mkdocs serve`.
+
 ---
 
 ## What You Can Do With It

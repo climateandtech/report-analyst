@@ -6,16 +6,16 @@ Tests app loading, title, and layout elements.
 from streamlit.testing.v1 import AppTest
 
 
-def test_app_loads():
+def test_app_loads(streamlit_app_path):
     """Test that streamlit_app.py loads without errors"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(streamlit_app_path)
     at.run(timeout=10)  # Increase timeout
     assert not at.exception
 
 
-def test_app_title_and_layout():
+def test_app_title_and_layout(streamlit_app_path):
     """Test app displays correct title and basic layout"""
-    at = AppTest.from_file("report_analyst/streamlit_app.py")
+    at = AppTest.from_file(streamlit_app_path)
     # Navigate to Report Analyst page where title is displayed
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)  # Increase timeout
