@@ -312,7 +312,7 @@ class ReportAnalyzer:
 
 
 def save_uploaded_file(uploaded_file) -> Optional[str]:
-    """Save uploaded file to temp directory or PostgreSQL"""
+    """Save an uploaded PDF to the report upload folder, or to PostgreSQL when that mode is on."""
     try:
         if uploaded_file is None:
             logger.warning("No file was uploaded")
@@ -384,9 +384,10 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
             except Exception as e:
                 logger.warning(f"PostgreSQL file storage failed: {e!s}, falling back to local")
 
-        # Fallback to local file storage
-        file_path = Path("temp") / uploaded_file.name
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        # Same folder report history lists, so the PDF survives a container replace.
+        from report_analyst.core.service import get_report_upload_dir
+
+        file_path = get_report_upload_dir() / uploaded_file.name
         with open(file_path, "wb") as f:
             f.write(file_bytes)
         logger.info(f"Successfully saved file: {file_path}")
@@ -3166,10 +3167,10 @@ def main():
                 if use_postgres_storage:
                     st.info("📦 Files will be stored in PostgreSQL database")
                 else:
-                    st.caption("Files will be stored in local temp directory")
+                    st.caption("Files will be stored in the report upload folder")
             else:
                 st.info("PostgreSQL file storage requires a PostgreSQL database. Currently using SQLite.")
-                st.caption("Files are stored in local temp directory")
+                st.caption("Files are stored in the report upload folder")
 
         # Show page-specific content based on navigation
         if nav_page == "Report Analyst":
