@@ -11,7 +11,7 @@ annotated-types==0.7.0
 anyio==4.14.2
 asgiref==3.8.1
 attrs==25.1.0
-Authlib==1.6.12
+Authlib==1.9.1
 backoff==2.2.1
 bcrypt==4.2.1
 beautifulsoup4==4.13.3
@@ -70,6 +70,7 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 jiter==0.8.2
 joblib==1.4.2
+joserfc==1.7.7
 jsonpatch==1.33
 jsonpointer==3.0.0
 jsonschema==4.23.0
