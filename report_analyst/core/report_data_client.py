@@ -71,7 +71,11 @@ class ReportResource:
 class ReportDataClient:
     """Unified client for sustainability report data from multiple sources"""
 
-    def __init__(self, temp_dir: Path = Path("temp")):
+    def __init__(self, temp_dir: Optional[Path] = None):
+        if temp_dir is None:
+            from report_analyst.core.service import get_report_upload_dir
+
+            temp_dir = get_report_upload_dir()
         self.temp_dir = temp_dir
         self._backend_clients: Dict[str, Any] = {}  # Cache backend clients by host
 
@@ -124,8 +128,8 @@ class ReportDataClient:
                 if page_count == 0:
                     logger.warning(f"Skipping {file.name}: PDF has 0 pages, likely invalid")
                     continue
-            except Exception as e:
-                logger.warning(f"Skipping {file.name}: cannot open as PDF ({str(e)})")
+            except (OSError, RuntimeError, ValueError) as e:
+                logger.warning(f"Skipping {file.name}: cannot open as PDF ({e!s})")
                 continue
 
             # Create file:// URI
@@ -151,7 +155,7 @@ class ReportDataClient:
 
             backend_service = BackendService(config)
             return backend_service.list_reports()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — backend may raise arbitrary client errors
             logger.warning(f"Failed to list backend reports: {e}")
             return []
 
