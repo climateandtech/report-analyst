@@ -6,8 +6,20 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf-worker-bootstrap.mjs";
 
 const MIN_MATCH_TOKENS = 6;
 const UNMAPPED_QUESTION_ID = "__unmapped__";
+const TEXT_ITEM = "[data-source-text-start]";
+// From this version Chromium keeps a selection steady across blank space by itself.
+const NATIVE_SELECTION_CHROMIUM = 148;
 
 const STYLES = `<style>${styleText}</style>`;
+
+function boxFromCorners(first, opposite) {
+  return {
+    x: Math.min(first[0], opposite[0]),
+    y: Math.min(first[1], opposite[1]),
+    width: Math.abs(opposite[0] - first[0]),
+    height: Math.abs(opposite[1] - first[1]),
+  };
+}
 
 function tokenize(value) {
   return String(value || "")
@@ -22,24 +34,37 @@ class PdfViewerWithChunks extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._pdfData = null;
+    this._documentId = null;
     this._pdfDoc = null;
     this._loadingTask = null;
     this._chunks = [];
     this._questions = [];
+    this._annotations = [];
+    this._focusedAnnotationId = null;
+    this._pendingSourceAnchor = null;
+    this._pageSelectionContext = null;
+    this._previousSelectionRange = null;
+    this._hoveredHighlight = null;
     this._selectedQuestionId = null;
     this._showEvidenceOnly = false;
     this._currentPage = 1;
     this._renderId = 0;
     this._lastRenderedWidth = 0;
     this._resizeObserver = null;
+    this._selectionChangeHandler = () => this.captureCurrentSelection();
+    this._mouseUpHandler = () => this.resetEndOfContent();
   }
 
   connectedCallback() {
     this.render();
     this.observeViewerSize();
+    document.addEventListener("selectionchange", this._selectionChangeHandler);
+    window.addEventListener("mouseup", this._mouseUpHandler);
   }
 
   disconnectedCallback() {
+    document.removeEventListener("selectionchange", this._selectionChangeHandler);
+    window.removeEventListener("mouseup", this._mouseUpHandler);
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
     this.resetPdfDocument();
@@ -50,6 +75,17 @@ class PdfViewerWithChunks extends HTMLElement {
     this.resetPdfDocument();
     this._pdfData = data || null;
     if (this.isConnected) void this.loadAndRenderPdf();
+  }
+
+  setDocumentId(documentId) {
+    this._documentId = documentId;
+  }
+
+  setAnnotations(annotations) {
+    if (JSON.stringify(annotations) === JSON.stringify(this._annotations)) return;
+    this._annotations = annotations;
+    this.renderAnnotationList();
+    if (this._pdfDoc) void this.renderCurrentPage();
   }
 
   setChunks(chunks) {
@@ -100,6 +136,8 @@ class PdfViewerWithChunks extends HTMLElement {
     this._pdfDoc = null;
     this._currentPage = 1;
     this._lastRenderedWidth = 0;
+    this._pageSelectionContext = null;
+    this.resetPendingSourceAnchor();
   }
 
   observeViewerSize() {
@@ -132,18 +170,31 @@ class PdfViewerWithChunks extends HTMLElement {
             <select id="question-select" class="question-select"></select>
             <label class="evidence-filter">
               <input id="evidence-filter" type="checkbox">
-              <span id="evidence-filter-label">Show evidence only</span>
+              <span id="evidence-filter-label">Show analyzed evidence only</span>
             </label>
           </div>
+          <section class="annotations-section">
+            <h3>Saved evidence</h3>
+            <div class="annotations-list"></div>
+          </section>
           <div class="chunks-list"></div>
         </aside>
         <main class="viewer">
+          <div class="source-guide">
+            <strong>Add manual evidence</strong>
+            <span>Select text in the PDF, then choose Add evidence. Repeat to save more sources.</span>
+          </div>
           <div class="viewer-controls">
             <button id="prev-page" type="button">Previous</button>
             <span class="page-info">
               Page <span id="current-page">1</span> of <span id="total-pages">-</span>
             </span>
             <button id="next-page" type="button">Next</button>
+            <span id="selection-status" class="selection-status"></span>
+            <button id="save-selection" class="save-selection" type="button" disabled>
+              Add evidence
+            </button>
+            <button id="clear-selection" type="button" disabled>Clear</button>
           </div>
           <div id="viewer-content" class="viewer-content"></div>
         </main>
@@ -152,8 +203,10 @@ class PdfViewerWithChunks extends HTMLElement {
 
     this.bindEvents();
     this.renderQuestionOptions();
+    this.renderAnnotationList();
     this.updateFilters();
     this.updatePageControls();
+    this.updateSelectionControls();
   }
 
   bindEvents() {
@@ -177,6 +230,86 @@ class PdfViewerWithChunks extends HTMLElement {
     this.shadowRoot.getElementById("next-page").addEventListener("click", () => {
       void this.navigateToPage(this._currentPage + 1);
     });
+    const viewerContent = this.shadowRoot.getElementById("viewer-content");
+    viewerContent.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return;
+      const textItem = event.target.closest(TEXT_ITEM);
+      if (textItem) {
+        this.resetPendingSourceAnchor();
+        textItem.closest(".text-layer").classList.add("selecting");
+      } else {
+        // A selection starts on text. A press on blank space only clears the current one.
+        event.preventDefault();
+        this.clearPendingSourceAnchor();
+      }
+    });
+    viewerContent.addEventListener("mousemove", (event) => this.updateHighlightHover(event));
+    viewerContent.addEventListener("mouseleave", () => this.setHoveredHighlight());
+    this.shadowRoot.getElementById("save-selection").addEventListener("click", () => {
+      this.savePendingSourceAnchor();
+    });
+    this.shadowRoot.getElementById("clear-selection").addEventListener("click", () => {
+      this.clearPendingSourceAnchor();
+    });
+    this.shadowRoot.querySelector(".annotations-list").addEventListener("click", (event) => {
+      const item = event.target.closest(".source-annotation-item");
+      if (!item) return;
+      const annotation = this._annotations[Number(item.dataset.annotationIndex)];
+      if (event.target.closest(".source-annotation-delete")) {
+        this.dispatchSourceAnnotationChange("delete", annotation);
+      } else {
+        void this.openAnnotation(annotation);
+      }
+    });
+  }
+
+  async openAnnotation(annotation) {
+    this._focusedAnnotationId = annotation.id;
+    this.renderAnnotationList();
+    await this.navigateToPage(annotation.page);
+    this.shadowRoot.querySelector(".source-highlight.is-focused")?.scrollIntoView({ block: "nearest" });
+  }
+
+  // Highlights sit under the text layer, so they never receive mouse events themselves.
+  updateHighlightHover({ buttons, clientX, clientY }) {
+    if (buttons) return;
+    const highlights = this.shadowRoot.querySelectorAll(".highlight");
+    this.setHoveredHighlight([...highlights].find((highlight) => {
+      const box = highlight.getBoundingClientRect();
+      return clientX >= box.left && clientX <= box.right && clientY >= box.top && clientY <= box.bottom;
+    }));
+  }
+
+  setHoveredHighlight(highlight = null) {
+    if (highlight === this._hoveredHighlight) return;
+    this._hoveredHighlight?.classList.remove("is-hovered");
+    this._hoveredHighlight = highlight;
+    highlight?.classList.add("is-hovered");
+    const layer = this.shadowRoot.querySelector(".text-layer");
+    if (layer) layer.title = highlight?.title ?? "";
+  }
+
+  renderAnnotationList() {
+    const list = this.shadowRoot.querySelector(".annotations-list");
+    if (!this._annotations.length) {
+      list.innerHTML = '<div class="empty">No manual evidence saved yet</div>';
+      return;
+    }
+
+    list.innerHTML = this._annotations.map((annotation, index) => `
+      <div
+        class="source-annotation-item ${annotation.id === this._focusedAnnotationId ? "is-active" : ""}"
+        data-annotation-index="${index}"
+      >
+        <button class="source-annotation-open" type="button">
+          <span class="source-annotation-title">Source ${index + 1} · Page ${annotation.page}</span>
+          <span class="source-annotation-text">${this.escapeHtml(annotation.selected_text)}</span>
+        </button>
+        <button class="source-annotation-delete" type="button" aria-label="Remove source ${index + 1}">
+          Remove
+        </button>
+      </div>
+    `).join("");
   }
 
   renderQuestionOptions() {
@@ -210,8 +343,8 @@ class PdfViewerWithChunks extends HTMLElement {
     }
     if (evidenceLabel) {
       evidenceLabel.textContent = evidenceAvailable
-        ? "Show evidence only"
-        : "Evidence unavailable";
+        ? "Show analyzed evidence only"
+        : "No analyzed evidence";
     }
     this.renderChunkList();
     if (this._pdfDoc) void this.renderCurrentPage();
@@ -315,6 +448,7 @@ class PdfViewerWithChunks extends HTMLElement {
     const pdf = await this.loadPdf();
     this._currentPage = Math.min(Math.max(Number(pageNumber) || 1, 1), pdf.numPages);
     this.updatePageControls();
+    this.clearPendingSourceAnchor();
     await this.renderCurrentPage();
   }
 
@@ -350,7 +484,8 @@ class PdfViewerWithChunks extends HTMLElement {
       const scale = this.getFitScale(baseViewport.width, containerWidth);
       const viewport = page.getViewport({ scale });
       const canvas = await this.renderPage(page, viewport);
-      const textItems = await this.readTextItems(page);
+      const textContent = await this.readTextContent(page);
+      const { layer, pageText } = await this.renderTextLayer(textContent, viewport);
       if (renderId !== this._renderId) return;
 
       this._currentPage = pageNumber;
@@ -358,10 +493,16 @@ class PdfViewerWithChunks extends HTMLElement {
 
       const pageContainer = document.createElement("div");
       pageContainer.className = "page-container";
+      pageContainer.style.setProperty("--total-scale-factor", viewport.scale);
       pageContainer.append(canvas);
 
-      const highlights = this.renderHighlights(textItems, viewport, pageNumber);
+      const highlights = this.renderHighlights(textContent.items, viewport, pageNumber);
       if (highlights.childElementCount) pageContainer.append(highlights);
+      const annotationLayer = this.renderSourceAnnotations(viewport, pageNumber);
+      if (annotationLayer.childElementCount) pageContainer.append(annotationLayer);
+      pageContainer.append(layer);
+
+      this._pageSelectionContext = { pageText, pageContainer, viewport, pageNumber };
       content.replaceChildren(pageContainer);
     } catch (error) {
       if (renderId === this._renderId) {
@@ -390,18 +531,241 @@ class PdfViewerWithChunks extends HTMLElement {
     return canvas;
   }
 
-  async readTextItems(page) {
+  // page.getTextContent() needs async-iterable streams, which Safari 18 lacks.
+  async readTextContent(page) {
     const reader = page.streamTextContent().getReader();
-    const items = [];
+    const textContent = { items: [], styles: {}, lang: null };
     try {
       while (true) {
         const { value, done } = await reader.read();
-        if (done) return items;
-        items.push(...value.items);
+        if (done) return textContent;
+        textContent.items.push(...value.items);
+        Object.assign(textContent.styles, value.styles);
+        textContent.lang ??= value.lang;
       }
     } finally {
       reader.releaseLock();
     }
+  }
+
+  async renderTextLayer(textContent, viewport) {
+    const layer = document.createElement("div");
+    layer.className = "text-layer";
+    const textLayer = new pdfjsLib.TextLayer({
+      textContentSource: textContent,
+      container: layer,
+      viewport,
+    });
+    await textLayer.render();
+    const endOfContent = document.createElement("div");
+    endOfContent.className = "end-of-content";
+    layer.append(endOfContent);
+
+    const textItems = textContent.items.filter((item) => typeof item.str === "string");
+    return { layer, pageText: this.buildTextIndex(textItems, textLayer.textDivs) };
+  }
+
+  buildTextIndex(textItems, textDivs) {
+    let pageText = "";
+    textItems.forEach((item, index) => {
+      textDivs[index].dataset.sourceTextStart = pageText.length;
+      pageText += item.str;
+      if (item.hasEOL) pageText += "\n";
+    });
+    return pageText;
+  }
+
+  captureCurrentSelection() {
+    const context = this._pageSelectionContext;
+    const range = context && this.getSelectionRange();
+    if (!range || range.collapsed || !range.intersectsNode(context.pageContainer)) return;
+    this.moveEndOfContent(range);
+    this._pendingSourceAnchor = this.createSourceAnchor(range, context);
+    this.updateSelectionControls();
+  }
+
+  createSourceAnchor(range, { pageText, pageContainer, viewport, pageNumber }) {
+    const segments = this.getSelectionSegments(range, pageContainer);
+    if (!segments.length || !this._documentId) return null;
+    const first = segments[0];
+    const last = segments.at(-1);
+    const spanStart = Number(first.element.dataset.sourceTextStart) + first.start;
+    const spanEnd = Number(last.element.dataset.sourceTextStart) + last.end;
+    const selectedText = pageText.slice(spanStart, spanEnd);
+    const rects = this.selectionRectsToPdf(segments, pageContainer, viewport);
+    if (!selectedText.trim() || !rects.length) return null;
+
+    return {
+      id: this.createAnnotationId(),
+      document_id: this._documentId,
+      page: pageNumber,
+      span_start: spanStart,
+      span_end: spanEnd,
+      selected_text: selectedText,
+      rects,
+    };
+  }
+
+  getSelectionRange() {
+    const selection = window.getSelection();
+    let composedRange;
+    try {
+      [composedRange] = selection.getComposedRanges({ shadowRoots: [this.shadowRoot] });
+    } catch {
+      // Safari 18 only accepts the shadow root itself.
+      [composedRange] = selection.getComposedRanges(this.shadowRoot);
+    }
+    if (!composedRange) return null;
+    const range = document.createRange();
+    range.setStart(composedRange.startContainer, composedRange.startOffset);
+    range.setEnd(composedRange.endContainer, composedRange.endOffset);
+    return range;
+  }
+
+  needsEndOfContentMove() {
+    const chromium = /\bChrome\/(\d+)\b/.exec(navigator.userAgent)?.[1];
+    return !CSS.supports("-moz-user-select", "none") && !(Number(chromium) >= NATIVE_SELECTION_CHROMIUM);
+  }
+
+  // As in the PDF.js viewer: other browsers need the blank-space element next to the moving
+  // end of the selection, or the selection jumps across the page.
+  moveEndOfContent(range) {
+    if (!this.needsEndOfContentMove()) return;
+    const previous = this._previousSelectionRange;
+    const modifyStart = previous && (
+      range.compareBoundaryPoints(Range.END_TO_END, previous) === 0 ||
+      range.compareBoundaryPoints(Range.START_TO_END, previous) === 0
+    );
+    this._previousSelectionRange = range.cloneRange();
+
+    let anchor = modifyStart ? range.startContainer : range.endContainer;
+    if (anchor.nodeType === Node.TEXT_NODE) anchor = anchor.parentNode;
+    const end = this.shadowRoot.querySelector(".end-of-content");
+    if (anchor === end) return;
+    if (!modifyStart && range.endOffset === 0 && !anchor.matches(".text-layer")) {
+      do {
+        while (anchor && !anchor.previousSibling) anchor = anchor.parentNode;
+        anchor = anchor?.previousSibling;
+      } while (anchor && !anchor.childNodes.length);
+    }
+    if (anchor?.parentElement?.closest(".text-layer")) {
+      end.style.userSelect = "text";
+      anchor.parentElement.insertBefore(end, modifyStart ? anchor : anchor.nextSibling);
+    }
+  }
+
+  resetEndOfContent() {
+    this._previousSelectionRange = null;
+    const layer = this.shadowRoot.querySelector(".text-layer");
+    if (!layer) return;
+    const end = layer.querySelector(".end-of-content");
+    layer.append(end);
+    end.style.userSelect = "";
+    layer.classList.remove("selecting");
+  }
+
+  getSelectionSegments(range, pageContainer) {
+    const segments = [];
+    for (const element of pageContainer.querySelectorAll(TEXT_ITEM)) {
+      if (!range.intersectsNode(element)) continue;
+      const start = element.contains(range.startContainer)
+        ? this.getTextOffset(element, range.startContainer, range.startOffset)
+        : 0;
+      const end = element.contains(range.endContainer)
+        ? this.getTextOffset(element, range.endContainer, range.endOffset)
+        : element.textContent.length;
+      if (end > start) segments.push({ element, start, end });
+    }
+    return segments;
+  }
+
+  getTextOffset(textElement, container, offset) {
+    const range = document.createRange();
+    range.selectNodeContents(textElement);
+    range.setEnd(container, offset);
+    return range.toString().length;
+  }
+
+  selectionRectsToPdf(segments, pageContainer, viewport) {
+    const pageRect = pageContainer.getBoundingClientRect();
+    const rects = [];
+    for (const { element, start, end } of segments) {
+      const range = document.createRange();
+      range.setStart(element.firstChild, start);
+      range.setEnd(element.firstChild, end);
+      for (const rect of range.getClientRects()) {
+        const left = Math.max(0, rect.left - pageRect.left);
+        const top = Math.max(0, rect.top - pageRect.top);
+        const right = Math.min(viewport.width, rect.right - pageRect.left);
+        const bottom = Math.min(viewport.height, rect.bottom - pageRect.top);
+        if (right > left && bottom > top) {
+          rects.push(boxFromCorners(
+            viewport.convertToPdfPoint(left, top),
+            viewport.convertToPdfPoint(right, bottom),
+          ));
+        }
+      }
+    }
+    return rects;
+  }
+
+  renderSourceAnnotations(viewport, pageNumber) {
+    const layer = document.createElement("div");
+    layer.className = "source-annotations-layer";
+    for (const annotation of this._annotations) {
+      if (annotation.page !== pageNumber) continue;
+      const className = `source-highlight ${annotation.id === this._focusedAnnotationId ? "is-focused" : ""}`;
+      for (const { x, y, width, height } of annotation.rects) {
+        const box = boxFromCorners(
+          viewport.convertToViewportPoint(x, y),
+          viewport.convertToViewportPoint(x + width, y + height),
+        );
+        layer.append(this.createPageBox(className, box, viewport));
+      }
+    }
+    return layer;
+  }
+
+  createPageBox(className, box, viewport) {
+    const element = document.createElement("div");
+    element.className = className;
+    element.style.left = `${(box.x / viewport.width) * 100}%`;
+    element.style.top = `${(box.y / viewport.height) * 100}%`;
+    element.style.width = `${(box.width / viewport.width) * 100}%`;
+    element.style.height = `${(box.height / viewport.height) * 100}%`;
+    return element;
+  }
+
+  savePendingSourceAnchor() {
+    const anchor = this._pendingSourceAnchor;
+    this.clearPendingSourceAnchor();
+    this.dispatchSourceAnnotationChange("create", anchor);
+  }
+
+  dispatchSourceAnnotationChange(action, annotation) {
+    this.dispatchEvent(new CustomEvent("source-annotation-change", { detail: { action, annotation } }));
+  }
+
+  clearPendingSourceAnchor() {
+    this.resetPendingSourceAnchor();
+    window.getSelection().removeAllRanges();
+  }
+
+  resetPendingSourceAnchor() {
+    this._pendingSourceAnchor = null;
+    this.updateSelectionControls();
+  }
+
+  updateSelectionControls() {
+    const anchor = this._pendingSourceAnchor;
+    this.shadowRoot.getElementById("save-selection").disabled = !anchor;
+    this.shadowRoot.getElementById("clear-selection").disabled = !anchor;
+    this.shadowRoot.getElementById("selection-status").textContent = anchor?.selected_text ?? "";
+  }
+
+  // randomUUID only exists over HTTPS or on localhost.
+  createAnnotationId() {
+    return crypto.randomUUID?.() ?? `source-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
   renderHighlights(textItems, viewport, pageNumber) {
@@ -415,12 +779,8 @@ class PdfViewerWithChunks extends HTMLElement {
     for (const chunk of chunks) {
       const boxes = this.findChunkTextPositions(textItems, chunk.text, viewport);
       for (const box of boxes) {
-        const highlight = document.createElement("div");
-        highlight.className = `highlight ${this.isEvidenceChunk(chunk) ? "evidence" : ""}`;
-        highlight.style.left = `${(box.x / viewport.width) * 100}%`;
-        highlight.style.top = `${(box.y / viewport.height) * 100}%`;
-        highlight.style.width = `${(box.width / viewport.width) * 100}%`;
-        highlight.style.height = `${(box.height / viewport.height) * 100}%`;
+        const className = `highlight ${this.isEvidenceChunk(chunk) ? "evidence" : ""}`;
+        const highlight = this.createPageBox(className, box, viewport);
         highlight.title = this.getChunkTooltip(chunk);
         layer.append(highlight);
       }
@@ -527,18 +887,11 @@ class PdfViewerWithChunks extends HTMLElement {
       maxX = Math.max(maxX, x + width);
       maxY = Math.max(maxY, y + height);
     }
-    const firstCorner = viewport.convertToViewportPoint(minX, minY);
-    const oppositeCorner = viewport.convertToViewportPoint(maxX, maxY);
-
-    const width = Math.abs(oppositeCorner[0] - firstCorner[0]);
-    const height = Math.abs(oppositeCorner[1] - firstCorner[1]);
-    if (width < 1 || height < 1) return null;
-    return {
-      x: Math.min(firstCorner[0], oppositeCorner[0]),
-      y: Math.min(firstCorner[1], oppositeCorner[1]),
-      width,
-      height,
-    };
+    const box = boxFromCorners(
+      viewport.convertToViewportPoint(minX, minY),
+      viewport.convertToViewportPoint(maxX, maxY),
+    );
+    return box.width < 1 || box.height < 1 ? null : box;
   }
 
   getChunkPage(chunk) {

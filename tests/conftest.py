@@ -358,6 +358,7 @@ def mocked_report_analyzer():
     # Cache used during analysis
     report_analyzer.cache_manager = MagicMock()
     report_analyzer.cache_manager.get_analysis.return_value = {}
+    report_analyzer.cache_manager.get_source_annotations.return_value = []
 
     # Mock nested analyzer used by the Streamlit app
     report_analyzer.analyzer = Mock()

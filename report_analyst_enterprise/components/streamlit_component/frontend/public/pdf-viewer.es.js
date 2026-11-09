@@ -1,6 +1,6 @@
 import "./pdfjs-map-polyfill.js";
 //#region src/pdf-viewer.styles.js
-var e = "\n:host {\n  display: block;\n  height: 100vh;\n  font-family: system-ui, sans-serif;\n}\n\n.container {\n  display: flex;\n  width: 100%;\n  height: 100%;\n  min-width: 0;\n  background: #f5f5f5;\n}\n\n.sidebar {\n  display: flex;\n  flex: 0 0 clamp(220px, 32%, 350px);\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: white;\n  border-right: 1px solid #e0e0e0;\n}\n\n.sidebar-header {\n  padding: 16px;\n  background: #fafafa;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.sidebar-header h3 {\n  margin: 0 0 12px;\n  font-size: 16px;\n}\n\n.question-select {\n  width: 100%;\n  margin-bottom: 12px;\n  padding: 8px;\n}\n\n.evidence-filter {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  color: #666;\n  font-size: 14px;\n}\n\n.chunks-list {\n  flex: 1;\n  overflow-y: auto;\n  padding: 8px;\n}\n\n.empty {\n  padding: 16px;\n  color: #777;\n  text-align: center;\n}\n\n.chunk-item {\n  margin-bottom: 8px;\n  padding: 12px;\n  background: white;\n  border: 1px solid #e0e0e0;\n  border-radius: 6px;\n  cursor: pointer;\n}\n\n.chunk-item:hover {\n  border-color: #4313c8;\n  box-shadow: 0 2px 4px rgba(67, 19, 200, 0.1);\n}\n\n.chunk-item.evidence {\n  background: #f8f7ff;\n  border-left: 4px solid #4313c8;\n}\n\n.chunk-header,\n.badges,\n.chunk-scores {\n  display: flex;\n  align-items: center;\n}\n\n.chunk-header {\n  justify-content: space-between;\n  margin-bottom: 8px;\n}\n\n.chunk-title {\n  color: #333;\n  font-size: 14px;\n  font-weight: 600;\n}\n\n.badges {\n  gap: 4px;\n}\n\n.badge {\n  padding: 2px 8px;\n  border-radius: 12px;\n  background: #e0e0e0;\n  color: #666;\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.badge.evidence {\n  background: #4313c8;\n  color: white;\n}\n\n.chunk-text {\n  display: -webkit-box;\n  overflow: hidden;\n  color: #666;\n  font-size: 13px;\n  line-height: 1.5;\n  -webkit-box-orient: vertical;\n  -webkit-line-clamp: 3;\n}\n\n.chunk-scores {\n  gap: 12px;\n  margin-top: 8px;\n  color: #888;\n  font-size: 11px;\n}\n\n.viewer {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: #525252;\n}\n\n.viewer-controls {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 12px 16px;\n  background: white;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.viewer-controls button {\n  padding: 6px 12px;\n  background: white;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  cursor: pointer;\n}\n\n.viewer-controls button:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n\n.page-info {\n  color: #666;\n  font-size: 14px;\n}\n\n.viewer-content {\n  display: flex;\n  flex: 1;\n  align-items: flex-start;\n  justify-content: center;\n  overflow: auto;\n  padding: 20px;\n}\n\n.page-container {\n  position: relative;\n  flex: none;\n  background: white;\n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);\n}\n\n.page-canvas {\n  display: block;\n}\n\n.page-highlights {\n  position: absolute;\n  inset: 0;\n  pointer-events: none;\n}\n\n.highlight {\n  position: absolute;\n  z-index: 1;\n  background: transparent;\n  border: 1px solid rgba(67, 19, 200, 0.35);\n  border-radius: 2px;\n  pointer-events: auto;\n  transition: background-color 0.15s ease, border-color 0.15s ease;\n}\n\n.highlight:hover {\n  background: rgba(67, 19, 200, 0.2);\n  border-color: rgba(67, 19, 200, 0.75);\n}\n\n.highlight.evidence {\n  border-color: #4313c8;\n}\n\n.highlight.evidence:hover {\n  background: rgba(67, 19, 200, 0.3);\n}\n\n.message {\n  margin: auto;\n  color: #eee;\n  font-size: 14px;\n}\n\n.message.error {\n  color: #fecaca;\n}\n", t = typeof process == "object" && process + "" == "[object process]" && !process.versions.nw && !(process.versions.electron && process.type && process.type !== "browser"), n = [
+var e = "\n:host {\n  display: block;\n  height: 100vh;\n  font-family: system-ui, sans-serif;\n}\n\n.container {\n  display: flex;\n  width: 100%;\n  height: 100%;\n  min-width: 0;\n  background: #f5f5f5;\n}\n\n.sidebar {\n  display: flex;\n  flex: 0 0 clamp(220px, 32%, 350px);\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: white;\n  border-right: 1px solid #e0e0e0;\n}\n\n.sidebar-header {\n  padding: 16px;\n  background: #fafafa;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.sidebar-header h3 {\n  margin: 0 0 12px;\n  font-size: 16px;\n}\n\n.annotations-section {\n  max-height: 34%;\n  overflow-y: auto;\n  padding: 12px 8px;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.annotations-section h3 {\n  margin: 0 8px 8px;\n  color: #333;\n  font-size: 14px;\n}\n\n.annotations-list {\n  display: grid;\n  gap: 6px;\n}\n\n.source-annotation-item {\n  display: grid;\n  grid-template-columns: minmax(0, 1fr) auto;\n  width: 100%;\n  border: 1px solid #f0b429;\n  border-radius: 6px;\n  background: #fffbeb;\n  color: #333;\n}\n\n.source-annotation-item:hover {\n  border-color: #d97706;\n  background: #fef3c7;\n}\n\n.source-annotation-item.is-active {\n  border-color: #b45309;\n  box-shadow: inset 3px 0 0 #b45309;\n}\n\n.source-annotation-open {\n  display: grid;\n  gap: 4px;\n  min-width: 0;\n  padding: 9px 10px;\n  border: 0;\n  background: transparent;\n  color: inherit;\n  cursor: pointer;\n  text-align: left;\n}\n\n.source-annotation-delete {\n  align-self: center;\n  margin-right: 8px;\n  padding: 5px 7px;\n  border: 0;\n  border-radius: 4px;\n  background: transparent;\n  color: #b42318;\n  cursor: pointer;\n}\n\n.source-annotation-delete:hover {\n  background: #fee4e2;\n}\n\n.source-annotation-title {\n  font-size: 12px;\n  font-weight: 700;\n}\n\n.source-annotation-text {\n  display: -webkit-box;\n  overflow: hidden;\n  color: #666;\n  font-size: 12px;\n  line-height: 1.35;\n  -webkit-box-orient: vertical;\n  -webkit-line-clamp: 2;\n}\n\n.question-select {\n  width: 100%;\n  margin-bottom: 12px;\n  padding: 8px;\n}\n\n.evidence-filter {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  color: #666;\n  font-size: 14px;\n}\n\n.chunks-list {\n  flex: 1;\n  overflow-y: auto;\n  padding: 8px;\n}\n\n.empty {\n  padding: 16px;\n  color: #777;\n  text-align: center;\n}\n\n.chunk-item {\n  margin-bottom: 8px;\n  padding: 12px;\n  background: white;\n  border: 1px solid #e0e0e0;\n  border-radius: 6px;\n  cursor: pointer;\n}\n\n.chunk-item:hover {\n  border-color: #4313c8;\n  box-shadow: 0 2px 4px rgba(67, 19, 200, 0.1);\n}\n\n.chunk-item.evidence {\n  background: #f8f7ff;\n  border-left: 4px solid #4313c8;\n}\n\n.chunk-header,\n.badges,\n.chunk-scores {\n  display: flex;\n  align-items: center;\n}\n\n.chunk-header {\n  justify-content: space-between;\n  margin-bottom: 8px;\n}\n\n.chunk-title {\n  color: #333;\n  font-size: 14px;\n  font-weight: 600;\n}\n\n.badges {\n  gap: 4px;\n}\n\n.badge {\n  padding: 2px 8px;\n  border-radius: 12px;\n  background: #e0e0e0;\n  color: #666;\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.badge.evidence {\n  background: #4313c8;\n  color: white;\n}\n\n.chunk-text {\n  display: -webkit-box;\n  overflow: hidden;\n  color: #666;\n  font-size: 13px;\n  line-height: 1.5;\n  -webkit-box-orient: vertical;\n  -webkit-line-clamp: 3;\n}\n\n.chunk-scores {\n  gap: 12px;\n  margin-top: 8px;\n  color: #888;\n  font-size: 11px;\n}\n\n.viewer {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: #525252;\n}\n\n.source-guide {\n  display: flex;\n  gap: 8px;\n  padding: 8px 16px;\n  background: #f8f7ff;\n  border-bottom: 1px solid #ddd6fe;\n  color: #555;\n  font-size: 13px;\n}\n\n.source-guide strong {\n  color: #4313c8;\n  white-space: nowrap;\n}\n\n.viewer-controls {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 12px;\n  padding: 12px 16px;\n  background: white;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.selection-status {\n  flex: 1;\n  overflow: hidden;\n  color: #666;\n  font-size: 13px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.viewer-controls .save-selection:not(:disabled) {\n  border-color: #4313c8;\n  background: #4313c8;\n  color: white;\n}\n\n.viewer-controls button {\n  padding: 6px 12px;\n  background: white;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  cursor: pointer;\n}\n\n.viewer-controls button:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n\n.page-info {\n  color: #666;\n  font-size: 14px;\n}\n\n.viewer-content {\n  display: flex;\n  flex: 1;\n  align-items: flex-start;\n  justify-content: center;\n  overflow: auto;\n  padding: 20px;\n}\n\n.page-container {\n  --scale-round-x: 1px;\n  --scale-round-y: 1px;\n  position: relative;\n  flex: none;\n  background: white;\n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);\n}\n\n.page-canvas {\n  display: block;\n}\n\n.page-highlights,\n.source-annotations-layer,\n.text-layer {\n  position: absolute;\n  inset: 0;\n}\n\n.page-highlights,\n.source-annotations-layer {\n  pointer-events: none;\n}\n\n.page-highlights {\n  z-index: 1;\n}\n\n.source-annotations-layer {\n  z-index: 2;\n}\n\n.text-layer {\n  --min-font-size-inv: calc(1 / var(--min-font-size));\n  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));\n  z-index: 3;\n  overflow: clip;\n  line-height: 1;\n  transform-origin: 0 0;\n}\n\n.text-layer :is(span, br) {\n  position: absolute;\n  color: transparent;\n  cursor: text;\n  transform-origin: 0% 0%;\n  white-space: pre;\n}\n\n.text-layer > :not(.markedContent),\n.text-layer .markedContent span:not(.markedContent) {\n  --rotate: 0deg;\n  --scale-x: 1;\n  z-index: 1;\n  font-size: calc(var(--text-scale-factor) * var(--font-height));\n  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));\n}\n\n.text-layer .markedContent {\n  display: contents;\n}\n\n.text-layer[data-main-rotation=\"90\"] {\n  transform: rotate(90deg) translateY(-100%);\n}\n\n.text-layer[data-main-rotation=\"180\"] {\n  transform: rotate(180deg) translate(-100%, -100%);\n}\n\n.text-layer[data-main-rotation=\"270\"] {\n  transform: rotate(270deg) translateX(-100%);\n}\n\n.text-layer .end-of-content {\n  position: absolute;\n  inset: 100% 0 0;\n  z-index: 0;\n  cursor: default;\n  user-select: none;\n}\n\n.text-layer.selecting .end-of-content {\n  top: 0;\n}\n\n.text-layer ::selection {\n  background: rgba(37, 99, 235, 0.35);\n}\n\n.highlight {\n  position: absolute;\n  z-index: 1;\n  background: transparent;\n  border: 1px solid rgba(67, 19, 200, 0.35);\n  border-radius: 2px;\n}\n\n.highlight.evidence {\n  border-color: #4313c8;\n}\n\n.highlight.is-hovered {\n  background: rgba(67, 19, 200, 0.2);\n  border-color: rgba(67, 19, 200, 0.75);\n}\n\n.source-highlight {\n  position: absolute;\n  box-sizing: border-box;\n  border: 1px solid rgba(217, 119, 6, 0.9);\n  border-radius: 2px;\n  background: rgba(250, 204, 21, 0.28);\n}\n\n.source-highlight.is-focused {\n  z-index: 1;\n  scroll-margin: 20px;\n  border: 2px solid #b45309;\n  background: rgba(245, 158, 11, 0.5);\n}\n\n.message {\n  margin: auto;\n  color: #eee;\n  font-size: 14px;\n}\n\n.message.error {\n  color: #fecaca;\n}\n", t = typeof process == "object" && process + "" == "[object process]" && !process.versions.nw && !(process.versions.electron && process.type && process.type !== "browser"), n = [
 	Infinity,
 	Infinity,
 	-Infinity,
@@ -16348,22 +16348,36 @@ globalThis._pdfjsTestingUtils = { HighlightOutliner: Ai }, globalThis.pdfjsLib =
 	version: zr,
 	XfaLayer: Se
 }, _r.workerSrc = "./pdf-worker-bootstrap.mjs";
-var ra = 6, ia = "__unmapped__", aa = `<style>${e}</style>`;
-function oa(e) {
+var ra = 6, ia = "__unmapped__", aa = "[data-source-text-start]", oa = 148, sa = `<style>${e}</style>`;
+function ca(e, t) {
+	return {
+		x: Math.min(e[0], t[0]),
+		y: Math.min(e[1], t[1]),
+		width: Math.abs(t[0] - e[0]),
+		height: Math.abs(t[1] - e[1])
+	};
+}
+function la(e) {
 	return String(e || "").normalize("NFKC").replace(/\u00ad/g, "").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
 }
-var sa = class extends HTMLElement {
+var ua = class extends HTMLElement {
 	constructor() {
-		super(), this.attachShadow({ mode: "open" }), this._pdfData = null, this._pdfDoc = null, this._loadingTask = null, this._chunks = [], this._questions = [], this._selectedQuestionId = null, this._showEvidenceOnly = !1, this._currentPage = 1, this._renderId = 0, this._lastRenderedWidth = 0, this._resizeObserver = null;
+		super(), this.attachShadow({ mode: "open" }), this._pdfData = null, this._documentId = null, this._pdfDoc = null, this._loadingTask = null, this._chunks = [], this._questions = [], this._annotations = [], this._focusedAnnotationId = null, this._pendingSourceAnchor = null, this._pageSelectionContext = null, this._previousSelectionRange = null, this._hoveredHighlight = null, this._selectedQuestionId = null, this._showEvidenceOnly = !1, this._currentPage = 1, this._renderId = 0, this._lastRenderedWidth = 0, this._resizeObserver = null, this._selectionChangeHandler = () => this.captureCurrentSelection(), this._mouseUpHandler = () => this.resetEndOfContent();
 	}
 	connectedCallback() {
-		this.render(), this.observeViewerSize();
+		this.render(), this.observeViewerSize(), document.addEventListener("selectionchange", this._selectionChangeHandler), window.addEventListener("mouseup", this._mouseUpHandler);
 	}
 	disconnectedCallback() {
-		this._resizeObserver?.disconnect(), this._resizeObserver = null, this.resetPdfDocument();
+		document.removeEventListener("selectionchange", this._selectionChangeHandler), window.removeEventListener("mouseup", this._mouseUpHandler), this._resizeObserver?.disconnect(), this._resizeObserver = null, this.resetPdfDocument();
 	}
 	setPdfData(e) {
 		e !== this._pdfData && (this.resetPdfDocument(), this._pdfData = e || null, this.isConnected && this.loadAndRenderPdf());
+	}
+	setDocumentId(e) {
+		this._documentId = e;
+	}
+	setAnnotations(e) {
+		JSON.stringify(e) !== JSON.stringify(this._annotations) && (this._annotations = e, this.renderAnnotationList(), this._pdfDoc && this.renderCurrentPage());
 	}
 	setChunks(e) {
 		this._chunks = Array.isArray(e) ? e : [], this._selectedQuestionId === ia && !this._chunks.some((e) => !e.question_id) && (this._selectedQuestionId = null), this.renderQuestionOptions(), this.updateFilters();
@@ -16384,7 +16398,7 @@ var sa = class extends HTMLElement {
 		t !== this._showEvidenceOnly && (this._showEvidenceOnly = t, this.updateFilters());
 	}
 	resetPdfDocument() {
-		this._renderId += 1, this._loadingTask?.destroy(), this._loadingTask = null, this._pdfDoc && this._pdfDoc.destroy(), this._pdfDoc = null, this._currentPage = 1, this._lastRenderedWidth = 0;
+		this._renderId += 1, this._loadingTask?.destroy(), this._loadingTask = null, this._pdfDoc && this._pdfDoc.destroy(), this._pdfDoc = null, this._currentPage = 1, this._lastRenderedWidth = 0, this._pageSelectionContext = null, this.resetPendingSourceAnchor();
 	}
 	observeViewerSize() {
 		if (this._resizeObserver?.disconnect(), typeof ResizeObserver != "function") return;
@@ -16395,7 +16409,7 @@ var sa = class extends HTMLElement {
 		}), this._resizeObserver.observe(e));
 	}
 	render() {
-		this.shadowRoot.innerHTML = `${aa}
+		this.shadowRoot.innerHTML = `${sa}
       <div class="container">
         <aside class="sidebar">
           <div class="sidebar-header">
@@ -16403,23 +16417,36 @@ var sa = class extends HTMLElement {
             <select id="question-select" class="question-select"></select>
             <label class="evidence-filter">
               <input id="evidence-filter" type="checkbox">
-              <span id="evidence-filter-label">Show evidence only</span>
+              <span id="evidence-filter-label">Show analyzed evidence only</span>
             </label>
           </div>
+          <section class="annotations-section">
+            <h3>Saved evidence</h3>
+            <div class="annotations-list"></div>
+          </section>
           <div class="chunks-list"></div>
         </aside>
         <main class="viewer">
+          <div class="source-guide">
+            <strong>Add manual evidence</strong>
+            <span>Select text in the PDF, then choose Add evidence. Repeat to save more sources.</span>
+          </div>
           <div class="viewer-controls">
             <button id="prev-page" type="button">Previous</button>
             <span class="page-info">
               Page <span id="current-page">1</span> of <span id="total-pages">-</span>
             </span>
             <button id="next-page" type="button">Next</button>
+            <span id="selection-status" class="selection-status"></span>
+            <button id="save-selection" class="save-selection" type="button" disabled>
+              Add evidence
+            </button>
+            <button id="clear-selection" type="button" disabled>Clear</button>
           </div>
           <div id="viewer-content" class="viewer-content"></div>
         </main>
       </div>
-    `, this.bindEvents(), this.renderQuestionOptions(), this.updateFilters(), this.updatePageControls();
+    `, this.bindEvents(), this.renderQuestionOptions(), this.renderAnnotationList(), this.updateFilters(), this.updatePageControls(), this.updateSelectionControls();
 	}
 	bindEvents() {
 		this.shadowRoot.getElementById("question-select").addEventListener("change", (e) => {
@@ -16436,6 +16463,59 @@ var sa = class extends HTMLElement {
 		}), this.shadowRoot.getElementById("next-page").addEventListener("click", () => {
 			this.navigateToPage(this._currentPage + 1);
 		});
+		let e = this.shadowRoot.getElementById("viewer-content");
+		e.addEventListener("mousedown", (e) => {
+			if (e.button !== 0) return;
+			let t = e.target.closest(aa);
+			t ? (this.resetPendingSourceAnchor(), t.closest(".text-layer").classList.add("selecting")) : (e.preventDefault(), this.clearPendingSourceAnchor());
+		}), e.addEventListener("mousemove", (e) => this.updateHighlightHover(e)), e.addEventListener("mouseleave", () => this.setHoveredHighlight()), this.shadowRoot.getElementById("save-selection").addEventListener("click", () => {
+			this.savePendingSourceAnchor();
+		}), this.shadowRoot.getElementById("clear-selection").addEventListener("click", () => {
+			this.clearPendingSourceAnchor();
+		}), this.shadowRoot.querySelector(".annotations-list").addEventListener("click", (e) => {
+			let t = e.target.closest(".source-annotation-item");
+			if (!t) return;
+			let n = this._annotations[Number(t.dataset.annotationIndex)];
+			e.target.closest(".source-annotation-delete") ? this.dispatchSourceAnnotationChange("delete", n) : this.openAnnotation(n);
+		});
+	}
+	async openAnnotation(e) {
+		this._focusedAnnotationId = e.id, this.renderAnnotationList(), await this.navigateToPage(e.page), this.shadowRoot.querySelector(".source-highlight.is-focused")?.scrollIntoView({ block: "nearest" });
+	}
+	updateHighlightHover({ buttons: e, clientX: t, clientY: n }) {
+		if (e) return;
+		let r = this.shadowRoot.querySelectorAll(".highlight");
+		this.setHoveredHighlight([...r].find((e) => {
+			let r = e.getBoundingClientRect();
+			return t >= r.left && t <= r.right && n >= r.top && n <= r.bottom;
+		}));
+	}
+	setHoveredHighlight(e = null) {
+		if (e === this._hoveredHighlight) return;
+		this._hoveredHighlight?.classList.remove("is-hovered"), this._hoveredHighlight = e, e?.classList.add("is-hovered");
+		let t = this.shadowRoot.querySelector(".text-layer");
+		t && (t.title = e?.title ?? "");
+	}
+	renderAnnotationList() {
+		let e = this.shadowRoot.querySelector(".annotations-list");
+		if (!this._annotations.length) {
+			e.innerHTML = "<div class=\"empty\">No manual evidence saved yet</div>";
+			return;
+		}
+		e.innerHTML = this._annotations.map((e, t) => `
+      <div
+        class="source-annotation-item ${e.id === this._focusedAnnotationId ? "is-active" : ""}"
+        data-annotation-index="${t}"
+      >
+        <button class="source-annotation-open" type="button">
+          <span class="source-annotation-title">Source ${t + 1} · Page ${e.page}</span>
+          <span class="source-annotation-text">${this.escapeHtml(e.selected_text)}</span>
+        </button>
+        <button class="source-annotation-delete" type="button" aria-label="Remove source ${t + 1}">
+          Remove
+        </button>
+      </div>
+    `).join("");
 	}
 	renderQuestionOptions() {
 		let e = this.shadowRoot?.getElementById("question-select");
@@ -16450,7 +16530,7 @@ var sa = class extends HTMLElement {
 	}
 	updateFilters() {
 		let e = this.shadowRoot?.getElementById("question-select"), t = this.shadowRoot?.getElementById("evidence-filter"), n = this.shadowRoot?.getElementById("evidence-filter-label"), r = this.getScopedChunks().some((e) => this.hasEvidenceMapping(e));
-		r || (this._showEvidenceOnly = !1), e && (e.value = this._selectedQuestionId || ""), t && (t.checked = this._showEvidenceOnly, t.disabled = !r), n && (n.textContent = r ? "Show evidence only" : "Evidence unavailable"), this.renderChunkList(), this._pdfDoc && this.renderCurrentPage();
+		r || (this._showEvidenceOnly = !1), e && (e.value = this._selectedQuestionId || ""), t && (t.checked = this._showEvidenceOnly, t.disabled = !r), n && (n.textContent = r ? "Show analyzed evidence only" : "No analyzed evidence"), this.renderChunkList(), this._pdfDoc && this.renderCurrentPage();
 	}
 	getScopedChunks() {
 		let e = this._chunks;
@@ -16512,7 +16592,7 @@ var sa = class extends HTMLElement {
 	}
 	async navigateToPage(e) {
 		let t = await this.loadPdf();
-		this._currentPage = Math.min(Math.max(Number(e) || 1, 1), t.numPages), this.updatePageControls(), await this.renderCurrentPage();
+		this._currentPage = Math.min(Math.max(Number(e) || 1, 1), t.numPages), this.updatePageControls(), this.clearPendingSourceAnchor(), await this.renderCurrentPage();
 	}
 	async navigateToChunk(e) {
 		await this.navigateToPage(this.getChunkPage(e) ?? 1);
@@ -16528,13 +16608,20 @@ var sa = class extends HTMLElement {
 		try {
 			let n = await this.loadPdf(), r = Math.min(Math.max(this._currentPage, 1), n.numPages), i = await n.getPage(r), a = i.getViewport({ scale: 1 }), o = e.clientWidth;
 			this._lastRenderedWidth = o;
-			let s = this.getFitScale(a.width, o), c = i.getViewport({ scale: s }), l = await this.renderPage(i, c), u = await this.readTextItems(i);
+			let s = this.getFitScale(a.width, o), c = i.getViewport({ scale: s }), l = await this.renderPage(i, c), u = await this.readTextContent(i), { layer: d, pageText: f } = await this.renderTextLayer(u, c);
 			if (t !== this._renderId) return;
 			this._currentPage = r, this.updatePageControls();
-			let d = document.createElement("div");
-			d.className = "page-container", d.append(l);
-			let f = this.renderHighlights(u, c, r);
-			f.childElementCount && d.append(f), e.replaceChildren(d);
+			let p = document.createElement("div");
+			p.className = "page-container", p.style.setProperty("--total-scale-factor", c.scale), p.append(l);
+			let m = this.renderHighlights(u.items, c, r);
+			m.childElementCount && p.append(m);
+			let h = this.renderSourceAnnotations(c, r);
+			h.childElementCount && p.append(h), p.append(d), this._pageSelectionContext = {
+				pageText: f,
+				pageContainer: p,
+				viewport: c,
+				pageNumber: r
+			}, e.replaceChildren(p);
 		} catch (e) {
 			t === this._renderId && this.showMessage(`Error rendering page: ${e.message}`, "error");
 		}
@@ -16556,17 +16643,168 @@ var sa = class extends HTMLElement {
 			0
 		]), await e.render(a).promise, r;
 	}
-	async readTextItems(e) {
-		let t = e.streamTextContent().getReader(), n = [];
+	async readTextContent(e) {
+		let t = e.streamTextContent().getReader(), n = {
+			items: [],
+			styles: {},
+			lang: null
+		};
 		try {
 			for (;;) {
 				let { value: e, done: r } = await t.read();
 				if (r) return n;
-				n.push(...e.items);
+				n.items.push(...e.items), Object.assign(n.styles, e.styles), n.lang ??= e.lang;
 			}
 		} finally {
 			t.releaseLock();
 		}
+	}
+	async renderTextLayer(e, t) {
+		let n = document.createElement("div");
+		n.className = "text-layer";
+		let r = new Or({
+			textContentSource: e,
+			container: n,
+			viewport: t
+		});
+		await r.render();
+		let i = document.createElement("div");
+		i.className = "end-of-content", n.append(i);
+		let a = e.items.filter((e) => typeof e.str == "string");
+		return {
+			layer: n,
+			pageText: this.buildTextIndex(a, r.textDivs)
+		};
+	}
+	buildTextIndex(e, t) {
+		let n = "";
+		return e.forEach((e, r) => {
+			t[r].dataset.sourceTextStart = n.length, n += e.str, e.hasEOL && (n += "\n");
+		}), n;
+	}
+	captureCurrentSelection() {
+		let e = this._pageSelectionContext, t = e && this.getSelectionRange();
+		!t || t.collapsed || !t.intersectsNode(e.pageContainer) || (this.moveEndOfContent(t), this._pendingSourceAnchor = this.createSourceAnchor(t, e), this.updateSelectionControls());
+	}
+	createSourceAnchor(e, { pageText: t, pageContainer: n, viewport: r, pageNumber: i }) {
+		let a = this.getSelectionSegments(e, n);
+		if (!a.length || !this._documentId) return null;
+		let o = a[0], s = a.at(-1), c = Number(o.element.dataset.sourceTextStart) + o.start, l = Number(s.element.dataset.sourceTextStart) + s.end, u = t.slice(c, l), d = this.selectionRectsToPdf(a, n, r);
+		return !u.trim() || !d.length ? null : {
+			id: this.createAnnotationId(),
+			document_id: this._documentId,
+			page: i,
+			span_start: c,
+			span_end: l,
+			selected_text: u,
+			rects: d
+		};
+	}
+	getSelectionRange() {
+		let e = window.getSelection(), t;
+		try {
+			[t] = e.getComposedRanges({ shadowRoots: [this.shadowRoot] });
+		} catch {
+			[t] = e.getComposedRanges(this.shadowRoot);
+		}
+		if (!t) return null;
+		let n = document.createRange();
+		return n.setStart(t.startContainer, t.startOffset), n.setEnd(t.endContainer, t.endOffset), n;
+	}
+	needsEndOfContentMove() {
+		let e = /\bChrome\/(\d+)\b/.exec(navigator.userAgent)?.[1];
+		return !CSS.supports("-moz-user-select", "none") && !(Number(e) >= oa);
+	}
+	moveEndOfContent(e) {
+		if (!this.needsEndOfContentMove()) return;
+		let t = this._previousSelectionRange, n = t && (e.compareBoundaryPoints(Range.END_TO_END, t) === 0 || e.compareBoundaryPoints(Range.START_TO_END, t) === 0);
+		this._previousSelectionRange = e.cloneRange();
+		let r = n ? e.startContainer : e.endContainer;
+		r.nodeType === Node.TEXT_NODE && (r = r.parentNode);
+		let i = this.shadowRoot.querySelector(".end-of-content");
+		if (r !== i) {
+			if (!n && e.endOffset === 0 && !r.matches(".text-layer")) do {
+				for (; r && !r.previousSibling;) r = r.parentNode;
+				r = r?.previousSibling;
+			} while (r && !r.childNodes.length);
+			r?.parentElement?.closest(".text-layer") && (i.style.userSelect = "text", r.parentElement.insertBefore(i, n ? r : r.nextSibling));
+		}
+	}
+	resetEndOfContent() {
+		this._previousSelectionRange = null;
+		let e = this.shadowRoot.querySelector(".text-layer");
+		if (!e) return;
+		let t = e.querySelector(".end-of-content");
+		e.append(t), t.style.userSelect = "", e.classList.remove("selecting");
+	}
+	getSelectionSegments(e, t) {
+		let n = [];
+		for (let r of t.querySelectorAll(aa)) {
+			if (!e.intersectsNode(r)) continue;
+			let t = r.contains(e.startContainer) ? this.getTextOffset(r, e.startContainer, e.startOffset) : 0, i = r.contains(e.endContainer) ? this.getTextOffset(r, e.endContainer, e.endOffset) : r.textContent.length;
+			i > t && n.push({
+				element: r,
+				start: t,
+				end: i
+			});
+		}
+		return n;
+	}
+	getTextOffset(e, t, n) {
+		let r = document.createRange();
+		return r.selectNodeContents(e), r.setEnd(t, n), r.toString().length;
+	}
+	selectionRectsToPdf(e, t, n) {
+		let r = t.getBoundingClientRect(), i = [];
+		for (let { element: t, start: a, end: o } of e) {
+			let e = document.createRange();
+			e.setStart(t.firstChild, a), e.setEnd(t.firstChild, o);
+			for (let t of e.getClientRects()) {
+				let e = Math.max(0, t.left - r.left), a = Math.max(0, t.top - r.top), o = Math.min(n.width, t.right - r.left), s = Math.min(n.height, t.bottom - r.top);
+				o > e && s > a && i.push(ca(n.convertToPdfPoint(e, a), n.convertToPdfPoint(o, s)));
+			}
+		}
+		return i;
+	}
+	renderSourceAnnotations(e, t) {
+		let n = document.createElement("div");
+		n.className = "source-annotations-layer";
+		for (let r of this._annotations) {
+			if (r.page !== t) continue;
+			let i = `source-highlight ${r.id === this._focusedAnnotationId ? "is-focused" : ""}`;
+			for (let { x: t, y: a, width: o, height: s } of r.rects) {
+				let r = ca(e.convertToViewportPoint(t, a), e.convertToViewportPoint(t + o, a + s));
+				n.append(this.createPageBox(i, r, e));
+			}
+		}
+		return n;
+	}
+	createPageBox(e, t, n) {
+		let r = document.createElement("div");
+		return r.className = e, r.style.left = `${t.x / n.width * 100}%`, r.style.top = `${t.y / n.height * 100}%`, r.style.width = `${t.width / n.width * 100}%`, r.style.height = `${t.height / n.height * 100}%`, r;
+	}
+	savePendingSourceAnchor() {
+		let e = this._pendingSourceAnchor;
+		this.clearPendingSourceAnchor(), this.dispatchSourceAnnotationChange("create", e);
+	}
+	dispatchSourceAnnotationChange(e, t) {
+		this.dispatchEvent(new CustomEvent("source-annotation-change", { detail: {
+			action: e,
+			annotation: t
+		} }));
+	}
+	clearPendingSourceAnchor() {
+		this.resetPendingSourceAnchor(), window.getSelection().removeAllRanges();
+	}
+	resetPendingSourceAnchor() {
+		this._pendingSourceAnchor = null, this.updateSelectionControls();
+	}
+	updateSelectionControls() {
+		let e = this._pendingSourceAnchor;
+		this.shadowRoot.getElementById("save-selection").disabled = !e, this.shadowRoot.getElementById("clear-selection").disabled = !e, this.shadowRoot.getElementById("selection-status").textContent = e?.selected_text ?? "";
+	}
+	createAnnotationId() {
+		return crypto.randomUUID?.() ?? `source-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 	}
 	renderHighlights(e, t, n) {
 		let r = document.createElement("div");
@@ -16575,16 +16813,16 @@ var sa = class extends HTMLElement {
 		for (let n of i) {
 			let i = this.findChunkTextPositions(e, n.text, t);
 			for (let e of i) {
-				let i = document.createElement("div");
-				i.className = `highlight ${this.isEvidenceChunk(n) ? "evidence" : ""}`, i.style.left = `${e.x / t.width * 100}%`, i.style.top = `${e.y / t.height * 100}%`, i.style.width = `${e.width / t.width * 100}%`, i.style.height = `${e.height / t.height * 100}%`, i.title = this.getChunkTooltip(n), r.append(i);
+				let i = `highlight ${this.isEvidenceChunk(n) ? "evidence" : ""}`, a = this.createPageBox(i, e, t);
+				a.title = this.getChunkTooltip(n), r.append(a);
 			}
 		}
 		return r;
 	}
 	findChunkTextPositions(e, t, n) {
-		let r = oa(t);
+		let r = la(t);
 		if (r.length < ra) return [];
-		let i = e.flatMap((e, t) => oa(e.str).map((e) => ({
+		let i = e.flatMap((e, t) => la(e.str).map((e) => ({
 			token: e,
 			itemIndex: t
 		}))), a = this.findMatchingTokenRanges(i.map(({ token: e }) => e), r), o = /* @__PURE__ */ new Set();
@@ -16635,13 +16873,8 @@ var sa = class extends HTMLElement {
 			let e = t.transform[4], o = t.transform[5], s = t.width, c = t.height || Math.abs(t.transform[3]);
 			n = Math.min(n, e), r = Math.min(r, o), i = Math.max(i, e + s), a = Math.max(a, o + c);
 		}
-		let o = t.convertToViewportPoint(n, r), s = t.convertToViewportPoint(i, a), c = Math.abs(s[0] - o[0]), l = Math.abs(s[1] - o[1]);
-		return c < 1 || l < 1 ? null : {
-			x: Math.min(o[0], s[0]),
-			y: Math.min(o[1], s[1]),
-			width: c,
-			height: l
-		};
+		let o = ca(t.convertToViewportPoint(n, r), t.convertToViewportPoint(i, a));
+		return o.width < 1 || o.height < 1 ? null : o;
 	}
 	getChunkPage(e) {
 		let t = e.metadata?.page_number ?? e.metadata?.source, n = Number.parseInt(t, 10);
@@ -16689,6 +16922,6 @@ var sa = class extends HTMLElement {
 		return t.textContent = String(e ?? ""), t.innerHTML;
 	}
 };
-customElements.get("pdf-viewer-with-chunks") || customElements.define("pdf-viewer-with-chunks", sa);
+customElements.get("pdf-viewer-with-chunks") || customElements.define("pdf-viewer-with-chunks", ua);
 //#endregion
-export { sa as default };
+export { ua as default };

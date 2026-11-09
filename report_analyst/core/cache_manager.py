@@ -7,10 +7,12 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from llama_index.core import Document
-from sqlalchemy import text
+from sqlalchemy import select, text
+
+from report_analyst.models.source_annotation import SourceAnchor
 
 from .database_manager import DatabaseManager
-from .database_schema import indexes, metadata
+from .database_schema import indexes, metadata, source_annotations
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +85,43 @@ class CacheManager:
         except Exception as e:
             logger.error(f"Error initializing database schema: {e!s}", exc_info=True)
             raise
+
+    def save_source_annotation(self, annotation: Dict[str, Any]) -> None:
+        """Save a new PDF source annotation. The database sets created_at."""
+        values = SourceAnchor.model_validate(annotation).model_dump(exclude={"created_at"})
+        values["rects"] = json.dumps(values["rects"])
+        with self.db_manager.get_connection() as conn:
+            conn.execute(source_annotations.insert().values(**values))
+
+    def get_source_annotations(self, document_id: str) -> List[Dict[str, Any]]:
+        """Return the saved PDF source annotations for one document."""
+        with self.db_manager.get_connection() as conn:
+            rows = (
+                conn.execute(
+                    select(source_annotations)
+                    .where(source_annotations.c.document_id == document_id)
+                    .order_by(
+                        source_annotations.c.page,
+                        source_annotations.c.span_start,
+                        source_annotations.c.id,
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            SourceAnchor.model_validate({**row, "rects": json.loads(row["rects"])}).model_dump(mode="json") for row in rows
+        ]
+
+    def delete_source_annotation(self, annotation_id: str, document_id: str) -> None:
+        """Delete one PDF source annotation from its document."""
+        with self.db_manager.get_connection() as conn:
+            conn.execute(
+                source_annotations.delete().where(
+                    source_annotations.c.id == annotation_id,
+                    source_annotations.c.document_id == document_id,
+                )
+            )
 
     def _load_vector_store(self, file_path: str, chunks: List[Dict]) -> None:
         """Load chunks into an in-memory vector store."""
