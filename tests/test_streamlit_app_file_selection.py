@@ -61,6 +61,25 @@ def test_file_selection_with_file_uri(streamlit_app_path):
                 del os.environ["TEMP_DIR"]
 
 
+def test_uploaded_files_history_reads_osa_temp_dir(monkeypatch):
+    """Uploads saved under OSA_TEMP_DIR are the reports the viewer can open."""
+    import fitz
+
+    from report_analyst.streamlit_app import get_uploaded_files_history
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        pdf_path = Path(temp_dir) / "desktop-report.pdf"
+        document = fitz.open()
+        document.new_page().insert_text((72, 72), "desktop viewer")
+        document.save(pdf_path)
+        document.close()
+        monkeypatch.setenv("OSA_TEMP_DIR", temp_dir)
+
+        names = [item["name"] for item in get_uploaded_files_history()]
+
+    assert "desktop-report.pdf" in names
+
+
 def test_file_path_resolution_from_uri():
     """Test that file:// URIs are correctly converted to file paths"""
     from report_analyst.streamlit_app import get_uploaded_files_history

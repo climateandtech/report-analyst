@@ -19,6 +19,7 @@ from llama_index.readers.file import PyMuPDFReader
 
 from .api_key_manager import APIKeyManager
 from .cache_manager import CacheManager
+from .database_manager import storage_root
 from .llm_providers import get_llm
 from .prompt_manager import PromptManager
 from .storage import LlamaVectorStore
@@ -123,8 +124,8 @@ class DocumentAnalyzer:
             return
 
         self.prompt_manager = PromptManager()
-        # Use absolute paths for storage
-        self.storage_path = Path(__file__).parent.parent.parent / "storage"
+        # Unset STORAGE_PATH keeps repository storage/. A set value overrides it.
+        self.storage_path = storage_root()
         self.cache_path = self.storage_path / "cache"
         self.llm_cache_path = self.storage_path / "llm_cache"
 
@@ -1106,22 +1107,13 @@ class DocumentAnalyzer:
 
     def _load_questions(self) -> dict:
         """Load questions from YAML files"""
-        # Look for question set file in multiple possible locations
-        possible_paths = [
-            Path(__file__).parent.parent / "questionsets" / f"{self.question_set}_questions.yaml",  # app/questionsets
-            Path(__file__).parent.parent.parent / "questionsets" / f"{self.question_set}_questions.yaml",  # project root
-            Path.cwd() / "questionsets" / f"{self.question_set}_questions.yaml",  # current working directory
-        ]
+        from report_analyst.core.question_loader import question_file, questionset_directories
 
-        yaml_file = None
-        for path in possible_paths:
-            if path.exists():
-                yaml_file = path
-                break
-
+        yaml_file = question_file(self.question_set)
         if not yaml_file:
             logger.error(
-                f"Could not find questions file for {self.question_set} in any of: {[str(p) for p in possible_paths]}"
+                f"Could not find questions file for {self.question_set} in any of: "
+                f"{[str(p) for p in questionset_directories()]}"
             )
             return {}
 

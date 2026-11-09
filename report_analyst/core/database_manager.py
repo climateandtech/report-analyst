@@ -12,9 +12,20 @@ from typing import Optional
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
+
+
+def storage_root() -> Path:
+    """Return where local cache files live.
+
+    Unset ``STORAGE_PATH`` keeps the repository ``storage/`` directory.
+    A set value is an optional override and does not change ``DATABASE_URL``.
+    """
+    configured = os.getenv("STORAGE_PATH")
+    if configured:
+        return Path(configured)
+    return Path(__file__).resolve().parent.parent.parent / "storage"
 
 
 class DatabaseManager:

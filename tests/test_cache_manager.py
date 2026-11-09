@@ -3,12 +3,14 @@ import os
 import shutil
 import sqlite3
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from report_analyst.core.cache_manager import CacheManager
+from report_analyst.core.database_manager import DatabaseManager, storage_root
 
 
 @pytest.fixture(autouse=True)
@@ -31,6 +33,47 @@ def temp_db():
     cache_manager = CacheManager(str(db_path))
     yield cache_manager
     shutil.rmtree(temp_dir)
+
+
+def test_unset_env_keeps_web_sqlite_default(monkeypatch, tmp_path):
+    """Web launches keep a cwd SQLite file unless DATABASE_URL or STORAGE_PATH is set."""
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("STORAGE_PATH", raising=False)
+    monkeypatch.chdir(tmp_path)
+    manager = CacheManager()
+    assert manager.db_manager.is_sqlite()
+    assert not manager.db_manager.is_postgres()
+    assert manager.db_path.resolve() == (tmp_path / "storage" / "cache" / "analysis.db").resolve()
+
+
+def test_postgres_database_url_is_unchanged(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://analyst:secret@db/reports")
+    manager = DatabaseManager()
+    assert manager.is_postgres()
+    assert manager.database_url.startswith("postgresql://")
+
+
+def test_storage_root_defaults_to_repository_storage(monkeypatch):
+    monkeypatch.delenv("STORAGE_PATH", raising=False)
+    assert storage_root() == Path(__file__).resolve().parents[1] / "storage"
+
+
+def test_concurrent_init_reuses_one_sqlite_file(tmp_path):
+    """Several openers share one SQLite file instead of failing on CREATE TABLE."""
+    db_path = tmp_path / "analysis.db"
+    errors = []
+
+    def open_db():
+        try:
+            CacheManager(str(db_path))
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda _index: open_db(), range(8)))
+
+    assert errors == []
+    assert db_path.is_file()
 
 
 def test_init_db(temp_db):

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -8,9 +9,12 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from llama_index.core import Document
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from .database_manager import DatabaseManager
 from .database_schema import indexes, metadata
+
+_schema_lock = threading.Lock()
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +40,13 @@ class CacheManager:
             db_url = f"sqlite:///{db_path}"
             self.db_path = db_path_obj  # Keep for backward compatibility
         else:
-            # Default to SQLite
+            # Default to SQLite. DATABASE_URL still wins inside DatabaseManager
+            # when this branch is not used; Postgres deployments pass database_url.
             storage_path = os.getenv("STORAGE_PATH", "./storage")
             db_path = str(Path(storage_path) / "cache" / "analysis.db")
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
             db_url = f"sqlite:///{db_path}"
-            self.db_path = Path(db_path)  # Keep for backward compatibility
+            self.db_path = Path(db_path)
 
         # Initialize database manager
         self.db_manager = DatabaseManager(db_url)
@@ -61,28 +66,33 @@ class CacheManager:
         self.current_chunk_overlap = None
 
     def init_db(self):
-        """Initialize the database schema using SQLAlchemy"""
+        """Initialize the database schema using SQLAlchemy."""
+        with _schema_lock:
+            self._create_schema()
+
+    def _create_schema(self) -> None:
+        """Create tables if needed. A second opener reuses the existing file."""
         try:
-            engine = self.db_manager.get_engine()
-            # Create all tables
-            metadata.create_all(engine)
+            self._apply_schema()
+        except OperationalError as exc:
+            if "already exists" not in str(exc):
+                logger.error(f"Error initializing database schema: {exc!s}", exc_info=True)
+                raise
+            logger.info("SQLite tables already exist; reusing the database file")
+            self._apply_schema()
 
-            # Create indexes (using raw SQL for IF NOT EXISTS support)
-            # Note: Some databases may not support IF NOT EXISTS in CREATE INDEX
-            # We'll try to create them and ignore errors if they already exist
-            with self.db_manager.get_connection() as conn:
-                for index_sql in indexes:
-                    try:
-                        conn.execute(text(index_sql))
-                    except Exception as e:  # noqa: BLE001
-                        # Index might already exist, which is fine
-                        logger.debug(f"Index creation (may already exist): {e}")
-                conn.commit()
-
-            logger.info("Database schema initialized successfully")
-        except Exception as e:
-            logger.error(f"Error initializing database schema: {e!s}", exc_info=True)
-            raise
+    def _apply_schema(self) -> None:
+        """Create cache tables and indexes."""
+        engine = self.db_manager.get_engine()
+        metadata.create_all(engine, checkfirst=True)
+        with self.db_manager.get_connection() as conn:
+            for index_sql in indexes:
+                try:
+                    conn.execute(text(index_sql))
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug(f"Index creation (may already exist): {exc}")
+            conn.commit()
+        logger.info("Database schema initialized successfully")
 
     def _load_vector_store(self, file_path: str, chunks: List[Dict]) -> None:
         """Load chunks into an in-memory vector store."""
