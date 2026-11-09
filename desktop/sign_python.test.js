@@ -53,3 +53,9 @@ test("ad-hoc codesign args skip Apple timestamps", () => {
   );
   assert.ok(developer.includes("--timestamp"));
 });
+
+test("mac entitlements disable library validation for ad-hoc Electron", () => {
+  const entitlements = fs.readFileSync(path.join(__dirname, "build", "entitlements.mac.plist"), "utf8");
+  assert.match(entitlements, /com\.apple\.security\.cs\.disable-library-validation/);
+  assert.match(entitlements, /com\.apple\.security\.cs\.allow-jit/);
+});

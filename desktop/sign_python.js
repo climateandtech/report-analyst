@@ -90,16 +90,47 @@ function isMasTarget(context) {
   return (context.targets || []).some((target) => target.name === "mas" || target.name === "mas-dev");
 }
 
+function signOne(identity, entitlements, target) {
+  execFileSync("/usr/bin/codesign", codesignArgs(identity, entitlements, target), { stdio: "inherit" });
+}
+
 function signAppBundle(appPath, identity, entitlements) {
-  const args = ["--force", "--sign", identity, "--options", "runtime", "--entitlements", entitlements];
-  if (identity === ADHOC_IDENTITY) {
-    // Seal nested Mach-O when electron-builder skips signing (no Developer ID).
-    args.splice(1, 0, "--deep");
-  } else {
-    args.push("--timestamp");
+  // Do not use --deep. Sign helpers and frameworks inside-out so each process
+  // gets disable-library-validation; otherwise dyld rejects Electron Framework
+  // for "different Team IDs" under hardened runtime.
+  const frameworks = path.join(appPath, "Contents", "Frameworks");
+  const electronFramework = path.join(frameworks, "Electron Framework.framework");
+  const crashpad = path.join(
+    electronFramework,
+    "Versions",
+    "A",
+    "Helpers",
+    "chrome_crashpad_handler",
+  );
+  if (fs.existsSync(crashpad)) {
+    signOne(identity, entitlements, crashpad);
   }
-  args.push(appPath);
-  execFileSync("/usr/bin/codesign", args, { stdio: "inherit" });
+  if (fs.existsSync(path.join(electronFramework, "Versions", "A", "Electron Framework"))) {
+    signOne(identity, entitlements, path.join(electronFramework, "Versions", "A", "Electron Framework"));
+  }
+  if (fs.existsSync(electronFramework)) {
+    signOne(identity, entitlements, electronFramework);
+  }
+  for (const name of ["Mantle", "ReactiveObjC", "Squirrel"]) {
+    const framework = path.join(frameworks, `${name}.framework`);
+    if (fs.existsSync(framework)) {
+      signOne(identity, entitlements, framework);
+    }
+  }
+  if (fs.existsSync(frameworks)) {
+    for (const entry of fs.readdirSync(frameworks)) {
+      if (!entry.endsWith(".app")) {
+        continue;
+      }
+      signOne(identity, entitlements, path.join(frameworks, entry));
+    }
+  }
+  signOne(identity, entitlements, appPath);
 }
 
 async function afterPack(context) {
@@ -116,7 +147,7 @@ async function afterPack(context) {
   }
   signPrefix(prefix, identity, entitlements);
   if (identity === ADHOC_IDENTITY) {
-    // electron-builder's afterSign hook is skipped when it finds no identity.
+    // electron-builder skips afterSign when it finds no identity.
     console.log(`ad-hoc sealing app bundle after pack: ${appPath}`);
     signAppBundle(appPath, identity, entitlements);
   }
