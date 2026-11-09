@@ -20,7 +20,7 @@ black==26.3.1
 blinker==1.9.0
 build==1.2.2.post1
 cachetools==5.5.1
-certifi==2024.12.14
+certifi==2026.10.18
 cffi==2.1.0
 charset-normalizer==3.4.1
 click==8.1.8
@@ -78,8 +78,6 @@ jsonschema-specifications==2024.10.1
 kiwisolver==1.4.8
 kubernetes==32.0.0
 langsmith==0.8.18
-llama-cloud==0.1.11
-llama-cloud-services==0.6.0
 llama-index-core==0.13.6
 llama-index-embeddings-openai==0.5.2
 llama-index-llms-google-genai==0.3.1
