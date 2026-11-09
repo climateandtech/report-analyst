@@ -49,6 +49,13 @@ jobs:
             npx electron-builder --mac
           fi
 
+      - name: Smoke the packed Mac app
+        run: |
+          APP=$(find desktop/dist -type d -name 'Open Sustainability Analyst.app' | head -1)
+          test -n "$APP"
+          PY="$APP/Contents/Resources/python/bin/python3"
+          "$PY" desktop/smoke_packed_app.py "$APP"
+
       - name: Upload the DMG and zip
         uses: actions/upload-artifact@v4
         with:
@@ -56,6 +63,8 @@ jobs:
           path: |
             desktop/dist/*.dmg
             desktop/dist/*mac.zip
+            desktop/dist/Clear\ Quarantine.command
+            desktop/dist/INSTALL-MAC.md
           if-no-files-found: error
 
   windows-installer:

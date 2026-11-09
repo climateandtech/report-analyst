@@ -33,6 +33,11 @@ function launcherScript() {
   return path.join(resourceDir(), "run_app.py");
 }
 
+function appIconPath() {
+  const candidate = path.join(__dirname, "build", "icon.png");
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
 function stopPython() {
   if (pythonProcess && !pythonProcess.killed) {
     pythonProcess.kill();
@@ -231,15 +236,16 @@ async function openWindow() {
   console.log(targetUrl);
   await waitForHealth(targetUrl);
 
-  if (process.platform === "darwin" && app.dock) {
-    app.dock.setIcon(path.join(__dirname, "build", "icon.png"));
+  const iconPath = appIconPath();
+  if (process.platform === "darwin" && app.dock && iconPath) {
+    app.dock.setIcon(iconPath);
   }
 
   const window = new BrowserWindow({
     width: 1280,
     height: 860,
     title: "Open Sustainability Analyst",
-    icon: path.join(__dirname, "build", "icon.png"),
+    ...(iconPath ? { icon: iconPath } : {}),
   });
   window.on("closed", stopPython);
   await window.loadURL(targetUrl);

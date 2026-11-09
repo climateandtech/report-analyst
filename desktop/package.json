@@ -28,6 +28,7 @@
       "main.js",
       "remote-manifest.js",
       "package.json",
+      "build/icon.png",
       "node_modules/**/*"
     ],
     "publish": {
