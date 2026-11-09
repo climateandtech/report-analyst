@@ -33,3 +33,23 @@ test("only Mach-O files in the prefix are selected, deepest first", () => {
   assert.deepEqual(selected, [path.join(nested, "_mupdf.so")]);
   fs.unlinkSync(outside);
 });
+
+test("ad-hoc codesign args skip Apple timestamps", () => {
+  const adhoc = signer.codesignArgs("-", "/tmp/entitlements.plist", "/tmp/binary");
+  assert.deepEqual(adhoc, [
+    "--force",
+    "--sign",
+    "-",
+    "--options",
+    "runtime",
+    "--entitlements",
+    "/tmp/entitlements.plist",
+    "/tmp/binary",
+  ]);
+  const developer = signer.codesignArgs(
+    "Developer ID Application: Example (ABCD)",
+    "/tmp/entitlements.plist",
+    "/tmp/binary",
+  );
+  assert.ok(developer.includes("--timestamp"));
+});

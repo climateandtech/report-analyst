@@ -89,6 +89,20 @@ def _load_env_files(root: Path, data_dir: Path) -> None:
     load_dotenv(data_dir / ".env", override=True)
 
 
+def configure_questionsets(root: Path, data_dir: Path, environ: dict[str, str] | None = None) -> Path:
+    """Load the shipped question sets and a writable folder beside the user's data.
+
+    A YAML file in the writable folder is added to the list. The same filename
+    replaces the shipped set.
+    """
+    environ = os.environ if environ is None else environ
+    user_sets = data_dir / "questionsets"
+    user_sets.mkdir(parents=True, exist_ok=True)
+    environ["QUESTIONSETS_PATH"] = str(root / "report_analyst" / "questionsets")
+    environ.setdefault("QUESTIONSETS_EXTRA_PATH", str(user_sets))
+    return user_sets
+
+
 def isolate_local_store(data_dir: Path, environ: dict[str, str] | None = None) -> Path:
     """Point the process at one on-disk SQLite file and keep user files beside it.
 
@@ -118,10 +132,10 @@ def main() -> None:
 
     os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
     os.environ["PYTHONNOUSERSITE"] = "1"
-    os.environ["QUESTIONSETS_PATH"] = str(root / "report_analyst" / "questionsets")
     os.chdir(root)
     _load_env_files(root, data_dir)
     isolate_local_store(data_dir)
+    configure_questionsets(root, data_dir)
 
     port = pick_port()
     print(f"{URL_PREFIX}{desktop_url(port)}", flush=True)

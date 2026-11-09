@@ -100,6 +100,24 @@ def test_isolate_local_store_forces_sqlite_file(run_app, tmp_path):
     assert environ["USE_POSTGRES_FILE_STORAGE"] == "false"
 
 
+def test_configure_questionsets_merges_a_writable_folder(run_app, tmp_path):
+    """Shipped sets stay in the bundle; a folder next to user data can add or replace one."""
+    root = tmp_path / "app"
+    data = tmp_path / "data"
+    environ: dict[str, str] = {}
+
+    user_sets = run_app.configure_questionsets(root, data, environ)
+
+    assert user_sets == data / "questionsets"
+    assert user_sets.is_dir()
+    assert environ["QUESTIONSETS_PATH"] == str(root / "report_analyst" / "questionsets")
+    assert environ["QUESTIONSETS_EXTRA_PATH"] == str(user_sets)
+
+    environ["QUESTIONSETS_EXTRA_PATH"] = "/already/chosen"
+    run_app.configure_questionsets(root, data, environ)
+    assert environ["QUESTIONSETS_EXTRA_PATH"] == "/already/chosen"
+
+
 def test_remote_manifests_are_version_and_notice_files():
     """The git files Electron fetches are a version gate and a notice list."""
     release = json.loads((REPO_ROOT / "desktop" / "remote" / "release.json").read_text())

@@ -22,6 +22,8 @@
     "productName": "Open Sustainability Analyst",
     "asar": true,
     "afterPack": "sign_python.js",
+    "afterSign": "after_sign.js",
+    "afterAllArtifactBuild": "after_all_artifact_build.js",
     "files": [
       "main.js",
       "remote-manifest.js",

@@ -1107,22 +1107,13 @@ class DocumentAnalyzer:
 
     def _load_questions(self) -> dict:
         """Load questions from YAML files"""
-        # Look for question set file in multiple possible locations
-        possible_paths = [
-            Path(__file__).parent.parent / "questionsets" / f"{self.question_set}_questions.yaml",  # app/questionsets
-            Path(__file__).parent.parent.parent / "questionsets" / f"{self.question_set}_questions.yaml",  # project root
-            Path.cwd() / "questionsets" / f"{self.question_set}_questions.yaml",  # current working directory
-        ]
+        from report_analyst.core.question_loader import question_file, questionset_directories
 
-        yaml_file = None
-        for path in possible_paths:
-            if path.exists():
-                yaml_file = path
-                break
-
+        yaml_file = question_file(self.question_set)
         if not yaml_file:
             logger.error(
-                f"Could not find questions file for {self.question_set} in any of: {[str(p) for p in possible_paths]}"
+                f"Could not find questions file for {self.question_set} in any of: "
+                f"{[str(p) for p in questionset_directories()]}"
             )
             return {}
 

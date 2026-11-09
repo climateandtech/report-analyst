@@ -302,6 +302,7 @@ class TestQuestionSetLoader:
 
             # Set environment variable to use custom directory
             original_env = os.environ.get("QUESTIONSETS_PATH")
+            original_extra = os.environ.pop("QUESTIONSETS_EXTRA_PATH", None)
             os.environ["QUESTIONSETS_PATH"] = temp_dir
 
             try:
@@ -318,6 +319,32 @@ class TestQuestionSetLoader:
                     os.environ["QUESTIONSETS_PATH"] = original_env
                 elif "QUESTIONSETS_PATH" in os.environ:
                     del os.environ["QUESTIONSETS_PATH"]
+                if original_extra:
+                    os.environ["QUESTIONSETS_EXTRA_PATH"] = original_extra
+
+    def test_extra_path_adds_and_replaces_a_set(self, tmp_path, monkeypatch):
+        """A second directory adds a new set and replaces a shipped filename."""
+        extra = tmp_path / "mine"
+        extra.mkdir()
+        (extra / "custom_questions.yaml").write_text(
+            "name: Custom\ndescription: Mine\nquestions:\n  - id: custom_1\n    text: Hello\n",
+            encoding="utf-8",
+        )
+        (extra / "tcfd_questions.yaml").write_text(
+            "name: Replaced TCFD\ndescription: Local copy\nquestions:\n  - id: tcfd_1\n    text: Replaced\n",
+            encoding="utf-8",
+        )
+        monkeypatch.delenv("QUESTIONSETS_PATH", raising=False)
+        monkeypatch.setenv("QUESTIONSETS_EXTRA_PATH", str(extra))
+
+        from report_analyst.core.question_loader import question_file
+
+        loader = QuestionSetLoader()
+        sets = loader.get_question_sets()
+        assert "custom" in sets
+        assert sets["custom"].questions["custom_1"]["text"] == "Hello"
+        assert sets["tcfd"].name == "Replaced TCFD"
+        assert question_file("tcfd") == extra / "tcfd_questions.yaml"
 
     def test_fallback_behavior_without_core_functionality(self):
         """Test fallback behavior when core functionality is unavailable"""

@@ -27,6 +27,42 @@ class QuestionSet:
     questions: Dict[str, Dict[str, str]]  # question_id -> {text, guidelines}
 
 
+def questionset_directories() -> List[Path]:
+    """Return built-in directories, then the optional extra directory.
+
+    ``QUESTIONSETS_PATH`` replaces the built-in search. ``QUESTIONSETS_EXTRA_PATH``
+    is always appended, so a person can add or replace a set without copying the
+    ones shipped with the app. A file in the extra directory wins when the id matches.
+    """
+    env_path = os.getenv("QUESTIONSETS_PATH")
+    if env_path:
+        paths = [Path(env_path)]
+    else:
+        paths = [
+            Path(__file__).parent.parent / "questionsets",
+            Path(__file__).parent.parent.parent / "questionsets",
+            Path.cwd() / "questionsets",
+        ]
+    extra = os.getenv("QUESTIONSETS_EXTRA_PATH")
+    if extra:
+        paths.append(Path(extra))
+    return paths
+
+
+def question_file(question_set_id: str) -> Optional[Path]:
+    """Return the YAML file for one set. The extra directory is preferred."""
+    filename = f"{question_set_id}_questions.yaml"
+    directories = questionset_directories()
+    extra_raw = os.getenv("QUESTIONSETS_EXTRA_PATH")
+    extra = Path(extra_raw) if extra_raw else None
+    ordered = ([extra] if extra is not None else []) + [path for path in directories if path != extra]
+    for directory in ordered:
+        candidate = directory / filename
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 class QuestionSetLoader:
     """Centralized loader for question sets from YAML files"""
 
@@ -36,17 +72,7 @@ class QuestionSetLoader:
 
     def _get_questionsets_paths(self) -> List[Path]:
         """Get possible paths for questionsets directory"""
-        # Check environment variable first
-        env_path = os.getenv("QUESTIONSETS_PATH")
-        if env_path:
-            return [Path(env_path)]
-
-        # Default search paths
-        return [
-            Path(__file__).parent.parent / "questionsets",  # app/questionsets
-            Path(__file__).parent.parent.parent / "questionsets",  # project root
-            Path.cwd() / "questionsets",  # current working directory
-        ]
+        return questionset_directories()
 
     def _load_question_sets(self) -> Dict[str, QuestionSet]:
         """Load all question sets from YAML files"""

@@ -1,7 +1,7 @@
 "use strict";
 
 // Sign Mach-O files inside the bundled CPython prefix before electron-builder
-// signs the app. Without a Developer ID this is a no-op so local packs still run.
+// signs the app. Uses a Developer ID when one is available; otherwise ad-hoc ("-").
 
 const { execFileSync } = require("child_process");
 const fs = require("fs");
@@ -10,6 +10,7 @@ const path = require("path");
 const MACH_O_MAGICS = new Set([
   0xfeedface, 0xcefaedfe, 0xfeedfacf, 0xcffaedfe, 0xcafebabe, 0xbebafeca,
 ]);
+const ADHOC_IDENTITY = "-";
 
 function isMachO(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 4) {
@@ -51,7 +52,7 @@ function machOPaths(root) {
   return found.sort((left, right) => right.split(path.sep).length - left.split(path.sep).length);
 }
 
-function signingIdentity() {
+function developerIdIdentity() {
   if (process.env.CSC_NAME) {
     return process.env.CSC_NAME;
   }
@@ -66,13 +67,22 @@ function signingIdentity() {
   }
 }
 
+function signingIdentity() {
+  return developerIdIdentity() || ADHOC_IDENTITY;
+}
+
+function codesignArgs(identity, entitlements, file) {
+  const args = ["--force", "--sign", identity, "--options", "runtime", "--entitlements", entitlements];
+  if (identity !== ADHOC_IDENTITY) {
+    args.push("--timestamp");
+  }
+  args.push(file);
+  return args;
+}
+
 function signPrefix(prefix, identity, entitlements) {
   for (const file of machOPaths(prefix)) {
-    execFileSync(
-      "/usr/bin/codesign",
-      ["--force", "--sign", identity, "--options", "runtime", "--timestamp", "--entitlements", entitlements, file],
-      { stdio: "inherit" },
-    );
+    execFileSync("/usr/bin/codesign", codesignArgs(identity, entitlements, file), { stdio: "inherit" });
   }
 }
 
@@ -80,22 +90,44 @@ function isMasTarget(context) {
   return (context.targets || []).some((target) => target.name === "mas" || target.name === "mas-dev");
 }
 
+function signAppBundle(appPath, identity, entitlements) {
+  const args = ["--force", "--sign", identity, "--options", "runtime", "--entitlements", entitlements];
+  if (identity === ADHOC_IDENTITY) {
+    // Seal nested Mach-O when electron-builder skips signing (no Developer ID).
+    args.splice(1, 0, "--deep");
+  } else {
+    args.push("--timestamp");
+  }
+  args.push(appPath);
+  execFileSync("/usr/bin/codesign", args, { stdio: "inherit" });
+}
+
 async function afterPack(context) {
   if (context.electronPlatformName !== "darwin" || isMasTarget(context)) {
     return;
   }
   const identity = signingIdentity();
-  if (!identity) {
-    console.log("skipped Python prefix signing: no Developer ID Application identity");
-    return;
-  }
   const appName = context.packager.appInfo.productFilename;
-  const prefix = path.join(context.appOutDir, `${appName}.app`, "Contents", "Resources", "python");
-  signPrefix(prefix, identity, path.join(__dirname, "build", "entitlements.mac.plist"));
+  const appPath = path.join(context.appOutDir, `${appName}.app`);
+  const entitlements = path.join(__dirname, "build", "entitlements.mac.plist");
+  const prefix = path.join(appPath, "Contents", "Resources", "python");
+  if (identity === ADHOC_IDENTITY) {
+    console.log("signing Python prefix with ad-hoc identity (no Developer ID on this machine)");
+  }
+  signPrefix(prefix, identity, entitlements);
+  if (identity === ADHOC_IDENTITY) {
+    // electron-builder's afterSign hook is skipped when it finds no identity.
+    console.log(`ad-hoc sealing app bundle after pack: ${appPath}`);
+    signAppBundle(appPath, identity, entitlements);
+  }
 }
 
 module.exports = afterPack;
 module.exports.isMachO = isMachO;
 module.exports.machOPaths = machOPaths;
 module.exports.signPrefix = signPrefix;
+module.exports.signAppBundle = signAppBundle;
 module.exports.signingIdentity = signingIdentity;
+module.exports.developerIdIdentity = developerIdIdentity;
+module.exports.codesignArgs = codesignArgs;
+module.exports.ADHOC_IDENTITY = ADHOC_IDENTITY;
