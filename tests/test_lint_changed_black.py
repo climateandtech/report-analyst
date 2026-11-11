@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import textwrap
 from pathlib import Path
@@ -14,17 +15,17 @@ def test_lint_changed_fails_when_black_would_reformat(tmp_path: Path) -> None:
     bad = tmp_path / "bad_format.py"
     # 2-space indent is always reformatted by black.
     bad.write_text(
-        textwrap.dedent(
-            """\
+        textwrap.dedent("""\
             def f():
               return 1
-            """
-        ),
+            """),
         encoding="utf-8",
     )
 
-    result = subprocess.run(
-        ["bash", str(LINT_CHANGED), str(bad)],
+    bash = shutil.which("bash")
+    assert bash is not None
+    result = subprocess.run(  # noqa: S603
+        [bash, str(LINT_CHANGED), str(bad)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
