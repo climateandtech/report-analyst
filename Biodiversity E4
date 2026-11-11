@@ -1,0 +1,304 @@
+name: ESRS E4 Biodiversity Strategy Research 2023
+shortcut: bioe42023
+description: Custom research question set for CSRD biodiversity disclosures, TNFD, commitments, targets, strategic responses
+  and ecological outcomes. Anchored to 2023 ESRS; not an automated regulatory compliance opinion.
+questions:
+- id: bioe4_01
+  text: Which ESRS edition and financial reporting period does the undertaking state it uses?
+  guidelines: '- Theme: Reporting context â€” Applicable reporting framework
+
+    - Reference: ESRS 1 / ESRS 2 BP-1
+
+    - Record the financial year and the explicit ESRS version if stated; do not infer the version solely from publication
+    date. If unstated, say so.'
+- id: bioe4_02
+  text: Does the undertaking identify biodiversity and ecosystems as a material sustainability topic?
+  guidelines: '- Theme: Materiality and scope â€” Materiality conclusion
+
+    - Reference: ESRS 2 IRO-1/IRO-2 and E4-linked disclosures
+
+    - Distinguish explicitly material, explicitly non-material and not determined from the report. Look beyond the E4
+    chapter, including the DMA overview.'
+- id: bioe4_03
+  text: Which methods and evidence are reported for identifying and assessing biodiversity impacts, dependencies, risks
+    and opportunities?
+  guidelines: '- Theme: Materiality and scope â€” Biodiversity assessment methods
+
+    - Reference: ESRS 2 IRO-1 E4-related
+
+    - Capture screening methods, datasets, site mapping, thresholds, consultations and uncertainty. Do not infer method
+    use from framework mentions.'
+- id: bioe4_04
+  text: What actual or potential biodiversity and ecosystem impacts does the undertaking report?
+  guidelines: '- Theme: Impacts and dependencies â€” Negative and positive impacts
+
+    - Reference: E4 / ESRS 2 SBM-3
+
+    - Separate positive from negative, actual from potential, and direct operations from value chain. Cite concrete instances.'
+- id: bioe4_05
+  text: Which drivers of biodiversity change are attributed to the undertaking's activities or value chain?
+  guidelines: '- Theme: Impacts and dependencies â€” Drivers of biodiversity change
+
+    - Reference: E4-5 / IRO assessment
+
+    - Look for land or sea-use change, freshwater use, pollution, climate change, resource extraction or invasive species;
+    report only drivers linked to biodiversity.'
+- id: bioe4_06
+  text: Which dependencies on ecosystems or ecosystem services are identified?
+  guidelines: '- Theme: Impacts and dependencies â€” Ecosystem dependencies
+
+    - Reference: E4 / ESRS 2 SBM-3
+
+    - Differentiate ecosystem dependencies from impacts; capture nature, location, business process and value-chain segment.'
+- id: bioe4_07
+  text: Does the report identify facilities or activities in or near biodiversity-sensitive areas?
+  guidelines: '- Theme: Impacts and dependencies â€” Biodiversity-sensitive sites
+
+    - Reference: E4-5 / ESRS 2 SBM-3
+
+    - Capture named locations, protection status, proximity method and reported impact, if available. Do not count generic
+    geographic presence.'
+- id: bioe4_08
+  text: Which physical risks linked to ecosystem degradation or nature loss are disclosed?
+  guidelines: '- Theme: Risks and opportunities â€” Physical biodiversity risks
+
+    - Reference: ESRS 2 SBM-3 / E4-6
+
+    - Identify specific hazard, business consequence, affected asset or process and time horizon where present.'
+- id: bioe4_09
+  text: Which regulatory, market, technology, litigation or reputational risks tied to biodiversity are disclosed?
+  guidelines: '- Theme: Risks and opportunities â€” Transition biodiversity risks
+
+    - Reference: ESRS 2 SBM-3 / E4-6
+
+    - Give the stated transmission channel to the business and distinguish an actual risk from a hypothetical possibility.'
+- id: bioe4_10
+  text: Which biodiversity-related commercial, operational or ecosystem restoration opportunities are reported?
+  guidelines: '- Theme: Risks and opportunities â€” Nature-related opportunities
+
+    - Reference: ESRS 2 SBM-3 / E4-6
+
+    - Capture the strategic or financial opportunity stated by the company; avoid inferring benefits from generic environmental
+    projects.'
+- id: bioe4_11
+  text: Which specific changes to strategy or business model are explicitly linked to biodiversity impacts, dependencies,
+    risks or opportunities?
+  guidelines: '- Theme: Strategy and decisions â€” Explicit strategic adaptation
+
+    - Reference: E4-1 / ESRS 2 SBM-3
+
+    - Require a named strategic decision or adaptation and an explicit connection to a biodiversity issue. Do not treat
+    an ambition alone as strategic change.'
+- id: bioe4_12
+  text: Are capital allocation, investment selection, facility expansion or site location decisions reported as influenced
+    by biodiversity considerations?
+  guidelines: '- Theme: Strategy and decisions â€” Investment or site decisions
+
+    - Reference: E4-1 / ESRS 2 SBM-3
+
+    - Record decisions and reported drivers; distinguish implemented, planned and merely considered decisions.'
+- id: bioe4_13
+  text: What procurement, sourcing or supply-chain strategic changes are attributed to biodiversity?
+  guidelines: '- Theme: Strategy and decisions â€” Procurement and value chain
+
+    - Reference: E4-1 / E4-2 / E4-3
+
+    - Look for traceability, supplier thresholds, sourcing shifts, contract criteria or landscape partnerships; separate
+    policy from execution.'
+- id: bioe4_14
+  text: What strategic tensions or trade-offs involving biodiversity are acknowledged?
+  guidelines: '- Theme: Strategy and decisions â€” Strategic trade-offs
+
+    - Reference: E4-1 / ESRS 2 SBM-3
+
+    - Look for explicit tensions such as land use versus growth, renewables versus habitats, circularity versus ecosystem
+    impacts; avoid inventing tensions.'
+- id: bioe4_15
+  text: Does the company use biodiversity scenarios, long-term assumptions or future ecological pathways to inform decisions?
+  guidelines: '- Theme: Strategy and decisions â€” Scenario and future horizons
+
+    - Reference: E4-1 / ESRS 2 SBM-3
+
+    - Capture scenario method, horizons, assumptions and claimed strategic use; a risk horizon alone is not scenario
+    analysis.'
+- id: bioe4_16
+  text: How does the undertaking describe biodiversity-related adaptation of its strategy and business model, including
+    any transition plan?
+  guidelines: '- Theme: Strategy and decisions â€” Biodiversity transition plan
+
+    - Reference: E4-1
+
+    - Identify whether plan exists, is public, proposed or not disclosed. Extract goals, strategic transformation, actions,
+    finance and governance, if stated.'
+- id: bioe4_17
+  text: Which policies specifically address biodiversity and ecosystems and what scope do they cover?
+  guidelines: '- Theme: Policies and responses â€” Biodiversity policies
+
+    - Reference: E4-2
+
+    - Identify policy owner, operations and supply-chain coverage, land or marine practices, sensitive areas and traceability
+    where given.'
+- id: bioe4_18
+  text: What concrete actions are reported to avoid, minimise, restore or compensate biodiversity impacts?
+  guidelines: '- Theme: Policies and responses â€” Mitigation hierarchy actions
+
+    - Reference: E4-3
+
+    - Classify each distinct action by avoid/minimise/restore/offset; separate completed, in progress and planned actions.'
+- id: bioe4_19
+  text: What financial, staffing or collaborative resources are committed to biodiversity actions?
+  guidelines: '- Theme: Policies and responses â€” Resources and partnerships
+
+    - Reference: E4-3
+
+    - Report monetary amounts and partners exactly if present; distinguish programme costs from ecological outcomes.'
+- id: bioe4_20
+  text: Who is accountable for biodiversity strategy, risks, policies and targets?
+  guidelines: '- Theme: Governance â€” Board and management accountability
+
+    - Reference: ESRS 2 GOV / E4
+
+    - Name responsible body/role and decisions or monitoring responsibilities; distinguish committee mention from concrete
+    oversight.'
+- id: bioe4_21
+  text: Does the report explicitly mention or claim alignment with TNFD recommendations?
+  guidelines: '- Theme: Frameworks â€” TNFD referenced
+
+    - Reference: Research extension / voluntary TNFD
+
+    - Quote the claim and classify as mentioned, intended, claimed aligned or evidenced use. A TNFD reference alone is
+    not proof of application.'
+- id: bioe4_22
+  text: Does the report describe using TNFD's LEAP approach for nature-related assessment?
+  guidelines: '- Theme: Frameworks â€” TNFD LEAP application
+
+    - Reference: Research extension / voluntary TNFD
+
+    - Search for Locate, Evaluate, Assess and Prepare or substantive equivalent steps; record what is actually demonstrated,
+    not assumed.'
+- id: bioe4_23
+  text: Which additional nature-related frameworks are referenced and how are they used?
+  guidelines: '- Theme: Frameworks â€” Other biodiversity frameworks
+
+    - Reference: Research extension / E4 context
+
+    - Look for SBTN, Kunming-Montreal GBF, EU Biodiversity Strategy, GRI 101, Nature Positive Initiative and relevant
+    methodologies; distinguish adoption from mention.'
+- id: bioe4_24
+  text: What explicit biodiversity commitments or ambitions has the undertaking made?
+  guidelines: '- Theme: Commitments and targets â€” Public biodiversity commitments
+
+    - Reference: E4-2 / E4-4
+
+    - Capture nature-positive, no-net-loss, net-gain, restoration, species protection and zero deforestation verbatim
+    where feasible; record scope and deadline separately.'
+- id: bioe4_25
+  text: What quantitative or verifiable biodiversity targets, baselines and deadlines are disclosed?
+  guidelines: '- Theme: Commitments and targets â€” Measurable biodiversity targets
+
+    - Reference: E4-4
+
+    - Extract metric, target value, baseline, target year, boundary and location or value-chain scope. Do not equate
+    an ambition with a target.'
+- id: bioe4_26
+  text: Does the company report that its biodiversity targets are science-based or independently validated?
+  guidelines: '- Theme: Commitments and targets â€” Science-based or validated targets
+
+    - Reference: E4-4
+
+    - Differentiate SBTN committed/intended, submitted, validated and implemented; do not infer validation from science-based
+    language.'
+- id: bioe4_27
+  text: How are biodiversity targets governed and translated into interim milestones and operational accountabilities?
+  guidelines: '- Theme: Commitments and targets â€” Target governance and milestones
+
+    - Reference: E4-4 / ESRS 2 GOV
+
+    - Record milestones, owner, monitoring frequency, escalation and incentives only where explicit.'
+- id: bioe4_28
+  text: Which metrics are used to assess biodiversity pressures, species, ecosystems or ecosystem services?
+  guidelines: '- Theme: Outcomes and metrics â€” Biodiversity metrics
+
+    - Reference: E4-5
+
+    - List units, coverage, data source, baseline and monitoring interval. Distinguish pressure/activity indicators from
+    state-of-nature outcomes.'
+- id: bioe4_29
+  text: What progress or shortfall against biodiversity targets is reported?
+  guidelines: '- Theme: Outcomes and metrics â€” Progress against targets
+
+    - Reference: E4-4 / E4-5
+
+    - Compare reported achievement against target and baseline; identify period, evidence and limitations. If no figures,
+    report not disclosed.'
+- id: bioe4_30
+  text: What measured changes in ecological condition or biodiversity outcomes are attributed to the company's actions?
+  guidelines: '- Theme: Outcomes and metrics â€” Ecological outcomes
+
+    - Reference: E4-5
+
+    - Distinguish documented ecological outcome (e.g. habitat condition/species changes) from outputs (e.g. trees planted
+    or hectares managed). Avoid causal inference unless company states a basis.'
+- id: bioe4_31
+  text: Does the company use biodiversity offsets or compensation and explain how these are applied?
+  guidelines: '- Theme: Outcomes and metrics â€” Biodiversity offsets
+
+    - Reference: E4-3 / E4-4
+
+    - Separate offset policy, actual offset use and offset-in-target accounting; capture standard, site, quantity, quality
+    and financing if disclosed.'
+- id: bioe4_32
+  text: What anticipated financial effects of material biodiversity-related risks and opportunities are disclosed under
+    ESRS E4-6 or related ESRS 2 information?
+  guidelines: '- Theme: Financial implications â€” Reported financial consequences
+
+    - Reference: E4-6 / ESRS 2 SBM-3
+
+    - Capture quantified and qualitative effects, time horizons, affected cash flows or assets and cited uncertainties.
+    Apply the ESRS version appropriate to the report.'
+- id: bioe4_33
+  text: What limitations, data gaps, estimates or uncertainty does the company disclose about its biodiversity assessment
+    and outcomes?
+  guidelines: '- Theme: Evidence and limitations â€” Specificity and uncertainty
+
+    - Reference: ESRS 1 / E4
+
+    - Record explicit limitations; distinguish non-material topic, phased-in omission, not disclosed and genuinely no
+    action.'
+- id: bioe4_34
+  text: Does the company explicitly explain how identifying a biodiversity issue led to a strategic decision and subsequent
+    response?
+  guidelines: '- Theme: Evidence and limitations â€” Reported causal linkage
+
+    - Reference: Research extension / ESRS 2 SBM-3
+
+    - Require a traceable reported sequence issue > interpretation > decision > action. If only co-located claims occur,
+    do not infer causality.'
+- id: bioe4_35
+  text: Where else in the report are material biodiversity disclosures and responses presented?
+  guidelines: '- Theme: Evidence and limitations â€” Cross-references outside E4
+
+    - Reference: ESRS 2 / E1-E5 / S3
+
+    - Check ESRS 2, E1 climate, E2 pollution, E3 water, E5 circular economy, S3 communities and business strategy; identify
+    sections and pages.'
+analysis_guidelines: '- Use only the uploaded sustainability report as evidence and identify page numbers or section
+  titles when available.
+
+  - Distinguish explicit disclosure from inference; do not claim that a strategic action resulted from biodiversity unless
+  the report says so.
+
+  - If no evidence is found, answer ''Not identified in the supplied report'', not ''The company does not do this''.
+
+  - Distinguish targets or plans from implemented actions and from measured ecological outcomes.
+
+  - Treat TNFD, LEAP, SBTN, and nature-positive claims as distinct categories; mention does not establish adoption or
+  validation.
+
+  - Check ESRS 2 and related E1, E2, E3, E5 and S3 disclosures, not only the E4-labelled section.
+
+  - When assessing omission, consider materiality, reporting-standard edition, phase-ins and transitional reliefs; do
+  not automatically label a gap as noncompliance.
+
+  - Report the company''s claims as company-reported evidence, not independently verified facts.'
+
