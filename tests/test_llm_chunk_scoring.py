@@ -96,6 +96,41 @@ async def test_score_chunk_relevance_must_not_accept_silent_zero(scoring_analyze
 
 
 @pytest.mark.asyncio
+async def test_score_chunk_relevance_batch_sequential_uses_messages(scoring_analyzer):
+    """single_call=False scores each chunk via score_chunk_relevance (messages API)."""
+    scoring_analyzer.llm = MessagesOnlyLLM("0.55")
+    chunks = [
+        {"text": "0.13 t CO2e/t by 2035."},
+        {"text": "Board oversight text."},
+    ]
+    scores = await scoring_analyzer.score_chunk_relevance_batch(
+        "What GHG targets?",
+        chunks,
+        single_call=False,
+    )
+    assert scores == pytest.approx([0.55, 0.55])
+    assert len(scoring_analyzer.llm.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_score_chunk_relevance_batch_bad_parse_returns_zeros(scoring_analyzer):
+    """Parse mismatch must soft-fail to zeros, not raise out of batch scoring."""
+    scoring_analyzer.llm = MessagesOnlyLLM("not-a-score")
+    chunks = [{"text": "a"}, {"text": "b"}]
+    scores = await scoring_analyzer.score_chunk_relevance_batch(
+        "What GHG targets?",
+        chunks,
+        single_call=True,
+    )
+    assert scores == [0.0, 0.0]
+
+
+def test_parse_relevance_scores_rejects_wrong_count():
+    with pytest.raises(ValueError, match="Got 1 scores for 2 chunks"):
+        DocumentAnalyzer._parse_relevance_scores("0.9", expected=2)
+
+
+@pytest.mark.asyncio
 async def test_analyze_chunks_passes_llm_score_into_prompt(scoring_analyzer):
     """Hypothesis: answer prompt must show llm_score as relevance, not always 0.0."""
     captured: dict[str, Any] = {}
@@ -122,3 +157,30 @@ async def test_analyze_chunks_passes_llm_score_into_prompt(scoring_analyzer):
     content = "\n".join(m.content for m in captured["messages"] if hasattr(m, "content"))
     assert "Relevance Score: 1.000" in content
     assert "Relevance Score: 0.200" in content
+
+
+@pytest.mark.asyncio
+async def test_analyze_chunks_falls_back_to_similarity_when_llm_score_missing(scoring_analyzer):
+    """With scoring on but no llm_score, prompt uses embedding similarity."""
+    captured: dict[str, Any] = {}
+
+    async def fake_achat(messages, **kwargs):
+        captured["messages"] = messages
+        return Mock(
+            message=Mock(
+                content=(
+                    '{"ANSWER":"ok","SCORE":"5","EVIDENCE":[{"text":"e","chunk":1}],'
+                    '"GAPS":[],"SOURCES":[1]}'
+                )
+            )
+        )
+
+    scoring_analyzer.llm = Mock(model="gpt-4o-mini-test")
+    scoring_analyzer.llm.achat = fake_achat
+    question = {"text": "What targets?", "guidelines": ""}
+    chunks = [
+        {"text": "intensity targets", "score": 0.73, "metadata": {}},
+    ]
+    await scoring_analyzer._analyze_chunks(question, chunks, use_llm_scoring=True)
+    content = "\n".join(m.content for m in captured["messages"] if hasattr(m, "content"))
+    assert "Relevance Score: 0.730" in content

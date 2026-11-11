@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 from typing import Any, List, Sequence
 from unittest.mock import Mock
 
