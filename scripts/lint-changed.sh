@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lint changed Python under report-analyst with ruff.
+# Lint changed Python under report-analyst with ruff + black (matches CI lint).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -54,6 +54,13 @@ if ! qg_require_ruff; then
   echo "lint-changed: ruff not available (pip install ruff)" >&2
   exit 2
 fi
+if ! qg_require_black; then
+  echo "lint-changed: black not available (pip install black)" >&2
+  exit 2
+fi
 
 echo "lint-changed: ruff check ${#FILES[@]} file(s)"
 qg_run_ruff check "${FILES[@]}"
+
+echo "lint-changed: black --check ${#FILES[@]} file(s)"
+qg_run_black --check --diff "${FILES[@]}"
