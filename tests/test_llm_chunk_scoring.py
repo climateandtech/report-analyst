@@ -139,10 +139,7 @@ async def test_analyze_chunks_passes_llm_score_into_prompt(scoring_analyzer):
         captured["messages"] = messages
         return Mock(
             message=Mock(
-                content=(
-                    '{"ANSWER":"ok","SCORE":"5","EVIDENCE":[{"text":"e","chunk":1}],'
-                    '"GAPS":[],"SOURCES":[1]}'
-                )
+                content=('{"ANSWER":"ok","SCORE":"5","EVIDENCE":[{"text":"e","chunk":1}],' '"GAPS":[],"SOURCES":[1]}')
             )
         )
 
@@ -168,10 +165,7 @@ async def test_analyze_chunks_falls_back_to_similarity_when_llm_score_missing(sc
         captured["messages"] = messages
         return Mock(
             message=Mock(
-                content=(
-                    '{"ANSWER":"ok","SCORE":"5","EVIDENCE":[{"text":"e","chunk":1}],'
-                    '"GAPS":[],"SOURCES":[1]}'
-                )
+                content=('{"ANSWER":"ok","SCORE":"5","EVIDENCE":[{"text":"e","chunk":1}],' '"GAPS":[],"SOURCES":[1]}')
             )
         )
 

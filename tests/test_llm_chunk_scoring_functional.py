@@ -134,9 +134,7 @@ async def test_process_document_llm_scoring_persists_nonzero_scores(functional_a
     result = result_events[0]["result"]
     scored_chunks = result.get("chunks") or []
     llm_scores = [
-        float(chunk["llm_score"])
-        for chunk in scored_chunks
-        if isinstance(chunk, dict) and chunk.get("llm_score") is not None
+        float(chunk["llm_score"]) for chunk in scored_chunks if isinstance(chunk, dict) and chunk.get("llm_score") is not None
     ]
     assert llm_scores, "expected llm_score values on scored chunks"
     assert max(llm_scores) > 0.0, "LLM scoring must not silently store only 0.0"

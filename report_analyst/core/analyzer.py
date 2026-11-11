@@ -432,9 +432,7 @@ class DocumentAnalyzer:
             logger.error(f"[ANALYSIS] Error scoring chunk relevance: {e!s}")
             return 0.0
 
-    async def score_chunk_relevance_batch(
-        self, question: str, chunks: List[Dict], single_call: bool = True
-    ) -> List[float]:
+    async def score_chunk_relevance_batch(self, question: str, chunks: List[Dict], single_call: bool = True) -> List[float]:
         """Score a batch of chunks using LLM.
 
         Args:
