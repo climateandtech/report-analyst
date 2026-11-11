@@ -12,7 +12,7 @@ import yaml
 from dotenv import load_dotenv
 from llama_index.core import Document, Settings
 from llama_index.core.ingestion import IngestionCache
-from llama_index.core.llms import ChatMessage
+from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.file import PyMuPDFReader
@@ -348,51 +348,83 @@ class DocumentAnalyzer:
             logger.debug(f"Full vector store cache error: {e!s}", exc_info=True)
             return None
 
+    @staticmethod
+    def _chunk_scoring_rubric() -> str:
+        """Shared rubric for single-chunk and batch LLM relevance scoring."""
+        return (
+            "As a senior equity analyst with expertise in climate science evaluating a company's "
+            "sustainability report, you are tasked with evaluating text fragments for their "
+            "usefulness in answering specific TCFD questions.\n\n"
+            "Consider:\n\n"
+            "1. Specificity and Concreteness:\n"
+            "   - Quantitative data and specific metrics (highest value)\n"
+            "   - Concrete policies and procedures\n"
+            "   - Specific commitments with timelines\n"
+            "   - General statements or vague claims (lowest value)\n\n"
+            "2. Evidence Quality:\n"
+            "   - Verifiable data and third-party verification\n"
+            "   - Clear methodologies and frameworks\n"
+            "   - Specific examples and case studies\n"
+            "   - Unsubstantiated claims (lowest value)\n\n"
+            "3. Direct Relevance:\n"
+            "   - Direct answers to the question components\n"
+            "   - Related but indirect information\n"
+            "   - Contextual background\n"
+            "   - Unrelated information (lowest value)\n\n"
+            "4. Disclosure Quality:\n"
+            "   - Comprehensive and transparent disclosure\n"
+            "   - Balanced reporting (both positive and negative)\n"
+            "   - Clear acknowledgment of limitations\n"
+            "   - Potential greenwashing or selective disclosure (lowest value)\n\n"
+            "Score from 0.0 to 1.0 where:\n"
+            "0.0 = Not useful (generic statements, unrelated content)\n"
+            "0.3 = Contains relevant context but no specific evidence\n"
+            "0.6 = Contains useful specific information but requires additional context\n"
+            "1.0 = Contains critical evidence or specific details that directly answer the question"
+        )
+
+    @staticmethod
+    def _clamp_relevance_score(value: float) -> float:
+        return max(0.0, min(1.0, float(value)))
+
+    @classmethod
+    def _parse_relevance_scores(cls, content: str, expected: int) -> List[float]:
+        """Parse one score per line (or embedded floats) from an LLM scoring reply."""
+        scores: List[float] = []
+        for line in (content or "").strip().splitlines():
+            match = re.search(r"([01](?:\.\d+)?|\.\d+)", line.strip())
+            if match:
+                scores.append(cls._clamp_relevance_score(float(match.group(1))))
+        if len(scores) != expected:
+            raise ValueError(f"Got {len(scores)} scores for {expected} chunks")
+        return scores
+
+    def _build_score_messages(self, user_content: str) -> List[ChatMessage]:
+        return [
+            ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=(
+                    "You are a senior equity analyst scoring sustainability-report "
+                    "passages for usefulness as TCFD evidence. Reply with scores only."
+                ),
+            ),
+            ChatMessage(role=MessageRole.USER, content=user_content),
+        ]
+
     async def score_chunk_relevance(self, question: str, chunk_text: str) -> float:
         """Score the relevance of a chunk to a question using LLM."""
         if not self.use_cache:
             Settings.ingestion_cache = None
 
         try:
-            response = await self.llm.achat(
-                prompt=(
-                    "As a senior equity analyst with expertise in climate science evaluating a company's "
-                    "sustainability report, you are tasked with evaluating text fragments for their "
-                    "usefulness in answering specific TCFD questions.\n\n"
-                    "Your task is to score the relevance and quality of evidence in each text fragment. Consider:\n\n"
-                    "1. Specificity and Concreteness:\n"
-                    "   - Quantitative data and specific metrics (highest value)\n"
-                    "   - Concrete policies and procedures\n"
-                    "   - Specific commitments with timelines\n"
-                    "   - General statements or vague claims (lowest value)\n\n"
-                    "2. Evidence Quality:\n"
-                    "   - Verifiable data and third-party verification\n"
-                    "   - Clear methodologies and frameworks\n"
-                    "   - Specific examples and case studies\n"
-                    "   - Unsubstantiated claims (lowest value)\n\n"
-                    "3. Direct Relevance:\n"
-                    "   - Direct answers to the question components\n"
-                    "   - Related but indirect information\n"
-                    "   - Contextual background\n"
-                    "   - Unrelated information (lowest value)\n\n"
-                    "4. Disclosure Quality:\n"
-                    "   - Comprehensive and transparent disclosure\n"
-                    "   - Balanced reporting (both positive and negative)\n"
-                    "   - Clear acknowledgment of limitations\n"
-                    "   - Potential greenwashing or selective disclosure (lowest value)\n\n"
-                    "Score from 0.0 to 1.0 where:\n"
-                    "0.0 = Not useful (generic statements, unrelated content)\n"
-                    "0.3 = Contains relevant context but no specific evidence\n"
-                    "0.6 = Contains useful specific information but requires additional context\n"
-                    "1.0 = Contains critical evidence or specific details that directly answer the question\n\n"
-                    f"Question: {question}\n\n"
-                    f"Text to evaluate:\n{chunk_text}\n\n"
-                    "Output only the numeric score (0.0-1.0):"
-                )
+            user_content = (
+                f"{self._chunk_scoring_rubric()}\n\n"
+                f"Question: {question}\n\n"
+                f"Text to evaluate:\n{chunk_text}\n\n"
+                "Output only the numeric score (0.0-1.0):"
             )
-
-            score = float(response.message.content.strip())
-            score = max(0.0, min(1.0, score))
+            response = await self.llm.achat(self._build_score_messages(user_content))
+            score = self._parse_relevance_scores(response.message.content, expected=1)[0]
             logger.debug(f"[ANALYSIS] Computed relevance score: {score:.4f}")
             return score
 
@@ -400,7 +432,9 @@ class DocumentAnalyzer:
             logger.error(f"[ANALYSIS] Error scoring chunk relevance: {e!s}")
             return 0.0
 
-    async def score_chunk_relevance_batch(self, question: str, chunks: List[Dict], single_call: bool = True) -> List[float]:
+    async def score_chunk_relevance_batch(
+        self, question: str, chunks: List[Dict], single_call: bool = True
+    ) -> List[float]:
         """Score a batch of chunks using LLM.
 
         Args:
@@ -410,65 +444,27 @@ class DocumentAnalyzer:
         """
         try:
             if single_call:
-                # Batch scoring - all chunks in one call
-                chunks_text = "\n\n".join([f"[CHUNK {i + 1}]\n{chunk['text']}" for i, chunk in enumerate(chunks)])
-
-                response = await self.llm.achat(
-                    prompt=(
-                        "As a senior equity analyst with expertise in climate science evaluating a company's "
-                        "sustainability report, you are tasked with evaluating text fragments for their "
-                        "usefulness in answering specific TCFD questions.\n\n"
-                        "Your task is to score the relevance and quality of evidence in each text fragment "
-                        "marked as [CHUNK X]. Consider:\n\n"
-                        "1. Specificity and Concreteness:\n"
-                        "   - Quantitative data and specific metrics (highest value)\n"
-                        "   - Concrete policies and procedures\n"
-                        "   - Specific commitments with timelines\n"
-                        "   - General statements or vague claims (lowest value)\n\n"
-                        "2. Evidence Quality:\n"
-                        "   - Verifiable data and third-party verification\n"
-                        "   - Clear methodologies and frameworks\n"
-                        "   - Specific examples and case studies\n"
-                        "   - Unsubstantiated claims (lowest value)\n\n"
-                        "3. Direct Relevance:\n"
-                        "   - Direct answers to the question components\n"
-                        "   - Related but indirect information\n"
-                        "   - Contextual background\n"
-                        "   - Unrelated information (lowest value)\n\n"
-                        "4. Disclosure Quality:\n"
-                        "   - Comprehensive and transparent disclosure\n"
-                        "   - Balanced reporting (both positive and negative)\n"
-                        "   - Clear acknowledgment of limitations\n"
-                        "   - Potential greenwashing or selective disclosure (lowest value)\n\n"
-                        "For each chunk marked [CHUNK X], provide a score from 0.0 to 1.0 where:\n"
-                        "0.0 = Not useful (generic statements, unrelated content)\n"
-                        "0.3 = Contains relevant context but no specific evidence\n"
-                        "0.6 = Contains useful specific information but requires additional context\n"
-                        "1.0 = Contains critical evidence or specific details that directly answer the question\n\n"
-                        f"Question: {question}\n\n"
-                        f"Text fragments to evaluate:\n{chunks_text}\n\n"
-                        "Output only the scores, one per line, in order:"
-                    )
+                chunks_text = "\n\n".join(f"[CHUNK {i + 1}]\n{chunk['text']}" for i, chunk in enumerate(chunks))
+                user_content = (
+                    f"{self._chunk_scoring_rubric()}\n\n"
+                    "For each chunk marked [CHUNK X], provide a score from 0.0 to 1.0.\n\n"
+                    f"Question: {question}\n\n"
+                    f"Text fragments to evaluate:\n{chunks_text}\n\n"
+                    "Output only the scores, one per line, in order:"
                 )
-
-                # Parse scores from response
+                response = await self.llm.achat(self._build_score_messages(user_content))
                 try:
-                    scores = [float(score.strip()) for score in response.message.content.strip().split("\n")]
-                    if len(scores) != len(chunks):
-                        raise ValueError(f"Got {len(scores)} scores for {len(chunks)} chunks")
-                    return scores
+                    return self._parse_relevance_scores(response.message.content, expected=len(chunks))
                 except Exception as e:  # noqa: BLE001
                     logger.error(f"[ANALYSIS] Error parsing batch scores: {e!s}")
                     return [0.0] * len(chunks)
 
-            else:
-                # Individual scoring - one API call per chunk
-                scores = []
-                for i, chunk in enumerate(chunks):
-                    score = await self.score_chunk_relevance(question, chunk["text"])
-                    scores.append(score)
-                    logger.debug(f"[ANALYSIS] Scored chunk {i + 1}/{len(chunks)}: {score:.2f}")
-                return scores
+            scores = []
+            for i, chunk in enumerate(chunks):
+                score = await self.score_chunk_relevance(question, chunk["text"])
+                scores.append(score)
+                logger.debug(f"[ANALYSIS] Scored chunk {i + 1}/{len(chunks)}: {score:.2f}")
+            return scores
 
         except Exception as e:  # noqa: BLE001
             logger.error(f"[ANALYSIS] Error in batch scoring: {e!s}")
@@ -718,6 +714,12 @@ class DocumentAnalyzer:
                                     chunk["llm_score"] = 0.0
                                     logger.warning(f"No LLM score available for chunk {i + 1}")
 
+                            # Re-order by LLM relevance so answer evidence indices follow usefulness,
+                            # not only embedding similarity (embedding top-k is still the candidate pool).
+                            similar_chunks.sort(
+                                key=lambda c: float(c.get("llm_score") or 0.0),
+                                reverse=True,
+                            )
                             logger.info(f"[ANALYSIS] Applied LLM scores to {len(similar_chunks)} chunks")
 
                         except Exception as e:
@@ -969,7 +971,13 @@ class DocumentAnalyzer:
                 processed_chunks.append(chunk_data)
                 logger.debug(f"Processed chunk with similarity score: {similarity_score:.4f}, llm_score: {llm_score}")
 
-            # Create analysis prompt with indexed chunks
+            # Create analysis prompt with indexed chunks.
+            # Prefer llm_score when scoring ran; otherwise fall back to similarity.
+            def _prompt_relevance(chunk: Dict[str, Any]) -> float:
+                if use_llm_scoring and chunk.get("llm_score") is not None:
+                    return float(chunk["llm_score"])
+                return float(chunk.get("similarity_score") or 0.0)
+
             messages = self.prompt_manager.get_analysis_messages(
                 question=question_data["text"],
                 guidelines=question_data.get("guidelines", ""),
@@ -978,6 +986,7 @@ class DocumentAnalyzer:
                         "index": i + 1,  # Use 1-based indexing for LLM
                         "text": c["text"],
                         "metadata": c["metadata"],
+                        "computed_score": _prompt_relevance(c),
                     }
                     for i, c in enumerate(processed_chunks)
                 ],
