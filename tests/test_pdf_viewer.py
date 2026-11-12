@@ -139,6 +139,7 @@ def test_display_pdf_viewer_opens_without_analysis():
     with (
         patch("report_analyst.streamlit_app.st.expander", return_value=nullcontext()) as expander,
         patch("report_analyst.streamlit_app.pdf_viewer", component),
+        patch("report_analyst.streamlit_app.display_concept_search"),
     ):
         display_pdf_viewer(
             file_path="report.pdf",
@@ -152,6 +153,17 @@ def test_display_pdf_viewer_opens_without_analysis():
     component.assert_called_once()
     assert component.call_args.kwargs["chunks_data"] == {}
     assert component.call_args.kwargs["unmapped_chunks"] == []
+
+
+def test_display_pdf_viewer_shows_the_concept_search():
+    with (
+        patch("report_analyst.streamlit_app.st.expander", return_value=nullcontext()),
+        patch("report_analyst.streamlit_app.pdf_viewer", Mock(return_value=None)),
+        patch("report_analyst.streamlit_app.display_concept_search") as concept_search,
+    ):
+        display_pdf_viewer(file_path="report.pdf", results={}, questions={}, cache_manager=Mock())
+
+    concept_search.assert_called_once_with()
 
 
 @pytest.fixture
