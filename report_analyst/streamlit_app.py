@@ -99,6 +99,7 @@ from report_analyst.core.llm_models import (
 )
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
+from report_analyst.ui.concept_search import display_concept_search
 from report_analyst_enterprise.components.streamlit_component.backend import pdf_viewer
 
 # Load environment variables
@@ -990,6 +991,7 @@ def display_pdf_viewer(
         )
         if source_change:
             _apply_source_change(source_change, document_id, cache_manager, error_slot)
+    display_concept_search()
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
