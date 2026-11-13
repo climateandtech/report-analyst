@@ -21,12 +21,17 @@ def _taxonomy(path: str, modified: float | None) -> Taxonomy:
     return load_esrs_taxonomy(path)
 
 
+def current_taxonomy() -> Taxonomy:
+    """The taxonomy set in ESRS_TAXONOMY_PATH. Raises TaxonomyUnavailableError when it cannot be loaded."""
+    path = os.getenv(TAXONOMY_PATH_ENV, "")
+    modified = Path(path).stat().st_mtime if path and Path(path).exists() else None
+    return _taxonomy(path, modified)
+
+
 def display_concept_search(sources: list[dict], cache_manager: Any) -> None:
     with st.expander("ESRS concepts", expanded=False):
-        path = os.getenv(TAXONOMY_PATH_ENV, "")
-        modified = Path(path).stat().st_mtime if path and Path(path).exists() else None
         try:
-            taxonomy = _taxonomy(path, modified)
+            taxonomy = current_taxonomy()
         except TaxonomyUnavailableError as error:
             st.info(f"ESRS concepts are not available. {error}")
             return
@@ -51,7 +56,7 @@ def display_concept_search(sources: list[dict], cache_manager: Any) -> None:
             return
         concept = found[results.selection.rows[0]]
         _show_details(concept)
-        display_source_tagging(concept, sources, {known.name: known for known in taxonomy.concepts}, cache_manager)
+        display_source_tagging(concept, sources, cache_manager)
 
 
 def _row(concept: TaxonomyConcept) -> dict:

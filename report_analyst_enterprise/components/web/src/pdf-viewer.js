@@ -255,7 +255,14 @@ class PdfViewerWithChunks extends HTMLElement {
       const item = event.target.closest(".source-annotation-item");
       if (!item) return;
       const annotation = this._annotations[Number(item.dataset.annotationIndex)];
-      if (event.target.closest(".source-annotation-delete")) {
+      const tagDelete = event.target.closest(".source-tag-delete");
+      if (tagDelete) {
+        // Python reads the id of what to remove from the annotation field, also for a tag.
+        this.dispatchSourceAnnotationChange("delete_tag", {
+          id: annotation.tags[Number(tagDelete.dataset.tagIndex)].id,
+          document_id: annotation.document_id,
+        });
+      } else if (event.target.closest(".source-annotation-delete")) {
         this.dispatchSourceAnnotationChange("delete", annotation);
       } else {
         void this.openAnnotation(annotation);
@@ -308,8 +315,21 @@ class PdfViewerWithChunks extends HTMLElement {
         <button class="source-annotation-delete" type="button" aria-label="Remove source ${index + 1}">
           Remove
         </button>
+        ${this.renderSourceTags(annotation.tags)}
       </div>
     `).join("");
+  }
+
+  renderSourceTags(tags = []) {
+    if (!tags.length) return "";
+    return `<ul class="source-tags">${tags.map((tag, index) => `
+      <li class="source-tag">
+        <span class="source-tag-text">${this.escapeHtml(tag.text)}</span>
+        <button class="source-tag-delete" type="button" data-tag-index="${index}" aria-label="Remove tag ${index + 1}">
+          ×
+        </button>
+      </li>
+    `).join("")}</ul>`;
   }
 
   renderQuestionOptions() {

@@ -135,6 +135,11 @@ class CacheManager:
         with self.db_manager.get_connection() as conn:
             conn.execute(source_tags.insert().values(**tag.model_dump(exclude={"created_at"})))
 
+    def delete_source_tag(self, tag_id: str, document_id: str) -> None:
+        """Delete one tag from its document."""
+        with self.db_manager.get_connection() as conn:
+            conn.execute(source_tags.delete().where(source_tags.c.id == tag_id, source_tags.c.document_id == document_id))
+
     def get_source_tags(self, document_id: str) -> List[SourceTag]:
         """Return the tags on one document's PDF sources, oldest first."""
         with self.db_manager.get_connection() as conn:

@@ -783,6 +783,56 @@ describe("PDF viewer", () => {
       .map((item) => item.classList.contains("is-active"))).toEqual([false, true]);
   });
 
+  describe("tags on saved sources", () => {
+    const taggedSource = {
+      id: "source-1",
+      document_id: "document-hash",
+      page: 14,
+      selected_text: "Scope 1 emissions were 1,240 tCO2e",
+      rects: [{ x: 25, y: 700, width: 125, height: 20 }],
+      tags: [
+        { id: "tag-1", text: "Gross scope 1 GHG emissions: 1240 tCO2e" },
+        { id: "tag-2", text: 'Policy <b>name</b>: "Climate" policy' },
+      ],
+    };
+
+    beforeEach(() => {
+      viewer.render();
+      viewer.navigateToPage = vi.fn().mockResolvedValue(undefined);
+      viewer.setAnnotations([taggedSource, { ...taggedSource, id: "source-2", tags: [] }]);
+    });
+
+    it("lists each source's tags under it as plain text", () => {
+      const [first, second] = viewer.shadowRoot.querySelectorAll(".source-annotation-item");
+
+      expect([...first.querySelectorAll(".source-tag-text")].map((tag) => tag.textContent)).toEqual([
+        "Gross scope 1 GHG emissions: 1240 tCO2e",
+        'Policy <b>name</b>: "Climate" policy',
+      ]);
+      expect([...first.querySelectorAll(".source-tag-delete")].map((button) => button.getAttribute("aria-label")))
+        .toEqual(["Remove tag 1", "Remove tag 2"]);
+      expect(second.querySelector(".source-tags")).toBeNull();
+    });
+
+    it("removes one tag without opening its source", () => {
+      const listener = vi.fn();
+      viewer.addEventListener("source-annotation-change", listener);
+
+      viewer.shadowRoot.querySelectorAll(".source-tag-delete")[1].click();
+
+      expect(listener.mock.calls.map(([event]) => event.detail)).toEqual([
+        { action: "delete_tag", annotation: { id: "tag-2", document_id: "document-hash" } },
+      ]);
+      expect(viewer.navigateToPage).not.toHaveBeenCalled();
+    });
+
+    it("opens the source when one of its tags is clicked", () => {
+      viewer.shadowRoot.querySelector(".source-tag-text").click();
+
+      expect(viewer.navigateToPage).toHaveBeenCalledWith(14);
+    });
+  });
+
   it("renders analyzed and manual evidence together", () => {
     viewer._currentPage = 2;
     viewer._showEvidenceOnly = true;

@@ -95,8 +95,38 @@ export default `
   cursor: pointer;
 }
 
-.source-annotation-delete:hover {
-  background: #fee4e2;
+.source-annotation-delete:hover,
+.source-tags {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px 8px 10px;
+  list-style: none;
+}
+
+.source-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.source-tag-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.source-tag-delete {
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #b42318;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .source-annotation-title {
