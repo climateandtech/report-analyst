@@ -26,9 +26,11 @@ TAXONOMY = Taxonomy(
 
 
 def panel():
+    from unittest.mock import Mock
+
     from report_analyst.ui.concept_search import display_concept_search
 
-    display_concept_search()
+    display_concept_search([], Mock())
 
 
 def run_panel():
@@ -63,6 +65,7 @@ def test_panel_lists_all_concepts(monkeypatch, tmp_path):
 
     assert labels(app) == ["Gross scope 1 GHG emissions", "Description of climate policy", "Gas covered"]
     assert app.caption[0].value == "3 of 3 concepts, Sample ESRS Taxonomy 2026-08-30"
+    assert app.caption[1].value == "Select a concept to tag a source with it."
 
 
 def test_panel_searches_and_filters(monkeypatch, tmp_path):

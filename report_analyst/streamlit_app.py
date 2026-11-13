@@ -991,7 +991,7 @@ def display_pdf_viewer(
         )
         if source_change:
             _apply_source_change(source_change, document_id, cache_manager, error_slot)
-    display_concept_search()
+    display_concept_search(annotations, cache_manager)
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):

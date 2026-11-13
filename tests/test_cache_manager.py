@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
 from report_analyst.core.cache_manager import CacheManager
+from report_analyst.models.source_tag import SourceTag
 
 
 @pytest.fixture(autouse=True)
@@ -134,6 +135,63 @@ def test_clear_cache_keeps_source_annotations(temp_db):
     temp_db.clear_cache()
 
     assert len(temp_db.get_source_annotations("document-hash")) == 1
+
+
+def source_tag(**fields):
+    return SourceTag(
+        **{
+            "id": "tag-1",
+            "source_id": "source-1",
+            "document_id": "document-hash",
+            "concept": "esrs:GrossScope1GreenhouseGasEmissions",
+            "value": "1240",
+            "unit": "tCO2e",
+            "decimals": 0,
+            **fields,
+        }
+    )
+
+
+def test_save_and_get_source_tags(temp_db):
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+    temp_db.save_source_tag(source_tag())
+    temp_db.save_source_tag(source_tag(id="tag-2", concept="esrs:PolicyTextBlock", value="Text", unit=None, decimals=None))
+
+    saved = temp_db.get_source_tags("document-hash")
+
+    assert [(tag.id, tag.value, tag.unit, tag.decimals) for tag in saved] == [
+        ("tag-1", "1240", "tCO2e", 0),
+        ("tag-2", "Text", None, None),
+    ]
+    assert all(tag.created_at for tag in saved)
+    assert temp_db.get_source_tags("other-document") == []
+
+
+def test_deleting_a_source_deletes_only_its_tags(temp_db):
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+    temp_db.save_source_annotation({**SOURCE_ANNOTATION, "id": "source-2"})
+    temp_db.save_source_tag(source_tag())
+    temp_db.save_source_tag(source_tag(id="tag-2", source_id="source-2"))
+
+    temp_db.delete_source_annotation("source-1", "document-hash")
+
+    assert [tag.id for tag in temp_db.get_source_tags("document-hash")] == ["tag-2"]
+
+
+def test_deleting_a_source_of_another_document_keeps_its_tags(temp_db):
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+    temp_db.save_source_tag(source_tag())
+
+    temp_db.delete_source_annotation("source-1", "other-document")
+
+    assert len(temp_db.get_source_tags("document-hash")) == 1
+
+
+def test_source_tag_needs_decimals_with_its_unit():
+    with pytest.raises(ValidationError):
+        source_tag(decimals=None)
+    with pytest.raises(ValidationError):
+        source_tag(unit=None)
 
 
 def test_save_and_get_analysis(temp_db):

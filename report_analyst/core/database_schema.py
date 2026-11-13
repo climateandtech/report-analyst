@@ -125,6 +125,20 @@ source_annotations = Table(
     Column("created_at", DateTime, default=datetime.now),
 )
 
+# Facts tagged on a saved source: an ESRS concept and its value
+source_tags = Table(
+    "source_tags",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("source_id", Text, nullable=False),
+    Column("document_id", Text, nullable=False),
+    Column("concept", Text, nullable=False),
+    Column("value", Text, nullable=False),
+    Column("unit", Text),
+    Column("decimals", Integer),
+    Column("created_at", DateTime, default=datetime.now),
+)
+
 # Indexes (defined separately for clarity)
 # Note: SQLAlchemy doesn't support "IF NOT EXISTS" in CREATE INDEX directly,
 # so we'll handle these in init_db() using raw SQL
@@ -134,4 +148,5 @@ indexes = [
     # Index on chunk parameters
     "CREATE INDEX IF NOT EXISTS idx_chunk_params ON document_chunks(chunk_size, chunk_overlap)",
     "CREATE INDEX IF NOT EXISTS idx_source_annotations_document_id ON source_annotations(document_id)",
+    "CREATE INDEX IF NOT EXISTS idx_source_tags_document_id ON source_tags(document_id)",
 ]
