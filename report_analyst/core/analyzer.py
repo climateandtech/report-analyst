@@ -48,14 +48,10 @@ logger.info(
     use_full_backend_analysis,
 )
 
-# If using backend for LLM, don't require local API keys
-if use_backend and (use_centralized_llm or use_full_backend_analysis):
-    logger.info("Using backend for LLM functionality - local API keys not required")
-    # Set placeholder values for compatibility
-    if not openai_key:
-        openai_key = "backend-handles-llm"
-    if not gemini_key:
-        gemini_key = "backend-handles-llm"
+# Centralized LLM: platform handles inference via NATS — never use placeholder OpenAI keys
+_centralized_llm_active = use_backend and (use_centralized_llm or use_full_backend_analysis)
+if _centralized_llm_active:
+    logger.info("Centralized LLM mode — inference via platform/NATS (no local OpenAI/Gemini)")
 else:
     # Only check for API keys if not using backend LLM
     # Check if we need to force the default model based on available keys
@@ -144,8 +140,20 @@ class DocumentAnalyzer:
         self.use_backend_llm = use_backend and (use_centralized_llm or use_full_backend_analysis)
 
         if self.use_backend_llm:
-            # Set minimal placeholders for compatibility
-            self.llm = None
+            log_analysis_step(
+                "Initializing NATS-backed LLM (platform centralized)",
+                "info",
+            )
+            try:
+                from report_analyst_enterprise.nats_llm_adapter import NATSLLMChatAdapter
+            except ImportError as exc:
+                raise ImportError(
+                    "Centralized LLM requires the enterprise package "
+                    "(report_analyst_enterprise.nats_llm_adapter). "
+                    "Install enterprise extras or disable USE_CENTRALIZED_LLM."
+                ) from exc
+
+            self.llm = NATSLLMChatAdapter(model=os.getenv("PLATFORM_CHAT_MODEL", "gemma3-4b"))
             self.embeddings = None
         else:
             self._initialize_llm_clients()
