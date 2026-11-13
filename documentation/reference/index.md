@@ -1,4 +1,4 @@
-# Core and enterprise
+# Overview
 
 Every API page is labeled. The label matches the module and the license, not the screen you happen to be on.
 
@@ -11,7 +11,7 @@ Every API page is labeled. The label matches the module and the license, not the
 
 The Streamlit app can call enterprise pieces, such as the PDF viewer, when that package is installed. Those calls are still enterprise. The open core does not require them.
 
-## Core
+## Core modules
 
 - [Question sets](question-sets.md)
 - [Documents and chunks](documents.md)
@@ -20,8 +20,8 @@ The Streamlit app can call enterprise pieces, such as the PDF viewer, when that 
 - [Evaluation engine](evaluation-engine.md)
 - [Loading results](retrieval-results.md)
 
-## Enterprise
+## Enterprise modules
 
-- [PDF viewer](pdf-viewer.md)
-- [pgvector](pgvector.md)
-- [REST API models](api-schemas.md)
+- [PDF viewer](pdf-viewer.md) — `report_analyst_enterprise` component used for chunk highlighting
+- [pgvector](pgvector.md) — Postgres vector helpers for the enterprise image
+- [REST API models](api-schemas.md) — `report_analyst_api` request/response schemas (same license; not the open core)
