@@ -143,6 +143,7 @@ def test_display_pdf_viewer_opens_without_analysis():
         patch("report_analyst.streamlit_app.st.expander", return_value=nullcontext()) as expander,
         patch("report_analyst.streamlit_app.pdf_viewer", component),
         patch("report_analyst.streamlit_app.display_concept_search"),
+        patch("report_analyst.streamlit_app.display_xbrl_check"),
     ):
         display_pdf_viewer(
             file_path="report.pdf",
@@ -234,6 +235,8 @@ TAXONOMY = Taxonomy(
     identifier="https://example.org/build",
     name="Sample ESRS Taxonomy",
     version="2026-08-30",
+    entry_point="https://example.org/esrs.xsd",
+    namespaces={"esrs": "https://example.org/esrs"},
     concepts=[
         TaxonomyConcept(
             name="esrs:Scope1",
@@ -276,6 +279,16 @@ def test_display_pdf_viewer_gives_each_source_its_tags(pdf_path):
         {"id": "source-1", "tags": [{"id": "tag-1", "text": "Gross scope 1 GHG emissions: 1240 tCO2e"}]},
         {"id": "source-2", "tags": []},
     ]
+
+
+def test_display_pdf_viewer_shows_the_xbrl_check_with_the_tags(pdf_path):
+    with (
+        patch("report_analyst.streamlit_app.current_taxonomy", return_value=TAXONOMY),
+        patch("report_analyst.streamlit_app.display_xbrl_check") as xbrl_check,
+    ):
+        sources = _viewer_sources(pdf_path)
+
+    xbrl_check.assert_called_once_with([TAG], sources)
 
 
 def test_display_pdf_viewer_names_tags_by_concept_without_a_taxonomy(pdf_path):
