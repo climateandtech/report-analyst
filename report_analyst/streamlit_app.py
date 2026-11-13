@@ -92,6 +92,7 @@ from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
 )
+from report_analyst.core.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.core.llm_models import (
     get_default_llm_model,
     get_gemini_models,
@@ -99,7 +100,9 @@ from report_analyst.core.llm_models import (
 )
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
-from report_analyst.ui.concept_search import display_concept_search
+from report_analyst.models.taxonomy import TaxonomyConcept
+from report_analyst.ui.concept_search import current_taxonomy, display_concept_search
+from report_analyst.ui.source_tagging import with_tags
 from report_analyst_enterprise.components.streamlit_component.backend import pdf_viewer
 
 # Load environment variables
@@ -939,6 +942,7 @@ SOURCE_CHANGE_ERRORS = {
     "create": "Could not save this evidence. Select the text and add it again.",
     # Remove sends the same event each time, and repeats are ignored until a reload.
     "delete": "Could not remove this evidence. Reload the page and try again.",
+    "delete_tag": "Could not remove this tag. Reload the page and try again.",
 }
 
 
@@ -954,6 +958,9 @@ def _apply_source_change(change: Dict[str, Any], document_id: str, cache_manager
     try:
         if action == "create":
             cache_manager.save_source_annotation(annotation)
+        elif action == "delete_tag":
+            # For a tag, the event carries the tag's id instead of a source.
+            cache_manager.delete_source_tag(annotation["id"], document_id)
         else:
             cache_manager.delete_source_annotation(annotation["id"], document_id)
     except (SQLAlchemyError, ValidationError):
@@ -961,6 +968,14 @@ def _apply_source_change(change: Dict[str, Any], document_id: str, cache_manager
         error_slot.error(SOURCE_CHANGE_ERRORS[action])
     else:
         st.rerun()
+
+
+def _concepts() -> Dict[str, TaxonomyConcept]:
+    """The ESRS concepts by name, or none when the taxonomy is not set up."""
+    try:
+        return {concept.name: concept for concept in current_taxonomy().concepts}
+    except TaxonomyUnavailableError:
+        return {}
 
 
 def display_pdf_viewer(
@@ -974,7 +989,11 @@ def display_pdf_viewer(
     questions_data = {question_id: question.get("text", question_id) for question_id, question in questions.items()}
     viewer_key = Path(str(file_path)).stem or "analysis"
     document_id = compute_file_hash(str(file_path)) if Path(file_path).is_file() else None
-    annotations = cache_manager.get_source_annotations(document_id) if document_id else []
+    annotations = (
+        with_tags(cache_manager.get_source_annotations(document_id), cache_manager.get_source_tags(document_id), _concepts())
+        if document_id
+        else []
+    )
 
     with st.expander("PDF Viewer with Chunks", expanded=True):
         # Above the viewer, where a tall page can't push the message off screen.
