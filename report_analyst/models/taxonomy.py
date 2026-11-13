@@ -44,4 +44,7 @@ class Taxonomy(BaseModel):
     identifier: str
     name: str
     version: str
+    # The schema an XBRL report links to, and the namespace of each prefix used in concept and option names.
+    entry_point: str
+    namespaces: dict[str, str]
     concepts: list[TaxonomyConcept]
