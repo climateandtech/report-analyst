@@ -103,6 +103,7 @@ from report_analyst.core.question_loader import get_question_loader
 from report_analyst.models.taxonomy import TaxonomyConcept
 from report_analyst.ui.concept_search import current_taxonomy, display_concept_search
 from report_analyst.ui.source_tagging import with_tags
+from report_analyst.ui.xbrl_check import display_xbrl_check
 from report_analyst_enterprise.components.streamlit_component.backend import pdf_viewer
 
 # Load environment variables
@@ -989,11 +990,8 @@ def display_pdf_viewer(
     questions_data = {question_id: question.get("text", question_id) for question_id, question in questions.items()}
     viewer_key = Path(str(file_path)).stem or "analysis"
     document_id = compute_file_hash(str(file_path)) if Path(file_path).is_file() else None
-    annotations = (
-        with_tags(cache_manager.get_source_annotations(document_id), cache_manager.get_source_tags(document_id), _concepts())
-        if document_id
-        else []
-    )
+    tags = cache_manager.get_source_tags(document_id) if document_id else []
+    annotations = with_tags(cache_manager.get_source_annotations(document_id), tags, _concepts()) if document_id else []
 
     with st.expander("PDF Viewer with Chunks", expanded=True):
         # Above the viewer, where a tall page can't push the message off screen.
@@ -1011,6 +1009,7 @@ def display_pdf_viewer(
         if source_change:
             _apply_source_change(source_change, document_id, cache_manager, error_slot)
     display_concept_search(annotations, cache_manager)
+    display_xbrl_check(tags, annotations)
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):

@@ -216,6 +216,12 @@ def test_loads_package_metadata(package):
     assert taxonomy.identifier == BASE + "build/2026-09-18"
     assert taxonomy.name == "Sample ESRS Taxonomy"
     assert taxonomy.version == "2026-08-30"
+    assert taxonomy.namespaces == {"esrs": BASE[:-1]}
+
+
+@pytest.mark.parametrize(("layout", "schema"), [("single", "esrs.xsd"), ("split", "all.xsd")])
+def test_entry_point_is_the_complete_one(tmp_path, layout, schema):
+    assert load_esrs_taxonomy(write_package(tmp_path, layout)).entry_point == BASE + schema
 
 
 def test_loads_only_reportable_concepts(package):
@@ -342,4 +348,5 @@ def test_loads_the_2026_draft_package():
     taxonomy = load_esrs_taxonomy()
 
     assert taxonomy.version == "2026-08-30"
+    assert taxonomy.entry_point == "https://xbrl.efrag.org/taxonomy/esrs/2026-08-30/esrs.xsd"
     assert len(taxonomy.concepts) == 444

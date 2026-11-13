@@ -7,6 +7,8 @@ TAXONOMY = Taxonomy(
     identifier="https://example.org/build",
     name="Sample ESRS Taxonomy",
     version="2026-08-30",
+    entry_point="https://example.org/esrs.xsd",
+    namespaces={"esrs": "https://example.org/esrs"},
     concepts=[
         TaxonomyConcept(
             name=f"esrs:{name}",
