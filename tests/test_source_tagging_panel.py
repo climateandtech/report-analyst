@@ -33,10 +33,17 @@ GROUPS = concept(
 
 
 def form(concept, sources, database):
-    from report_analyst.core.cache_manager import CacheManager
-    from report_analyst.ui.source_tagging import display_source_tagging
+    import streamlit as st
 
-    display_source_tagging(concept, sources, {concept.name: concept}, CacheManager(database))
+    from report_analyst.core.cache_manager import CacheManager
+    from report_analyst.ui.source_tagging import display_source_tagging, with_tags
+
+    # Counts runs, so a test can see that saving reruns the page.
+    st.session_state["runs"] = st.session_state.get("runs", 0) + 1
+    # Like the viewer page, the sources come with their saved tags.
+    cache_manager = CacheManager(database)
+    sources = with_tags(sources, cache_manager.get_source_tags("document-hash"), {concept.name: concept})
+    display_source_tagging(concept, sources, cache_manager)
 
 
 @pytest.fixture
@@ -138,3 +145,14 @@ def test_form_falls_back_to_the_first_source_when_the_selected_one_is_removed(da
 
     assert not app.exception
     assert app.selectbox(key="tag_source").value == "source-1"
+
+
+def test_saving_reruns_the_page_so_the_viewer_shows_the_tag(database):
+    app = run_form(POLICY, database)
+
+    save(app)
+    assert app.session_state["runs"] == 3
+
+    app.text_area[0].input(" ")
+    save(app)
+    assert app.session_state["runs"] == 4

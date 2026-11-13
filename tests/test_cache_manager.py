@@ -187,6 +187,17 @@ def test_deleting_a_source_of_another_document_keeps_its_tags(temp_db):
     assert len(temp_db.get_source_tags("document-hash")) == 1
 
 
+def test_delete_source_tag_is_scoped_to_its_document(temp_db):
+    temp_db.save_source_tag(source_tag())
+    temp_db.save_source_tag(source_tag(id="tag-2"))
+
+    temp_db.delete_source_tag("tag-1", "other-document")
+    assert len(temp_db.get_source_tags("document-hash")) == 2
+
+    temp_db.delete_source_tag("tag-1", "document-hash")
+    assert [tag.id for tag in temp_db.get_source_tags("document-hash")] == ["tag-2"]
+
+
 def test_source_tag_needs_decimals_with_its_unit():
     with pytest.raises(ValidationError):
         source_tag(decimals=None)

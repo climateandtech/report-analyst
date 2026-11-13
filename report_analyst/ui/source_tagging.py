@@ -24,10 +24,8 @@ logger = logging.getLogger(__name__)
 SHOWN_LENGTH = 80
 
 
-def display_source_tagging(
-    concept: TaxonomyConcept, sources: list[dict], concepts: dict[str, TaxonomyConcept], cache_manager: Any
-) -> None:
-    """Tag a saved source with the concept. `concepts` maps names to concepts, to show the saved tags."""
+def display_source_tagging(concept: TaxonomyConcept, sources: list[dict], cache_manager: Any) -> None:
+    """Tag a saved source with the concept. Each source comes with its tags, as made by `with_tags`."""
     st.markdown("**Tag a source**")
     if not sources:
         st.info("Save a source in the viewer first: select text in the PDF, then choose Add evidence.")
@@ -50,9 +48,8 @@ def display_source_tagging(
     if submitted:
         _save(concept, source, entered, unit, decimals, cache_manager)
 
-    tags = [tag for tag in cache_manager.get_source_tags(source["document_id"]) if tag.source_id == source["id"]]
-    if tags:
-        st.markdown("Tags on this source  \n" + "\n".join(f"- {_shown(tag, concepts.get(tag.concept))}" for tag in tags))
+    if source["tags"]:
+        st.markdown("Tags on this source  \n" + "\n".join(f"- {tag['text']}" for tag in source["tags"]))
 
 
 def _value_input(concept: TaxonomyConcept, source: dict, key: str) -> Any:
@@ -106,18 +103,38 @@ def _save(
     except SQLAlchemyError:
         logger.error(f"Could not save a tag for {concept.name} on source {source['id']}", exc_info=True)
         st.error("Could not save this tag. Try again.")
+    else:
+        # The viewer above the form was already drawn, so it shows the new tag after a rerun.
+        st.rerun()
 
 
-def _shown(tag: SourceTag, concept: TaxonomyConcept | None) -> str:
-    if concept is None:
-        return f"{tag.concept}: {_short(tag.value)}"
-    if concept.options:
+def with_tags(sources: list[dict], tags: list[SourceTag], concepts: dict[str, TaxonomyConcept]) -> list[dict]:
+    """Give each saved source its tags as {id, text}, for the viewer's list and the form."""
+    return [
+        {
+            **source,
+            "tags": [
+                {"id": tag.id, "text": _tag_text(tag, concepts.get(tag.concept))}
+                for tag in tags
+                if tag.source_id == source["id"]
+            ],
+        }
+        for source in sources
+    ]
+
+
+def _tag_text(tag: SourceTag, concept: TaxonomyConcept | None) -> str:
+    """A tag as people read it, such as "Gross scope 1 GHG emissions: 1240 tCO2e".
+
+    Without its concept, for example when the taxonomy is not set up, the concept name is shown instead.
+    """
+    if concept and concept.options:
         option_labels = {option.name: option.label for option in concept.options}
         value = ", ".join(option_labels.get(name, name) for name in tag.value.split())
     else:
         value = _short(tag.value)
     unit = f" {tag.unit}" if tag.unit and tag.unit != PURE else ""
-    return f"{concept.label}: {value}{unit}"
+    return f"{concept.label if concept else tag.concept}: {value}{unit}"
 
 
 def _short(text: str) -> str:
