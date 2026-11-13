@@ -21,13 +21,12 @@ CURRENCY = re.compile(r"[A-Z]{3}")
 # The recommended units of the XBRL Unit Type Registry (https://www.xbrl.org/utr/utr.xml),
 # with the ones most used in ESRS reports first.
 UNITS = {
-    "ghgEmissionsItemType": ["tCO2e", "ktCO2e", "MtCO2e", "GtCO2e"],
-    "energyItemType": [
-        "MWh", "GWh", "TWh", "kWh", "Wh", "GJ", "TJ", "MJ", "kJ", "J", "mJ", "MMBTU", "Btu", "Boe",
-        "MBoe", "MMBoe", "Mcfe", "MMcfe", "Bcfe", "Tcfe", "Cal", "ft_lb", "MWM", "GWM", "VAh", "dth", "MWd",
-    ],  # fmt: skip
-    "massItemType": ["t", "kt", "Mt", "Gt", "kg", "g", "lb", "oz", "ozt", "T", "kT", "MT", "GT"],
-    "volumeItemType": ["m3", "l", "bbl", "MBbls", "MMBbls", "ft3", "Mcf", "MMcf", "Bcf", "Tcf", "gal", "bu", "aft"],
+    "ghgEmissionsItemType": "tCO2e ktCO2e MtCO2e GtCO2e".split(),
+    "energyItemType": (
+        "MWh GWh TWh kWh Wh GJ TJ MJ kJ J mJ MMBTU Btu Boe MBoe MMBoe Mcfe MMcfe Bcfe Tcfe Cal ft_lb MWM GWM VAh dth MWd"
+    ).split(),
+    "massItemType": "t kt Mt Gt kg g lb oz ozt T kT MT GT".split(),
+    "volumeItemType": "m3 l bbl MBbls MMBbls ft3 Mcf MMcf Bcf Tcf gal bu aft".split(),
 }
 
 
