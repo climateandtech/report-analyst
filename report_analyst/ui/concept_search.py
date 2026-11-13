@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import get_args
+from typing import Any, get_args
 
 import pandas as pd
 import streamlit as st
@@ -10,6 +10,7 @@ import streamlit as st
 from report_analyst.core.concept_search import search_concepts, standards
 from report_analyst.core.esrs_taxonomy import TAXONOMY_PATH_ENV, TaxonomyUnavailableError, load_esrs_taxonomy
 from report_analyst.models.taxonomy import ConceptKind, Taxonomy, TaxonomyConcept
+from report_analyst.ui.source_tagging import display_source_tagging
 
 ALL = "All"
 
@@ -20,7 +21,7 @@ def _taxonomy(path: str, modified: float | None) -> Taxonomy:
     return load_esrs_taxonomy(path)
 
 
-def display_concept_search() -> None:
+def display_concept_search(sources: list[dict], cache_manager: Any) -> None:
     with st.expander("ESRS concepts", expanded=False):
         path = os.getenv(TAXONOMY_PATH_ENV, "")
         modified = Path(path).stat().st_mtime if path and Path(path).exists() else None
@@ -45,8 +46,12 @@ def display_concept_search() -> None:
             on_select="rerun",
             selection_mode="single-row",
         )
-        if results.selection.rows:
-            _show_details(found[results.selection.rows[0]])
+        if not results.selection.rows:
+            st.caption("Select a concept to tag a source with it.")
+            return
+        concept = found[results.selection.rows[0]]
+        _show_details(concept)
+        display_source_tagging(concept, sources, {known.name: known for known in taxonomy.concepts}, cache_manager)
 
 
 def _row(concept: TaxonomyConcept) -> dict:

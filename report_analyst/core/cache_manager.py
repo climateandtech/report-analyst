@@ -10,9 +10,10 @@ from llama_index.core import Document
 from sqlalchemy import select, text
 
 from report_analyst.models.source_annotation import SourceAnchor
+from report_analyst.models.source_tag import SourceTag
 
 from .database_manager import DatabaseManager
-from .database_schema import indexes, metadata, source_annotations
+from .database_schema import indexes, metadata, source_annotations, source_tags
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,7 @@ class CacheManager:
         ]
 
     def delete_source_annotation(self, annotation_id: str, document_id: str) -> None:
-        """Delete one PDF source annotation from its document."""
+        """Delete one PDF source annotation from its document, together with its tags."""
         with self.db_manager.get_connection() as conn:
             conn.execute(
                 source_annotations.delete().where(
@@ -122,6 +123,31 @@ class CacheManager:
                     source_annotations.c.document_id == document_id,
                 )
             )
+            conn.execute(
+                source_tags.delete().where(
+                    source_tags.c.source_id == annotation_id,
+                    source_tags.c.document_id == document_id,
+                )
+            )
+
+    def save_source_tag(self, tag: SourceTag) -> None:
+        """Save a new tag on a PDF source. The database sets created_at."""
+        with self.db_manager.get_connection() as conn:
+            conn.execute(source_tags.insert().values(**tag.model_dump(exclude={"created_at"})))
+
+    def get_source_tags(self, document_id: str) -> List[SourceTag]:
+        """Return the tags on one document's PDF sources, oldest first."""
+        with self.db_manager.get_connection() as conn:
+            rows = (
+                conn.execute(
+                    select(source_tags)
+                    .where(source_tags.c.document_id == document_id)
+                    .order_by(source_tags.c.created_at, source_tags.c.id)
+                )
+                .mappings()
+                .all()
+            )
+        return [SourceTag.model_validate(row) for row in rows]
 
     def _load_vector_store(self, file_path: str, chunks: List[Dict]) -> None:
         """Load chunks into an in-memory vector store."""
