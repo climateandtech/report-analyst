@@ -389,10 +389,15 @@ class DocumentAnalyzer:
 
     @classmethod
     def _parse_relevance_scores(cls, content: str, expected: int) -> List[float]:
-        """Parse one score per line (or embedded floats) from an LLM scoring reply."""
+        """Parse one score per line (or embedded floats) from an LLM scoring reply.
+
+        Ignore leading markdown/list numbering (e.g. ``1. 0.2`` → ``0.2``) so a
+        list index is never promoted to a relevance score.
+        """
         scores: List[float] = []
         for line in (content or "").strip().splitlines():
-            match = re.search(r"([01](?:\.\d+)?|\.\d+)", line.strip())
+            stripped = re.sub(r"^\s*\d+\.\s+", "", line.strip())
+            match = re.search(r"([01](?:\.\d+)?|\.\d+)", stripped)
             if match:
                 scores.append(cls._clamp_relevance_score(float(match.group(1))))
         if len(scores) != expected:

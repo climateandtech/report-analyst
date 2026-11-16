@@ -130,6 +130,15 @@ def test_parse_relevance_scores_rejects_wrong_count():
         DocumentAnalyzer._parse_relevance_scores("0.9", expected=2)
 
 
+def test_parse_relevance_scores_ignores_numbered_list_prefixes():
+    """Hypothesis: '1. 0.2' must yield 0.2, not the list index 1.0 after clamp."""
+    scores = DocumentAnalyzer._parse_relevance_scores(
+        "1. 0.2\n2. 0.8\n3. 0.1",
+        expected=3,
+    )
+    assert scores == pytest.approx([0.2, 0.8, 0.1])
+
+
 @pytest.mark.asyncio
 async def test_analyze_chunks_passes_llm_score_into_prompt(scoring_analyzer):
     """Hypothesis: answer prompt must show llm_score as relevance, not always 0.0."""
