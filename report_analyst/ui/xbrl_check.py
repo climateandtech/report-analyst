@@ -60,6 +60,10 @@ def _show(problems: list[XbrlProblem], known: list[SourceTag], left_out: int, so
     package_problems = [problem.message for problem in problems if not problem.tag_id]
     if package_problems:
         st.caption(
-            f"Problems in the ESRS package itself, not in your tags: {len(package_problems)}  \n"
-            + "  \n".join(package_problems)
+            f"Arelle also noted problems in the ESRS taxonomy package itself ({len(package_problems)}). "
+            "They are not about your tags."
         )
+        # A popover opens without a rerun, so the check result stays on the page.
+        with st.popover("Details"):
+            for message in package_problems:
+                st.caption(message)

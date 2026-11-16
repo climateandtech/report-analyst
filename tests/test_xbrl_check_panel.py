@@ -118,4 +118,7 @@ def test_panel_checks_the_known_tags_and_shows_the_result(check):
     assert app.success[0].value == "1 of 2 tags make valid XBRL."
     assert "**Prepared on a consolidated basis: true**  \n  Element esrs:Consolidated type boolean" in app.error[0].value
     assert app.warning[0].value == "Tags whose concept is not in this taxonomy were left out: 1"
-    assert app.caption[0].value.startswith("Problems in the ESRS package itself, not in your tags: 1")
+    assert app.caption[0].value == (
+        "Arelle also noted problems in the ESRS taxonomy package itself (1). They are not about your tags."
+    )
+    assert app.caption[1].value == "Could not load nace-codes.xsd"
