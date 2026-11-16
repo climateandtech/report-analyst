@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import styleText from "./pdf-viewer.styles.js";
 
 vi.mock("pdfjs-dist/build/pdf.mjs", () => ({
   GlobalWorkerOptions: { workerSrc: "" },
@@ -830,6 +831,19 @@ describe("PDF viewer", () => {
       viewer.shadowRoot.querySelector(".source-tag-text").click();
 
       expect(viewer.navigateToPage).toHaveBeenCalledWith(14);
+    });
+
+    it("only changes colours on hover, so the remove buttons stay in place", () => {
+      const style = document.createElement("style");
+      style.textContent = styleText;
+      document.head.append(style);
+      const hover = [...style.sheet.cssRules].filter((rule) => rule.selectorText?.includes(":hover"));
+      style.remove();
+
+      expect(hover.map((rule) => rule.selectorText)).toContain(".source-annotation-delete:hover, .source-tag-delete:hover");
+      for (const rule of hover) {
+        expect(Array.from(rule.style).filter((name) => !/^(background|color|border(-\w+)?-color|box-shadow)/.test(name))).toEqual([]);
+      }
     });
   });
 

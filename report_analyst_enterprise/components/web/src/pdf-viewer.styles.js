@@ -96,6 +96,10 @@ export default `
 }
 
 .source-annotation-delete:hover,
+.source-tag-delete:hover {
+  background: #fee4e2;
+}
+
 .source-tags {
   grid-column: 1 / -1;
   display: grid;
