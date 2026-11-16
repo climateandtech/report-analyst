@@ -13,16 +13,13 @@ from streamlit.testing.v1 import AppTest
 
 from report_analyst.streamlit_app import ReportAnalyzer
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
 
 @pytest.fixture
-def test_pdf_in_app_temp():
-    """Create a valid temporary PDF in the app's temp directory."""
-    app_temp = PROJECT_ROOT / "temp"
-    app_temp.mkdir(exist_ok=True)
+def test_pdf_in_app_temp(monkeypatch, tmp_path):
+    """Create a valid PDF in a per-test upload directory the app reads reports from."""
+    monkeypatch.setenv("REPORT_ANALYST_UPLOAD_DIR", str(tmp_path))
 
-    pdf_path = app_temp / "test_report.pdf"
+    pdf_path = tmp_path / "test_report.pdf"
 
     writer = PdfWriter()
     writer.add_blank_page(width=612, height=792)
@@ -30,10 +27,7 @@ def test_pdf_in_app_temp():
     with pdf_path.open("wb") as file:
         writer.write(file)
 
-    yield pdf_path
-
-    # Remove only the file created by this test.
-    pdf_path.unlink(missing_ok=True)
+    return pdf_path
 
 
 def test_process_document_with_all_keywords():
