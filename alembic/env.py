@@ -1,9 +1,9 @@
 import os
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
 from report_analyst.core.database_manager import DatabaseManager
 
 # Import our database schema

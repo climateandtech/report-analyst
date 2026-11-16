@@ -147,7 +147,7 @@ class S3UploadService:
                 self.nc = None
                 self.js = None
                 logger.info(f"Published control message for {filename}")
-                logger.info(f"Closed connection")
+                logger.info("Closed connection")
 
             except Exception as publish_error:
                 logger.error(f"NATS publish failed: {publish_error}")
