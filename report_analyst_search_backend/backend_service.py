@@ -100,7 +100,7 @@ class BackendService:
                 raise BackendServiceError(f"Upload failed: {response.status_code}")
 
         except requests.RequestException as e:
-            raise BackendServiceError(f"Upload error: {str(e)}")
+            raise BackendServiceError(f"Upload error: {e!s}")
 
     def wait_for_processing(self, resource_id: str, timeout: int = 120) -> bool:
         """
@@ -148,7 +148,7 @@ class BackendService:
                 time.sleep(3)
 
             except Exception as e:
-                st.error(f"Error checking status: {str(e)}")
+                st.error(f"Error checking status: {e!s}")
                 return False
 
     def get_chunks(self, resource_id: str) -> List[Dict[str, Any]]:
@@ -191,7 +191,7 @@ class BackendService:
                 raise BackendServiceError(f"Failed to get chunks: {response.status_code}")
 
         except requests.RequestException as e:
-            raise BackendServiceError(f"Error getting chunks: {str(e)}")
+            raise BackendServiceError(f"Error getting chunks: {e!s}")
 
     def submit_analysis_job(self, resource_id: str, question_set: str) -> str:
         """
@@ -235,7 +235,7 @@ class BackendService:
                 raise BackendServiceError(f"Failed to submit analysis job: {response.status_code}")
 
         except requests.RequestException as e:
-            raise BackendServiceError(f"Error submitting analysis job: {str(e)}")
+            raise BackendServiceError(f"Error submitting analysis job: {e!s}")
 
     def wait_for_analysis(self, analysis_job_id: str, timeout: int = 300) -> Dict[str, Any]:
         """
@@ -284,7 +284,7 @@ class BackendService:
                 time.sleep(5)
 
             except requests.RequestException as e:
-                raise BackendServiceError(f"Error checking analysis status: {str(e)}")
+                raise BackendServiceError(f"Error checking analysis status: {e!s}")
 
     def get_analysis_results(self, analysis_job_id: str = None, resource_id: str = None) -> Optional[Dict[str, Any]]:
         """
@@ -521,6 +521,6 @@ def create_backend_service(config: BackendConfig) -> BackendService:
 
 def handle_backend_error(error: BackendServiceError, context: str = ""):
     """Standard error handling for backend service errors"""
-    error_msg = f"{context} failed: {str(error)}" if context else f"{str(error)}"
+    error_msg = f"{context} failed: {error!s}" if context else f"{error!s}"
     st.error(error_msg)
     logger.error(f"Backend service error: {error}")
