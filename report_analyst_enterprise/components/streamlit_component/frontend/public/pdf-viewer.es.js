@@ -1,5 +1,5 @@
 import "./pdfjs-map-polyfill.js";
-//#region src/pdf-viewer.styles.js
+// src/pdf-viewer.styles.js
 var e = "\n:host {\n  display: block;\n  height: 100vh;\n  font-family: system-ui, sans-serif;\n}\n\n.container {\n  display: flex;\n  width: 100%;\n  height: 100%;\n  min-width: 0;\n  background: #f5f5f5;\n}\n\n.sidebar {\n  display: flex;\n  flex: 0 0 clamp(220px, 32%, 350px);\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: white;\n  border-right: 1px solid #e0e0e0;\n}\n\n.sidebar-header {\n  padding: 16px;\n  background: #fafafa;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.sidebar-header h3 {\n  margin: 0 0 12px;\n  font-size: 16px;\n}\n\n.question-select {\n  width: 100%;\n  margin-bottom: 12px;\n  padding: 8px;\n}\n\n.evidence-filter {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  color: #666;\n  font-size: 14px;\n}\n\n.chunks-list {\n  flex: 1;\n  overflow-y: auto;\n  padding: 8px;\n}\n\n.empty {\n  padding: 16px;\n  color: #777;\n  text-align: center;\n}\n\n.chunk-item {\n  margin-bottom: 8px;\n  padding: 12px;\n  background: white;\n  border: 1px solid #e0e0e0;\n  border-radius: 6px;\n  cursor: pointer;\n}\n\n.chunk-item:hover {\n  border-color: #4313c8;\n  box-shadow: 0 2px 4px rgba(67, 19, 200, 0.1);\n}\n\n.chunk-item.evidence {\n  background: #f8f7ff;\n  border-left: 4px solid #4313c8;\n}\n\n.chunk-header,\n.badges,\n.chunk-scores {\n  display: flex;\n  align-items: center;\n}\n\n.chunk-header {\n  justify-content: space-between;\n  margin-bottom: 8px;\n}\n\n.chunk-title {\n  color: #333;\n  font-size: 14px;\n  font-weight: 600;\n}\n\n.badges {\n  gap: 4px;\n}\n\n.badge {\n  padding: 2px 8px;\n  border-radius: 12px;\n  background: #e0e0e0;\n  color: #666;\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.badge.evidence {\n  background: #4313c8;\n  color: white;\n}\n\n.chunk-text {\n  display: -webkit-box;\n  overflow: hidden;\n  color: #666;\n  font-size: 13px;\n  line-height: 1.5;\n  -webkit-box-orient: vertical;\n  -webkit-line-clamp: 3;\n}\n\n.chunk-scores {\n  gap: 12px;\n  margin-top: 8px;\n  color: #888;\n  font-size: 11px;\n}\n\n.viewer {\n  display: flex;\n  flex: 1;\n  flex-direction: column;\n  min-width: 0;\n  overflow: hidden;\n  background: #525252;\n}\n\n.viewer-controls {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 12px 16px;\n  background: white;\n  border-bottom: 1px solid #e0e0e0;\n}\n\n.viewer-controls button {\n  padding: 6px 12px;\n  background: white;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  cursor: pointer;\n}\n\n.viewer-controls button:disabled {\n  cursor: default;\n  opacity: 0.45;\n}\n\n.page-info {\n  color: #666;\n  font-size: 14px;\n}\n\n.viewer-content {\n  display: flex;\n  flex: 1;\n  align-items: flex-start;\n  justify-content: center;\n  overflow: auto;\n  padding: 20px;\n}\n\n.page-container {\n  position: relative;\n  flex: none;\n  background: white;\n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);\n}\n\n.page-canvas {\n  display: block;\n}\n\n.page-highlights {\n  position: absolute;\n  inset: 0;\n  pointer-events: none;\n}\n\n.highlight {\n  position: absolute;\n  z-index: 1;\n  background: transparent;\n  border: 1px solid rgba(67, 19, 200, 0.35);\n  border-radius: 2px;\n  pointer-events: auto;\n  transition: background-color 0.15s ease, border-color 0.15s ease;\n}\n\n.highlight:hover {\n  background: rgba(67, 19, 200, 0.2);\n  border-color: rgba(67, 19, 200, 0.75);\n}\n\n.highlight.evidence {\n  border-color: #4313c8;\n}\n\n.highlight.evidence:hover {\n  background: rgba(67, 19, 200, 0.3);\n}\n\n.message {\n  margin: auto;\n  color: #eee;\n  font-size: 14px;\n}\n\n.message.error {\n  color: #fecaca;\n}\n", t = typeof process == "object" && process + "" == "[object process]" && !process.versions.nw && !(process.versions.electron && process.type && process.type !== "browser"), n = [
 	Infinity,
 	Infinity,
@@ -677,7 +677,7 @@ var ve = class e {
 	static setAttributes({ html: e, element: t, storage: n = null, intent: r, linkService: i }) {
 		let { attributes: a } = t, o = e instanceof HTMLAnchorElement;
 		a.type === "radio" && (a.name = `${a.name}-${r}`);
-		for (let [t, n] of Object.entries(a)) if (n != null && !xe.test(t) && !(r === "richText" && !this._allowedRichTextAttributes.has(t))) switch (t) {
+		for (let [t, n] of Object.entries(a)) if (n != null && !xe.test(t) && (r !== "richText" || this._allowedRichTextAttributes.has(t))) switch (t) {
 			case "class":
 				n.length && e.setAttribute(t, n.join(" "));
 				break;
@@ -813,9 +813,7 @@ async function we(e, t = "text") {
 							return;
 					}
 					n(i.responseText);
-					return;
-				}
-				r(Error(i.statusText));
+				} else r(Error(i.statusText));
 			}
 		}, i.send(null);
 	});
@@ -1323,11 +1321,7 @@ var Xe = class e {
 			let e = i.y + i.height;
 			if (e < n) continue;
 			let a = i.x + (t ? i.width : 0);
-			if (e > n) {
-				r = a, n = e;
-				continue;
-			}
-			t ? a > r && (r = a) : a < r && (r = a);
+			e > n ? (r = a, n = e) : t ? a > r && (r = a) : a < r && (r = a);
 		}
 		return [t ? 1 - r : r, n];
 	}
@@ -1578,15 +1572,14 @@ var V = class e {
 		for (let i of t.split("+")) {
 			if (i = i.trim(), !i) continue;
 			let a = i.toUpperCase(), o = e[a];
-			if (o) {
-				r |= o;
-				continue;
+			if (o) r |= o;
+			else {
+				if (n !== null) {
+					T(`KeyboardManager: multiple keys in shortcut "${t}"`);
+					break;
+				}
+				n = a === "SPACE" ? " " : i;
 			}
-			if (n !== null) {
-				T(`KeyboardManager: multiple keys in shortcut "${t}"`);
-				break;
-			}
-			n = a === "SPACE" ? " " : i;
 		}
 		return n === null && T(`KeyboardManager: no key found in shortcut "${t}"`), [n, r];
 	}
@@ -1604,7 +1597,7 @@ var V = class e {
 		let i = (n.altKey ? e.ALT : 0) | (n.ctrlKey ? e.CTRL : 0) | (n.metaKey ? e.META : 0) | (n.shiftKey ? e.SHIFT : 0), a = r.find((e) => e.modifiers === i);
 		if (!a) return;
 		let { callback: o, options: { bubbles: s = !1, args: c = [], checker: l = null } } = a;
-		l && !l(t, n) || (o.bind(t, ...c, n)(), s || R(n));
+		(!l || l(t, n)) && (o.bind(t, ...c, n)(), s || R(n));
 	}
 }, it = class e {
 	static _colorsMapping = /* @__PURE__ */ new Map([["CanvasText", [
@@ -1872,11 +1865,7 @@ var V = class e {
 		let t = /* @__PURE__ */ new Map(), n = !!this.#B;
 		for (let [r, i] of e) {
 			let e = r.endsWith("_HCM");
-			if (n && e) {
-				t.set(r.replace("_HCM", ""), i);
-				continue;
-			}
-			!n && !e && t.set(r, i);
+			n && e ? t.set(r.replace("_HCM", ""), i) : !n && !e && t.set(r, i);
 		}
 		return j(this, "highlightColors", t);
 	}
@@ -2039,11 +2028,7 @@ var V = class e {
 			});
 			f && this.showAllEditors("highlight", !0, !0), t && n?.editComment();
 		};
-		if (f) {
-			this.switchToMode(u.HIGHLIGHT, p);
-			return;
-		}
-		p();
+		f ? this.switchToMode(u.HIGHLIGHT, p) : p();
 	}
 	commentSelection(e = "") {
 		this.highlightSelection(e, !0);
@@ -2078,11 +2063,8 @@ var V = class e {
 		let { anchorNode: t } = e;
 		if (t === this.#R) return;
 		let n = this.#X(e).closest(".textLayer");
-		if (!n) {
-			this.#R && (this.#E?.hide(), this.#R = null, this.#le({ hasSelectedText: !1 }));
-			return;
-		}
-		if (this.#E?.hide(), this.#R = t, this.#le({ hasSelectedText: !0 }), (this.#I === u.HIGHLIGHT || this.#I === u.NONE) && (this.#I === u.HIGHLIGHT && this.showAllEditors("highlight", !0, !0), this.#T = this.isShiftKeyDown, !this.isShiftKeyDown)) {
+		if (!n) this.#R && (this.#E?.hide(), this.#R = null, this.#le({ hasSelectedText: !1 }));
+		else if (this.#E?.hide(), this.#R = t, this.#le({ hasSelectedText: !0 }), (this.#I === u.HIGHLIGHT || this.#I === u.NONE) && (this.#I === u.HIGHLIGHT && this.showAllEditors("highlight", !0, !0), this.#T = this.isShiftKeyDown, !this.isShiftKeyDown)) {
 			let e = this.#I === u.HIGHLIGHT ? this.#Z(n) : null;
 			if (e?.toggleDrawing(), this.#k) {
 				let t = new AbortController(), n = this.combinedSignal(t), r = (n) => {
@@ -2311,30 +2293,29 @@ var V = class e {
 				this.setEditingState(!1), this.#fe();
 				for (let e of this.#r.values()) e.hideStandaloneCommentButton();
 				this._editorUndoBar?.hide(), this.toggleComment(null), this.#Y.resolve();
-				return;
-			}
-			for (let e of this.#r.values()) e.addStandaloneCommentButton();
-			e === u.SIGNATURE && await this.#z?.loadSignatures(), n && V.clearPointerType(), this.setEditingState(!0), await this.#de(), this.unselectAll();
-			for (let t of this.#i.values()) t.updateMode(e);
-			if (e === u.POPUP) {
-				this.#n ||= await this.#H.getAnnotationsByType(new Set(this.#g.map((e) => e._editorType)));
-				let e = /* @__PURE__ */ new Set(), t = [];
-				for (let n of this.#r.values()) {
-					let { annotationElementId: r, hasComment: i, deleted: a } = n;
-					r && e.add(r), i && !a && t.push(n.getData());
+			} else {
+				for (let e of this.#r.values()) e.addStandaloneCommentButton();
+				e === u.SIGNATURE && await this.#z?.loadSignatures(), n && V.clearPointerType(), this.setEditingState(!0), await this.#de(), this.unselectAll();
+				for (let t of this.#i.values()) t.updateMode(e);
+				if (e === u.POPUP) {
+					this.#n ||= await this.#H.getAnnotationsByType(new Set(this.#g.map((e) => e._editorType)));
+					let e = /* @__PURE__ */ new Set(), t = [];
+					for (let n of this.#r.values()) {
+						let { annotationElementId: r, hasComment: i, deleted: a } = n;
+						r && e.add(r), i && !a && t.push(n.getData());
+					}
+					for (let n of this.#n) {
+						let { id: r, popupRef: i, contentsObj: a } = n;
+						i && a?.str && !e.has(r) && !this.#m.has(r) && t.push(n);
+					}
+					this.#u?.showSidebar(t);
 				}
-				for (let n of this.#n) {
-					let { id: r, popupRef: i, contentsObj: a } = n;
-					i && a?.str && !e.has(r) && !this.#m.has(r) && t.push(n);
+				if (!t) r && this.addNewEditorFromKeyboard(), this.#Y.resolve();
+				else {
+					for (let e of this.#r.values()) e.uid === t ? (this.setSelected(e), a ? e.editComment() : i ? e.enterInEditMode() : e.focus()) : e.unselect();
+					this.#Y.resolve();
 				}
-				this.#u?.showSidebar(t);
 			}
-			if (!t) {
-				r && this.addNewEditorFromKeyboard(), this.#Y.resolve();
-				return;
-			}
-			for (let e of this.#r.values()) e.uid === t ? (this.setSelected(e), a ? e.editComment() : i ? e.enterInEditMode() : e.focus()) : e.unselect();
-			this.#Y.resolve();
 		}
 	}
 	addNewEditorFromKeyboard() {
@@ -2405,7 +2386,7 @@ var V = class e {
 	removeEditor(e) {
 		e.div.contains(document.activeElement) && (this.#S && clearTimeout(this.#S), this.#S = setTimeout(() => {
 			this.focusMainContainer(), this.#S = null;
-		}, 0)), this.#r.delete(e.id), e.annotationElementId && this.#P?.delete(e.annotationElementId), this.unselect(e), (!e.annotationElementId || !this.#m.has(e.annotationElementId)) && this.#s?.remove(e.id);
+		}, 0)), this.#r.delete(e.id), e.annotationElementId && this.#P?.delete(e.annotationElementId), this.unselect(e), e.annotationElementId && this.#m.has(e.annotationElementId) || this.#s?.remove(e.id);
 	}
 	addDeletedAnnotationElement(e) {
 		this.#m.add(e.annotationElementId), this.addChangedExistingAnnotation(e), e.deleted = !0;
@@ -2435,11 +2416,7 @@ var V = class e {
 		this.#ue(e.defaultPropertiesToUpdate);
 	}
 	toggleSelected(e) {
-		if (this.#L.has(e)) {
-			this.#L.delete(e), e.unselect(), this.#le({ hasSelectedEditor: this.hasSelection });
-			return;
-		}
-		this.#L.add(e), e.select(), this.#ue(e.propertiesToUpdate), this.#le({ hasSelectedEditor: !0 });
+		this.#L.has(e) ? (this.#L.delete(e), e.unselect(), this.#le({ hasSelectedEditor: this.hasSelection })) : (this.#L.add(e), e.select(), this.#ue(e.propertiesToUpdate), this.#le({ hasSelectedEditor: !0 }));
 	}
 	setSelected(e) {
 		this.updateToolbar({
@@ -2663,7 +2640,7 @@ var V = class e {
 		let t = this.#c?.get(e.data.id);
 		if (!t) return;
 		let n = this.#s.getRawValue(t);
-		n && (this.#I === u.NONE && !n.hasBeenModified || n.renderAnnotationElement(e));
+		n && (this.#I !== u.NONE || n.hasBeenModified) && n.renderAnnotationElement(e);
 	}
 	setMissingCanvas(e, t, n) {
 		let r = this.#P?.get(e);
@@ -2739,15 +2716,14 @@ var V = class e {
 		this.#e === null && (this.#l = t, this.#u = await e._l10n.get("pdfjs-editor-new-alt-text-generated-alt-text-with-disclaimer", { generatedAltText: t }), this.#m());
 	}
 	toggleAltTextBadge(e = !1) {
-		if (!this.#d || this.#e) {
-			this.#s?.remove(), this.#s = null;
-			return;
+		if (!this.#d || this.#e) this.#s?.remove(), this.#s = null;
+		else {
+			if (!this.#s) {
+				let e = this.#s = document.createElement("div");
+				e.className = "noAltTextBadge", this.#c.div.append(e);
+			}
+			this.#s.classList.toggle("hidden", !e);
 		}
-		if (!this.#s) {
-			let e = this.#s = document.createElement("div");
-			e.className = "noAltTextBadge", this.#c.div.append(e);
-		}
-		this.#s.classList.toggle("hidden", !e);
 	}
 	serialize(e) {
 		let t = this.#e;
@@ -2942,11 +2918,7 @@ var V = class e {
 		};
 	}
 	set data(e) {
-		if (e !== this.#o && (this.#a = null), e === null) {
-			this.#o = "", this.#c = !0;
-			return;
-		}
-		this.#o = e, this.#s = /* @__PURE__ */ new Date(), this.#c = !1;
+		e !== this.#o && (this.#a = null), e === null ? (this.#o = "", this.#c = !0) : (this.#o = e, this.#s = /* @__PURE__ */ new Date(), this.#c = !1);
 	}
 	restoreData({ text: e, richText: t, date: n }) {
 		this.#o = e, this.#a = t, this.#s = n, this.#c = !1;
@@ -3574,13 +3546,7 @@ var V = class e {
 		return this.canAddComment ? this.#r ||= new st(this) : null;
 	}
 	addStandaloneCommentButton() {
-		if (this._uiManager.hasCommentManager()) {
-			if (this.#i) {
-				this._uiManager.isEditingMode() && this.#i.classList.remove("hidden");
-				return;
-			}
-			this.hasComment && (this.#i = this.#r.renderForStandalone(), this.div.append(this.#i));
-		}
+		this._uiManager.hasCommentManager() && (this.#i ? this._uiManager.isEditingMode() && this.#i.classList.remove("hidden") : this.hasComment && (this.#i = this.#r.renderForStandalone(), this.div.append(this.#i)));
 	}
 	removeStandaloneCommentButton() {
 		this.#r.removeStandaloneCommentButton(), this.#i = null;
@@ -3695,15 +3661,7 @@ var V = class e {
 	}
 	pointerdown(e) {
 		let { isMac: t } = P.platform;
-		if (e.button !== 0 || e.ctrlKey && t) {
-			e.preventDefault();
-			return;
-		}
-		if (this.#m = !0, this._isDraggable) {
-			this.#R(e);
-			return;
-		}
-		this.#L(e);
+		e.button !== 0 || e.ctrlKey && t ? e.preventDefault() : (this.#m = !0, this._isDraggable ? this.#R(e) : this.#L(e));
 	}
 	#L(e) {
 		let { isMac: t } = P.platform;
@@ -3732,11 +3690,7 @@ var V = class e {
 			e.pointerType === this.#s && (this.#C || e.isPrimary) && o(e), R(e);
 		}, a));
 		let s = (e) => {
-			if (!this.#o || this.#o === e.pointerId) {
-				o(e);
-				return;
-			}
-			R(e);
+			!this.#o || this.#o === e.pointerId ? o(e) : R(e);
 		};
 		window.addEventListener("pointerup", s, { signal: i }), window.addEventListener("blur", s, { signal: i });
 	}
@@ -4006,17 +3960,9 @@ var V = class e {
 		this.#W(), this.div.focus();
 	}
 	select() {
-		if (this.isSelected && this._editToolbar) {
-			this._editToolbar.show();
-			return;
-		}
-		if (this.isSelected = !0, this.makeResizable(), this.div?.classList.add("selectedEditor"), !this._editToolbar) {
-			this.addEditToolbar().then(() => {
-				this.div?.classList.contains("selectedEditor") && this._editToolbar?.show();
-			});
-			return;
-		}
-		this._editToolbar?.show(), this.#n?.toggleAltTextBadge(!1);
+		this.isSelected && this._editToolbar ? this._editToolbar.show() : (this.isSelected = !0, this.makeResizable(), this.div?.classList.add("selectedEditor"), this._editToolbar ? (this._editToolbar?.show(), this.#n?.toggleAltTextBadge(!1)) : this.addEditToolbar().then(() => {
+			this.div?.classList.contains("selectedEditor") && this._editToolbar?.show();
+		}));
 	}
 	focus() {
 		this.div && !this.div.contains(document.activeElement) && setTimeout(() => this.div?.focus({ preventScroll: !0 }), 0);
@@ -4073,9 +4019,7 @@ var V = class e {
 			r && clearTimeout(r), r = setTimeout(() => {
 				this._reportTelemetry(t), this.#S.delete(n), this.#S.size === 0 && (this.#S = null);
 			}, e._telemetryTimeout), this.#S.set(n, r);
-			return;
-		}
-		t.type ||= this.editorType, this._uiManager._eventBus.dispatch("reporttelemetry", {
+		} else t.type ||= this.editorType, this._uiManager._eventBus.dispatch("reporttelemetry", {
 			source: this,
 			details: {
 				type: "editing",
@@ -4093,15 +4037,7 @@ var V = class e {
 		this.div && (this.div.tabIndex = -1), this.#a = !0;
 	}
 	updateFakeAnnotationElement(e) {
-		if (!this.#d && !this.deleted) {
-			this.#d = e.addFakeAnnotation(this);
-			return;
-		}
-		if (this.deleted) {
-			this.#d.remove(), this.#d = null;
-			return;
-		}
-		(this.hasEditedComment || this._hasBeenMoved || this._hasBeenResized) && this.#d.updateEdited({
+		!this.#d && !this.deleted ? this.#d = e.addFakeAnnotation(this) : this.deleted ? (this.#d.remove(), this.#d = null) : (this.hasEditedComment || this._hasBeenMoved || this._hasBeenResized) && this.#d.updateEdited({
 			rect: this.getPDFRect(),
 			popup: this.comment
 		});
@@ -4129,7 +4065,7 @@ var V = class e {
 	}
 }, ut = 3285377520, U = 4294901760, W = 65535, dt = class {
 	constructor(e) {
-		this.h1 = e ? e & 4294967295 : ut, this.h2 = e ? e & 4294967295 : ut;
+		this.h1 = e ? e | 0 : ut, this.h2 = e ? e | 0 : ut;
 	}
 	update(e) {
 		let t, n;
@@ -4175,7 +4111,7 @@ var V = class e {
 	}
 	remove(e) {
 		let t = this.#r.get(e);
-		t !== void 0 && (t instanceof H && this.#n.delete(t.annotationElementId), this.#r.delete(e), this.#r.size === 0 && this.resetModified(), !this.#r.values().some((e) => e instanceof H) && this.onAnnotationEditor?.(null));
+		t !== void 0 && (t instanceof H && this.#n.delete(t.annotationElementId), this.#r.delete(e), this.#r.size === 0 && this.resetModified(), this.#r.values().some((e) => e instanceof H) || this.onAnnotationEditor?.(null));
 	}
 	setValue(e, t) {
 		let n = this.#r.get(e), r = !1;
@@ -4524,7 +4460,7 @@ var bt = new Uint32Array(new Uint8Array([
 	restore(e) {
 		this.#s.restore(e, this.#o);
 		let t = Object.getPrototypeOf(this.#e);
-		return t === null ? this : (this.#e = t, this.#t = Object.getPrototypeOf(this.#t), this);
+		return t === null || (this.#e = t, this.#t = Object.getPrototypeOf(this.#t)), this;
 	}
 	recordOpenMarker(e) {
 		return this.#s.recordOpenMarker(e, this.#o), this;
@@ -4899,7 +4835,7 @@ var bt = new Uint32Array(new Uint8Array([
 		this.styleElement &&= (this.styleElement.remove(), null);
 	}
 	async loadSystemFont({ systemFontInfo: e, disableFontFace: t, _inspectFont: n }) {
-		if (!(!e || this.#e.has(e.loadedName))) {
+		if (e && !this.#e.has(e.loadedName)) {
 			if (D(!t, "loadSystemFont shouldn't be called when `disableFontFace` is set."), this.isFontLoadingAPISupported) {
 				let { loadedName: t, src: r, style: i } = e, a = new FontFace(t, r, i);
 				this.addNativeFontFace(a);
@@ -4908,9 +4844,7 @@ var bt = new Uint32Array(new Uint8Array([
 				} catch {
 					T(`Cannot load system font: ${e.baseFontName}, installing it could help to improve PDF rendering.`), this.removeNativeFontFace(a);
 				}
-				return;
-			}
-			E("Not implemented: loadSystemFont without the Font Loading API.");
+			} else E("Not implemented: loadSystemFont without the Font Loading API.");
 		}
 	}
 	async bind(e) {
@@ -4980,15 +4914,7 @@ var bt = new Uint32Array(new Uint8Array([
 		s.width = 1, s.height = 1;
 		let c = s.getContext("2d"), l = 0;
 		function u(e, t) {
-			if (++l > 30) {
-				T("Load test font never loaded."), t();
-				return;
-			}
-			if (c.font = "30px " + e, c.fillText(".", 0, 20), c.getImageData(0, 0, 1, 1).data[3] > 0) {
-				t();
-				return;
-			}
-			setTimeout(u.bind(null, e, t));
+			++l > 30 ? (T("Load test font never loaded."), t()) : (c.font = "30px " + e, c.fillText(".", 0, 20), c.getImageData(0, 0, 1, 1).data[3] > 0 ? t() : setTimeout(u.bind(null, e, t)));
 		}
 		let d = `lt${Date.now()}${this.loadTestFontId++}`, f = this._loadTestFont;
 		f = i(f, 976, d.length, d);
@@ -5551,13 +5477,7 @@ var Gt = class {
 					reason: J(t)
 				});
 			});
-			return;
-		}
-		if (e.streamId) {
-			this.#n(e);
-			return;
-		}
-		t(e.data);
+		} else e.streamId ? this.#n(e) : t(e.data);
 	}
 	on(e, t) {
 		let n = this.actionHandler;
@@ -5653,7 +5573,7 @@ var Gt = class {
 				}), delete a.streamSinks[t]);
 			},
 			error(e) {
-				D(e instanceof Error, "error must have a valid reason"), !this.isCancelled && (this.isCancelled = !0, i.postMessage({
+				D(e instanceof Error, "error must have a valid reason"), this.isCancelled || (this.isCancelled = !0, i.postMessage({
 					sourceName: n,
 					targetName: r,
 					stream: q.ERROR,
@@ -7084,7 +7004,7 @@ var Pn = [
 			this.ctx.canvas.height
 		];
 		let t = this.current.activeSMask, n = this.suspendedCtx, r = this.#t > 0 && n === this.ctx;
-		this.composeSMask(r ? null : n, t, this.ctx, e), !r && (this.ctx.save(), this.ctx.setTransform(1, 0, 0, 1, 0, 0), this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height), this.ctx.restore());
+		this.composeSMask(r ? null : n, t, this.ctx, e), r || (this.ctx.save(), this.ctx.setTransform(1, 0, 0, 1, 0, 0), this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height), this.ctx.restore());
 	}
 	composeSMask(e, t, n, r) {
 		let i = r[0], a = r[1], o = r[2] - i, s = r[3] - a;
@@ -7125,11 +7045,7 @@ var Pn = [
 		this.stateStack.push(t), this.current = t.clone(), this.dependencyTracker?.save(e);
 	}
 	restore(e) {
-		if (this.dependencyTracker?.restore(e), this.stateStack.length === 0) {
-			this.inSMaskMode && this.endSMaskMode();
-			return;
-		}
-		this.current = this.stateStack.pop(), this.ctx.restore(), this.inSMaskMode && (jn(this.suspendedCtx, this.ctx), this.ctx.setTransform(this.suspendedCtx.getTransform())), this.checkSMaskState(e), this.pendingClip = null, this._cachedScaleForStroking[0] = -1, this._cachedGetSinglePixelWidth = null;
+		this.dependencyTracker?.restore(e), this.stateStack.length === 0 ? this.inSMaskMode && this.endSMaskMode() : (this.current = this.stateStack.pop(), this.ctx.restore(), this.inSMaskMode && (jn(this.suspendedCtx, this.ctx), this.ctx.setTransform(this.suspendedCtx.getTransform())), this.checkSMaskState(e), this.pendingClip = null, this._cachedScaleForStroking[0] = -1, this._cachedGetSinglePixelWidth = null);
 	}
 	transform(e, t, n, r, i, a, o) {
 		this.dependencyTracker?.recordIncrementalData("transform", e), this.ctx.transform(t, n, r, i, a, o), this._cachedScaleForStroking[0] = -1, this._cachedGetSinglePixelWidth = null;
@@ -7365,8 +7281,8 @@ var Pn = [
 			n.x += i * _ * d, o.restore(), this.compose(), this.#g(a);
 			return;
 		}
-		let E = 0, D;
-		for (D = 0; D < f; ++D) {
+		let E = 0, D = 0;
+		for (; D < f; ++D) {
 			let n = t[D];
 			if (typeof n == "number") {
 				E += h * n * i / 1e3;
@@ -7580,11 +7496,8 @@ var Pn = [
 		if (!this.contentVisible) return;
 		this.groupLevel--;
 		let n = this.ctx, i = this.groupStack.pop(), a = this.#l.pop();
-		if (a && (this.#e = a.savedKnockoutLevel), i === null) {
-			this.restore(e);
-			return;
-		}
-		if (t.isGray && this.#v(n), this.ctx = i, this.ctx.imageSmoothingEnabled = !1, this.dependencyTracker?.popBaseTransform(), t.smask) this.tempSMask = this.smaskStack.pop(), this.restore(e), this.dependencyTracker && (this.ctx.restore(), this.inSMaskMode && this.ctx.setTransform(this.suspendedCtx.getTransform())), this.#y(a);
+		if (a && (this.#e = a.savedKnockoutLevel), i === null) this.restore(e);
+		else if (t.isGray && this.#v(n), this.ctx = i, this.ctx.imageSmoothingEnabled = !1, this.dependencyTracker?.popBaseTransform(), t.smask) this.tempSMask = this.smaskStack.pop(), this.restore(e), this.dependencyTracker && (this.ctx.restore(), this.inSMaskMode && this.ctx.setTransform(this.suspendedCtx.getTransform())), this.#y(a);
 		else {
 			this.ctx.restore();
 			let t = z(this.ctx);
@@ -7712,11 +7625,7 @@ var Pn = [
 	paintImageXObject(e, t) {
 		if (!this.contentVisible) return;
 		let n = this.getObject(e, t);
-		if (!n) {
-			T("Dependent image isn't ready yet");
-			return;
-		}
-		this.paintInlineImageXObject(e, n);
+		n ? this.paintInlineImageXObject(e, n) : T("Dependent image isn't ready yet");
 	}
 	paintImageXObjectRepeat(e, t, n, r, i) {
 		if (!this.contentVisible) return;
@@ -7979,9 +7888,7 @@ function Hn(e) {
 			let [, e, r, i] = n;
 			if (e = parseInt(e, 10), e in t) {
 				if (e === 0) break;
-				continue;
-			}
-			t[e] = [r, i];
+			} else t[e] = [r, i];
 		}
 		let a = [];
 		for (let e = 0; e < t.length && e in t; ++e) {
@@ -8640,12 +8547,11 @@ var _r = class {
 	}
 	setVisibility(e, t = !0, n = !0) {
 		let r = this.#t.get(e);
-		if (!r) {
-			T(`Optional content group not found: ${e}`);
-			return;
+		if (!r) T(`Optional content group not found: ${e}`);
+		else {
+			if (n && t && r.rbGroups.length) for (let t of r.rbGroups) for (let n of t) n !== e && this.#t.get(n)?._setVisible(yr, !1, !0);
+			r._setVisible(yr, !!t, !0), this.#e = null;
 		}
-		if (n && t && r.rbGroups.length) for (let t of r.rbGroups) for (let n of t) n !== e && this.#t.get(n)?._setVisible(yr, !1, !0);
-		r._setVisible(yr, !!t, !0), this.#e = null;
 	}
 	setOCGState({ state: e, preserveRB: t }) {
 		let n;
@@ -8924,11 +8830,7 @@ var _r = class {
 		this.#i && this.#t.append(this.#i.render());
 		let t = () => {
 			this.#l.read().then(({ value: e, done: n }) => {
-				if (n) {
-					this.#e.resolve();
-					return;
-				}
-				this.#a ??= e.lang, Object.assign(this.#p, e.styles), this.#w(e.items), t();
+				n ? this.#e.resolve() : (this.#a ??= e.lang, Object.assign(this.#p, e.styles), this.#w(e.items), t());
 			}, this.#e.reject);
 		};
 		return this.#l = this.#h.getReader(), e.#C.add(this), t(), this.#e.promise;
@@ -8969,9 +8871,7 @@ var _r = class {
 					let t = this.#t;
 					this.#t = document.createElement("span"), this.#t.classList.add("markedContent"), e.id && this.#t.setAttribute("id", e.id), e.tag === "Artifact" && (this.#t.ariaHidden = !0), t.append(this.#t);
 				} else e.type === "endMarkedContent" && (this.#t = this.#t.parentNode);
-				continue;
-			}
-			r.push(e.str), this.#T(e);
+			} else r.push(e.str), this.#T(e);
 		}
 	}
 	#T(t) {
@@ -9429,15 +9329,14 @@ var jr = class e {
 		(b.renderTasks ||= /* @__PURE__ */ new Set()).add(O);
 		let ee = O.task;
 		return Promise.all([b.displayReadyCapability.promise, l]).then(([e, t]) => {
-			if (this.destroyed) {
-				T();
-				return;
+			if (this.destroyed) T();
+			else {
+				if (this._stats?.time("Rendering"), !(t.renderingIntent & v)) throw Error("Must use the same `intent`-argument when calling the `PDFPageProxy.render` and `PDFDocumentProxy.getOptionalContentConfig` methods.");
+				O.initializeGraphics({
+					transparency: e,
+					optionalContentConfig: t
+				}), O.operatorListChanged();
 			}
-			if (this._stats?.time("Rendering"), !(t.renderingIntent & v)) throw Error("Must use the same `intent`-argument when calling the `PDFPageProxy.render` and `PDFDocumentProxy.getOptionalContentConfig` methods.");
-			O.initializeGraphics({
-				transparency: e,
-				optionalContentConfig: t
-			}), O.operatorListChanged();
 		}).catch(T), ee;
 	}
 	getOperatorList({ intent: e = "display", annotationMode: t = s.ENABLE, printAnnotationStorage: n = null, isEditing: r = !1 } = {}) {
@@ -9520,11 +9419,7 @@ var jr = class e {
 		s.streamReader = o;
 		let c = () => {
 			o.read().then(({ value: e, done: t }) => {
-				if (t) {
-					s.streamReader = null;
-					return;
-				}
-				this._transport.destroyed || (this._renderPageChunk(e, s), c());
+				t ? s.streamReader = null : this._transport.destroyed || (this._renderPageChunk(e, s), c());
 			}, (e) => {
 				if (s.streamReader = null, !this._transport.destroyed) {
 					if (s.operatorList) {
@@ -9622,17 +9517,10 @@ var jr = class e {
 			n.addEventListener("error", () => {
 				this.#r || i();
 			}, { signal: a.signal }), r.on("test", (e) => {
-				if (a.abort(), this.destroyed || !e) {
-					i();
-					return;
-				}
-				this.#t = r, this.#n = n, this.#r = n, this.#s();
+				a.abort(), this.destroyed || !e ? i() : (this.#t = r, this.#n = n, this.#r = n, this.#s());
 			}), r.on("ready", (e) => {
-				if (a.abort(), this.destroyed) {
-					i();
-					return;
-				}
-				try {
+				if (a.abort(), this.destroyed) i();
+				else try {
 					o();
 				} catch {
 					this.#u();
@@ -9779,11 +9667,7 @@ var jr = class e {
 		e.on("GetReader", (e, t) => {
 			D(this.#n, "GetReader - no `BasePDFStream` instance available."), this.#e = this.#n.getFullReader(), this.#e.onProgress = (e) => this.#c(e), t.onPull = () => {
 				this.#e.read().then(function({ value: e, done: n }) {
-					if (n) {
-						t.close();
-						return;
-					}
-					D(e instanceof ArrayBuffer, "GetReader - expected an ArrayBuffer."), t.enqueue(new Uint8Array(e), 1, [e]);
+					n ? t.close() : (D(e instanceof ArrayBuffer, "GetReader - expected an ArrayBuffer."), t.enqueue(new Uint8Array(e), 1, [e]));
 				}).catch((e) => {
 					t.error(e);
 				});
@@ -9803,17 +9687,9 @@ var jr = class e {
 		}), e.on("GetRangeReader", (e, t) => {
 			D(this.#n, "GetRangeReader - no `BasePDFStream` instance available.");
 			let n = this.#n.getRangeReader(e.begin, e.end);
-			if (!n) {
-				t.close();
-				return;
-			}
-			t.onPull = () => {
+			n ? (t.onPull = () => {
 				n.read().then(function({ value: e, done: n }) {
-					if (n) {
-						t.close();
-						return;
-					}
-					D(e instanceof ArrayBuffer, "GetRangeReader - expected an ArrayBuffer."), t.enqueue(new Uint8Array(e), 1, [e]);
+					n ? t.close() : (D(e instanceof ArrayBuffer, "GetRangeReader - expected an ArrayBuffer."), t.enqueue(new Uint8Array(e), 1, [e]));
 				}).catch((e) => {
 					t.error(e);
 				});
@@ -9821,7 +9697,7 @@ var jr = class e {
 				n.cancel(e), t.ready.catch((e) => {
 					if (!this.destroyed) throw e;
 				});
-			};
+			}) : t.close();
 		}), e.on("GetDoc", ({ pdfInfo: e }) => {
 			this.pagesMapper.pagesNumber = e.numPages, this._numPages = e.numPages, this._htmlForXfa = e.htmlForXfa, delete e.htmlForXfa, t._capability.resolve(new Nr(e, this));
 		}), e.on("DocException", (e) => {
@@ -9885,11 +9761,8 @@ var jr = class e {
 			if (this.destroyed) return;
 			let i = this.#r.get(t);
 			if (!i.objs.has(e)) {
-				if (i._intentStates.size === 0) {
-					r?.bitmap?.close();
-					return;
-				}
-				switch (n) {
+				if (i._intentStates.size === 0) r?.bitmap?.close();
+				else switch (n) {
 					case "Image":
 					case "Pattern":
 						i.objs.resolve(e, r);
@@ -10131,14 +10004,10 @@ var jr = class e {
 		this.running = !1, this.cancelled = !0, this.gfx?.endDrawing(), this.#e &&= (window.cancelAnimationFrame(this.#e), null), e.#t.delete(this._canvas), t ||= new Te(`Rendering cancelled, page ${this._pageIndex + 1}`, n), this.callback(t), this.task.onError?.(t);
 	}
 	operatorListChanged() {
-		if (!this.graphicsReady) {
-			this.graphicsReadyCallback ||= this._continueBound;
-			return;
-		}
-		this.gfx.dependencyTracker?.growOperationsCount(this.operatorList.fnArray.length), this.stepper?.updateOperatorList(this.operatorList), !this.running && this._continue();
+		this.graphicsReady ? (this.gfx.dependencyTracker?.growOperationsCount(this.operatorList.fnArray.length), this.stepper?.updateOperatorList(this.operatorList), this.running || this._continue()) : this.graphicsReadyCallback ||= this._continueBound;
 	}
 	_continue() {
-		this.running = !0, !this.cancelled && (this.task.onContinue ? this.task.onContinue(this._scheduleNextBound) : this._scheduleNext());
+		this.running = !0, this.cancelled || (this.task.onContinue ? this.task.onContinue(this._scheduleNextBound) : this._scheduleNext());
 	}
 	_scheduleNext() {
 		this._useRequestAnimationFrame ? this.#e = window.requestAnimationFrame(() => {
@@ -10218,36 +10087,16 @@ var jr = class e {
 		t && this.#f(t, e);
 	}
 	_moveToNext(e) {
-		if (!this.#g) {
-			this.#m(e);
-			return;
-		}
-		if (e.target === this.#e) {
-			this.#r.firstElementChild?.focus();
-			return;
-		}
-		e.target.nextSibling?.focus();
+		this.#g ? e.target === this.#e ? this.#r.firstElementChild?.focus() : e.target.nextSibling?.focus() : this.#m(e);
 	}
 	_moveToPrevious(e) {
-		if (e.target === this.#r?.firstElementChild || e.target === this.#e) {
-			this.#g && this._hideDropdownFromKeyboard();
-			return;
-		}
-		this.#g || this.#m(e), e.target.previousSibling?.focus();
+		e.target === this.#r?.firstElementChild || e.target === this.#e ? this.#g && this._hideDropdownFromKeyboard() : (this.#g || this.#m(e), e.target.previousSibling?.focus());
 	}
 	_moveToBeginning(e) {
-		if (!this.#g) {
-			this.#m(e);
-			return;
-		}
-		this.#r.firstElementChild?.focus();
+		this.#g ? this.#r.firstElementChild?.focus() : this.#m(e);
 	}
 	_moveToEnd(e) {
-		if (!this.#g) {
-			this.#m(e);
-			return;
-		}
-		this.#r.lastElementChild?.focus();
+		this.#g ? this.#r.lastElementChild?.focus() : this.#m(e);
 	}
 	#p(t) {
 		e._keyboardManager.exec(this, t);
@@ -10274,16 +10123,10 @@ var jr = class e {
 		return this.#r && !this.#r.classList.contains("hidden");
 	}
 	_hideDropdownFromKeyboard() {
-		if (!this.#a) {
-			if (!this.#g) {
-				this.#o?.unselect();
-				return;
-			}
-			this.hideDropdown(), this.#e.focus({
-				preventScroll: !0,
-				focusVisible: this.#i
-			});
-		}
+		this.#a || (this.#g ? (this.hideDropdown(), this.#e.focus({
+			preventScroll: !0,
+			focusVisible: this.#i
+		})) : this.#o?.unselect());
 	}
 	updateColor(e) {
 		if (this.#t && (this.#t.style.backgroundColor = e), !this.#r) return;
@@ -10555,7 +10398,7 @@ var Gr = class {
 	}
 	_createContainer(e) {
 		let { data: t, parent: { page: n, viewport: r } } = this, i = document.createElement("section");
-		i.setAttribute("data-annotation-id", t.id), !(this instanceof ti) && !(this instanceof $r) && !(this instanceof wi) && (i.tabIndex = 0);
+		i.setAttribute("data-annotation-id", t.id), this instanceof ti || this instanceof $r || this instanceof wi || (i.tabIndex = 0);
 		let { style: a } = i;
 		if (a.zIndex = this.parent.zIndex, this.parent.zIndex += 2, t.alternativeText && (i.title = t.alternativeText), t.noRotate && i.classList.add("norotate"), !t.rect || this instanceof ci) {
 			let { rotation: e } = t;
@@ -10740,11 +10583,7 @@ var Gr = class {
 			for (let { page: e, id: i, exportValues: a } of r) {
 				if (e === -1 || i === t) continue;
 				let r = typeof a == "string" ? a : null, o = document.querySelector(`[data-element-id="${i}"]`);
-				if (o && !Yr.has(o)) {
-					T(`_getElementsByName - element not allowed: ${i}`);
-					continue;
-				}
-				n.push({
+				o && !Yr.has(o) ? T(`_getElementsByName - element not allowed: ${i}`) : n.push({
 					id: i,
 					exportValue: r,
 					domElement: o
@@ -10789,7 +10628,7 @@ var Gr = class {
 		});
 	}
 	updateOC(e) {
-		!this.data.oc || !e || (e.isVisible(this.data.oc) ? this.show() : this.hide());
+		this.data.oc && e && (e.isVisible(this.data.oc) ? this.show() : this.hide());
 	}
 	get width() {
 		return this.data.rect[2] - this.data.rect[0];
@@ -10888,11 +10727,7 @@ var Gr = class {
 	}
 	_bindResetFormAction(e, t) {
 		let n = e.onclick;
-		if (n || (e.href = this.linkService.getAnchorUrl("")), this.#e(), !this._fieldObjects) {
-			T("_bindResetFormAction - \"resetForm\" action not supported, ensure that the `fieldObjects` parameter is provided."), n || (e.onclick = () => !1);
-			return;
-		}
-		e.onclick = () => {
+		n || (e.href = this.linkService.getAnchorUrl("")), this.#e(), this._fieldObjects ? e.onclick = () => {
 			n?.();
 			let { fields: e, refs: r, include: i } = t, a = [];
 			if (e.length !== 0 || r.length !== 0) {
@@ -10927,13 +10762,7 @@ var Gr = class {
 					default: continue;
 				}
 				let n = document.querySelector(`[data-element-id="${t}"]`);
-				if (n) {
-					if (!Yr.has(n)) {
-						T(`_bindResetFormAction - element not allowed: ${t}`);
-						continue;
-					}
-					n.dispatchEvent(new Event("resetform"));
-				}
+				n && (Yr.has(n) ? n.dispatchEvent(new Event("resetform")) : T(`_bindResetFormAction - element not allowed: ${t}`));
 			}
 			return this.enableScripting && this.linkService.eventBus?.dispatch("dispatcheventinsandbox", {
 				source: this,
@@ -10943,7 +10772,7 @@ var Gr = class {
 					name: "ResetForm"
 				}
 			}), !1;
-		};
+		} : (T("_bindResetFormAction - \"resetForm\" action not supported, ensure that the `fieldObjects` parameter is provided."), n || (e.onclick = () => !1));
 	}
 }, ei = class extends Q {
 	constructor(e) {
@@ -11640,18 +11469,10 @@ var Gr = class {
 		e.altKey || e.shiftKey || e.ctrlKey || e.metaKey || (e.key === "Enter" || e.key === "Escape" && this.#f) && this.#I();
 	}
 	updateEdited({ rect: e, popup: t, deleted: n }) {
-		if (this.#e) {
-			n ? (this.remove(), this.#T = null) : t && (t.deleted ? this.remove() : (this.#k(), this.#T = t.text)), e && (this.#_ = null, this.#D(), this.#O());
-			return;
-		}
-		if (n || t?.deleted) {
-			this.remove();
-			return;
-		}
-		this.#E(), this.#S ||= {
+		this.#e ? (n ? (this.remove(), this.#T = null) : t && (t.deleted ? this.remove() : (this.#k(), this.#T = t.text)), e && (this.#_ = null, this.#D(), this.#O())) : n || t?.deleted ? this.remove() : (this.#E(), this.#S ||= {
 			contentsObj: this.#s,
 			richText: this.#b
-		}, e && (this.#h = null), t && t.text && (this.#b = this.#N(t.text), this.#c = Me.toDateObject(t.date), this.#s = null), this.#p?.remove(), this.#p = null;
+		}, e && (this.#h = null), t && t.text && (this.#b = this.#N(t.text), this.#c = Me.toDateObject(t.date), this.#s = null), this.#p?.remove(), this.#p = null);
 	}
 	resetEdited() {
 		this.#S && ({contentsObj: this.#s, richText: this.#b} = this.#S, this.#S = null, this.#p?.remove(), this.#p = null, this.#h = null);
@@ -11677,17 +11498,13 @@ var Gr = class {
 		d.left = `${this.#h[0]}%`, d.top = `${this.#h[1]}%`;
 	}
 	#I() {
-		if (this.#e) {
-			this.#e.toggleCommentPopup(this, !1);
-			return;
-		}
-		this.#f = !this.#f, this.#f ? (this.#L(), this.#o.addEventListener("click", this.#i), this.#o.addEventListener("keydown", this.#t)) : (this.#R(), this.#o.removeEventListener("click", this.#i), this.#o.removeEventListener("keydown", this.#t));
+		this.#e ? this.#e.toggleCommentPopup(this, !1) : (this.#f = !this.#f, this.#f ? (this.#L(), this.#o.addEventListener("click", this.#i), this.#o.addEventListener("keydown", this.#t)) : (this.#R(), this.#o.removeEventListener("click", this.#i), this.#o.removeEventListener("keydown", this.#t)));
 	}
 	#L() {
 		this.#p || this.render(), this.isVisible ? this.#f && this.#o.classList.add("focused") : (this.#F(), this.#o.hidden = !1, this.#o.style.zIndex = parseInt(this.#o.style.zIndex, 10) + 1e3);
 	}
 	#R() {
-		this.#o.classList.remove("focused"), !(this.#f || !this.isVisible) && (this.#o.hidden = !0, this.#o.style.zIndex = parseInt(this.#o.style.zIndex, 10) - 1e3);
+		this.#o.classList.remove("focused"), this.#f || !this.isVisible || (this.#o.hidden = !0, this.#o.style.zIndex = parseInt(this.#o.style.zIndex, 10) - 1e3);
 	}
 	forceHide() {
 		this.#C = this.isVisible, this.#C && (this.#o.hidden = !0);
@@ -12429,11 +12246,7 @@ var Gr = class {
 		let e = this.#e, t = this.#e = this.#o().trimEnd();
 		if (e === t) return;
 		let n = (e) => {
-			if (this.#e = e, !e) {
-				this.remove();
-				return;
-			}
-			this.#l(), this._uiManager.rebuild(this), this.#s();
+			this.#e = e, e ? (this.#l(), this._uiManager.rebuild(this), this.#s()) : this.remove();
 		};
 		this.addCommands({
 			cmd: () => {
@@ -12526,13 +12339,7 @@ var Gr = class {
 			let t = s.parentElement;
 			if (u.push(s.nodeValue.slice(c).replaceAll(Ei, "")), t !== this.editorDiv) {
 				let n = l;
-				for (let r of this.editorDiv.childNodes) {
-					if (r === t) {
-						n = u;
-						continue;
-					}
-					n.push(e.#c(r));
-				}
+				for (let r of this.editorDiv.childNodes) r === t ? n = u : n.push(e.#c(r));
 			}
 			l.push(s.nodeValue.slice(0, c).replaceAll(Ei, ""));
 		} else if (s === this.editorDiv) {
@@ -12768,21 +12575,9 @@ var Gr = class {
 		for (let e = 0, t = s.length - 2; e < t; e += 2) s[e] = (this.#f[e] - r) / a, s[e + 1] = (this.#f[e + 1] - i) / o;
 		if (s[s.length - 2] = (this.#o - r) / a, s[s.length - 1] = (this.#s - i) / o, isNaN(n[6]) && !this.isEmpty()) return this.#b(s);
 		let c = new Float32Array(this.#i.length + 24 + this.#t.length), l = e.length;
-		for (let t = 0; t < l; t += 2) {
-			if (isNaN(e[t])) {
-				c[t] = c[t + 1] = NaN;
-				continue;
-			}
-			c[t] = e[t], c[t + 1] = e[t + 1];
-		}
+		for (let t = 0; t < l; t += 2) isNaN(e[t]) ? c[t] = c[t + 1] = NaN : (c[t] = e[t], c[t + 1] = e[t + 1]);
 		l = this.#S(c, l);
-		for (let e = t.length - 6; e >= 6; e -= 6) for (let n = 0; n < 6; n += 2) {
-			if (isNaN(t[e + n])) {
-				c[l] = c[l + 1] = NaN, l += 2;
-				continue;
-			}
-			c[l] = t[e + n], c[l + 1] = t[e + n + 1], l += 2;
-		}
+		for (let e = t.length - 6; e >= 6; e -= 6) for (let n = 0; n < 6; n += 2) isNaN(t[e + n]) ? (c[l] = c[l + 1] = NaN, l += 2) : (c[l] = t[e + n], c[l + 1] = t[e + n + 1], l += 2);
 		return this.#x(c, l), this.newFreeDrawOutline(c, s, this.#e, this.#u, this.#n, this.#r);
 	}
 	#b(e) {
@@ -12882,13 +12677,7 @@ var Gr = class {
 	}
 	toSVGPath() {
 		let e = [`M${this.#o[4]} ${this.#o[5]}`];
-		for (let t = 6, n = this.#o.length; t < n; t += 6) {
-			if (isNaN(this.#o[t])) {
-				e.push(`L${this.#o[t + 4]} ${this.#o[t + 5]}`);
-				continue;
-			}
-			e.push(`C${this.#o[t]} ${this.#o[t + 1]} ${this.#o[t + 2]} ${this.#o[t + 3]} ${this.#o[t + 4]} ${this.#o[t + 5]}`);
-		}
+		for (let t = 6, n = this.#o.length; t < n; t += 6) isNaN(this.#o[t]) ? e.push(`L${this.#o[t + 4]} ${this.#o[t + 5]}`) : e.push(`C${this.#o[t]} ${this.#o[t + 1]} ${this.#o[t + 2]} ${this.#o[t + 3]} ${this.#o[t + 4]} ${this.#o[t + 5]}`);
 		return e.push("Z"), e.join(" ");
 	}
 	serialize([e, t, n, r], i) {
@@ -13065,9 +12854,7 @@ var Gr = class {
 							if (a === 1) return [];
 							i.splice(e, 1), e--, a--;
 						}
-						continue;
-					}
-					i[e][2] = n, s > r && i.push([
+					} else i[e][2] = n, s > r && i.push([
 						t,
 						r,
 						s
@@ -13359,7 +13146,7 @@ var Gr = class {
 		this.#d && (this.#y({ highlightOutlines: this.#l.getNewOutline(e / 2) }), this.fixAndSetPosition(), this.setDims());
 	}
 	#C() {
-		this.#u === null || !this.parent || (this.parent.drawLayer.remove(this.#u), this.#u = null, this.parent.drawLayer.remove(this.#m), this.#m = null);
+		this.#u !== null && this.parent && (this.parent.drawLayer.remove(this.#u), this.#u = null, this.parent.drawLayer.remove(this.#m), this.#m = null);
 	}
 	#w(e = this.parent) {
 		this.#u === null && ({id: this.#u, clipPathId: this.#r} = e.drawLayer.draw({
@@ -13817,16 +13604,10 @@ var Gr = class {
 		this.parent && !e ? (this._uiManager.removeShouldRescale(this), this.#s()) : e && (this._uiManager.addShouldRescale(this), this.#c(e), t = !this.parent && this.div?.classList.contains("selectedEditor")), super.setParent(e), t && this.select();
 	}
 	#s() {
-		this._drawId === null || !this.parent || (this.parent.drawLayer.remove(this._drawId), this._drawId = null, this._drawingOptions.reset());
+		this._drawId !== null && this.parent && (this.parent.drawLayer.remove(this._drawId), this._drawId = null, this._drawingOptions.reset());
 	}
 	#c(e = this.parent) {
-		if (this._drawId === null || this.parent !== e) {
-			if (this._drawId !== null) {
-				this.parent.drawLayer.updateParent(this._drawId, e.drawLayer);
-				return;
-			}
-			this._drawingOptions.updateAll(), this._drawId = this.#o(this.#e, e);
-		}
+		(this._drawId === null || this.parent !== e) && (this._drawId === null ? (this._drawingOptions.updateAll(), this._drawId = this.#o(this.#e, e)) : this.parent.drawLayer.updateParent(this._drawId, e.drawLayer));
 	}
 	#l([e, t, n, r]) {
 		let { parentDimensions: [i, a], rotation: o } = this;
@@ -14013,7 +13794,7 @@ var Gr = class {
 		let { target: a, offsetX: o, offsetY: s, pointerId: c, pointerType: l } = i;
 		if (V.isInitializedAndDifferentPointerType(l)) return;
 		let { viewport: { rotation: u } } = t, { width: d, height: f } = a.getBoundingClientRect(), p = e.#r = new AbortController(), m = t.combinedSignal(p);
-		if (V.setPointer(l, c), window.addEventListener("pointerup", (e) => {
+		V.setPointer(l, c), window.addEventListener("pointerup", (e) => {
 			V.isSamePointerIdOrRemove(e.pointerId) && this._endDraw(e);
 		}, { signal: m }), window.addEventListener("pointercancel", (e) => {
 			V.isSamePointerIdOrRemove(e.pointerId) && this._currentParent.endDrawingSession();
@@ -14025,22 +13806,12 @@ var Gr = class {
 			signal: m
 		}), window.addEventListener("contextmenu", L, { signal: m }), a.addEventListener("pointermove", this._drawMove.bind(this), { signal: m }), a.addEventListener("touchmove", (e) => {
 			V.isSameTimeStamp(e.timeStamp) && R(e);
-		}, { signal: m }), t.toggleDrawing(), n._editorUndoBar?.hide(), e.#n) {
-			t.drawLayer.updateProperties(this._currentDrawId, e.#n.startNew(o, s, d, f, u));
-			return;
-		}
-		n.updateUIForDefaultProperties(this), e.#n = this.createDrawerInstance(o, s, d, f, u), e.#i = this.getDefaultDrawingOptions(), this._currentParent = t, {id: this._currentDrawId} = t.drawLayer.draw(this._mergeSVGProperties(e.#i.toSVGProperties(), e.#n.defaultSVGProperties), !0, !1);
+		}, { signal: m }), t.toggleDrawing(), n._editorUndoBar?.hide(), e.#n ? t.drawLayer.updateProperties(this._currentDrawId, e.#n.startNew(o, s, d, f, u)) : (n.updateUIForDefaultProperties(this), e.#n = this.createDrawerInstance(o, s, d, f, u), e.#i = this.getDefaultDrawingOptions(), this._currentParent = t, {id: this._currentDrawId} = t.drawLayer.draw(this._mergeSVGProperties(e.#i.toSVGProperties(), e.#n.defaultSVGProperties), !0, !1));
 	}
 	static _drawMove(t) {
 		if (V.isSameTimeStamp(t.timeStamp), !e.#n) return;
 		let { offsetX: n, offsetY: r, pointerId: i } = t;
-		if (V.isSamePointerId(i)) {
-			if (V.isUsingMultiplePointers()) {
-				this._endDraw(t);
-				return;
-			}
-			this._currentParent.drawLayer.updateProperties(this._currentDrawId, e.#n.add(n, r)), V.setTimeStamp(t.timeStamp), R(t);
-		}
+		V.isSamePointerId(i) && (V.isUsingMultiplePointers() ? this._endDraw(t) : (this._currentParent.drawLayer.updateProperties(this._currentDrawId, e.#n.add(n, r)), V.setTimeStamp(t.timeStamp), R(t)));
 	}
 	static _cleanup(t) {
 		t && (this._currentDrawId = -1, this._currentParent = null, e.#n = null, e.#i = null, V.clearTimeStamp()), e.#r && (e.#r.abort(), e.#r = null, V.clearPointerIds());
@@ -14060,9 +13831,7 @@ var Gr = class {
 					mustExec: !1,
 					type: d.DRAW_STEP
 				});
-				return;
-			}
-			this.endDrawing(!1);
+			} else this.endDrawing(!1);
 		}
 	}
 	static endDrawing(t) {
@@ -14255,19 +14024,11 @@ var Gr = class {
 	}
 	toSVGPath() {
 		let e = [];
-		for (let { line: t } of this.#r) {
-			if (e.push(`M${$.svgRound(t[4])} ${$.svgRound(t[5])}`), t.length === 6) {
-				e.push("Z");
-				continue;
-			}
-			if (t.length === 12 && isNaN(t[6])) {
-				e.push(`L${$.svgRound(t[10])} ${$.svgRound(t[11])}`);
-				continue;
-			}
-			for (let n = 6, r = t.length; n < r; n += 6) {
-				let [r, i, a, o, s, c] = t.subarray(n, n + 6).map($.svgRound);
-				e.push(`C${r} ${i} ${a} ${o} ${s} ${c}`);
-			}
+		for (let { line: t } of this.#r) if (e.push(`M${$.svgRound(t[4])} ${$.svgRound(t[5])}`), t.length === 6) e.push("Z");
+		else if (t.length === 12 && isNaN(t[6])) e.push(`L${$.svgRound(t[10])} ${$.svgRound(t[11])}`);
+		else for (let n = 6, r = t.length; n < r; n += 6) {
+			let [r, i, a, o, s, c] = t.subarray(n, n + 6).map($.svgRound);
+			e.push(`C${r} ${i} ${a} ${o} ${s} ${c}`);
 		}
 		return e.join("");
 	}
@@ -14610,18 +14371,10 @@ var Gr = class {
 		return d.INK_OPACITY;
 	}
 	updateParams(e, t) {
-		if (e === d.INK_COLOR_AND_OPACITY) {
-			this._updateColorAndOpacity(t.color, t.opacity);
-			return;
-		}
-		super.updateParams(e, t);
+		e === d.INK_COLOR_AND_OPACITY ? this._updateColorAndOpacity(t.color, t.opacity) : super.updateParams(e, t);
 	}
 	static updateDefaultParams(e, t) {
-		if (e === d.INK_COLOR_AND_OPACITY) {
-			super.updateDefaultParams(d.INK_COLOR, t.color), super.updateDefaultParams(d.INK_OPACITY, t.opacity);
-			return;
-		}
-		super.updateDefaultParams(e, t);
+		e === d.INK_COLOR_AND_OPACITY ? (super.updateDefaultParams(d.INK_COLOR, t.color), super.updateDefaultParams(d.INK_OPACITY, t.opacity)) : super.updateDefaultParams(e, t);
 	}
 	get color() {
 		return this._drawingOptions.stroke;
@@ -15262,33 +15015,28 @@ var Gr = class {
 		};
 	}
 	#d(e, t = !1) {
-		if (!e) {
-			this.remove();
-			return;
-		}
-		this.#e = e.bitmap, t || (this.#t = e.id, this.#l = e.isSvg), e.file && (this.#a = e.file.name), this.#m();
+		e ? (this.#e = e.bitmap, t || (this.#t = e.id, this.#l = e.isSvg), e.file && (this.#a = e.file.name), this.#m()) : this.remove();
 	}
 	#f() {
 		if (this.#n = null, this._uiManager.enableWaiting(!1), this.#o) {
-			if (this._uiManager.useNewAltTextWhenAddingImage && this._uiManager.useNewAltTextFlow && this.#e) {
-				this.addEditToolbar().then(() => {
-					this._editToolbar.hide(), this._uiManager.editAltText(this, !0);
-				});
-				return;
+			if (this._uiManager.useNewAltTextWhenAddingImage && this._uiManager.useNewAltTextFlow && this.#e) this.addEditToolbar().then(() => {
+				this._editToolbar.hide(), this._uiManager.editAltText(this, !0);
+			});
+			else {
+				if (!this._uiManager.useNewAltTextWhenAddingImage && this._uiManager.useNewAltTextFlow && this.#e) {
+					this._reportTelemetry({
+						action: "pdfjs.image.image_added",
+						data: {
+							alt_text_modal: !1,
+							alt_text_type: "empty"
+						}
+					});
+					try {
+						this.mlGuessAltText();
+					} catch {}
+				}
+				this.div.focus();
 			}
-			if (!this._uiManager.useNewAltTextWhenAddingImage && this._uiManager.useNewAltTextFlow && this.#e) {
-				this._reportTelemetry({
-					action: "pdfjs.image.image_added",
-					data: {
-						alt_text_modal: !1,
-						alt_text_type: "empty"
-					}
-				});
-				try {
-					this.mlGuessAltText();
-				} catch {}
-			}
-			this.div.focus();
 		}
 	}
 	async mlGuessAltText(e = null, t = !0) {
@@ -15354,11 +15102,7 @@ var Gr = class {
 		this.#t && (this.#e = null, this._uiManager.imageManager.deleteId(this.#t), this.#o?.remove(), this.#o = null, this.#c &&= (clearTimeout(this.#c), null)), super.remove();
 	}
 	rebuild() {
-		if (!this.parent) {
-			this.#t && this.#p();
-			return;
-		}
-		super.rebuild(), this.div !== null && (this.#t && this.#o === null && this.#p(), this.isAttachedToDOM || this.parent.add(this));
+		this.parent ? (super.rebuild(), this.div !== null && (this.#t && this.#o === null && this.#p(), this.isAttachedToDOM || this.parent.add(this))) : this.#t && this.#p();
 	}
 	onceAdded(e) {
 		this._isDraggable = !0, e && this.div.focus();
@@ -15398,7 +15142,7 @@ var Gr = class {
 		}
 		this._uiManager.enableWaiting(!1);
 		let o = this.#o = document.createElement("canvas");
-		o.setAttribute("role", "img"), this.addContainer(o), this.width = t / r, this.height = n / i, this.setDims(), this._initialOptions?.isCentered ? this.center() : this.fixAndSetPosition(), this._initialOptions = null, (!this._uiManager.useNewAltTextWhenAddingImage || !this._uiManager.useNewAltTextFlow || this.annotationElementId) && (e.hidden = !1), this.#g(), this.#u ||= (this.parent.addUndoableEditor(this), !0), this._reportTelemetry({ action: "inserted_image" }), this.#a && this.div.setAttribute("aria-description", this.#a), this.annotationElementId || this._uiManager.a11yAlert(H._l10nAlert.stamp);
+		o.setAttribute("role", "img"), this.addContainer(o), this.width = t / r, this.height = n / i, this.setDims(), this._initialOptions?.isCentered ? this.center() : this.fixAndSetPosition(), this._initialOptions = null, this._uiManager.useNewAltTextWhenAddingImage && this._uiManager.useNewAltTextFlow && !this.annotationElementId || (e.hidden = !1), this.#g(), this.#u ||= (this.parent.addUndoableEditor(this), !0), this._reportTelemetry({ action: "inserted_image" }), this.#a && this.div.setAttribute("aria-description", this.#a), this.annotationElementId || this._uiManager.a11yAlert(H._l10nAlert.stamp);
 	}
 	copyCanvas(e, t, n = !1) {
 		e ||= 224;
@@ -15682,17 +15426,7 @@ var Gr = class {
 		let t = this.#n, n = [];
 		if (t) {
 			let e = /* @__PURE__ */ new Map(), r = /* @__PURE__ */ new Map();
-			for (let t of this.#_) {
-				if (t.disableEditing(), !t.annotationElementId) {
-					n.push(t);
-					continue;
-				}
-				if (t.serialize() !== null) {
-					e.set(t.annotationElementId, t);
-					continue;
-				}
-				r.set(t.annotationElementId, t), this.getEditableAnnotation(t.annotationElementId)?.show(), t.remove();
-			}
+			for (let t of this.#_) t.disableEditing(), t.annotationElementId ? t.serialize() === null ? (r.set(t.annotationElementId, t), this.getEditableAnnotation(t.annotationElementId)?.show(), t.remove()) : e.set(t.annotationElementId, t) : n.push(t);
 			for (let n of t.getEditableAnnotations()) {
 				let { id: t } = n.data;
 				if (this.#h.isDeletedAnnotationElement(t)) {
@@ -15700,11 +15434,7 @@ var Gr = class {
 					continue;
 				}
 				let i = r.get(t);
-				if (i) {
-					i.resetAnnotationElement(n), i.show(!1), n.show();
-					continue;
-				}
-				i = e.get(t), i && (this.#h.addChangedExistingAnnotation(i), i.renderAnnotationElement(n) && i.show(!1)), n.show();
+				i ? (i.resetAnnotationElement(n), i.show(!1), n.show()) : (i = e.get(t), i && (this.#h.addChangedExistingAnnotation(i), i.renderAnnotationElement(n) && i.show(!1)), n.show());
 			}
 		}
 		this.#S(), this.isEmpty && (this.div.hidden = !0);
@@ -15879,11 +15609,7 @@ var Gr = class {
 			return;
 		}
 		let n = this.#h.getMode();
-		if (n === u.STAMP || n === u.POPUP || n === u.SIGNATURE) {
-			this.#h.unselectAll();
-			return;
-		}
-		this.createAndAddNewEditor(e, !1);
+		n === u.STAMP || n === u.POPUP || n === u.SIGNATURE ? this.#h.unselectAll() : this.createAndAddNewEditor(e, !1);
 	}
 	pointerdown(e) {
 		if (this.#h.getMode() === u.HIGHLIGHT && this.enableTextSelection(), this.#o) {
@@ -15914,9 +15640,7 @@ var Gr = class {
 		if (e) {
 			let { activeElement: e } = document;
 			this.div.contains(e) && (this.#u = e);
-			return;
-		}
-		this.#u && setTimeout(() => {
+		} else this.#u && setTimeout(() => {
 			this.#u?.focus(), this.#u = null;
 		}, 0);
 	}
@@ -16003,7 +15727,7 @@ var ea = class e {
 		if (this.pageIndex = r, this.#r = t, this.#i = n, i) {
 			let t = e.#p.get(i);
 			if (t?.selectionDiv && (t.selectionDiv.remove(), e.#u.delete(t.selectionDiv)), e.#p.set(i, { drawLayer: this }), e.#f.add(i), this.#n = i, this.#a = new MutationObserver((t) => {
-				if (!(!this.#e || !this.#n?.isConnected || !e.#h())) {
+				if (this.#e && this.#n?.isConnected && e.#h()) {
 					for (let { addedNodes: n } of t) for (let t of n) if (t.nodeType === Node.ELEMENT_NODE && t.classList.contains("endOfContent")) {
 						e.#_();
 						return;
@@ -16023,11 +15747,8 @@ var ea = class e {
 		}
 	}
 	setParent(t) {
-		if (!this.#e) {
-			this.#e = t, this.#n?.isConnected && e.#h() && e.#_();
-			return;
-		}
-		if (this.#e !== t) {
+		if (!this.#e) this.#e = t, this.#n?.isConnected && e.#h() && e.#_();
+		else if (this.#e !== t) {
 			if (this.#t.size > 0) for (let e of this.#t.values()) e.remove(), t.append(e);
 			this.#e = t;
 		}
@@ -16079,11 +15800,8 @@ var ea = class e {
 				if (!e) continue;
 				a = e.container, o = e.offset;
 			}
-			if (l === u && !m && p.includes(l)) {
-				i.push([n, l]);
-				continue;
-			}
-			for (let e of p) {
+			if (l === u && !m && p.includes(l)) i.push([n, l]);
+			else for (let e of p) {
 				let t = e.firstChild;
 				if (!t) continue;
 				let n = document.createRange();
@@ -16282,8 +16000,7 @@ var na = class e {
 		}), u;
 	}
 };
-//#endregion
-//#region src/pdf-viewer.js
+// src/pdf-viewer.js
 globalThis._pdfjsTestingUtils = { HighlightOutliner: Ai }, globalThis.pdfjsLib = {
 	AbortException: N,
 	AnnotationEditorLayer: Yi,
@@ -16369,11 +16086,7 @@ var sa = class extends HTMLElement {
 		this._chunks = Array.isArray(e) ? e : [], this._selectedQuestionId === ia && !this._chunks.some((e) => !e.question_id) && (this._selectedQuestionId = null), this.renderQuestionOptions(), this.updateFilters();
 	}
 	setQuestions(e) {
-		if (this._questions = Array.isArray(e) ? e : [], this._selectedQuestionId && this._selectedQuestionId !== ia && !this._questions.some((e) => e.question_id === this._selectedQuestionId)) {
-			this._selectedQuestionId = null, this.updateFilters();
-			return;
-		}
-		this.renderQuestionOptions();
+		this._questions = Array.isArray(e) ? e : [], this._selectedQuestionId && this._selectedQuestionId !== ia && !this._questions.some((e) => e.question_id === this._selectedQuestionId) ? (this._selectedQuestionId = null, this.updateFilters()) : this.renderQuestionOptions();
 	}
 	setSelectedQuestionId(e) {
 		let t = e || null;
@@ -16464,11 +16177,7 @@ var sa = class extends HTMLElement {
 		let e = this.shadowRoot?.querySelector(".chunks-list");
 		if (!e) return;
 		let t = this.getFilteredChunks();
-		if (!t.length) {
-			e.innerHTML = "<div class=\"empty\">No chunks to display</div>";
-			return;
-		}
-		e.innerHTML = t.map((e, t) => {
+		e.innerHTML = t.length ? t.map((e, t) => {
 			let n = this.isEvidenceChunk(e), r = e.chunk_order == null ? t + 1 : Number(e.chunk_order) + 1, i = this.getChunkPage(e) ?? "?", a = String(e.text || ""), o = a.length > 150 ? `${a.slice(0, 150)}...` : a, s = this.getChunkStatus(e), c = "";
 			n ? c = "<span class=\"badge evidence\">Evidence</span>" : s !== "Analyzed" && (c = `<span class="badge">${s}</span>`);
 			let l = e.llm_score == null ? "" : `<span>LLM: ${this.formatScore(e.llm_score)}</span>`;
@@ -16488,7 +16197,7 @@ var sa = class extends HTMLElement {
           </div>
         </article>
       `;
-		}).join("");
+		}).join("") : "<div class=\"empty\">No chunks to display</div>";
 	}
 	async loadPdf() {
 		if (this._pdfDoc) return this._pdfDoc;
@@ -16690,5 +16399,4 @@ var sa = class extends HTMLElement {
 	}
 };
 customElements.get("pdf-viewer-with-chunks") || customElements.define("pdf-viewer-with-chunks", sa);
-//#endregion
 export { sa as default };
