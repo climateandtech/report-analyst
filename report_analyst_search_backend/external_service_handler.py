@@ -12,9 +12,8 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
-import aiohttp
 import boto3
 from botocore.config import Config
 

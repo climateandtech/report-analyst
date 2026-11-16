@@ -69,7 +69,7 @@ def get_available_integrations() -> Dict[str, bool]:
 
     # Check API module
     try:
-        import report_analyst_api
+        import report_analyst_api  # noqa: F401 -- Import verifies optional module availability.
 
         integrations["api"] = True
     except ImportError:
@@ -77,7 +77,7 @@ def get_available_integrations() -> Dict[str, bool]:
 
     # Check search backend integration
     try:
-        import report_analyst_search_backend
+        import report_analyst_search_backend  # noqa: F401 -- Import verifies optional module availability.
 
         integrations["search_backend"] = True
     except ImportError:

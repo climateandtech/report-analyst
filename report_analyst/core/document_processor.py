@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 import fitz  # PyMuPDF
-from fastapi import UploadFile
 
 from report_analyst.models.requests import DocumentMetadata
 

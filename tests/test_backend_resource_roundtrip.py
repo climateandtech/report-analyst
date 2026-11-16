@@ -20,10 +20,8 @@ from report_analyst.core.analyzer import DocumentAnalyzer
 from report_analyst.core.cache_manager import CacheManager
 from report_analyst.core.report_data_client import (
     ReportDataClient,
-    ReportResource,
     get_chunks_for_backend_resource,
 )
-from report_analyst_search_backend.backend_service import BackendService
 from report_analyst_search_backend.config import BackendConfig
 
 

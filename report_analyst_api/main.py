@@ -19,11 +19,10 @@ import shutil
 # Add the parent directory to the path to import from report_analyst
 import sys
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -37,7 +36,6 @@ from report_analyst.core.service import (
     get_reports_for_api,
 )
 from report_analyst_api.schemas import (
-    AnalysisRequest,
     AnalysisResponse,
     HealthResponse,
     QuestionSet,

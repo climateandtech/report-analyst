@@ -19,7 +19,6 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional
 
 import boto3
 import nats

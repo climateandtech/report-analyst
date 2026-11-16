@@ -5,7 +5,6 @@ This module handles configuration loading from environment variables and setting
 """
 
 import os
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv

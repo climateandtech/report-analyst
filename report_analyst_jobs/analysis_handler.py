@@ -7,10 +7,9 @@ Can be executed by any job executor (NATS, Lambda, etc.).
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import List
 
 from report_analyst.core.analyzer import DocumentAnalyzer
-from report_analyst.core.document_sources import DocumentSource
 from report_analyst.core.plugins import discover_document_sources
 from report_analyst.core.question_loader import get_question_loader
 

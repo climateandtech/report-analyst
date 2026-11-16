@@ -7,11 +7,14 @@ Use the config and flow_orchestrator modules instead.
 
 import logging
 
-from .backend_service import BackendService, create_backend_service
-
 # Re-export the clean components for backward compatibility
-from .config import BackendConfig, configure_backend_integration, display_config_status
-from .flow_orchestrator import create_flow_orchestrator, needs_local_analysis
+from .backend_service import BackendService as BackendService
+from .backend_service import create_backend_service as create_backend_service
+from .config import BackendConfig as BackendConfig
+from .config import configure_backend_integration as configure_backend_integration
+from .config import display_config_status as display_config_status
+from .flow_orchestrator import create_flow_orchestrator as create_flow_orchestrator
+from .flow_orchestrator import needs_local_analysis as needs_local_analysis
 
 logger = logging.getLogger(__name__)
 
