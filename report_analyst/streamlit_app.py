@@ -21,6 +21,8 @@ from pandas.api.types import (
     is_numeric_dtype,
     is_object_dtype,
 )
+from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 from streamlit_card import card
 
 # Add parent directory to path for backend integration
@@ -85,11 +87,12 @@ if str(current_dir) not in sys.path:
 logger.info(f"Added {current_dir} to Python path")
 
 # Keep relative imports
-from report_analyst.core.analyzer import DocumentAnalyzer
+from report_analyst.core.analyzer import DocumentAnalyzer, compute_file_hash
 from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
 )
+from report_analyst.core.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.core.llm_models import (
     get_default_llm_model,
     get_gemini_models,
@@ -97,6 +100,10 @@ from report_analyst.core.llm_models import (
 )
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
+from report_analyst.models.taxonomy import TaxonomyConcept
+from report_analyst.ui.concept_search import current_taxonomy, display_concept_search
+from report_analyst.ui.source_tagging import with_tags
+from report_analyst.ui.xbrl_check import display_xbrl_check
 from report_analyst_enterprise.components.streamlit_component.backend import pdf_viewer
 
 # Load environment variables
@@ -479,6 +486,15 @@ def generate_file_key(file_path: str, st) -> str:
         f"tk{st.session_state.new_top_k}_"
         f"m{llm_model}"
     )
+
+
+def _get_pdf_viewer_results(file_path: str, config: Dict[str, Any], results: Dict, cache_manager: Any) -> Dict:
+    """Keep analyzed evidence available across PDF component reruns."""
+    state_key = f"pdf_viewer_results_{generate_file_key(file_path, st)}_{config['question_set']}"
+    results = results or st.session_state.get(state_key) or cache_manager.get_analysis(file_path=file_path, config=config)
+    if results:
+        st.session_state[state_key] = results
+    return results
 
 
 async def analyze_document_and_display(
@@ -924,29 +940,82 @@ def display_analysis_results(analysis_df: pd.DataFrame, chunks_df: pd.DataFrame,
         st.error(f"Error displaying results: {e!s}")
 
 
+SOURCE_CHANGE_ERRORS = {
+    "create": "Could not save this evidence. Select the text and add it again.",
+    # Remove sends the same event each time, and repeats are ignored until a reload.
+    "delete": "Could not remove this evidence. Reload the page and try again.",
+    "delete_tag": "Could not remove this tag. Reload the page and try again.",
+}
+
+
+def _apply_source_change(change: Dict[str, Any], document_id: str, cache_manager: Any, error_slot: Any) -> None:
+    action, annotation = change["action"], change["annotation"]
+    event_key = f"pdf_source_change_{document_id}"
+    event_id = f"{action}:{annotation['id']}"
+    # The component keeps returning its last event, even after a new upload with the same name.
+    if annotation["document_id"] != document_id or st.session_state.get(event_key) == event_id:
+        return
+
+    st.session_state[event_key] = event_id
+    try:
+        if action == "create":
+            cache_manager.save_source_annotation(annotation)
+        elif action == "delete_tag":
+            # For a tag, the event carries the tag's id instead of a source.
+            cache_manager.delete_source_tag(annotation["id"], document_id)
+        else:
+            cache_manager.delete_source_annotation(annotation["id"], document_id)
+    except (SQLAlchemyError, ValidationError):
+        logger.error(f"Could not {action} source annotation {annotation['id']}", exc_info=True)
+        error_slot.error(SOURCE_CHANGE_ERRORS[action])
+    else:
+        st.rerun()
+
+
+def _concepts() -> Dict[str, TaxonomyConcept]:
+    """The ESRS concepts by name, or none when the taxonomy is not set up."""
+    try:
+        return {concept.name: concept for concept in current_taxonomy().concepts}
+    except TaxonomyUnavailableError:
+        return {}
+
+
 def display_pdf_viewer(
     file_path: str,
     results: Dict[str, Dict],
     questions: Dict[str, Dict],
+    cache_manager: Any,
     raw_chunks: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in (results or {}).items()}
     questions_data = {question_id: question.get("text", question_id) for question_id, question in (questions or {}).items()}
     viewer_key = Path(str(file_path)).stem or "analysis"
+    document_id = compute_file_hash(str(file_path)) if Path(file_path).is_file() else None
+    tags = cache_manager.get_source_tags(document_id) if document_id else []
+    annotations = with_tags(cache_manager.get_source_annotations(document_id), tags, _concepts()) if document_id else []
 
     with st.expander("PDF Viewer with Chunks", expanded=True):
+        # Above the viewer, where a tall page can't push the message off screen.
+        error_slot = st.empty()
         try:
-            pdf_viewer(
+            source_change = pdf_viewer(
                 pdf_path=str(file_path),
                 chunks_data=chunks_by_question,
                 questions_data=questions_data,
                 unmapped_chunks=raw_chunks,
+                document_id=document_id,
+                annotations=annotations,
                 key=f"pdf_viewer_{viewer_key}",
                 height=800,
             )
         except Exception as e:
             logger.error(f"Error rendering PDF viewer: {e!s}", exc_info=True)
             st.error(f"Error rendering PDF viewer: {e!s}")
+        else:
+            if source_change:
+                _apply_source_change(source_change, document_id, cache_manager, error_slot)
+    display_concept_search(annotations, cache_manager)
+    display_xbrl_check(tags, annotations)
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
@@ -1294,7 +1363,7 @@ def display_consolidated_results(analyzer, question_set, file_path=None, selecte
                         # Display results using the existing display function
                         file_key = f"{Path(file_path).stem}_cs{selected_config['config']['chunk_size']}"
                         display_analysis_results(analysis_df, chunks_df, file_key)
-                        display_pdf_viewer(file_path, cached_results, questions)
+                        display_pdf_viewer(file_path, cached_results, questions, analyzer.cache_manager)
                     else:
                         st.warning("No results found in stored for this configuration")
                 else:
@@ -3933,12 +4002,12 @@ def main():
                                 st.error(f"Error during analysis: {e!s}")
 
                     try:
-                        viewer_results = fresh_viewer_results
-                        if not viewer_results:
-                            viewer_results = analyzer.analyzer.cache_manager.get_analysis(
-                                file_path=analysis_file_path,
-                                config=config,
-                            )
+                        viewer_results = _get_pdf_viewer_results(
+                            analysis_file_path,
+                            config,
+                            fresh_viewer_results,
+                            analyzer.analyzer.cache_manager,
+                        )
                         if viewer_results:
                             raw_chunks = []
                         elif is_backend:
@@ -3953,6 +4022,7 @@ def main():
                             str(analysis_file_path),
                             viewer_results,
                             questions,
+                            analyzer.cache_manager,
                             raw_chunks,
                         )
                     except Exception as e:
