@@ -10,6 +10,8 @@ This project is part of the **OpenSustainability Analysis Framework** by Climate
 
 > **Tagline:** *Democratizing sustainability report analysis with modern technology.*
 
+Documentation is published with Material for MkDocs to [GitHub Pages](https://climateandtech.github.io/report-analyst/). Build it locally with `pip install -r requirements-docs.txt` and `mkdocs serve`.
+
 ---
 
 ## What You Can Do With It
@@ -507,6 +509,7 @@ For detailed deployment patterns (Docker, Kubernetes, NATS workers, etc.), see:
 - `scripts/README_CLIMRETRIEVE.md` – ClimRetrieve benchmark and generic CSV evaluation
 - `report_analyst_jobs/README.md` – Job processing and worker patterns
 - `docs/CI.md` – Continuous integration and testing
+- `docs/wireframes/` – Sketch screens of the Report Analyst UI ([GitHub-rendered gallery](docs/wireframes/README.md))
 
 ---
 
@@ -520,6 +523,7 @@ The repository uses a **module-based licensing model**:
 | `report_analyst_api/`              | FastAPI API module                           | **Climate+Tech Open License for Good**         |
 | `report_analyst_jobs/`             | Jobs, NATS, integration toolkit              | **Climate+Tech Open License for Good**         |
 | `report_analyst_search_backend/`   | Search/upload backend integration            | **Climate+Tech Open License for Good**         |
+| `report_analyst_enterprise/`       | Enterprise edition (Postgres/pgvector, deploy) | **Climate+Tech Open License for Good**         |
 
 The core analysis module `report_analyst/` is open source under the RPL (Reciprocal Public License). All other modules (API, jobs, search backend, etc.) are provided under the Climate+Tech Open License for Good, and can be dual-licensed for commercial or special use cases upon request.
 

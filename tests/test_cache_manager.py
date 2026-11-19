@@ -1,5 +1,4 @@
 import json
-import os
 import shutil
 import sqlite3
 import tempfile
@@ -15,15 +14,9 @@ from report_analyst.models.source_tag import SourceTag
 
 
 @pytest.fixture(autouse=True)
-def setup_test_env():
-    """Setup test environment variables"""
-    os.environ["STORAGE_PATH"] = str(Path(__file__).parent / "test_storage")
-    yield
-    # Cleanup after tests
-    if Path(os.environ["STORAGE_PATH"]).exists():
-        import shutil
-
-        shutil.rmtree(os.environ["STORAGE_PATH"])
+def setup_test_env(monkeypatch, tmp_path):
+    """Point STORAGE_PATH at a per-test directory and restore it afterwards."""
+    monkeypatch.setenv("STORAGE_PATH", str(tmp_path))
 
 
 @pytest.fixture
