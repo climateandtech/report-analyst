@@ -2,11 +2,11 @@
 
 import re
 
-from report_analyst.models.taxonomy import ConceptKind, TaxonomyConcept
+from report_analyst.models.taxonomy import ConceptKind, EsrsReference, TaxonomyConcept
 
 WORD = re.compile(r"\w[\w-]*")
 # The reference parts a user may type. The Knowledge Hub link is left out, its words would match almost any query.
-SEARCHED_REFERENCE_PARTS = ("section", "disclosure_requirement", "paragraph", "subparagraph", "clause", "datapoint_id")
+SEARCHED_REFERENCE_PARTS = tuple(part for part in EsrsReference.model_fields if part != "url")
 
 
 def search_concepts(
