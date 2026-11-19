@@ -4,8 +4,8 @@ from unittest.mock import Mock
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from report_analyst.core.arelle_check import XbrlProblem
-from report_analyst.core.esrs_taxonomy import TaxonomyUnavailableError
+from report_analyst.core.xbrl.arelle_check import XbrlProblem
+from report_analyst.core.xbrl.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
 

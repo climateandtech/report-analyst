@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError
 
 from report_analyst.core.analyzer import compute_file_hash
 from report_analyst.core.cache_manager import CacheManager
-from report_analyst.core.esrs_taxonomy import TaxonomyUnavailableError
+from report_analyst.core.xbrl.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
 from report_analyst.streamlit_app import _get_pdf_viewer_results, display_pdf_viewer

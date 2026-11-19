@@ -4,9 +4,9 @@ import os
 
 import streamlit as st
 
-from report_analyst.core.arelle_check import XbrlProblem, check_xbrl
-from report_analyst.core.esrs_taxonomy import TAXONOMY_PATH_ENV, TaxonomyUnavailableError
-from report_analyst.core.xbrl_report import xbrl_report
+from report_analyst.core.xbrl.arelle_check import XbrlProblem, check_xbrl
+from report_analyst.core.xbrl.esrs_taxonomy import TAXONOMY_PATH_ENV, TaxonomyUnavailableError
+from report_analyst.core.xbrl.xbrl_report import xbrl_report
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.ui.concept_search import current_taxonomy
 

@@ -6,7 +6,7 @@ from typing import Any
 import streamlit as st
 from sqlalchemy.exc import SQLAlchemyError
 
-from report_analyst.core.tagging import (
+from report_analyst.core.xbrl.tagging import (
     PERCENT,
     PURE,
     SET_MENU,

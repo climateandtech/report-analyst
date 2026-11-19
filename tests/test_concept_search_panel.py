@@ -1,6 +1,6 @@
 from streamlit.testing.v1 import AppTest
 
-from report_analyst.core.esrs_taxonomy import TAXONOMY_PATH_ENV
+from report_analyst.core.xbrl.esrs_taxonomy import TAXONOMY_PATH_ENV
 from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
 
 TAXONOMY = Taxonomy(

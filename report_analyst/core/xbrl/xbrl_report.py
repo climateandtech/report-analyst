@@ -3,7 +3,7 @@
 from datetime import date
 from xml.sax.saxutils import escape, quoteattr
 
-from report_analyst.core.tagging import MONEY, PURE, data_type
+from report_analyst.core.xbrl.tagging import MONEY, PURE, data_type
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
 

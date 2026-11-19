@@ -1,4 +1,4 @@
-from report_analyst.core.concept_search import search_concepts, standards
+from report_analyst.core.xbrl.concept_search import search_concepts, standards
 from report_analyst.models.taxonomy import EsrsReference, TaxonomyConcept
 
 DASH = "\N{EN DASH}"
