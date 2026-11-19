@@ -403,3 +403,21 @@ def test_pdf_viewer_loads_cached_analysis_when_opened():
         assert _viewer_results({}, cache_manager) == results
 
     cache_manager.get_analysis.assert_called_once_with(file_path="report.pdf", config={"question_set": "tcfd"})
+
+
+def test_display_pdf_viewer_survives_component_errors(pdf_path):
+    with (
+        patch("report_analyst.streamlit_app.st.expander", return_value=nullcontext()),
+        patch("report_analyst.streamlit_app.pdf_viewer", side_effect=RuntimeError("boom")),
+        patch("report_analyst.streamlit_app.st.error") as error,
+    ):
+        display_pdf_viewer(
+            file_path=str(pdf_path),
+            results=None,
+            questions=None,
+            cache_manager=storage(),
+            raw_chunks=None,
+        )
+
+    error.assert_called_once()
+    assert "Error rendering PDF viewer" in error.call_args.args[0]
