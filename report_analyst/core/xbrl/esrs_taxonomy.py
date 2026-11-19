@@ -33,29 +33,29 @@ DOMAIN_MEMBER = "http://xbrl.org/int/dim/arcrole/domain-member"
 # EFRAG references other laws too, such as SFDR. This name marks a reference to the ESRS.
 ESRS_REFERENCE = "ESRS"
 
+# Data type names that tagging also uses.
+DECIMAL = "decimalItemType"
+ENERGY = "energyItemType"
+GHG_EMISSIONS = "ghgEmissionsItemType"
+MASS = "massItemType"
+MONEY = "monetaryItemType"
+PERCENT = "percentItemType"
+SET_MENU = "enumerationSetItemType"
+VOLUME = "volumeItemType"
+WHOLE_NUMBER = "integerItemType"
+YEAR = "gYearItemType"
+
 # Kinds by data type name. The numeric types are listed because the schemas that define
 # them as numbers are on xbrl.org, outside the package.
 KINDS = {
     "textBlockItemType": "narrative",
     "booleanItemType": "yes/no",
     "enumerationItemType": "menu",
-    "enumerationSetItemType": "menu",
+    SET_MENU: "menu",
     "stringItemType": "text",
     "dateItemType": "date",
-    "gYearItemType": "date",
-    **dict.fromkeys(
-        [
-            "decimalItemType",
-            "energyItemType",
-            "ghgEmissionsItemType",
-            "integerItemType",
-            "massItemType",
-            "monetaryItemType",
-            "percentItemType",
-            "volumeItemType",
-        ],
-        "number",
-    ),
+    YEAR: "date",
+    **dict.fromkeys([DECIMAL, ENERGY, GHG_EMISSIONS, MASS, MONEY, PERCENT, VOLUME, WHOLE_NUMBER], "number"),
 }
 
 REFERENCE_PARTS = {

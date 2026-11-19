@@ -4,9 +4,9 @@ from datetime import date
 
 import pytest
 
-from report_analyst.core.arelle_check import check_xbrl
-from report_analyst.core.esrs_taxonomy import TAXONOMY_PATH_ENV, load_esrs_taxonomy
-from report_analyst.core.xbrl_report import xbrl_report
+from report_analyst.core.xbrl.arelle_check import check_xbrl
+from report_analyst.core.xbrl.esrs_taxonomy import TAXONOMY_PATH_ENV, load_esrs_taxonomy
+from report_analyst.core.xbrl.xbrl_report import xbrl_report
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
 

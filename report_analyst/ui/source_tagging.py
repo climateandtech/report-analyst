@@ -6,16 +6,8 @@ from typing import Any
 import streamlit as st
 from sqlalchemy.exc import SQLAlchemyError
 
-from report_analyst.core.tagging import (
-    PERCENT,
-    PURE,
-    SET_MENU,
-    YEAR,
-    InvalidTagError,
-    create_tag,
-    data_type,
-    unit_choices,
-)
+from report_analyst.core.xbrl.esrs_taxonomy import PERCENT, SET_MENU, YEAR
+from report_analyst.core.xbrl.tagging import PURE, InvalidTagError, create_tag, data_type, unit_choices
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import TaxonomyConcept
 

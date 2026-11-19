@@ -7,8 +7,8 @@ from typing import Any, get_args
 import pandas as pd
 import streamlit as st
 
-from report_analyst.core.concept_search import search_concepts, standards
-from report_analyst.core.esrs_taxonomy import TAXONOMY_PATH_ENV, TaxonomyUnavailableError, load_esrs_taxonomy
+from report_analyst.core.xbrl.concept_search import search_concepts, standards
+from report_analyst.core.xbrl.esrs_taxonomy import TAXONOMY_PATH_ENV, TaxonomyUnavailableError, load_esrs_taxonomy
 from report_analyst.models.taxonomy import ConceptKind, Taxonomy, TaxonomyConcept
 from report_analyst.ui.source_tagging import display_source_tagging
 

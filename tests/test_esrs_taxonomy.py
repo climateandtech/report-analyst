@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from report_analyst.core.esrs_taxonomy import TAXONOMY_PATH_ENV, TaxonomyUnavailableError, load_esrs_taxonomy
+from report_analyst.core.xbrl.esrs_taxonomy import TAXONOMY_PATH_ENV, TaxonomyUnavailableError, load_esrs_taxonomy
 from report_analyst.models.taxonomy import EsrsReference, TaxonomyOption
 
 BASE = "https://example.org/taxonomy/esrs/2026-08-30/"

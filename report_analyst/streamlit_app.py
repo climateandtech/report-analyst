@@ -92,7 +92,6 @@ from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
 )
-from report_analyst.core.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.core.llm_models import (
     get_default_llm_model,
     get_gemini_models,
@@ -100,6 +99,7 @@ from report_analyst.core.llm_models import (
 )
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
+from report_analyst.core.xbrl.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.models.taxonomy import TaxonomyConcept
 from report_analyst.ui.concept_search import current_taxonomy, display_concept_search
 from report_analyst.ui.source_tagging import with_tags

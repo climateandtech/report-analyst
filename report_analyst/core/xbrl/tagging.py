@@ -6,27 +6,33 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from report_analyst.core.xbrl.esrs_taxonomy import (
+    DECIMAL,
+    ENERGY,
+    GHG_EMISSIONS,
+    MASS,
+    MONEY,
+    PERCENT,
+    SET_MENU,
+    VOLUME,
+    WHOLE_NUMBER,
+)
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import TaxonomyConcept
 
-PERCENT = "percentItemType"
-WHOLE_NUMBER = "integerItemType"
-MONEY = "monetaryItemType"
-SET_MENU = "enumerationSetItemType"
-YEAR = "gYearItemType"
 # Percentages and counts have no unit, which XBRL writes as "pure".
 PURE = "pure"
-PURE_TYPES = {PERCENT, WHOLE_NUMBER, "decimalItemType"}
+PURE_TYPES = {PERCENT, WHOLE_NUMBER, DECIMAL}
 CURRENCY = re.compile(r"[A-Z]{3}")
 # The recommended units of the XBRL Unit Type Registry (https://www.xbrl.org/utr/utr.xml),
 # with the ones most used in ESRS reports first.
 UNITS = {
-    "ghgEmissionsItemType": "tCO2e ktCO2e MtCO2e GtCO2e".split(),
-    "energyItemType": (
+    GHG_EMISSIONS: "tCO2e ktCO2e MtCO2e GtCO2e".split(),
+    ENERGY: (
         "MWh GWh TWh kWh Wh GJ TJ MJ kJ J mJ MMBTU Btu Boe MBoe MMBoe Mcfe MMcfe Bcfe Tcfe Cal ft_lb MWM GWM VAh dth MWd"
     ).split(),
-    "massItemType": "t kt Mt Gt kg g lb oz ozt T kT MT GT".split(),
-    "volumeItemType": "m3 l bbl MBbls MMBbls ft3 Mcf MMcf Bcf Tcf gal bu aft".split(),
+    MASS: "t kt Mt Gt kg g lb oz ozt T kT MT GT".split(),
+    VOLUME: "m3 l bbl MBbls MMBbls ft3 Mcf MMcf Bcf Tcf gal bu aft".split(),
 }
 
 
