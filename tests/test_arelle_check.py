@@ -6,6 +6,7 @@ import pytest
 
 from report_analyst.core.xbrl.arelle_check import check_xbrl
 from report_analyst.core.xbrl.esrs_taxonomy import TAXONOMY_PATH_ENV, load_esrs_taxonomy
+from report_analyst.core.xbrl.inline_report import inline_report
 from report_analyst.core.xbrl.xbrl_report import xbrl_report
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
@@ -24,13 +25,17 @@ TAXONOMY = Taxonomy(
             kind="yes/no",
             data_type="xbrli:booleanItemType",
             period_type="duration",
-        )
+        ),
+        TaxonomyConcept(
+            name="sample:Amount", label="Amount", kind="number", data_type="xbrli:decimalItemType", period_type="duration"
+        ),
     ],
 )
+LEI, START, END = "529900T8BM49AURSDO55", date(2025, 1, 1), date(2025, 12, 31)
 
 
 def write_package(root):
-    """A taxonomy package with one yes/no concept, in a single top-level folder as packages are."""
+    """A taxonomy package with a yes/no and a number concept, in a single top-level folder as packages are."""
     folder = root / "sample"
     (folder / "META-INF").mkdir(parents=True)
     (folder / "schemas").mkdir()
@@ -51,6 +56,8 @@ def write_package(root):
         '<xs:import namespace="http://www.xbrl.org/2003/instance" '
         'schemaLocation="http://www.xbrl.org/2003/xbrl-instance-2003-12-31.xsd"/>'
         '<xs:element id="sample_Consolidated" name="Consolidated" type="xbrli:booleanItemType" '
+        'substitutionGroup="xbrli:item" xbrli:periodType="duration" nillable="true"/>'
+        '<xs:element id="sample_Amount" name="Amount" type="xbrli:decimalItemType" '
         'substitutionGroup="xbrli:item" xbrli:periodType="duration" nillable="true"/></xs:schema>'
     )
     return folder
@@ -58,7 +65,7 @@ def write_package(root):
 
 def report(value, taxonomy=TAXONOMY):
     tags = [SourceTag(id="1", source_id="source-1", document_id="document-hash", concept="sample:Consolidated", value=value)]
-    return xbrl_report(tags, taxonomy, "529900T8BM49AURSDO55", date(2025, 1, 1), date(2025, 12, 31))
+    return xbrl_report(tags, taxonomy, LEI, START, END)
 
 
 @pytest.fixture(params=["folder", "zip"])
@@ -90,6 +97,32 @@ def test_a_problem_outside_the_tags_has_no_tag(package):
     assert all(problem.tag_id is None for problem in problems)
 
 
+def sample_tag(id, concept, value, unit=None, decimals=None):
+    return SourceTag(id=id, source_id="source-1", document_id="d", concept=concept, value=value, unit=unit, decimals=decimals)
+
+
+SOURCES = [
+    {"id": "source-1", "page": 1, "span_start": 0, "selected_text": "Prepared on a consolidated basis, for 1,240 sites."}
+]
+
+
+def test_inline_report_makes_valid_xbrl(package):
+    tags = [sample_tag("1", "sample:Consolidated", "true"), sample_tag("2", "sample:Amount", "1240", "pure", 0)]
+    inline, written_below = inline_report(tags, SOURCES, TAXONOMY, LEI, START, END)
+
+    assert written_below == []
+    assert check_xbrl(inline, package) == []
+
+
+def test_inline_problem_names_its_tag(package):
+    tags = [sample_tag("1", "sample:Consolidated", "true"), sample_tag("2", "sample:Consolidated", "maybe")]
+    inline, written_below = inline_report(tags, SOURCES, TAXONOMY, LEI, START, END)
+
+    problems = [problem for problem in check_xbrl(inline, package) if problem.tag_id == "2"]
+    assert written_below == ["2"]
+    assert any("boolean" in problem.message for problem in problems)
+
+
 @pytest.mark.skipif(not os.getenv(TAXONOMY_PATH_ENV), reason=f"{TAXONOMY_PATH_ENV} is not set")
 def test_tags_on_the_2026_draft_make_valid_xbrl():
     taxonomy = load_esrs_taxonomy()
@@ -109,8 +142,47 @@ def test_tags_on_the_2026_draft_make_valid_xbrl():
             ]
         )
     ]
-    xbrl = xbrl_report(tags, taxonomy, "529900T8BM49AURSDO55", date(2025, 1, 1), date(2025, 12, 31))
+    xbrl = xbrl_report(tags, taxonomy, LEI, START, END)
 
     problems = check_xbrl(xbrl, os.environ[TAXONOMY_PATH_ENV])
 
     assert [problem for problem in problems if problem.tag_id] == []
+
+
+@pytest.mark.skipif(not os.getenv(TAXONOMY_PATH_ENV), reason=f"{TAXONOMY_PATH_ENV} is not set")
+def test_inline_tags_on_the_2026_draft_make_valid_xbrl():
+    emissions = "Die Scope-1-Emissionen betrugen 1.240 t CO2e."
+    water = "Our actions focus on areas with water stress."
+    tags = [
+        SourceTag(id=id, source_id=source_id, document_id="d", concept=name, value=value, unit=unit, decimals=decimals)
+        for id, source_id, name, value, unit, decimals in [
+            ("1", "a", "esrs:AbsoluteGrossScope1GhgEmissionsGeneratedDuringTheReportingPeriod", "1240", "tCO2e", 0),
+            (
+                "2",
+                "a",
+                "esrs:ActionsAndResourcesInRelationToClimateChangeMitigationAndAdaptationTextBlock",
+                emissions,
+                None,
+                None,
+            ),
+            ("3", "b", "esrs:ActionsAndResourcesAreRelatedToAreasWithWaterStress", "true", None, None),
+            (
+                "4",
+                "b",
+                "esrs:AffectedSocialStakeholderGroupsThatAreCoveredByTheOverarchingHumanRightsPolicyIdentified",
+                "esrs:OwnWorkforceMember",
+                None,
+                None,
+            ),
+        ]
+    ]
+    sources = [
+        {"id": "a", "page": 3, "span_start": 0, "selected_text": emissions},
+        {"id": "b", "page": 5, "span_start": 0, "selected_text": water},
+    ]
+    inline, written_below = inline_report(tags, sources, load_esrs_taxonomy(), LEI, START, END)
+
+    problems = check_xbrl(inline, os.environ[TAXONOMY_PATH_ENV])
+
+    assert [problem for problem in problems if problem.tag_id] == []
+    assert written_below == ["4"]
