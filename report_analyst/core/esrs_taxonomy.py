@@ -83,11 +83,14 @@ def load_esrs_taxonomy(path: str | Path | None = None, language: str = "en") -> 
         raise TaxonomyUnavailableError(f"No ESRS taxonomy package found at {path}.")
     try:
         package = _Package(path)
+        entry_point, dts = _complete_entry_point(package)
         return Taxonomy(
             identifier=package.index.findtext(f"{PACKAGE}identifier"),
             name=package.index.findtext(f"{PACKAGE}name"),
             version=package.index.findtext(f"{PACKAGE}version"),
-            concepts=_complete_entry_point(package).concepts(language),
+            entry_point=entry_point,
+            namespaces={element.prefix: element.namespace for element in dts.elements.values() if element.prefix},
+            concepts=dts.concepts(language),
         )
     except (OSError, ParseError, DefusedXmlException, zipfile.BadZipFile) as error:
         raise TaxonomyUnavailableError(f"Could not read the ESRS taxonomy package at {path}: {error}") from error
@@ -125,8 +128,8 @@ class _Package:
         return None
 
 
-def _complete_entry_point(package: _Package) -> "_Dts":
-    """The first entry point with labels, references, presentation and definition.
+def _complete_entry_point(package: _Package) -> tuple[str, "_Dts"]:
+    """The address and DTS of the first entry point with labels, references, presentation and definition.
 
     A package can also offer smaller entry points, for example one with only concepts and labels.
     """
@@ -136,7 +139,7 @@ def _complete_entry_point(package: _Package) -> "_Dts":
             raise TaxonomyUnavailableError(f"The package catalog does not say where {document.get('href')} is.")
         dts = _Dts(package, file)
         if set(dts.linkbases.values()) == set(LINKBASE_KINDS.values()):
-            return dts
+            return document.get("href"), dts
     raise TaxonomyUnavailableError("No entry point in the package has labels, references, presentation and definition.")
 
 
