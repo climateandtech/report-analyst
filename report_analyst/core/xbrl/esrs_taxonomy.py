@@ -12,7 +12,7 @@ from xml.etree.ElementTree import Element, ParseError
 from defusedxml import DefusedXmlException
 from defusedxml.ElementTree import fromstring, iterparse
 
-from report_analyst.models.taxonomy import EsrsReference, Taxonomy, TaxonomyConcept, TaxonomyOption
+from report_analyst.models.taxonomy import EsrsReference, Taxonomy, TaxonomyConcept, TaxonomyIdentifier, TaxonomyOption
 
 TAXONOMY_PATH_ENV = "ESRS_TAXONOMY_PATH"
 
@@ -21,6 +21,7 @@ LINK = "{http://www.xbrl.org/2003/linkbase}"
 XLINK = "{http://www.w3.org/1999/xlink}"
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 XBRLI = "{http://www.xbrl.org/2003/instance}"
+XBRLDT = "{http://xbrl.org/2005/xbrldt}"
 ENUM2 = "{http://xbrl.org/2020/extensible-enumerations-2.0}"
 PACKAGE = "{http://xbrl.org/2016/taxonomy-package}"
 CATALOG = "{urn:oasis:names:tc:entity:xmlns:xml:catalog}"
@@ -30,6 +31,10 @@ LINKBASE_KINDS = {
 }
 STANDARD_LABEL = "http://www.xbrl.org/2003/role/label"
 DOMAIN_MEMBER = "http://xbrl.org/int/dim/arcrole/domain-member"
+# A table: its concepts, its dimensions, and the dimensions that have a default and can be left out.
+ALL = "http://xbrl.org/int/dim/arcrole/all"
+HYPERCUBE_DIMENSION = "http://xbrl.org/int/dim/arcrole/hypercube-dimension"
+DIMENSION_DEFAULT = "http://xbrl.org/int/dim/arcrole/dimension-default"
 # EFRAG references other laws too, such as SFDR. This name marks a reference to the ESRS.
 ESRS_REFERENCE = "ESRS"
 
@@ -226,7 +231,8 @@ class _Dts:
 
     def _element_key(self, href: str, linkbase_file: str) -> str | None:
         schema, _, element_id = href.partition("#")
-        schema_file = self.package.locate(schema, linkbase_file)
+        # An href with only a fragment, such as #esrs_TYP, points into the same file.
+        schema_file = self.package.locate(schema, linkbase_file) if schema else linkbase_file
         return f"{schema_file}#{element_id}" if schema_file else None
 
     def concepts(self, language: str) -> list[TaxonomyConcept]:
@@ -234,6 +240,7 @@ class _Dts:
         references = self._esrs_references()
         groups = self._groups()
         members = self._domain_members()
+        needed = self._needed_dimensions(members)
 
         def label(key):
             if key not in labels:
@@ -258,6 +265,7 @@ class _Dts:
                     esrs_references=list(dict.fromkeys(references[key])),
                     options_domain=element.get(f"{ENUM2}domain"),
                     options=[TaxonomyOption(name=self.elements[member].qname, label=label(member)) for member in options],
+                    identifier=self._identifier(concept, needed[key], label),
                 )
             )
         return concepts
@@ -293,6 +301,42 @@ class _Dts:
             if arc.get(f"{XLINK}arcrole") == DOMAIN_MEMBER:
                 members[role][parent].append((float(arc.get("order", 0)), child))
         return members
+
+    def _needed_dimensions(self, members) -> dict[str, list[frozenset[str]]]:
+        """For each element, the dimensions without a default in each table it is in."""
+        tables, dimensions, defaults = [], defaultdict(set), set()
+        for role, arc, source, target in self.relationships("definition", "definitionArc"):
+            arcrole = arc.get(f"{XLINK}arcrole")
+            if arcrole == ALL:
+                tables.append((role, source, target))
+            elif arcrole == HYPERCUBE_DIMENSION:
+                dimensions[role, source].add(target)
+            elif arcrole == DIMENSION_DEFAULT:
+                defaults.add(source)
+        needed = defaultdict(list)
+        for role, head, hypercube in tables:
+            # A table holds its head concept and everything under it.
+            stack = [head]
+            while stack:
+                key = stack.pop()
+                needed[key].append(frozenset(dimensions[role, hypercube] - defaults))
+                stack.extend(child for _, child in members[role][key])
+        return needed
+
+    def _identifier(self, concept: _SchemaElement, needed_per_table: list[frozenset[str]], label) -> TaxonomyIdentifier | None:
+        """The identifier a concept needs, when every table it is in has a dimension without a default."""
+        if not needed_per_table or not all(needed_per_table):
+            return None
+        # Every table must need the same one dimension, and it must be free text.
+        [dimension, *others] = frozenset().union(*needed_per_table)
+        domain = self.elements[dimension].element.get(f"{XBRLDT}typedDomainRef")
+        if others or domain is None:
+            raise TaxonomyUnavailableError(f"{concept.qname} needs a dimension this loader does not support yet.")
+        return TaxonomyIdentifier(
+            dimension=self.elements[dimension].qname,
+            label=label(dimension),
+            element=self.elements[self._element_key(domain, dimension.partition("#")[0])].qname,
+        )
 
     def _options(self, concept: _SchemaElement, members) -> list[str]:
         """Element keys of a menu's options, in taxonomy order. Empty when the options are outside the package."""

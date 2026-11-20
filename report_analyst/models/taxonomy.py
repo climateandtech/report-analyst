@@ -26,6 +26,15 @@ class TaxonomyOption(BaseModel):
     label: str
 
 
+class TaxonomyIdentifier(BaseModel):
+    """A free-text dimension a concept cannot do without, such as the identifier of a policy."""
+
+    dimension: str
+    label: str
+    # The element the identifier is written in, inside the fact's context.
+    element: str
+
+
 class TaxonomyConcept(BaseModel):
     """A taxonomy concept that can carry a reported fact."""
 
@@ -38,6 +47,7 @@ class TaxonomyConcept(BaseModel):
     esrs_references: list[EsrsReference] = []
     options_domain: str | None = None
     options: list[TaxonomyOption] = []
+    identifier: TaxonomyIdentifier | None = None
 
 
 class Taxonomy(BaseModel):

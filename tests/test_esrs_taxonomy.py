@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from report_analyst.core.xbrl.esrs_taxonomy import TAXONOMY_PATH_ENV, TaxonomyUnavailableError, load_esrs_taxonomy
-from report_analyst.models.taxonomy import EsrsReference, TaxonomyOption
+from report_analyst.models.taxonomy import EsrsReference, TaxonomyIdentifier, TaxonomyOption
 
 BASE = "https://example.org/taxonomy/esrs/2026-08-30/"
 ROLE = BASE + "roles/"
@@ -28,6 +28,13 @@ ELEMENTS = {
     "GasMember": 'type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true"',
     "Co2Member": 'type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true"',
     "Ch4Member": 'type="dtr-types:domainItemType" substitutionGroup="xbrli:item" abstract="true"',
+    "PolicyLineItems": 'type="xbrli:stringItemType" substitutionGroup="xbrli:item" abstract="true"',
+    "PolicyTable": 'type="xbrli:stringItemType" substitutionGroup="xbrldt:hypercubeItem" abstract="true"',
+    "PolicyAxis": (
+        'type="xbrli:stringItemType" substitutionGroup="xbrldt:dimensionItem" abstract="true" '
+        'xbrldt:typedDomainRef="#esrs_TYP"'
+    ),
+    "TYP": 'type="xs:string"',
 }
 
 LABELS = {
@@ -38,6 +45,7 @@ LABELS = {
     "GasMember": "Gas",
     "Co2Member": "Carbon dioxide",
     "Ch4Member": "Methane",
+    "PolicyAxis": "Identifier of policy(ies) [typed axis]",
 }
 
 SCOPE1_REFERENCE = """
@@ -50,14 +58,30 @@ REFERENCES = {"Scope1": [SCOPE1_REFERENCE, SCOPE1_REFERENCE, "<ref:Name>SFDR</re
 
 PRESENTATION = {"role-210800": ("EmissionsHeader", ["Scope1", "PolicyTextBlock", "GasCovered", "CountriesCovered"])}
 
-# Out of order on purpose, options follow the order attribute.
-DEFINITION = {"role-999": [("GasMember", "Ch4Member", 2), ("GasMember", "Co2Member", 1)]}
+# The gas options, out of order on purpose: options follow the order attribute.
+# The emissions table has a gas dimension with a default, so its concepts need no identifier.
+# The policy table has a typed dimension without one, so a concept only in that table needs an identifier.
+DEFINITION = {
+    "role-999": [("domain-member", "GasMember", "Ch4Member", 2), ("domain-member", "GasMember", "Co2Member", 1)],
+    "role-998": [
+        ("all", "EmissionsHeader", "EmissionsTable", 1),
+        ("hypercube-dimension", "EmissionsTable", "GasAxis", 1),
+        ("dimension-default", "GasAxis", "GasMember", 1),
+        ("domain-member", "EmissionsHeader", "Scope1", 1),
+    ],
+    "role-997": [
+        ("all", "PolicyLineItems", "PolicyTable", 1),
+        ("hypercube-dimension", "PolicyTable", "PolicyAxis", 1),
+        ("domain-member", "PolicyLineItems", "PolicyTextBlock", 1),
+        ("domain-member", "PolicyLineItems", "Scope1", 2),
+    ],
+}
 
 SCHEMA_NAMESPACES = (
     'xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:link="http://www.xbrl.org/2003/linkbase" '
     'xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xbrli="http://www.xbrl.org/2003/instance" '
     f'xmlns:enum2="http://xbrl.org/2020/extensible-enumerations-2.0" xmlns:esrs="{BASE[:-1]}" '
-    'xmlns:country="https://xbrl.org/2024/iso3166"'
+    'xmlns:country="https://xbrl.org/2024/iso3166" xmlns:xbrldt="http://xbrl.org/2005/xbrldt"'
 )
 
 
@@ -186,11 +210,13 @@ def write_package(root: Path, layout="single", elements=None, arc_use=""):
         _linkbase(
             "".join(
                 f'<link:definitionLink xlink:type="extended" xlink:role="{ROLE}{role}">'
-                + "".join(_loc(concepts, name) for name in {name for arc in arcs for name in arc[:2]})
                 + "".join(
-                    '<link:definitionArc xlink:type="arc" xlink:arcrole="http://xbrl.org/int/dim/arcrole/domain-member" '
-                    f'xlink:from="loc_{parent}" xlink:to="loc_{child}" order="{order}" {arc_use}/>'
-                    for parent, child, order in arcs
+                    _loc(concepts, name) for name in {name for _, source, target, _ in arcs for name in (source, target)}
+                )
+                + "".join(
+                    f'<link:definitionArc xlink:type="arc" xlink:arcrole="http://xbrl.org/int/dim/arcrole/{arcrole}" '
+                    f'xlink:from="loc_{source}" xlink:to="loc_{target}" order="{order}" {arc_use}/>'
+                    for arcrole, source, target, order in arcs
                 )
                 + "</link:definitionLink>"
                 for role, arcs in DEFINITION.items()
@@ -222,6 +248,28 @@ def test_loads_package_metadata(package):
 @pytest.mark.parametrize(("layout", "schema"), [("single", "esrs.xsd"), ("split", "all.xsd")])
 def test_entry_point_is_the_complete_one(tmp_path, layout, schema):
     assert load_esrs_taxonomy(write_package(tmp_path, layout)).entry_point == BASE + schema
+
+
+def test_concept_only_in_a_table_with_a_typed_dimension_needs_an_identifier(package):
+    policy = concepts_by_name(load_esrs_taxonomy(package))["esrs:PolicyTextBlock"]
+
+    assert policy.identifier == TaxonomyIdentifier(
+        dimension="esrs:PolicyAxis", label="Identifier of policy(ies) [typed axis]", element="esrs:TYP"
+    )
+
+
+def test_concept_also_in_a_table_without_a_required_dimension_needs_no_identifier(package):
+    assert concepts_by_name(load_esrs_taxonomy(package))["esrs:Scope1"].identifier is None
+
+
+def test_concept_that_needs_a_list_dimension_is_reported(tmp_path):
+    # The policy dimension becomes a list, like the gas one.
+    elements = {**ELEMENTS, "PolicyAxis": ELEMENTS["GasAxis"]}
+
+    with pytest.raises(
+        TaxonomyUnavailableError, match="esrs:PolicyTextBlock needs a dimension this loader does not support yet"
+    ):
+        load_esrs_taxonomy(write_package(tmp_path, elements=elements))
 
 
 def test_loads_only_reportable_concepts(package):
