@@ -127,12 +127,7 @@ def _extract_grounded(
     payload: Dict[str, Any],
 ) -> GroundedAnswer:
     nested = payload.get("result") if isinstance(payload.get("result"), dict) else payload
-    answer = str(
-        nested.get("ANSWER")
-        or nested.get("answer")
-        or nested.get("analysis")
-        or ""
-    )
+    answer = str(nested.get("ANSWER") or nested.get("answer") or nested.get("analysis") or "")
     score_raw = nested.get("SCORE", nested.get("score", nested.get("confidence_score", 0)))
     try:
         score = float(score_raw or 0)

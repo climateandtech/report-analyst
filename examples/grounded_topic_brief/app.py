@@ -10,7 +10,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -121,8 +121,8 @@ async def sample() -> JSONResponse:
 
 @app.post("/analyze")
 async def analyze(
-    report: UploadFile = File(...),
-    model: str = Form("gpt-4o-mini"),
+    report: Annotated[UploadFile, File()],
+    model: Annotated[str, Form()] = "gpt-4o-mini",
 ) -> JSONResponse:
     """Run the water-risk question set on one uploaded PDF via the library API."""
     global _LAST_BRIEF
@@ -135,7 +135,7 @@ async def analyze(
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as handle:
         handle.write(raw)
-        tmp_path = Path(handle.name)
+        tmp_path = handle.name
 
     try:
         answers = await analyze_report(
@@ -148,7 +148,7 @@ async def analyze(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         try:
-            tmp_path.unlink(missing_ok=True)
+            os.unlink(tmp_path)
         except OSError:
             pass
 
@@ -263,7 +263,10 @@ INDEX_HTML = """<!DOCTYPE html>
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;600;700&display=swap"
+    rel="stylesheet"
+  />
 </head>
 <body>
   <main>
