@@ -554,9 +554,7 @@ def test_esrs_e1_climate_mixes_classification_and_quantity(monkeypatch):
     questions = QuestionSetLoader().get_questions("esrs_e1_climate")
     assert questions
 
-    first_lines = [
-        question["guidelines"].strip().splitlines()[0] for question in questions.values()
-    ]
+    first_lines = [question["guidelines"].strip().splitlines()[0] for question in questions.values()]
     assert any("classification" in line for line in first_lines)
     assert any("quantity" in line for line in first_lines)
     assert all(line.startswith("- ANSWER type:") for line in first_lines)
