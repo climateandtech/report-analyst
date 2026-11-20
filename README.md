@@ -21,11 +21,40 @@ Documentation is published with Material for MkDocs to [GitHub Pages](https://cl
 - **Get structured, explainable answers** with evidence, gaps, and sources.
 - **Compare configurations** (models, chunk sizes, question sets) to find better analysis setups.
 - **Export results** for further analysis (e.g. CSV for spreadsheets).
+- **Embed the engine in your own product** — same grounded answers, your UI and workflow.
 
 You stay in control of:
 - Which reports are analyzed.
 - Which questions/frameworks are used.
 - Which models and parameters are applied.
+
+---
+
+
+## Standalone tool *and* library
+
+Open Sustainability Analyst is both:
+
+1. **A ready-to-run analyst app** (Streamlit UI + optional REST API) for teams who want to analyze reports out of the box.
+2. **A Python library** for builders who want their *own* interface — procurement screens, risk portals, research notebooks — while still getting **evidence-backed answers** from the same analysis engine.
+
+### Library quick start
+
+```python
+from report_analyst.core.library import analyze_report, build_topic_brief
+
+# Built-in framework, or path to your own *_questions.yaml
+answers = await analyze_report("supplier-report.pdf", "tcfd")
+
+# Turn grounded answers into something your product can render or store
+brief = build_topic_brief(answers, topic="TCFD overview")
+```
+
+Synchronous scripts can call `analyze_report_sync(...)`.
+
+**Demo host app** (custom UI, one topic, then reuse grounded data): see [`examples/grounded_topic_brief/`](examples/grounded_topic_brief/). Agent skill (Claude / Cursor / Agents Skills): [`.claude/skills/osa-library-host-app/`](.claude/skills/osa-library-host-app/) (`/osa-library-host-app`). Also [`PROMPT.md`](examples/grounded_topic_brief/PROMPT.md) + [`STYLE.md`](examples/grounded_topic_brief/STYLE.md) for paste-into-any-agent.
+
+For HTTP integration instead of in-process import, use `report_analyst_api/` (same analyzer path). Production patterns are covered under **Integrating Into Production Systems** below.
 
 ---
 
@@ -451,6 +480,7 @@ Open Sustainability Analyst is designed for integration into production environm
 | Deployment Pattern | Use Case | Modules Required |
 |-------------------|----------|------------------|
 | **Standalone Analyst Tool** | Internal team usage, local analysis | `report_analyst/` only |
+| **Library embed** | Your own UI/product; call `report_analyst.core.library` (see `examples/grounded_topic_brief/`) | `report_analyst/` as a dependency |
 | **REST API Service** | Integrate into existing platforms, microservices architecture | `report_analyst/` + `report_analyst_api/` |
 | **Async Job Processing** | High-volume batch analysis, background processing | `report_analyst/` + `report_analyst_jobs/` |
 | **Full Backend Integration** | Enterprise SaaS with upload, search, and distributed processing | All modules + external dependencies (NATS, S3, etc.) |

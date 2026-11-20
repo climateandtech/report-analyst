@@ -1,0 +1,23 @@
+name: Water Risk Supplier Brief
+shortcut: water
+description: >
+  Small custom question set for a host app that screens one supplier
+  sustainability report for water stewardship.
+
+questions:
+  - id: water_1
+    text: "Does the company disclose quantitative water withdrawal or consumption targets?"
+    guidelines: |
+      - Prefer absolute or intensity targets with a baseline year
+      - Note whether targets cover high water-stress sites
+      - Do not treat qualitative ambitions as a target
+  - id: water_2
+    text: "Which sites or basins does the company identify as water-stressed or high-risk?"
+    guidelines: |
+      - Look for named basins, regions, or facilities
+      - Capture any risk rating methodology (e.g. WRI Aqueduct)
+  - id: water_3
+    text: "What evidence is given for water recycling, reuse, or efficiency measures?"
+    guidelines: |
+      - Prefer quantified recycling rates or m³ saved
+      - Note whether measures are operational or only pilot projects
