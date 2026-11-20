@@ -193,6 +193,8 @@ class TestQuestionSetLoader:
             "kilimanjaro",
             "lucia",
             "climretrieve",
+            "esrs_e1_climate",
+            "esrs_e1_climate_examples",
         ]
         for expected_set in expected_sets:
             assert expected_set in question_sets, f"Expected {expected_set} in question sets"
@@ -361,11 +363,13 @@ class TestQuestionSetLoader:
             "climretrieve",
             "climretrieve_complete",
             "climretrieve_complete_6",
+            "esrs_e1_climate",
+            "esrs_e1_climate_examples",
             "custom",
         }
         assert set(question_set_options) == expected_sets
-        # 8 real sets + "custom" UI option
-        assert len(question_set_options) == 9
+        # 10 real sets + "custom" UI option
+        assert len(question_set_options) == 11
         assert "custom" in question_set_options
         assert "everest" in question_set_options
         assert "tcfd" in question_set_options
@@ -418,11 +422,13 @@ class TestQuestionSetLoader:
             "climretrieve",
             "climretrieve_complete",
             "climretrieve_complete_6",
+            "esrs_e1_climate",
+            "esrs_e1_climate_examples",
         ]
         for expected_set in expected_sets:
             assert expected_set in options1, f"Expected question set '{expected_set}' not found in options"
 
-        assert len(options1) == 8
+        assert len(options1) == 10
 
 
 TYPED_ANSWER_QUESTIONSET = {
@@ -477,7 +483,7 @@ TYPED_ANSWER_EXAMPLES_QUESTIONSET = {
 
 
 class TestTypedAnswerQuestionSets:
-    """Load questionsets whose guidelines declare ANSWER type (fixture YAML, no local ESRS files)."""
+    """Load questionsets whose guidelines declare ANSWER type (fixture YAML)."""
 
     @pytest.fixture
     def typed_loader(self):
@@ -538,3 +544,17 @@ def test_climretrieve_core_questions_require_classification_answers(monkeypatch)
 
     assert all(question["guidelines"].startswith("- ANSWER type: classification") for question in core_questions)
     assert questions["climretr_17_ir"]["guidelines"] == ""
+
+
+def test_esrs_e1_climate_mixes_classification_and_quantity(monkeypatch):
+    """ESRS E1 is the documented mixed yes/no + numerical typed-answer example."""
+    package_questionsets = Path(__file__).resolve().parents[1] / "report_analyst" / "questionsets"
+    monkeypatch.setenv("QUESTIONSETS_PATH", str(package_questionsets))
+
+    questions = QuestionSetLoader().get_questions("esrs_e1_climate")
+    assert questions
+
+    first_lines = [question["guidelines"].strip().splitlines()[0] for question in questions.values()]
+    assert any("classification" in line for line in first_lines)
+    assert any("quantity" in line for line in first_lines)
+    assert all(line.startswith("- ANSWER type:") for line in first_lines)
