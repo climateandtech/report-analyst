@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 from report_analyst.core.xbrl.tagging import InvalidTagError, create_tag, unit_choices
-from report_analyst.models.taxonomy import TaxonomyConcept, TaxonomyOption
+from report_analyst.models.taxonomy import TaxonomyConcept, TaxonomyIdentifier, TaxonomyOption
 
 SOURCE = {"id": "source-1", "document_id": "document-hash", "selected_text": "Scope 1 emissions were 1240 t"}
 OPTIONS = [
@@ -12,7 +12,7 @@ OPTIONS = [
 ]
 
 
-def concept(kind, data_type, options=(), options_domain=None):
+def concept(kind, data_type, options=(), options_domain=None, identifier=None):
     return TaxonomyConcept(
         name="esrs:Sample",
         label="Sample",
@@ -21,6 +21,7 @@ def concept(kind, data_type, options=(), options_domain=None):
         period_type="duration",
         options=list(options),
         options_domain=options_domain,
+        identifier=identifier,
     )
 
 
@@ -35,6 +36,15 @@ SET = concept("menu", "enum2:enumerationSetItemType", OPTIONS)
 COUNTRY = concept("menu", "enum2:enumerationItemType", options_domain="country:CountriesDomain")
 DATE = concept("date", "xbrli:dateItemType")
 YEAR = concept("date", "xbrli:gYearItemType")
+POLICY_NAME = concept(
+    "text",
+    "xbrli:stringItemType",
+    identifier=TaxonomyIdentifier(
+        dimension="esrs:IdentifierOfPolicyIesTypedAxis",
+        label="Identifier of policy(ies) [typed axis]",
+        element="esrs:esrs_TYP",
+    ),
+)
 
 
 def test_a_tag_keeps_its_source_and_concept():
@@ -128,3 +138,17 @@ def test_dates_and_years():
 def test_a_date_or_year_must_be_entered(empty_concept):
     with pytest.raises(InvalidTagError, match="Enter a value"):
         create_tag(empty_concept, SOURCE, None)
+
+
+def test_an_identifier_is_kept_without_spaces_around_it():
+    assert create_tag(POLICY_NAME, SOURCE, "Climate policy", identifier=" P1 ").identifier == "P1"
+
+
+@pytest.mark.parametrize("identifier", [None, "", "   "])
+def test_a_concept_that_needs_an_identifier_must_get_one(identifier):
+    with pytest.raises(InvalidTagError, match="Enter the identifier, for example P1"):
+        create_tag(POLICY_NAME, SOURCE, "Climate policy", identifier=identifier)
+
+
+def test_an_identifier_is_not_kept_for_a_concept_that_needs_none():
+    assert create_tag(NARRATIVE, SOURCE, "Our policy", identifier="P1").identifier is None
