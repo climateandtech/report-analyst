@@ -1,4 +1,4 @@
-from report_analyst.core.concept_search import search_concepts, standards
+from report_analyst.core.xbrl.concept_search import search_concepts, standards
 from report_analyst.models.taxonomy import EsrsReference, TaxonomyConcept
 
 DASH = "\N{EN DASH}"
@@ -104,6 +104,14 @@ def test_search_matches_the_group():
 
 def test_search_matches_the_paragraph():
     assert names(search_concepts(CONCEPTS, "e1-1 5")) == ["esrs:PlanTextBlock"]
+
+
+def test_search_matches_the_clause_but_not_the_knowledge_hub_link():
+    reference = EsrsReference(clause="iv", url="https://knowledgehub.efrag.org/eng/interactive/esrs-e1")
+    linked = SCOPE1.model_copy(update={"esrs_references": [reference]})
+
+    assert names(search_concepts([linked], "iv")) == ["esrs:Scope1"]
+    assert search_concepts([linked], "interactive") == []
 
 
 def test_filters_by_standard():

@@ -92,7 +92,6 @@ from report_analyst.core.api_key_manager import APIKeyManager
 from report_analyst.core.dataframe_manager import (
     create_analysis_dataframes,
 )
-from report_analyst.core.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.core.llm_models import (
     get_default_llm_model,
     get_gemini_models,
@@ -100,6 +99,7 @@ from report_analyst.core.llm_models import (
 )
 from report_analyst.core.prompt_manager import PromptManager
 from report_analyst.core.question_loader import get_question_loader
+from report_analyst.core.xbrl.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.models.taxonomy import TaxonomyConcept
 from report_analyst.ui.concept_search import current_taxonomy, display_concept_search
 from report_analyst.ui.source_tagging import with_tags
@@ -1015,7 +1015,7 @@ def display_pdf_viewer(
             if source_change:
                 _apply_source_change(source_change, document_id, cache_manager, error_slot)
     display_concept_search(annotations, cache_manager)
-    display_xbrl_check(tags, annotations)
+    display_xbrl_check(tags, annotations, viewer_key)
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):

@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from report_analyst.core.tagging import InvalidTagError, create_tag, unit_choices
+from report_analyst.core.xbrl.tagging import InvalidTagError, create_tag, unit_choices
 from report_analyst.models.taxonomy import TaxonomyConcept, TaxonomyOption
 
 SOURCE = {"id": "source-1", "document_id": "document-hash", "selected_text": "Scope 1 emissions were 1240 t"}

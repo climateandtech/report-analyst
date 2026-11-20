@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError
 
 from report_analyst.core.analyzer import compute_file_hash
 from report_analyst.core.cache_manager import CacheManager
-from report_analyst.core.esrs_taxonomy import TaxonomyUnavailableError
+from report_analyst.core.xbrl.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
 from report_analyst.streamlit_app import _get_pdf_viewer_results, display_pdf_viewer
@@ -259,6 +259,7 @@ TAG = SourceTag(
 
 
 def _viewer_sources(pdf_path):
+    """The sources the viewer gets, and the mock that stands in for the Arelle panel."""
     cache_manager = storage()
     cache_manager.get_source_annotations.return_value = [{"id": "source-1"}, {"id": "source-2"}]
     cache_manager.get_source_tags.return_value = [TAG]
@@ -266,14 +267,15 @@ def _viewer_sources(pdf_path):
         patch("report_analyst.streamlit_app.st.expander", return_value=nullcontext()),
         patch("report_analyst.streamlit_app.pdf_viewer", return_value=None) as component,
         patch("report_analyst.streamlit_app.display_concept_search"),
+        patch("report_analyst.streamlit_app.display_xbrl_check") as xbrl_check,
     ):
         display_pdf_viewer(str(pdf_path), {}, {}, cache_manager)
-    return component.call_args.kwargs["annotations"]
+    return component.call_args.kwargs["annotations"], xbrl_check
 
 
 def test_display_pdf_viewer_gives_each_source_its_tags(pdf_path):
     with patch("report_analyst.streamlit_app.current_taxonomy", return_value=TAXONOMY):
-        sources = _viewer_sources(pdf_path)
+        sources, _ = _viewer_sources(pdf_path)
 
     assert sources == [
         {"id": "source-1", "tags": [{"id": "tag-1", "text": "Gross scope 1 GHG emissions: 1240 tCO2e"}]},
@@ -282,18 +284,15 @@ def test_display_pdf_viewer_gives_each_source_its_tags(pdf_path):
 
 
 def test_display_pdf_viewer_shows_the_xbrl_check_with_the_tags(pdf_path):
-    with (
-        patch("report_analyst.streamlit_app.current_taxonomy", return_value=TAXONOMY),
-        patch("report_analyst.streamlit_app.display_xbrl_check") as xbrl_check,
-    ):
-        sources = _viewer_sources(pdf_path)
+    with patch("report_analyst.streamlit_app.current_taxonomy", return_value=TAXONOMY):
+        sources, xbrl_check = _viewer_sources(pdf_path)
 
-    xbrl_check.assert_called_once_with([TAG], sources)
+    xbrl_check.assert_called_once_with([TAG], sources, "report")
 
 
 def test_display_pdf_viewer_names_tags_by_concept_without_a_taxonomy(pdf_path):
     with patch("report_analyst.streamlit_app.current_taxonomy", side_effect=TaxonomyUnavailableError("Not set up.")):
-        sources = _viewer_sources(pdf_path)
+        sources, _ = _viewer_sources(pdf_path)
 
     assert sources[0]["tags"] == [{"id": "tag-1", "text": "esrs:Scope1: 1240 tCO2e"}]
 

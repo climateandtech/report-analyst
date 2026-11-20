@@ -4,8 +4,8 @@ from unittest.mock import Mock
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from report_analyst.core.arelle_check import XbrlProblem
-from report_analyst.core.esrs_taxonomy import TaxonomyUnavailableError
+from report_analyst.core.xbrl.arelle_check import XbrlProblem
+from report_analyst.core.xbrl.esrs_taxonomy import TaxonomyUnavailableError
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
 
@@ -32,6 +32,9 @@ TAGS = [
 SOURCES = [
     {
         "id": "source-1",
+        "page": 1,
+        "span_start": 0,
+        "selected_text": "Prepared on a consolidated basis.",
         "tags": [
             {"id": "1", "text": "Prepared on a consolidated basis: true"},
             {"id": "2", "text": "Prepared on a consolidated basis: true"},
@@ -44,7 +47,7 @@ SOURCES = [
 def panel(tags, sources):
     from report_analyst.ui.xbrl_check import display_xbrl_check
 
-    display_xbrl_check(tags, sources)
+    display_xbrl_check(tags, sources, "report")
 
 
 @pytest.fixture
@@ -122,3 +125,25 @@ def test_panel_checks_the_known_tags_and_shows_the_result(check):
         "Arelle also noted problems in the ESRS taxonomy package itself (1). They are not about your tags."
     )
     assert app.caption[1].value == "Could not load nace-codes.xsd"
+
+
+def test_panel_checks_the_inline_report(check):
+    submit(run_panel())
+
+    report, _ = check.call_args.args
+    assert "<ix:nonNumeric" in report and 'id="tag-1"' in report
+
+
+def test_panel_lists_values_written_below_their_passage(check):
+    app = submit(run_panel())
+
+    # Both yes/no tags cover the whole passage, so the second one is written below it.
+    assert app.info[0].value == (
+        "Written below their passage, because the value is not in its text:\n- Prepared on a consolidated basis: true"
+    )
+
+
+def test_panel_offers_both_files(check):
+    app = submit(run_panel())
+
+    assert [button.proto.label for button in app.get("download_button")] == ["Download iXBRL", "Download XBRL"]

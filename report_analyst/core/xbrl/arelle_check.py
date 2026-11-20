@@ -9,7 +9,7 @@ from typing import NamedTuple
 from arelle.api.Session import Session
 from arelle.RuntimeOptions import RuntimeOptions
 
-from report_analyst.core.xbrl_report import FACT_ID
+from report_analyst.core.xbrl.xbrl_report import FACT_ID
 
 
 class XbrlProblem(NamedTuple):

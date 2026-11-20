@@ -2,7 +2,7 @@ from datetime import date
 
 from defusedxml.ElementTree import fromstring
 
-from report_analyst.core.xbrl_report import xbrl_report
+from report_analyst.core.xbrl.xbrl_report import xbrl_report
 from report_analyst.models.source_tag import SourceTag
 from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept, TaxonomyOption
 
