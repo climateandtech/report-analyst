@@ -6,9 +6,9 @@ Tests dataframes, charts, and result display functionality.
 from streamlit.testing.v1 import AppTest
 
 
-def test_dataframe_display_capability(streamlit_app_path):
+def test_dataframe_display_capability():
     """Test that the app can display dataframes"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # The app should load without errors, indicating dataframe display capability
@@ -18,9 +18,9 @@ def test_dataframe_display_capability(streamlit_app_path):
     # This is verified by the app loading successfully with dataframe_manager imports
 
 
-def test_analysis_results_structure(streamlit_app_path):
+def test_analysis_results_structure():
     """Test that analysis results structure is properly set up"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check for placeholder elements that would be used for results
@@ -33,19 +33,26 @@ def test_analysis_results_structure(streamlit_app_path):
     assert not at.exception
 
 
-def test_file_history_functionality(streamlit_app_path):
+def test_file_history_functionality():
     """Test file history and previous reports functionality"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
+
+    # Check for file history selectbox
+    has_file_history = False
+    for sb in at.selectbox:
+        if "previously analyzed" in str(sb.label).lower() or "previous_file" in str(sb.key):
+            has_file_history = True
+            break
 
     # File history might not be visible if no previous files exist
     # This is expected behavior, so we just verify the app loads correctly
     assert not at.exception
 
 
-def test_question_display_functionality(streamlit_app_path):
+def test_question_display_functionality():
     """Test question display and selection functionality"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     # Navigate to Report Analyst page where questions are displayed
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -64,9 +71,9 @@ def test_question_display_functionality(streamlit_app_path):
     assert not at.exception
 
 
-def test_model_selection_display(streamlit_app_path):
+def test_model_selection_display():
     """Test LLM model selection display"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     # Navigate to Report Analyst page where model selection is located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -86,9 +93,9 @@ def test_model_selection_display(streamlit_app_path):
     assert not at.exception
 
 
-def test_configuration_display(streamlit_app_path):
+def test_configuration_display():
     """Test configuration parameter display"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     # Navigate to Report Analyst page where configuration widgets are located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -109,9 +116,9 @@ def test_configuration_display(streamlit_app_path):
     assert not at.exception
 
 
-def test_analysis_controls_display(streamlit_app_path):
+def test_analysis_controls_display():
     """Test analysis control options display"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     # Navigate to Report Analyst page where analysis controls are located
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)
@@ -134,9 +141,9 @@ def test_analysis_controls_display(streamlit_app_path):
     # and may not appear until a file is selected. This is expected behavior.
 
 
-def test_error_handling_display(streamlit_app_path):
+def test_error_handling_display():
     """Test error handling and display capabilities"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # The app should handle errors gracefully and display them
@@ -148,9 +155,9 @@ def test_error_handling_display(streamlit_app_path):
     # The app should handle errors gracefully, which is verified by loading without exceptions
 
 
-def test_consolidated_results_display(streamlit_app_path):
+def test_consolidated_results_display():
     """Test All Results page display functionality (previously called Consolidated Results)"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     # Navigate to All Results page
     at.session_state["nav_page"] = "All Results"
     at.run(timeout=10)
@@ -169,9 +176,9 @@ def test_consolidated_results_display(streamlit_app_path):
     assert not at.exception
 
 
-def test_app_layout_and_structure(streamlit_app_path):
+def test_app_layout_and_structure():
     """Test overall app layout and structure"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check that navigation page is set in session state
@@ -191,9 +198,9 @@ def test_app_layout_and_structure(streamlit_app_path):
     assert not at.exception
 
 
-def test_dynamic_content_loading(streamlit_app_path):
+def test_dynamic_content_loading():
     """Test dynamic content loading capabilities"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     # Navigate to Report Analyst page where question sets are displayed
     at.session_state["nav_page"] = "Report Analyst"
     at.run(timeout=10)

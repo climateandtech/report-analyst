@@ -6,9 +6,9 @@ Tests backend integration availability and functionality.
 from streamlit.testing.v1 import AppTest
 
 
-def test_backend_integration_availability(streamlit_app_path):
+def test_backend_integration_availability():
     """Test that backend integration features are available"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # The app should load without errors, indicating backend integration is available
@@ -18,9 +18,9 @@ def test_backend_integration_availability(streamlit_app_path):
     # This is verified by the app loading successfully with backend integration
 
 
-def test_backend_configuration_display(streamlit_app_path):
+def test_backend_configuration_display():
     """Test backend configuration display"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check for backend configuration elements
@@ -30,9 +30,9 @@ def test_backend_configuration_display(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_flow_orchestrator(streamlit_app_path):
+def test_backend_flow_orchestrator():
     """Test backend flow orchestrator functionality"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check that backend flow orchestrator is properly integrated
@@ -41,9 +41,9 @@ def test_backend_flow_orchestrator(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_analysis_workflow(streamlit_app_path):
+def test_backend_analysis_workflow():
     """Test backend analysis workflow integration"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check for backend analysis workflow elements
@@ -53,9 +53,9 @@ def test_backend_analysis_workflow(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_error_handling(streamlit_app_path):
+def test_backend_error_handling():
     """Test backend integration error handling"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Backend integration should handle errors gracefully
@@ -64,9 +64,9 @@ def test_backend_error_handling(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_fallback_behavior(streamlit_app_path):
+def test_backend_fallback_behavior():
     """Test backend integration fallback behavior"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Backend integration should have proper fallback behavior
@@ -76,9 +76,9 @@ def test_backend_fallback_behavior(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_config_status(streamlit_app_path):
+def test_backend_config_status():
     """Test backend configuration status display"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check for backend configuration status elements
@@ -88,9 +88,9 @@ def test_backend_config_status(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_processing_result(streamlit_app_path):
+def test_backend_processing_result():
     """Test backend processing result handling"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check that backend processing results are handled properly
@@ -99,9 +99,9 @@ def test_backend_processing_result(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_analysis_result(streamlit_app_path):
+def test_backend_analysis_result():
     """Test backend analysis result integration"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check for backend analysis result handling
@@ -110,9 +110,9 @@ def test_backend_analysis_result(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_integration_imports(streamlit_app_path):
+def test_backend_integration_imports():
     """Test that backend integration imports work correctly"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Backend integration imports should work without errors
@@ -121,9 +121,9 @@ def test_backend_integration_imports(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_flow_selection(streamlit_app_path):
+def test_backend_flow_selection():
     """Test backend flow selection functionality"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check for backend flow selection elements
@@ -133,9 +133,9 @@ def test_backend_flow_selection(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_local_analysis(streamlit_app_path):
+def test_backend_local_analysis():
     """Test backend local analysis functionality"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Check for backend local analysis capabilities
@@ -144,9 +144,9 @@ def test_backend_local_analysis(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_integration_compatibility(streamlit_app_path):
+def test_backend_integration_compatibility():
     """Test backend integration compatibility with main app"""
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
     at.run(timeout=10)
 
     # Backend integration should be compatible with the main app
@@ -164,11 +164,11 @@ def test_backend_integration_compatibility(streamlit_app_path):
     assert not at.exception
 
 
-def test_backend_resource_full_roundtrip(streamlit_app_path):
+def test_backend_resource_full_roundtrip():
     """Test full roundtrip: list backend resources, select, retrieve chunks, analyze"""
     from unittest.mock import Mock, patch
 
-    at = AppTest.from_file(streamlit_app_path)
+    at = AppTest.from_file("report_analyst/streamlit_app.py")
 
     # Mock backend configuration
     mock_backend_config = Mock()

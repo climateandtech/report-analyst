@@ -5,12 +5,12 @@ Provides vector type and similarity search functions for PostgreSQL with pgvecto
 """
 
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
-def check_pgvector_available(connection: Any) -> bool:
+def check_pgvector_available(connection) -> bool:
     """
     Check if pgvector extension is available in the database.
 
@@ -43,7 +43,7 @@ def check_pgvector_available(connection: Any) -> bool:
         return False
 
 
-def setup_pgvector_extension(connection: Any) -> bool:
+def setup_pgvector_extension(connection) -> bool:
     """
     Attempt to create pgvector extension (requires superuser privileges).
 
@@ -114,9 +114,7 @@ def create_vector_type(dimension: Optional[int] = None):
     return VectorType()
 
 
-def get_vector_distance_func(
-    embedding_column_name: str, query_vector: Any, distance_type: str = "cosine"
-) -> tuple[str, dict[str, str]]:
+def get_vector_distance_func(embedding_column_name: str, query_vector, distance_type: str = "cosine"):
     """
     Get SQL expression for vector distance calculation.
 

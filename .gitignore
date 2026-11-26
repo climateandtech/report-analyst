@@ -20,9 +20,6 @@ report_analyst/temp/*
 # Cursor IDE files
 .cursor/
 
-# MkDocs build output
-/site/
-
 # Coverage and test artifacts
 .coverage
 coverage.xml
