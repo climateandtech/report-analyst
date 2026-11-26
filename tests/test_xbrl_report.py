@@ -1,20 +1,28 @@
 from datetime import date
 
+import pytest
 from defusedxml.ElementTree import fromstring
 
 from report_analyst.core.xbrl.xbrl_report import xbrl_report
 from report_analyst.models.source_tag import SourceTag
-from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept, TaxonomyOption
+from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept, TaxonomyIdentifier, TaxonomyOption
 
 NAMESPACE = "https://example.org/esrs"
 XBRLI = "{http://www.xbrl.org/2003/instance}"
 LINK = "{http://www.xbrl.org/2003/linkbase}"
 XLINK = "{http://www.w3.org/1999/xlink}"
+XBRLDI = "{http://xbrl.org/2006/xbrldi}"
 
 
-def concept(name, kind, data_type, period_type="duration", options=()):
+def concept(name, kind, data_type, period_type="duration", options=(), identifier=None):
     return TaxonomyConcept(
-        name=f"esrs:{name}", label=name, kind=kind, data_type=data_type, period_type=period_type, options=list(options)
+        name=f"esrs:{name}",
+        label=name,
+        kind=kind,
+        data_type=data_type,
+        period_type=period_type,
+        options=list(options),
+        identifier=identifier,
     )
 
 
@@ -31,11 +39,17 @@ TAXONOMY = Taxonomy(
         concept("Groups", "menu", "enum2:enumerationSetItemType", options=[TaxonomyOption(name="esrs:A", label="A")]),
         concept("Policy", "narrative", "dtr-types:textBlockItemType"),
         concept("LastUpdate", "date", "xbrli:dateItemType", period_type="instant"),
+        concept(
+            "PolicyName",
+            "text",
+            "xbrli:stringItemType",
+            identifier=TaxonomyIdentifier(dimension="esrs:PolicyAxis", label="Identifier of policy(ies)", element="esrs:TYP"),
+        ),
     ],
 )
 
 
-def tag(id, name, value, unit=None, decimals=None):
+def tag(id, name, value, unit=None, decimals=None, identifier=None):
     return SourceTag(
         id=id,
         source_id="source-1",
@@ -44,6 +58,7 @@ def tag(id, name, value, unit=None, decimals=None):
         value=value,
         unit=unit,
         decimals=decimals,
+        identifier=identifier,
     )
 
 
@@ -57,12 +72,21 @@ TAGS = [
 ]
 
 
-def report():
-    return fromstring(xbrl_report(TAGS, TAXONOMY, "529900T8BM49AURSDO55", date(2025, 1, 1), date(2025, 12, 31)))
+def report(tags=TAGS):
+    return fromstring(xbrl_report(tags, TAXONOMY, "529900T8BM49AURSDO55", date(2025, 1, 1), date(2025, 12, 31)))
 
 
 def facts(root):
     return {fact.get("id"): fact for fact in root if fact.tag.startswith(f"{{{NAMESPACE}}}")}
+
+
+def contexts(root):
+    return {context.get("id"): context for context in root.iter(f"{XBRLI}context")}
+
+
+def identifier_in(context):
+    member = context.find(f"{XBRLI}scenario/{XBRLDI}typedMember")
+    return member.get("dimension"), member.findtext(f"{{{NAMESPACE}}}TYP")
 
 
 def test_report_links_to_the_taxonomy_entry_point():
@@ -70,12 +94,12 @@ def test_report_links_to_the_taxonomy_entry_point():
 
 
 def test_report_has_the_company_and_a_context_per_period_type():
-    contexts = {context.get("id"): context for context in report().iter(f"{XBRLI}context")}
+    found = contexts(report())
 
-    assert {context.findtext(f".//{XBRLI}identifier") for context in contexts.values()} == {"529900T8BM49AURSDO55"}
-    assert contexts["duration"].findtext(f".//{XBRLI}startDate") == "2025-01-01"
-    assert contexts["duration"].findtext(f".//{XBRLI}endDate") == "2025-12-31"
-    assert contexts["instant"].findtext(f".//{XBRLI}instant") == "2025-12-31"
+    assert {context.findtext(f".//{XBRLI}identifier") for context in found.values()} == {"529900T8BM49AURSDO55"}
+    assert found["duration"].findtext(f".//{XBRLI}startDate") == "2025-01-01"
+    assert found["duration"].findtext(f".//{XBRLI}endDate") == "2025-12-31"
+    assert found["instant"].findtext(f".//{XBRLI}instant") == "2025-12-31"
 
 
 def test_each_tag_is_a_fact_named_after_the_tag():
@@ -107,3 +131,43 @@ def test_menu_options_are_written_with_their_namespace():
 
 def test_text_is_escaped():
     assert facts(report())["tag-5e"].text == 'Covers <all> sites & "offices"'
+
+
+def test_tag_with_an_identifier_gets_its_own_context():
+    root = report([tag("7g", "PolicyName", "Climate policy", identifier="P1")])
+    context = contexts(root)["duration-7g"]
+
+    assert identifier_in(context) == ("esrs:PolicyAxis", "P1")
+    assert context.findtext(f".//{XBRLI}identifier") == "529900T8BM49AURSDO55"
+    assert context.findtext(f".//{XBRLI}startDate") == "2025-01-01"
+    assert facts(root)["tag-7g"].get("contextRef") == "duration-7g"
+
+
+def test_two_tags_with_the_same_identifier_get_a_context_each():
+    root = report(
+        [
+            tag("7g", "PolicyName", "Climate policy", identifier="P1"),
+            tag("8h", "PolicyName", "Climate and energy policy", identifier="P1"),
+        ]
+    )
+
+    assert [facts(root)[id].get("contextRef") for id in ("tag-7g", "tag-8h")] == ["duration-7g", "duration-8h"]
+    assert [identifier_in(contexts(root)[id]) for id in ("duration-7g", "duration-8h")] == [("esrs:PolicyAxis", "P1")] * 2
+
+
+def test_identifier_is_escaped():
+    root = report([tag("7g", "PolicyName", "Climate policy", identifier="P&1 <a>")])
+
+    assert identifier_in(contexts(root)["duration-7g"]) == ("esrs:PolicyAxis", "P&1 <a>")
+
+
+@pytest.mark.parametrize(
+    "without_identifier",
+    [tag("7g", "PolicyName", "Climate policy"), tag("7g", "Scope1", "1240", "tCO2e", 0, identifier="P1")],
+    ids=["tag saved without its identifier", "concept that needs no identifier"],
+)
+def test_tag_without_an_identifier_its_concept_needs_uses_the_period_context(without_identifier):
+    root = report([without_identifier])
+
+    assert facts(root)["tag-7g"].get("contextRef") == "duration"
+    assert list(contexts(root)) == ["duration", "instant"]

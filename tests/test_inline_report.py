@@ -5,16 +5,24 @@ from defusedxml.ElementTree import fromstring
 
 from report_analyst.core.xbrl.inline_report import Mark, find_mark, inline_report
 from report_analyst.models.source_tag import SourceTag
-from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept, TaxonomyOption
+from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept, TaxonomyIdentifier, TaxonomyOption
 
 NAMESPACE = "https://example.org/esrs"
 XHTML = "{http://www.w3.org/1999/xhtml}"
 IX = "{http://www.xbrl.org/2013/inlineXBRL}"
+XBRLI = "{http://www.xbrl.org/2003/instance}"
+XBRLDI = "{http://xbrl.org/2006/xbrldi}"
 
 
-def concept(kind, data_type, name="Concept", label="Concept", options=()):
+def concept(kind, data_type, name="Concept", label="Concept", options=(), identifier=None):
     return TaxonomyConcept(
-        name=f"esrs:{name}", label=label, kind=kind, data_type=data_type, period_type="duration", options=list(options)
+        name=f"esrs:{name}",
+        label=label,
+        kind=kind,
+        data_type=data_type,
+        period_type="duration",
+        options=list(options),
+        identifier=identifier,
     )
 
 
@@ -24,19 +32,32 @@ CONSOLIDATED = concept("yes/no", "xbrli:booleanItemType", "Consolidated")
 GROUPS = concept("menu", "enum2:enumerationSetItemType", "Groups", options=[TaxonomyOption(name="esrs:A", label="A")])
 POLICY = concept("narrative", "dtr-types:textBlockItemType", "Policy")
 SUBSTANCE = concept("text", "xbrli:stringItemType")
+POLICY_NAME = concept(
+    "text",
+    "xbrli:stringItemType",
+    "PolicyName",
+    identifier=TaxonomyIdentifier(dimension="esrs:PolicyAxis", label="Identifier of policy(ies)", element="esrs:TYP"),
+)
 TAXONOMY = Taxonomy(
     identifier="https://example.org/build",
     name="Sample ESRS Taxonomy",
     version="2026-08-30",
     entry_point="https://example.org/esrs.xsd",
     namespaces={"esrs": NAMESPACE},
-    concepts=[EMISSIONS, CONSOLIDATED, GROUPS, POLICY],
+    concepts=[EMISSIONS, CONSOLIDATED, GROUPS, POLICY, POLICY_NAME],
 )
 
 
-def tag(value, id="1", concept="esrs:Concept", source_id="source-1", unit=None, decimals=None):
+def tag(value, id="1", concept="esrs:Concept", source_id="source-1", unit=None, decimals=None, identifier=None):
     return SourceTag(
-        id=id, source_id=source_id, document_id="document-hash", concept=concept, value=value, unit=unit, decimals=decimals
+        id=id,
+        source_id=source_id,
+        document_id="document-hash",
+        concept=concept,
+        value=value,
+        unit=unit,
+        decimals=decimals,
+        identifier=identifier,
     )
 
 
@@ -204,3 +225,13 @@ def test_report_links_to_the_taxonomy_and_holds_the_contexts_and_units():
         "instant",
     }
     assert [unit.get("id") for unit in header.iter("{http://www.xbrl.org/2003/instance}unit")] == ["tCO2e"]
+
+
+def test_inline_report_has_the_identifier_context():
+    root, _ = report(
+        [tag("Climate policy", concept="esrs:PolicyName", identifier="P1")], [source("Our Climate policy covers all sites.")]
+    )
+
+    context = root.find(f".//{XBRLI}context[@id='duration-1']")
+    assert context.find(f".//{XBRLDI}typedMember/{{{NAMESPACE}}}TYP").text == "P1"
+    assert root.find(f".//{IX}nonNumeric").get("contextRef") == "duration-1"
