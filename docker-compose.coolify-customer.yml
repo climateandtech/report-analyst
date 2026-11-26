@@ -29,12 +29,19 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      REPORT_ANALYST_RUNTIME: ${REPORT_ANALYST_RUNTIME:-core}
+      # Actwyser NH-Analyse: enterprise enables :8001 question-set push API (docs/QUESTIONSET-ADMIN-API.md).
+      REPORT_ANALYST_RUNTIME: ${REPORT_ANALYST_RUNTIME:-enterprise}
+      USE_NATS_WORKER: ${USE_NATS_WORKER:-false}
       STORAGE_PATH: /app/storage
+      QUESTIONSETS_JWT_HMAC_SECRET: ${QUESTIONSETS_JWT_HMAC_SECRET:-}
+      QUESTIONSETS_JWT_PUBLIC_JWK: ${QUESTIONSETS_JWT_PUBLIC_JWK:-}
+      QUESTIONSETS_JWT_ISSUERS: ${QUESTIONSETS_JWT_ISSUERS:-}
+      QUESTIONSETS_JWT_AUDIENCE: ${QUESTIONSETS_JWT_AUDIENCE:-report-analyst-questionset-admin}
     volumes:
       - storage-data:/app/storage
     expose:
       - "8080"
+      - "8001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/_stcore/health"]
       interval: 30s

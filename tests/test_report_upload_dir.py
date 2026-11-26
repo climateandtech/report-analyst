@@ -1,5 +1,8 @@
 """Tests for report PDF upload directory resolution."""
 
+from pathlib import Path
+from unittest.mock import Mock
+
 import pytest
 
 from report_analyst.core.report_data_client import ReportDataClient
@@ -101,3 +104,33 @@ def test_report_data_client_lists_pdfs_under_storage_uploads(tmp_path, monkeypat
     names = [r.name for r in ReportDataClient().list_reports()]
 
     assert "report.pdf" in names
+
+
+def test_save_uploaded_file_writes_storage_uploads(tmp_path, monkeypatch):
+    """A local upload lands in the folder report history reads."""
+    from report_analyst.streamlit_app import save_uploaded_file
+
+    storage = tmp_path / "storage"
+    monkeypatch.setenv("STORAGE_PATH", str(storage))
+
+    class _Session(dict):
+        def __getattr__(self, name):
+            try:
+                return self[name]
+            except KeyError as exc:
+                raise AttributeError(name) from exc
+
+        def __setattr__(self, name, value):
+            self[name] = value
+
+    uploaded = Mock()
+    uploaded.name = "annual.pdf"
+    uploaded.getbuffer = Mock(return_value=b"%PDF-1.4\n")
+
+    monkeypatch.setattr("report_analyst.streamlit_app.st.session_state", _Session())
+
+    saved = save_uploaded_file(uploaded)
+
+    assert saved is not None
+    assert Path(saved) == (storage / "uploads" / "annual.pdf").resolve()
+    assert Path(saved).read_bytes() == b"%PDF-1.4\n"
