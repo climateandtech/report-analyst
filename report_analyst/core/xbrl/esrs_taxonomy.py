@@ -31,7 +31,8 @@ LINKBASE_KINDS = {
 }
 STANDARD_LABEL = "http://www.xbrl.org/2003/role/label"
 DOMAIN_MEMBER = "http://xbrl.org/int/dim/arcrole/domain-member"
-# A table: its concepts, its dimensions, and the dimensions that have a default and can be left out.
+# How the taxonomy describes a table: the concepts in it, its dimensions, and the dimensions with a default,
+# which a fact can leave out.
 ALL = "http://xbrl.org/int/dim/arcrole/all"
 HYPERCUBE_DIMENSION = "http://xbrl.org/int/dim/arcrole/hypercube-dimension"
 DIMENSION_DEFAULT = "http://xbrl.org/int/dim/arcrole/dimension-default"
@@ -331,7 +332,7 @@ class _Dts:
         [dimension, *others] = frozenset().union(*needed_per_table)
         domain = self.elements[dimension].element.get(f"{XBRLDT}typedDomainRef")
         if others or domain is None:
-            raise TaxonomyUnavailableError(f"{concept.qname} needs a dimension this loader does not support yet.")
+            raise TaxonomyUnavailableError(f"{concept.qname} needs a dimension that the app does not support yet.")
         return TaxonomyIdentifier(
             dimension=self.elements[dimension].qname,
             label=label(dimension),

@@ -162,7 +162,7 @@ def test_two_tags_with_the_same_identifier_get_a_context_each():
     assert [identifier_in(contexts(root)[id]) for id in ("duration-7g", "duration-8h")] == [("esrs:PolicyAxis", "P1")] * 2
 
 
-def test_identifier_is_escaped():
+def test_identifier_with_markup_characters_reads_back_unchanged():
     root = report([tag("7g", "PolicyName", "Climate policy", identifier="P&1 <a>")])
 
     assert identifier_in(contexts(root)["duration-7g"]) == ("esrs:PolicyAxis", "P&1 <a>")

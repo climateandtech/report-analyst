@@ -22,6 +22,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # SQLite can only drop a column by copying the table, which batch mode does.
-    with op.batch_alter_table("source_tags") as table:
-        table.drop_column("identifier")
+    op.drop_column("source_tags", "identifier")

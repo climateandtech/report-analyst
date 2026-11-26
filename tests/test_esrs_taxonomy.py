@@ -60,7 +60,7 @@ PRESENTATION = {"role-210800": ("EmissionsHeader", ["Scope1", "PolicyTextBlock",
 
 # The gas options, out of order on purpose: options follow the order attribute.
 # The emissions table has a gas dimension with a default, so its concepts need no identifier.
-# The policy table has a typed dimension without one, so a concept only in that table needs an identifier.
+# The policy table has a typed dimension with no default, so a concept only in that table needs an identifier.
 DEFINITION = {
     "role-999": [("domain-member", "GasMember", "Ch4Member", 2), ("domain-member", "GasMember", "Co2Member", 1)],
     "role-998": [
@@ -267,7 +267,7 @@ def test_concept_that_needs_a_list_dimension_is_reported(tmp_path):
     elements = {**ELEMENTS, "PolicyAxis": ELEMENTS["GasAxis"]}
 
     with pytest.raises(
-        TaxonomyUnavailableError, match="esrs:PolicyTextBlock needs a dimension this loader does not support yet"
+        TaxonomyUnavailableError, match="esrs:PolicyTextBlock needs a dimension that the app does not support yet"
     ):
         load_esrs_taxonomy(write_package(tmp_path, elements=elements))
 
