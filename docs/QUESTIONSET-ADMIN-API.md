@@ -40,8 +40,21 @@ Contract: [`docs/contracts/questionset-document.v1.schema.json`](contracts/quest
 
 `GET /admin/question-sets/schema` — returns the JSON Schema (requires JWT).
 
-## Actwyser
+## Actwyser (Coolify compose)
 
-1. Deploy branch with enterprise runtime and expose `8001`.
-2. Set JWT verify env on Coolify; keep `STORAGE_PATH=/app/storage` volume.
-3. POST NH-Analyse off-repo; refresh Streamlit and select the new framework.
+In Coolify **Domains**, two services (internal port = container port):
+
+| Service | Domain | Internal port |
+|---------|--------|----------------|
+| `report-analyst-auth` | `https://<uuid>.<ip>.sslip.io` | **8080** |
+| `report-analyst` | `https://<uuid>-api.<ip>.sslip.io` | **8001** |
+
+Ops mirror in `coolify-provisioning` (`.env` + `.env.report-analyst` + `.env.customer.actwyser`):
+
+- `REPORT_ANALYST_CUSTOMER_ACTWYSER_API_DOMAIN` — browser base for POST (no basic auth)
+- `./scripts/set_compose_customer_enterprise_domains.py --customer actwyser --deploy`
+
+1. `REPORT_ANALYST_RUNTIME=enterprise`, JWT envs, persistent `STORAGE_PATH`.
+2. Redeploy after domain + git changes (`feature/docker-coolify-customer-deploy`).
+3. `curl -fsS "${REPORT_ANALYST_CUSTOMER_ACTWYSER_API_DOMAIN}/health"` → `ok`
+4. POST NH-Analyse; refresh Streamlit and select the new framework.
