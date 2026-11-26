@@ -118,7 +118,7 @@ def document_to_question_set(set_id: str, document: Dict[str, Any]):
     from report_analyst.core.question_loader import QuestionSet
 
     questions = {}
-    for idx, q in enumerate(document.get("questions") or []):
+    for q in document.get("questions") or []:
         q_id = q.get("id", "")
         if q_id:
             questions[q_id] = {

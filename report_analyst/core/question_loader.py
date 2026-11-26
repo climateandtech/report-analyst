@@ -89,10 +89,12 @@ class QuestionSetLoader:
 
     def _load_installed_db(self) -> Dict[str, QuestionSet]:
         try:
+            from sqlalchemy.exc import SQLAlchemyError
+
             from report_analyst.core.installed_questionsets import load_installed_question_sets
 
             return load_installed_question_sets()
-        except Exception as e:
+        except (ImportError, OSError, SQLAlchemyError) as e:
             logger.warning("[QUESTION_LOADER] Could not load installed question sets: %s", e)
             return {}
 

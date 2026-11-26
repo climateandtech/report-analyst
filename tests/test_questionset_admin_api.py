@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("REPORT_ANALYST_RUNTIME", "enterprise")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
-SECRET = "test-questionset-admin-secret"
+TEST_JWT_SIGNING_KEY = "test-questionset-admin-secret"
 ISSUER = "test-issuer"
 AUDIENCE = "report-analyst-questionset-admin"
 
@@ -30,7 +30,7 @@ def admin_env(tmp_path, monkeypatch):
     (storage / "cache").mkdir()
     monkeypatch.setenv("STORAGE_PATH", str(storage))
     monkeypatch.setenv("REPORT_ANALYST_RUNTIME", "enterprise")
-    monkeypatch.setenv("QUESTIONSETS_JWT_HMAC_SECRET", SECRET)
+    monkeypatch.setenv("QUESTIONSETS_JWT_HMAC_SECRET", TEST_JWT_SIGNING_KEY)
     monkeypatch.setenv("QUESTIONSETS_JWT_ISSUERS", ISSUER)
     monkeypatch.setenv("QUESTIONSETS_JWT_AUDIENCE", AUDIENCE)
     monkeypatch.delenv("DATABASE_URL", raising=False)
@@ -52,7 +52,7 @@ def _mint_token(*, jti: str | None = None, scope: str = "questionset:write") -> 
         "jti": jti or str(uuid.uuid4()),
         "scope": scope,
     }
-    return jwt.encode({"alg": "HS256"}, claims, OctKey.import_key(SECRET))
+    return jwt.encode({"alg": "HS256"}, claims, OctKey.import_key(TEST_JWT_SIGNING_KEY))
 
 
 @pytest.fixture
@@ -69,6 +69,30 @@ MINIMAL_SET = {
     "description": "From pytest",
     "questions": [{"id": "q1", "text": "What is the scope?", "guidelines": ""}],
 }
+
+
+def test_install_question_set_upsert_updates_existing(client):
+    token1 = _mint_token()
+    token2 = _mint_token()
+    set_id = "pytest-upsert"
+    headers = {"Content-Type": "application/yaml"}
+    first = client.post(
+        f"/admin/question-sets?set_id={set_id}",
+        content=yaml.dump(MINIMAL_SET),
+        headers={**headers, "Authorization": f"Bearer {token1}"},
+    )
+    assert first.status_code == 200
+    updated = {**MINIMAL_SET, "name": "Updated name", "documents": ["Annual report"]}
+    second = client.post(
+        f"/admin/question-sets?set_id={set_id}",
+        content=yaml.dump(updated),
+        headers={**headers, "Authorization": f"Bearer {token2}"},
+    )
+    assert second.status_code == 200
+    from report_analyst.core.question_loader import get_question_loader
+
+    get_question_loader().reload()
+    assert get_question_loader().get_question_set_info()[set_id]["name"] == "Updated name"
 
 
 def test_install_question_set_appears_in_loader(client):
