@@ -36,9 +36,10 @@ def display_source_tagging(concept: TaxonomyConcept, sources: list[dict], cache_
             entered, unit, decimals = _number_inputs(concept, key)
         else:
             entered, unit, decimals = _value_input(concept, source, key), None, None
+        identifier = _identifier_input(concept, key)
         submitted = st.form_submit_button("Save tag")
     if submitted:
-        _save(concept, source, entered, unit, decimals, cache_manager)
+        _save(concept, source, entered, unit, decimals, identifier, cache_manager)
 
     if source["tags"]:
         st.markdown("Tags on this source  \n" + "\n".join(f"- {tag['text']}" for tag in source["tags"]))
@@ -61,6 +62,16 @@ def _value_input(concept: TaxonomyConcept, source: dict, key: str) -> Any:
     if concept.kind == "date":
         return st.date_input("Value", value=None, key=key)
     return st.text_input("Code" if concept.kind == "menu" else "Value", key=key)
+
+
+def _identifier_input(concept: TaxonomyConcept, key: str) -> str | None:
+    if concept.identifier is None:
+        return None
+    return st.text_input(
+        concept.identifier.label.removesuffix(" [typed axis]"),
+        help="Use the same value for every tag about the same item, such as P1 for one policy.",
+        key=f"{key}_identifier",
+    )
 
 
 def _number_inputs(concept: TaxonomyConcept, key: str) -> tuple[str, str | None, int]:
@@ -86,10 +97,16 @@ def _number_inputs(concept: TaxonomyConcept, key: str) -> tuple[str, str | None,
 
 
 def _save(
-    concept: TaxonomyConcept, source: dict, entered: Any, unit: str | None, decimals: int | None, cache_manager: Any
+    concept: TaxonomyConcept,
+    source: dict,
+    entered: Any,
+    unit: str | None,
+    decimals: int | None,
+    identifier: str | None,
+    cache_manager: Any,
 ) -> None:
     try:
-        cache_manager.save_source_tag(create_tag(concept, source, entered, unit, decimals))
+        cache_manager.save_source_tag(create_tag(concept, source, entered, unit, decimals, identifier))
     except InvalidTagError as error:
         st.error(str(error))
     except SQLAlchemyError:
@@ -126,7 +143,8 @@ def _tag_text(tag: SourceTag, concept: TaxonomyConcept | None) -> str:
     else:
         value = _short(tag.value)
     unit = f" {tag.unit}" if tag.unit and tag.unit != PURE else ""
-    return f"{concept.label if concept else tag.concept}: {value}{unit}"
+    identifier = f" ({tag.identifier})" if tag.identifier else ""
+    return f"{concept.label if concept else tag.concept}: {value}{unit}{identifier}"
 
 
 def _short(text: str) -> str:
