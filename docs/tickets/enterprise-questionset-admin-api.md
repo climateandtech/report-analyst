@@ -16,3 +16,13 @@
 - An **enterprise** operator can use the **API** to push a question set to a **deployed** instance.
 - The pushed set appears in the app’s **question set** selection alongside built-in frameworks.
 - Pushed sets **survive redeploy** when the instance uses normal persistent storage (not ephemeral disk-only installs).
+
+## Local CI parity
+
+```bash
+./scripts/ci-parity.sh before-push   # packaging tests + pip in python:3.12-slim
+./scripts/ci-parity.sh pytest        # full suite (CI test job)
+./scripts/ci-parity.sh docker-build  # optional
+```
+
+Full QG runs `tests/test_dockerfile_packaging.py`; set `QG_CI_PARITY=1` (or change `Dockerfile` / `requirements*.txt`) to run slim deps inside QG.
