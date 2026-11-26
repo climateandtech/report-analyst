@@ -114,9 +114,49 @@ chunk_relevance = Table(
 # Indexes (defined separately for clarity)
 # Note: SQLAlchemy doesn't support "IF NOT EXISTS" in CREATE INDEX directly,
 # so we'll handle these in init_db() using raw SQL
+# Installed question sets (enterprise admin API push)
+installed_question_sets = Table(
+    "installed_question_sets",
+    metadata,
+    Column("set_id", Text, primary_key=True),
+    Column("name", Text, nullable=False),
+    Column("description", Text, nullable=False),
+    Column("shortcut", Text, nullable=True),
+    Column("documents_json", Text, nullable=True),
+    Column("analysis_guidelines", Text, nullable=True),
+    Column("schema_version", Text, nullable=False, default="v1"),
+    Column("installed_at", DateTime, default=datetime.now),
+    Column("updated_at", DateTime, default=datetime.now, onupdate=datetime.now),
+)
+
+installed_question_set_items = Table(
+    "installed_question_set_items",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column(
+        "set_id",
+        Text,
+        ForeignKey("installed_question_sets.set_id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("question_id", Text, nullable=False),
+    Column("text", Text, nullable=False),
+    Column("guidelines", Text, nullable=False, default=""),
+    Column("sort_order", Integer, nullable=False, default=0),
+    UniqueConstraint("set_id", "question_id"),
+)
+
+questionset_admin_jti = Table(
+    "questionset_admin_jti",
+    metadata,
+    Column("jti", Text, primary_key=True),
+    Column("expires_at", DateTime, nullable=False),
+)
+
 indexes = [
     # Index on file_path for document_chunks
     "CREATE INDEX IF NOT EXISTS idx_file_path ON document_chunks(file_path)",
     # Index on chunk parameters
     "CREATE INDEX IF NOT EXISTS idx_chunk_params ON document_chunks(chunk_size, chunk_overlap)",
+    "CREATE INDEX IF NOT EXISTS idx_installed_question_set_items_set_id ON installed_question_set_items(set_id)",
 ]
