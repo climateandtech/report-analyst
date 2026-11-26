@@ -12,6 +12,7 @@ from report_analyst.core.xbrl.xbrl_report import (
     contexts,
     fact_attributes,
     fact_value,
+    is_escaped,
     namespace_declarations,
     schema_ref,
     units,
@@ -21,7 +22,7 @@ from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
 
 XHTML = "http://www.w3.org/1999/xhtml"
 IX = "http://www.xbrl.org/2013/inlineXBRL"
-IXT = "http://www.xbrl.org/inlineXBRL/transformation/2020-02-12"
+IXT = "http://www.xbrl.org/inlineXBRL/transformation/2022-02-16"
 # How reports write numbers, by the iXBRL format that reads them: the thousands separators, then the decimal mark.
 NUMBER_FORMATS = {
     "ixt:num-dot-decimal": (("", ",", " ", "\xa0"), "."),
@@ -160,4 +161,6 @@ def _fact_element(tag: SourceTag, concept: TaxonomyConcept, mark: Mark | None = 
     if concept.kind == "number" and tag.value.startswith("-"):
         # iXBRL writes a number without its minus sign and marks it as negative.
         attributes += ' sign="-"'
+    if is_escaped(tag, concept):
+        attributes += ' escape="true"'
     return f"<{name} {attributes}>", f"</{name}>"

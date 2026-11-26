@@ -44,7 +44,7 @@ TAXONOMY = Taxonomy(
     version="2026-08-30",
     entry_point="https://example.org/esrs.xsd",
     namespaces={"esrs": NAMESPACE},
-    concepts=[EMISSIONS, CONSOLIDATED, GROUPS, POLICY, POLICY_NAME],
+    concepts=[EMISSIONS, CONSOLIDATED, GROUPS, POLICY, SUBSTANCE, POLICY_NAME],
 )
 
 
@@ -200,6 +200,29 @@ def test_passage_text_is_escaped():
     root, _ = report([tag(passage, concept="esrs:Policy")], [source(passage)])
 
     assert "".join(paragraphs(root)[0].itertext()) == passage
+
+
+@pytest.mark.parametrize(
+    ("value", "concept", "escape"),
+    [
+        ("Covers all sites", "esrs:Policy", "true"),
+        ("R&D", "esrs:Concept", "true"),
+        ("Below <5 %", "esrs:Concept", "true"),
+        ("Lead", "esrs:Concept", None),
+    ],
+    ids=["text block", "text with &", "text with <", "other text"],
+)
+def test_text_blocks_and_text_with_markup_characters_are_escaped(value, concept, escape):
+    root, _ = report([tag(value, concept=concept)], [source(f"{value}.")])
+
+    assert root.find(f".//{IX}nonNumeric").get("escape") == escape
+
+
+def test_report_uses_transformation_registry_5():
+    xhtml, _ = inline_report([], [], TAXONOMY, "529900T8BM49AURSDO55", date(2025, 1, 1), date(2025, 12, 31))
+
+    # ESEF requires it from its 2025 rules on.
+    assert 'xmlns:ixt="http://www.xbrl.org/inlineXBRL/transformation/2022-02-16"' in xhtml
 
 
 def test_sources_follow_page_order():

@@ -81,6 +81,11 @@ def fact_value(tag: SourceTag, concept: TaxonomyConcept, namespaces: dict[str, s
     return " ".join(_expanded(name, namespaces) for name in tag.value.split()) if concept.options else tag.value
 
 
+def is_escaped(tag: SourceTag, concept: TaxonomyConcept) -> bool:
+    """Whether the fact's value is HTML. ESEF's 2025 rules require it for text blocks and for any value with & or <."""
+    return concept.kind == "narrative" or any(character in tag.value for character in "&<")
+
+
 def _context_id(tag: SourceTag, concept: TaxonomyConcept) -> str:
     """A tag with the identifier its concept needs has its own context, which holds the identifier."""
     if concept.identifier and tag.identifier:
@@ -99,7 +104,11 @@ def _measure(unit: str, concept: TaxonomyConcept) -> str:
 
 
 def _fact(tag: SourceTag, concept: TaxonomyConcept, namespaces: dict[str, str]) -> str:
-    return f"<{concept.name} {fact_attributes(tag, concept)}>{escape(fact_value(tag, concept, namespaces))}</{concept.name}>"
+    value = fact_value(tag, concept, namespaces)
+    # Written as HTML, the same value the iXBRL report gives, then escaped again for XML.
+    if is_escaped(tag, concept):
+        value = escape(value)
+    return f"<{concept.name} {fact_attributes(tag, concept)}>{escape(value)}</{concept.name}>"
 
 
 def _expanded(name: str, namespaces: dict[str, str]) -> str:

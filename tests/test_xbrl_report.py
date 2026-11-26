@@ -33,6 +33,7 @@ TAXONOMY = Taxonomy(
     entry_point="https://example.org/esrs.xsd",
     namespaces={"esrs": NAMESPACE},
     concepts=[
+        concept("Substance", "text", "xbrli:stringItemType"),
         concept("Scope1", "number", "dtr-types:ghgEmissionsItemType"),
         concept("Revenue", "number", "xbrli:monetaryItemType"),
         concept("Share", "number", "dtr-types:percentItemType"),
@@ -129,8 +130,14 @@ def test_menu_options_are_written_with_their_namespace():
     assert facts(report())["tag-4d"].text == f"{NAMESPACE}#A {NAMESPACE}#B"
 
 
-def test_text_is_escaped():
-    assert facts(report())["tag-5e"].text == 'Covers <all> sites & "offices"'
+def test_text_block_is_written_as_html():
+    # Like in the iXBRL report, where a text block's value is the HTML of its passage.
+    assert facts(report())["tag-5e"].text == 'Covers &lt;all&gt; sites &amp; "offices"'
+
+
+@pytest.mark.parametrize(("value", "written"), [("R&D", "R&amp;D"), ("Lead", "Lead")], ids=["text with &", "other text"])
+def test_text_with_markup_characters_is_written_as_html(value, written):
+    assert facts(report([tag("7g", "Substance", value)]))["tag-7g"].text == written
 
 
 def test_tag_with_an_identifier_gets_its_own_context():
