@@ -1472,7 +1472,21 @@ def main():
         # Sync API keys from session state to environment at startup
         APIKeyManager.sync_api_keys_to_env(st.session_state)
 
-        st.set_page_config(page_title="Report Analyst", layout="wide")
+        st.set_page_config(
+            page_title=os.getenv("REPORT_ANALYST_BRAND_NAME", "Report Analyst"),
+            layout="wide",
+        )
+        brand_name = os.getenv("REPORT_ANALYST_BRAND_NAME", "").strip()
+        if brand_name:
+            st.markdown(
+                """
+                <style>
+                [data-testid="stHeader"] { background: #3457B5; }
+                [data-testid="stSidebar"] { border-right: 3px solid #199B69; }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
 
         # Inject Material Icons link tag at the top
         st.markdown(

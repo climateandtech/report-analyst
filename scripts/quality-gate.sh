@@ -91,15 +91,18 @@ for p in "${CHANGED[@]}"; do
 done
 
 if [[ ${#py_files[@]} -gt 0 ]]; then
-  log "=== report-analyst: ruff (changed files) ==="
+  log "=== report-analyst: ruff + black (changed files) ==="
   if ! qg_require_ruff; then
+    exit 2
+  fi
+  if ! qg_require_black; then
     exit 2
   fi
   BASE_REF="$BASE_REF" "$ROOT/scripts/lint-changed.sh" "${py_files[@]}" || FAILED=1
 fi
 
 if [[ "$FAILED" -ne 0 ]]; then
-  log "=== pytest skipped: fix ruff/lint on touched files first ==="
+  log "=== pytest skipped: fix ruff/black on touched files first ==="
 elif [[ "$SKIP_PYTEST" -eq 0 && ${#CHANGED[@]} -gt 0 ]]; then
   ra_py_changes=()
   for p in "${CHANGED[@]}"; do

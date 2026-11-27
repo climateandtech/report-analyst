@@ -144,6 +144,59 @@ qg_require_ruff() {
   return 0
 }
 
+# Populated by qg_resolve_black: e.g. (black) or (python3 -m black)
+QG_BLACK=()
+
+_qg_black_works() {
+  "$@" --version >/dev/null 2>&1
+}
+
+qg_resolve_black() {
+  QG_BLACK=()
+  local root="${ROOT:-.}"
+  local repo_root="${REPO_ROOT:-$(cd "$root/.." && pwd)}"
+
+  if qg_has_cmd black && _qg_black_works black; then
+    QG_BLACK=(black)
+    return 0
+  fi
+
+  local py
+  for py in python3 python; do
+    if qg_has_cmd "$py" && _qg_black_works "$py" -m black; then
+      QG_BLACK=("$py" -m black)
+      return 0
+    fi
+  done
+
+  local candidate
+  for candidate in \
+    "$root/backend/venv/bin/black" \
+    "$root/venv/bin/black" \
+    "$root/.venv/bin/black" \
+    "$repo_root/.venv/bin/black"; do
+    if [[ -x "$candidate" ]] && _qg_black_works "$candidate"; then
+      QG_BLACK=("$candidate")
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+qg_run_black() {
+  qg_resolve_black || return 1
+  "${QG_BLACK[@]}" "$@"
+}
+
+qg_require_black() {
+  if ! qg_resolve_black; then
+    echo "quality-gate: black not available (pip install black)" >&2
+    return 1
+  fi
+  return 0
+}
+
 qg_find_npm() {
   if qg_has_cmd npm; then
     command -v npm

@@ -281,10 +281,19 @@ def test_update_parameters(analyzer):
 
 @pytest.mark.asyncio
 async def test_score_chunk_relevance(analyzer):
-    """Test chunk relevance scoring"""
+    """Test chunk relevance scoring uses achat(messages=...) and returns the model score."""
+    mock_response = Mock()
+    mock_response.message.content = "0.64"
+    analyzer.llm.achat = AsyncMock(return_value=mock_response)
+
     score = await analyzer.score_chunk_relevance("Test question?", "Test chunk content")
-    assert isinstance(score, float)
-    assert 0 <= score <= 1
+    assert score == pytest.approx(0.64)
+    assert analyzer.llm.achat.await_count == 1
+    args, kwargs = analyzer.llm.achat.await_args
+    assert "prompt" not in kwargs
+    messages = args[0] if args else kwargs.get("messages")
+    assert messages is not None
+    assert len(messages) >= 1
 
 
 def test_cache_key_generation(analyzer):
