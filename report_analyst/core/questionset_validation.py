@@ -11,15 +11,11 @@ import jsonschema
 import yaml
 
 SCHEMA_VERSION = "v1"
-_SCHEMA_PATH = (
-    Path(__file__).resolve().parent.parent.parent / "docs" / "contracts" / "questionset-document.v1.schema.json"
-)
+_SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "docs" / "contracts" / "questionset-document.v1.schema.json"
 _SET_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,127}$")
 
 DEFAULT_CLASSIFICATION_SPEC = "exactly one of Yes / No / Unclear / Not disclosed"
-DEFAULT_QUANTITY_SPEC = (
-    "numeric value with unit (tCO2e, %, EUR/t, etc.) or Unclear / Not disclosed if not reported"
-)
+DEFAULT_QUANTITY_SPEC = "numeric value with unit (tCO2e, %, EUR/t, etc.) or Unclear / Not disclosed if not reported"
 
 _MAX_BODY_BYTES = 10 * 1024 * 1024
 
@@ -31,9 +27,7 @@ def load_v1_schema() -> Dict[str, Any]:
 
 def validate_set_id(set_id: str) -> None:
     if not _SET_ID_RE.match(set_id):
-        raise ValueError(
-            "set_id must match ^[a-z0-9][a-z0-9_-]{0,127}$ (lowercase slug for framework id)"
-        )
+        raise ValueError("set_id must match ^[a-z0-9][a-z0-9_-]{0,127}$ (lowercase slug for framework id)")
 
 
 def parse_body(raw: bytes, content_type: str | None) -> Dict[str, Any]:

@@ -256,4 +256,3 @@ def test_answer_type_normalization(client):
     get_question_loader().reload()
     guidelines = get_question_loader().get_questions("pytest-typed")["t1"]["guidelines"]
     assert has_typed_answer(guidelines)
-

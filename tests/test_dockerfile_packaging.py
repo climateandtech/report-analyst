@@ -38,9 +38,9 @@ def test_dockerfile_copies_contracts_for_admin_api():
     assert DOCKERFILE.is_file()
     text = DOCKERFILE.read_text(encoding="utf-8")
     copies = _dockerfile_copy_sources(text)
-    assert any(c.startswith("docs/contracts") for c in copies), (
-        "Dockerfile must COPY docs/contracts/ — load_v1_schema() breaks in production image"
-    )
+    assert any(
+        c.startswith("docs/contracts") for c in copies
+    ), "Dockerfile must COPY docs/contracts/ — load_v1_schema() breaks in production image"
 
 
 def test_dockerfile_copies_enterprise_runtime():

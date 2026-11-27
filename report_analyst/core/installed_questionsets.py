@@ -68,10 +68,7 @@ def load_installed_question_sets() -> Dict[str, QuestionSet]:
                 "description": row.description or "",
                 "shortcut": row.shortcut or set_id,
                 "analysis_guidelines": row.analysis_guidelines or "",
-                "questions": [
-                    {"id": i.question_id, "text": i.text, "guidelines": i.guidelines or ""}
-                    for i in items
-                ],
+                "questions": [{"id": i.question_id, "text": i.text, "guidelines": i.guidelines or ""} for i in items],
             }
             if row.documents_json:
                 try:
@@ -90,12 +87,8 @@ def upsert_installed_question_set(set_id: str, document: Dict[str, Any]) -> None
     if document.get("documents"):
         docs_json = json.dumps(document["documents"])
     with db.get_connection() as conn:
-        conn.execute(
-            delete(installed_question_set_items).where(installed_question_set_items.c.set_id == set_id)
-        )
-        existing = conn.execute(
-            select(installed_question_sets).where(installed_question_sets.c.set_id == set_id)
-        ).fetchone()
+        conn.execute(delete(installed_question_set_items).where(installed_question_set_items.c.set_id == set_id))
+        existing = conn.execute(select(installed_question_sets).where(installed_question_sets.c.set_id == set_id)).fetchone()
         if existing:
             conn.execute(
                 update(installed_question_sets)
@@ -142,9 +135,7 @@ def record_jti(jti: str, expires_at: datetime) -> bool:
     db = _database_manager()
     with db.get_connection() as conn:
         _prune_expired_jtis(conn)
-        existing = conn.execute(
-            select(questionset_admin_jti).where(questionset_admin_jti.c.jti == jti)
-        ).fetchone()
+        existing = conn.execute(select(questionset_admin_jti).where(questionset_admin_jti.c.jti == jti)).fetchone()
         if existing:
             return False
         conn.execute(insert(questionset_admin_jti).values(jti=jti, expires_at=expires_at))
