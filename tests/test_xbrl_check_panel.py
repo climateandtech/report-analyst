@@ -127,11 +127,19 @@ def test_panel_checks_the_known_tags_and_shows_the_result(check):
     assert app.caption[1].value == "Could not load nace-codes.xsd"
 
 
-def test_panel_checks_the_inline_report(check):
+def test_panel_checks_both_files(check):
     submit(run_panel())
 
-    report, _ = check.call_args.args
-    assert "<ix:nonNumeric" in report and 'id="tag-1"' in report
+    reports = [call.args[0] for call in check.call_args_list]
+    assert ["<ix:nonNumeric" in report for report in reports] == [True, False]
+
+
+def test_panel_shows_a_problem_found_in_both_files_once(check):
+    check.return_value = [XbrlProblem(None, "Could not load nace-codes.xsd")]
+
+    app = submit(run_panel())
+
+    assert "itself (1)" in app.caption[0].value
 
 
 def test_panel_lists_values_written_below_their_passage(check):

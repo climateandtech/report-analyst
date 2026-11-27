@@ -46,21 +46,18 @@ def display_xbrl_check(tags: list[SourceTag], sources: list[dict], report_name: 
         known = [tag for tag in tags if tag.concept in concepts]
         lei = lei.strip()
         ixbrl_file, written_below = inline_report(known, sources, taxonomy, lei, start, end)
+        xbrl_file = xbrl_report(known, taxonomy, lei, start, end)
         with st.spinner("Checking with Arelle..."):
-            problems = check_xbrl(ixbrl_file, os.environ[TAXONOMY_PATH_ENV])
+            # Both files are checked, so both downloads are covered. A problem found in both is shown once.
+            package = os.environ[TAXONOMY_PATH_ENV]
+            problems = list(dict.fromkeys(check_xbrl(ixbrl_file, package) + check_xbrl(xbrl_file, package)))
         _show(problems, known, len(tags) - len(known), sources, written_below)
         # A download leaves the page as it is, so the check result stays.
         ixbrl_column, xbrl_column = st.columns(2)
         ixbrl_column.download_button(
             "Download iXBRL", ixbrl_file, f"{report_name}.xhtml", "application/xhtml+xml", on_click="ignore"
         )
-        xbrl_column.download_button(
-            "Download XBRL",
-            xbrl_report(known, taxonomy, lei, start, end),
-            f"{report_name}.xbrl",
-            "application/xml",
-            on_click="ignore",
-        )
+        xbrl_column.download_button("Download XBRL", xbrl_file, f"{report_name}.xbrl", "application/xml", on_click="ignore")
 
 
 def _show(
