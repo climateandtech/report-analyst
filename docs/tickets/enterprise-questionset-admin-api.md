@@ -26,3 +26,9 @@
 ```
 
 Full QG runs `tests/test_dockerfile_packaging.py`; set `QG_CI_PARITY=1` (or change `Dockerfile` / `requirements*.txt`) to run slim deps inside QG.
+
+### Why `main` is green but your PR is red
+
+`main` stays green because it does not contain your branch’s files yet. CI on the PR applies **repo-wide** `black --check .` and full pytest (including `tests/test_linting.py`). Unformatted or new code in **your diff** fails those checks — that is correct post-merge behavior, not a regression on `main`.
+
+Session **quality gate** is intentionally narrower (ruff + affected pytest on paths you touched vs `BASE_REF`) so parallel agents do not fix each other’s unrelated dirty files. That scope is **not** the same as CI `lint` / full `test`. Local QG green + CI red on the same branch is expected until you run CI-shaped checks (`black --check .`, `./scripts/ci-parity.sh pytest`) before push.

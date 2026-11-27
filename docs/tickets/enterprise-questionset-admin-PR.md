@@ -26,7 +26,7 @@ Closes #203.
 QG_CI_PARITY=1 ./scripts/quality-gate.sh full
 ```
 
-Why: QG affected-pytest and CI’s `quality-gate` job did not run slim Docker `pip install` or validate Dockerfile `COPY` paths (Actwyser failures: pillow resolver, missing schema in image).
+**QG vs CI:** Session QG scopes to your diff (ruff + affected pytest) so multi-agent sessions do not churn unrelated files. CI `lint` / `test` are repo-wide (black, full pytest). PR failures on new files do not mean `main` broke. Coolify gaps: slim `pip install` and Dockerfile `COPY` (see `ci-parity.sh`).
 
 ## Test plan
 
