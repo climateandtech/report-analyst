@@ -10,11 +10,14 @@ Related: even when scores existed, `_analyze_chunks` did not pass them into the 
 prompt (`computed_score` / `relevance_score`), and candidates were not re-ordered by
 LLM score after embedding retrieval.
 
+Failed scoring must return `None` (not `0.0`) and keep embedding order — that is the
+embedding path, not a silent all-zeros LLM ranking the user has to second-guess.
+
 ## Coverage
 
 | Tier | File | What it asserts |
 | --- | --- | --- |
-| Unit | `tests/test_llm_chunk_scoring.py` | Messages-only LLM stub; scoring returns model values; answer prompt shows `llm_score` |
+| Unit | `tests/test_llm_chunk_scoring.py` | Messages-only LLM stub; scoring returns model values; answer prompt shows `llm_score`; failure → `None` + embedding order |
 | Unit | `tests/test_analyzer.py::test_score_chunk_relevance` | `achat` called without `prompt=` |
 | Functional | `tests/test_llm_chunk_scoring_functional.py` | `process_document(..., use_llm_scoring=True)` yields non-zero scores and re-ranks the numeric target chunk first |
 

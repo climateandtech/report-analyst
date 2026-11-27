@@ -416,8 +416,12 @@ class DocumentAnalyzer:
             ChatMessage(role=MessageRole.USER, content=user_content),
         ]
 
-    async def score_chunk_relevance(self, question: str, chunk_text: str) -> float:
-        """Score the relevance of a chunk to a question using LLM."""
+    async def score_chunk_relevance(self, question: str, chunk_text: str) -> Optional[float]:
+        """Score the relevance of a chunk to a question using LLM.
+
+        Returns None when scoring fails so callers stay on the embedding path
+        instead of inventing a real 0.0 usefulness judgment.
+        """
         if not self.use_cache:
             Settings.ingestion_cache = None
 
@@ -435,10 +439,15 @@ class DocumentAnalyzer:
 
         except Exception as e:  # noqa: BLE001
             logger.error(f"[ANALYSIS] Error scoring chunk relevance: {e!s}")
-            return 0.0
+            return None
 
-    async def score_chunk_relevance_batch(self, question: str, chunks: List[Dict], single_call: bool = True) -> List[float]:
+    async def score_chunk_relevance_batch(
+        self, question: str, chunks: List[Dict], single_call: bool = True
+    ) -> List[Optional[float]]:
         """Score a batch of chunks using LLM.
+
+        Failed scoring returns None per chunk (not 0.0) so the run stays on the
+        clear embedding path rather than looking like every chunk scored useless.
 
         Args:
             question: The question being analyzed
@@ -460,18 +469,36 @@ class DocumentAnalyzer:
                     return self._parse_relevance_scores(response.message.content, expected=len(chunks))
                 except Exception as e:  # noqa: BLE001
                     logger.error(f"[ANALYSIS] Error parsing batch scores: {e!s}")
-                    return [0.0] * len(chunks)
+                    return [None] * len(chunks)
 
-            scores = []
+            scores: List[Optional[float]] = []
             for i, chunk in enumerate(chunks):
                 score = await self.score_chunk_relevance(question, chunk["text"])
                 scores.append(score)
-                logger.debug(f"[ANALYSIS] Scored chunk {i + 1}/{len(chunks)}: {score:.2f}")
+                logger.debug(f"[ANALYSIS] Scored chunk {i + 1}/{len(chunks)}: {score}")
             return scores
 
         except Exception as e:  # noqa: BLE001
             logger.error(f"[ANALYSIS] Error in batch scoring: {e!s}")
-            return [0.0] * len(chunks)
+            return [None] * len(chunks)
+
+    def _apply_llm_scores_to_chunks(
+        self, chunks: List[Dict[str, Any]], llm_scores: List[Optional[float]]
+    ) -> List[Dict[str, Any]]:
+        """Attach scores and re-order only when every chunk got a real score.
+
+        Missing/failed scores stay None and embedding order is preserved — that is
+        the embedding path, not a silent all-zeros LLM ranking.
+        """
+        for i, chunk in enumerate(chunks):
+            chunk["llm_score"] = llm_scores[i] if i < len(llm_scores) else None
+
+        if chunks and all(c.get("llm_score") is not None for c in chunks):
+            chunks.sort(key=lambda c: float(c["llm_score"]), reverse=True)
+            logger.info(f"[ANALYSIS] Re-ordered {len(chunks)} chunks by LLM score")
+        else:
+            logger.warning("[ANALYSIS] LLM scoring produced no usable scores; keeping embedding order")
+        return chunks
 
     def _load_cached_answers(self, file_path: str) -> Dict:
         """Load cached answers for a file with exact configuration match"""
@@ -707,32 +734,24 @@ class DocumentAnalyzer:
                                 similar_chunks,
                                 single_call=single_call,
                             )
-
-                            # Apply LLM scores to chunks
-                            for i, chunk in enumerate(similar_chunks):
-                                if i < len(llm_scores):
-                                    chunk["llm_score"] = llm_scores[i]
-                                    logger.debug(f"Applied LLM score {llm_scores[i]:.3f} to chunk {i + 1}")
-                                else:
-                                    chunk["llm_score"] = 0.0
-                                    logger.warning(f"No LLM score available for chunk {i + 1}")
-
-                            # Re-order by LLM relevance so answer evidence indices follow usefulness,
-                            # not only embedding similarity (embedding top-k is still the candidate pool).
-                            similar_chunks.sort(
-                                key=lambda c: float(c.get("llm_score") or 0.0),
-                                reverse=True,
-                            )
-                            logger.info(f"[ANALYSIS] Applied LLM scores to {len(similar_chunks)} chunks")
+                            similar_chunks = self._apply_llm_scores_to_chunks(similar_chunks, llm_scores)
+                            if any(c.get("llm_score") is None for c in similar_chunks):
+                                yield {
+                                    "status": (
+                                        f"LLM scoring unavailable for question {question_number}; " "using embedding order"
+                                    )
+                                }
+                            else:
+                                logger.info(f"[ANALYSIS] Applied LLM scores to {len(similar_chunks)} chunks")
 
                         except Exception as e:
                             logger.error(
                                 f"[ANALYSIS] Error applying LLM scores: {e!s}",
                                 exc_info=True,
                             )
-                            # Set default scores if LLM scoring fails
                             for chunk in similar_chunks:
-                                chunk["llm_score"] = 0.0
+                                chunk["llm_score"] = None
+                            yield {"status": (f"LLM scoring failed for question {question_number}; using embedding order")}
                     else:
                         logger.info(f"[ANALYSIS] LLM scoring disabled for question {question_id}")
                         # Ensure llm_score is set to None when not using LLM scoring

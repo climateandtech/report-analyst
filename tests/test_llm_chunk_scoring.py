@@ -113,8 +113,8 @@ async def test_score_chunk_relevance_batch_sequential_uses_messages(scoring_anal
 
 
 @pytest.mark.asyncio
-async def test_score_chunk_relevance_batch_bad_parse_returns_zeros(scoring_analyzer):
-    """Parse mismatch must soft-fail to zeros, not raise out of batch scoring."""
+async def test_score_chunk_relevance_batch_bad_parse_returns_none(scoring_analyzer):
+    """Hypothesis: parse failure is 'no scores', not 'everything scored 0.0'."""
     scoring_analyzer.llm = MessagesOnlyLLM("not-a-score")
     chunks = [{"text": "a"}, {"text": "b"}]
     scores = await scoring_analyzer.score_chunk_relevance_batch(
@@ -122,7 +122,43 @@ async def test_score_chunk_relevance_batch_bad_parse_returns_zeros(scoring_analy
         chunks,
         single_call=True,
     )
-    assert scores == [0.0, 0.0]
+    assert scores == [None, None]
+
+
+@pytest.mark.asyncio
+async def test_score_chunk_relevance_api_failure_returns_none(scoring_analyzer):
+    """Hypothesis: API failure must not invent a real 0.0 usefulness judgment."""
+
+    class FailingLLM:
+        model = "gpt-4o-mini-test"
+
+        async def achat(self, messages, **kwargs):
+            raise RuntimeError("upstream timeout")
+
+    scoring_analyzer.llm = FailingLLM()
+    score = await scoring_analyzer.score_chunk_relevance("q?", "chunk")
+    assert score is None
+
+
+def test_apply_llm_scores_keeps_embedding_order_when_scoring_fails(scoring_analyzer):
+    """Clear path: scoring failed → llm_score None, keep embedding order, no fake zeros."""
+    chunks = [
+        {"text": "index prose", "score": 0.9, "metadata": {}},
+        {"text": "0.13 intensity", "score": 0.4, "metadata": {}},
+    ]
+    ordered = scoring_analyzer._apply_llm_scores_to_chunks(chunks, [None, None])
+    assert [c["text"] for c in ordered] == ["index prose", "0.13 intensity"]
+    assert all(c["llm_score"] is None for c in ordered)
+
+
+def test_apply_llm_scores_reorders_only_when_scores_are_real(scoring_analyzer):
+    chunks = [
+        {"text": "index prose", "score": 0.9, "metadata": {}},
+        {"text": "0.13 intensity", "score": 0.4, "metadata": {}},
+    ]
+    ordered = scoring_analyzer._apply_llm_scores_to_chunks(chunks, [0.2, 1.0])
+    assert [c["text"] for c in ordered] == ["0.13 intensity", "index prose"]
+    assert [c["llm_score"] for c in ordered] == [1.0, 0.2]
 
 
 def test_parse_relevance_scores_rejects_wrong_count():
@@ -166,8 +202,8 @@ async def test_analyze_chunks_passes_llm_score_into_prompt(scoring_analyzer):
 
 
 @pytest.mark.asyncio
-async def test_analyze_chunks_falls_back_to_similarity_when_llm_score_missing(scoring_analyzer):
-    """With scoring on but no llm_score, prompt uses embedding similarity."""
+async def test_analyze_chunks_uses_embedding_path_when_llm_scores_absent(scoring_analyzer):
+    """Clear embedding path: no llm_score means prompt shows similarity, not 0.000."""
     captured: dict[str, Any] = {}
 
     async def fake_achat(messages, **kwargs):
@@ -182,8 +218,9 @@ async def test_analyze_chunks_falls_back_to_similarity_when_llm_score_missing(sc
     scoring_analyzer.llm.achat = fake_achat
     question = {"text": "What targets?", "guidelines": ""}
     chunks = [
-        {"text": "intensity targets", "score": 0.73, "metadata": {}},
+        {"text": "intensity targets", "score": 0.73, "llm_score": None, "metadata": {}},
     ]
     await scoring_analyzer._analyze_chunks(question, chunks, use_llm_scoring=True)
     content = "\n".join(m.content for m in captured["messages"] if hasattr(m, "content"))
     assert "Relevance Score: 0.730" in content
+    assert "Relevance Score: 0.000" not in content

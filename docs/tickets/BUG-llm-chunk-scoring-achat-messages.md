@@ -10,6 +10,8 @@ With LLM scoring on, each retrieved chunk gets a real score between 0 and 1. Hig
 
 The scorer calls `achat(prompt=...)`, but the client needs `achat(messages=...)`. The error is caught and replaced with `0.0`, so every chunk looks useless. Enabling LLM scoring in the UI does nothing.
 
+Fix: call `achat(messages=...)`. On scoring failure, store `None` (not `0.0`), keep embedding order, and show similarity in the answer prompt — the embedding path, not a fake all-zeros LLM ranking.
+
 Example: on Continental GB 2025 / `tcfd_11`, the intensity targets sit around embedding rank 18. A working scorer would promote them to #1. With this bug they stay buried.
 
 ## Steps to reproduce
