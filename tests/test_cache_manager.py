@@ -6,8 +6,11 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
 
 from report_analyst.core.cache_manager import CacheManager
+from report_analyst.models.source_tag import SourceTag
 
 
 @pytest.fixture(autouse=True)
@@ -32,12 +35,173 @@ def test_init_db(temp_db):
     with sqlite3.connect(temp_db.db_path) as conn:
         cursor = conn.execute("""
             SELECT name FROM sqlite_master
-            WHERE type='table' AND (name='analysis_cache' OR name='document_chunks')
+            WHERE type='table'
+              AND name IN ('analysis_cache', 'document_chunks', 'source_annotations')
         """)
         tables = [row[0] for row in cursor.fetchall()]
 
     assert "analysis_cache" in tables
     assert "document_chunks" in tables
+    assert "source_annotations" in tables
+
+
+SOURCE_ANNOTATION = {
+    "id": "source-1",
+    "document_id": "document-hash",
+    "page": 1,
+    "span_start": 0,
+    "span_end": 8,
+    "selected_text": "Evidence",
+    "rects": [{"x": 10, "y": 20, "width": 50, "height": 12}],
+}
+
+
+def test_save_and_get_source_annotations(temp_db):
+    rects = [
+        {"x": 10.5, "y": 20.25, "width": 100.0, "height": 12.0},
+        {"x": 10.5, "y": 35.25, "width": 65.0, "height": 12.0},
+    ]
+
+    temp_db.save_source_annotation({**SOURCE_ANNOTATION, "rects": rects})
+
+    saved = temp_db.get_source_annotations("document-hash")
+    assert [annotation["selected_text"] for annotation in saved] == ["Evidence"]
+    assert saved[0]["rects"] == rects
+    assert temp_db.get_source_annotations("different-document") == []
+
+
+def test_source_annotations_allow_overlapping_spans(temp_db):
+    temp_db.save_source_annotation({**SOURCE_ANNOTATION, "id": "disclosure", "span_end": 50})
+    temp_db.save_source_annotation({**SOURCE_ANNOTATION, "id": "value", "span_start": 33, "span_end": 40})
+
+    saved = temp_db.get_source_annotations("document-hash")
+    assert [annotation["id"] for annotation in saved] == ["disclosure", "value"]
+
+
+def test_delete_source_annotation_is_scoped_to_its_document(temp_db):
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+
+    temp_db.delete_source_annotation("source-1", "other-document")
+    assert len(temp_db.get_source_annotations("document-hash")) == 1
+
+    temp_db.delete_source_annotation("source-1", "document-hash")
+    assert temp_db.get_source_annotations("document-hash") == []
+
+
+def test_source_annotation_records_when_it_was_created(temp_db):
+    before = datetime.now()
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+    after = datetime.now()
+
+    saved = temp_db.get_source_annotations("document-hash")[0]
+    assert before <= datetime.fromisoformat(saved["created_at"]) <= after
+
+
+def test_source_annotation_ignores_created_at_sent_by_the_browser(temp_db):
+    before = datetime.now()
+
+    temp_db.save_source_annotation({**SOURCE_ANNOTATION, "created_at": "2000-01-01T00:00:00"})
+
+    saved = temp_db.get_source_annotations("document-hash")[0]
+    assert datetime.fromisoformat(saved["created_at"]) >= before
+
+
+def test_source_annotation_id_used_by_another_document_is_rejected(temp_db):
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+
+    with pytest.raises(IntegrityError):
+        temp_db.save_source_annotation({**SOURCE_ANNOTATION, "document_id": "other-document"})
+
+    assert len(temp_db.get_source_annotations("document-hash")) == 1
+    assert temp_db.get_source_annotations("other-document") == []
+
+
+def test_source_annotation_with_an_empty_span_is_rejected(temp_db):
+    with pytest.raises(ValidationError):
+        temp_db.save_source_annotation({**SOURCE_ANNOTATION, "span_start": 8})
+
+
+def test_clear_cache_keeps_source_annotations(temp_db):
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+
+    temp_db.clear_cache("report.pdf")
+    temp_db.clear_cache()
+
+    assert len(temp_db.get_source_annotations("document-hash")) == 1
+
+
+def source_tag(**fields):
+    return SourceTag(
+        **{
+            "id": "tag-1",
+            "source_id": "source-1",
+            "document_id": "document-hash",
+            "concept": "esrs:GrossScope1GreenhouseGasEmissions",
+            "value": "1240",
+            "unit": "tCO2e",
+            "decimals": 0,
+            **fields,
+        }
+    )
+
+
+def test_save_and_get_source_tags(temp_db):
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+    temp_db.save_source_tag(source_tag())
+    temp_db.save_source_tag(source_tag(id="tag-2", concept="esrs:PolicyTextBlock", value="Text", unit=None, decimals=None))
+
+    saved = temp_db.get_source_tags("document-hash")
+
+    assert [(tag.id, tag.value, tag.unit, tag.decimals) for tag in saved] == [
+        ("tag-1", "1240", "tCO2e", 0),
+        ("tag-2", "Text", None, None),
+    ]
+    assert all(tag.created_at for tag in saved)
+    assert temp_db.get_source_tags("other-document") == []
+
+
+def test_a_tag_keeps_its_identifier(temp_db):
+    temp_db.save_source_tag(source_tag(identifier="P1"))
+
+    assert [tag.identifier for tag in temp_db.get_source_tags("document-hash")] == ["P1"]
+
+
+def test_deleting_a_source_deletes_only_its_tags(temp_db):
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+    temp_db.save_source_annotation({**SOURCE_ANNOTATION, "id": "source-2"})
+    temp_db.save_source_tag(source_tag())
+    temp_db.save_source_tag(source_tag(id="tag-2", source_id="source-2"))
+
+    temp_db.delete_source_annotation("source-1", "document-hash")
+
+    assert [tag.id for tag in temp_db.get_source_tags("document-hash")] == ["tag-2"]
+
+
+def test_deleting_a_source_of_another_document_keeps_its_tags(temp_db):
+    temp_db.save_source_annotation(SOURCE_ANNOTATION)
+    temp_db.save_source_tag(source_tag())
+
+    temp_db.delete_source_annotation("source-1", "other-document")
+
+    assert len(temp_db.get_source_tags("document-hash")) == 1
+
+
+def test_delete_source_tag_is_scoped_to_its_document(temp_db):
+    temp_db.save_source_tag(source_tag())
+    temp_db.save_source_tag(source_tag(id="tag-2"))
+
+    temp_db.delete_source_tag("tag-1", "other-document")
+    assert len(temp_db.get_source_tags("document-hash")) == 2
+
+    temp_db.delete_source_tag("tag-1", "document-hash")
+    assert [tag.id for tag in temp_db.get_source_tags("document-hash")] == ["tag-2"]
+
+
+def test_source_tag_needs_decimals_with_its_unit():
+    with pytest.raises(ValidationError):
+        source_tag(decimals=None)
+    with pytest.raises(ValidationError):
+        source_tag(unit=None)
 
 
 def test_save_and_get_analysis(temp_db):

@@ -48,10 +48,12 @@ def pdf_viewer(
     pdf_path: str,
     chunks_data: dict[str, list[dict[str, Any]]],
     questions_data: dict[str, str],
+    document_id: str | None,
     unmapped_chunks: list[dict[str, Any]] | None = None,
+    annotations: list[dict[str, Any]] | None = None,
     key: str | None = None,
     height: int = 800,
-) -> None:
+) -> dict[str, Any] | None:
     pdf_data, source_error = _pdf_source(pdf_path)
 
     questions = [
@@ -69,9 +71,11 @@ def pdf_viewer(
     ]
     chunks.extend({**_viewer_chunk(chunk), "question_id": None} for chunk in unmapped_chunks or [])
 
-    _COMPONENT(
+    return _COMPONENT(
         pdfData=pdf_data,
         sourceError=source_error,
+        documentId=document_id,
+        annotations=annotations or [],
         chunks=chunks,
         questions=questions,
         key=key,
