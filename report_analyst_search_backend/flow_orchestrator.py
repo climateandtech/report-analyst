@@ -283,8 +283,7 @@ class FlowOrchestrator:
         if not self._analysis_results_publishable(result.results):
             logger.info("Skipping platform publish — enhanced flow still uses non-publishable stub analysis")
             st.warning(
-                "Results are not published to the platform until enhanced analysis "
-                "uses the real report analyzer pipeline."
+                "Results are not published to the platform until enhanced analysis " "uses the real report analyzer pipeline."
             )
             return result
 
