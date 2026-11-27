@@ -25,4 +25,4 @@
 ./scripts/ci-parity.sh docker-build  # optional
 ```
 
-Full QG runs **ruff + black** on changed Python (same as CI `lint` for touched files), then `tests/test_dockerfile_packaging.py`. Set `QG_CI_PARITY=1` (or change `Dockerfile` / `requirements*.txt`) to run slim deps inside QG.
+Full QG runs `tests/test_dockerfile_packaging.py`; set `QG_CI_PARITY=1` (or change `Dockerfile` / `requirements*.txt`) to run slim deps inside QG.

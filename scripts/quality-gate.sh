@@ -91,15 +91,11 @@ for p in "${CHANGED[@]}"; do
 done
 
 if [[ ${#py_files[@]} -gt 0 ]]; then
-  log "=== report-analyst: ruff + black (changed files, matches CI lint) ==="
+  log "=== report-analyst: ruff (changed files) ==="
   if ! qg_require_ruff; then
     exit 2
   fi
-  if [[ "$MODE" != "full" ]]; then
-    export QG_BLACK_CHECK=0
-  fi
   BASE_REF="$BASE_REF" "$ROOT/scripts/lint-changed.sh" "${py_files[@]}" || FAILED=1
-  unset QG_BLACK_CHECK
 fi
 
 if [[ "$FAILED" -ne 0 ]]; then

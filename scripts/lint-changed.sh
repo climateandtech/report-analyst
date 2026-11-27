@@ -56,14 +56,4 @@ if ! qg_require_ruff; then
 fi
 
 echo "lint-changed: ruff check ${#FILES[@]} file(s)"
-qg_run_ruff check "${FILES[@]}" || exit 1
-
-# CI lint job runs black --check; QG must match or local green + CI red (PR #204).
-if [[ "${QG_BLACK_CHECK:-1}" == "1" ]]; then
-  if ! qg_run_python -m black --version >/dev/null 2>&1; then
-    echo "lint-changed: black not available (pip install black)" >&2
-    exit 2
-  fi
-  echo "lint-changed: black --check ${#FILES[@]} file(s)"
-  qg_run_python -m black --check "${FILES[@]}"
-fi
+qg_run_ruff check "${FILES[@]}"

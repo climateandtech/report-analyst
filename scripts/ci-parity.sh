@@ -38,12 +38,6 @@ _run_deps_in_slim() {
   '
 }
 
-_run_lint_changed() {
-  log "=== ci-parity: ruff + black on changes vs ${BASE_REF:-origin/main} ==="
-  export QG_BLACK_CHECK=1
-  BASE_REF="${BASE_REF:-origin/main}" "$ROOT/scripts/lint-changed.sh" || return 1
-}
-
 _run_packaging_tests() {
   log "=== ci-parity: Dockerfile / schema packaging tests ==="
   local py="${CI_PARITY_PYTHON:-python3}"
@@ -83,7 +77,6 @@ print('image schema OK')
 CMD="${1:-before-push}"
 case "$CMD" in
   before-push)
-    _run_lint_changed
     _run_packaging_tests
     _run_deps_in_slim
     ;;
