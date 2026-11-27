@@ -1,0 +1,34 @@
+name: ClimRetrieve Complete Benchmark
+shortcut: climretr
+description: Five ClimRetrieve questions annotated across all listed reports.
+documents:
+  - 2022_BXP_ESG_Report.pdf
+  - AEO 2022 ESG Report.pdf
+  - CT REIT 2022 ESG Report.pdf
+  - HM Group Sustainability Disclosure 2022.pdf
+  - Mastercard 2022 ESG Report.pdf
+  - McKinsey 2022 ESG Full Report.pdf
+  - PayPal Global Impact Report 2023.pdf
+  - Rio Tinto Climate Change Report 2023.pdf
+  - Ryanair 2022 Sustainability Report.pdf
+  - Sony Sustainability Report 2023.pdf
+  - Starbucks Environmental & Social Impact Report 2022.pdf
+  - Suncor Sustainability Report 2023.pdf
+  - University of Oxford 2022 Sustainability Report.pdf
+questions:
+  - id: climretr_1
+    text: Does the company provide definitions for climate change adaptation?
+    guidelines: &classification |-
+      - ANSWER type: classification — exactly one of Yes / No / Unclear / Not disclosed
+  - id: climretr_2
+    text: Has the company identified any synergies between its climate change adaptation goals and other business goals?
+    guidelines: *classification
+  - id: climretr_3
+    text: Does the company report the climate change scenarios used to test the resilience of its business strategy?
+    guidelines: *classification
+  - id: climretr_4
+    text: Does the company seek to adjust its business model to better provide climate change adaptation products and services?
+    guidelines: *classification
+  - id: climretr_5
+    text: Does the company have any engagements with industry peers in relation to climate change?
+    guidelines: *classification

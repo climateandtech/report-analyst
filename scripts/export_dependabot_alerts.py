@@ -3,11 +3,11 @@
 import csv
 import datetime
 import json
-import logging
 import subprocess
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+REPO_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = REPO_ROOT / "data" / "dependabot_alerts"
 
 
 def get_repo_info() -> tuple[str, str]:
@@ -29,6 +29,7 @@ def run_gh_api(owner: str, repo: str) -> list[dict]:
 
     # Build the GitHub CLI command for the Dependabot Alerts API
     # --paginate requests all result pages instead of only the first page
+    # and joins them into a single JSON array
     command = [
         "gh",
         "api",
@@ -57,12 +58,12 @@ def run_gh_api(owner: str, repo: str) -> list[dict]:
 
 
 def main() -> None:
-    owner, repo = get_repo_info()
-    date = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M")
-    output_path = Path(f"../{repo}/data/dependabot_alerts/{date}_dependabot_alerts.csv")
-
-    # Retrieve all Dependabot alerts from the selected repository
-    alerts = run_gh_api(owner, repo)
+    # Retrieve all Dependabot alerts from the current repository
+    try:
+        owner, repo = get_repo_info()
+        alerts = run_gh_api(owner, repo)
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(f"gh failed: {error.stderr.strip()}") from error
 
     # Transform the nested GitHub API response into flat dictionaries
     # that can be written directly as rows in a CSV file.
@@ -121,6 +122,10 @@ def main() -> None:
         "created_at",
         "url",
     ]
+
+    date = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M")
+    output_path = OUTPUT_DIR / f"{date}_dependabot_alerts.csv"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # Create or overwrite the CSV file.
     #

@@ -1,16 +1,11 @@
-import asyncio
-import json
 import os
 import shutil
-import sqlite3
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
-import streamlit as st
 import yaml
 
 from report_analyst.core.analyzer import DocumentAnalyzer
@@ -62,7 +57,7 @@ def test_env():
     db_path = cache_path / "analysis.db"
     from report_analyst.core.cache_manager import CacheManager
 
-    cache_manager = CacheManager(db_path=str(db_path))
+    cache_manager = CacheManager(db_path=str(db_path))  # noqa: F841
     # Tables are created automatically by CacheManager.init_db()
 
     # Create test question set
@@ -93,20 +88,28 @@ def test_env():
     test_pdf = storage_path / "test_report.pdf"
     test_pdf.write_bytes(b"%PDF-1.4\n%Test PDF")
 
-    # Set environment variables
+    # Set environment variables (restore on teardown — do not leak into other tests)
+    env_keys = ("STORAGE_PATH", "QUESTIONSETS_PATH", "OPENAI_API_KEY")
+    original_env = {key: os.environ.get(key) for key in env_keys}
     os.environ["STORAGE_PATH"] = str(storage_path)
     os.environ["QUESTIONSETS_PATH"] = str(questions_dir)
     os.environ["OPENAI_API_KEY"] = "test-key"
 
-    yield {
-        "temp_dir": temp_dir,
-        "storage_path": storage_path,
-        "questions_dir": questions_dir,
-        "db_path": db_path,
-        "test_pdf": test_pdf,
-    }
-
-    shutil.rmtree(temp_dir)
+    try:
+        yield {
+            "temp_dir": temp_dir,
+            "storage_path": storage_path,
+            "questions_dir": questions_dir,
+            "db_path": db_path,
+            "test_pdf": test_pdf,
+        }
+    finally:
+        for key, value in original_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        shutil.rmtree(temp_dir)
 
 
 @pytest.fixture
@@ -123,25 +126,26 @@ def test_report_analyzer_initialization(report_analyzer):
     assert report_analyzer.temp_dir.exists()
 
 
+# FIXME test usufull?
 def test_load_question_set(report_analyzer, test_env):
     """Test loading question sets"""
     # Mock the questions file loading
-    test_questions = {
-        "name": "TCFD Questions",
-        "description": "Test TCFD questions",
-        "questions": [
-            {
-                "id": "tcfd_1",
-                "text": "Test question 1",
-                "guidelines": "Test guidelines 1",
-            },
-            {
-                "id": "tcfd_2",
-                "text": "Test question 2",
-                "guidelines": "Test guidelines 2",
-            },
-        ],
-    }
+    # test_questions = {
+    #     "name": "TCFD Questions",
+    #     "description": "Test TCFD questions",
+    #     "questions": [
+    #         {
+    #             "id": "tcfd_1",
+    #             "text": "Test question 1",
+    #             "guidelines": "Test guidelines 1",
+    #         },
+    #         {
+    #             "id": "tcfd_2",
+    #             "text": "Test question 2",
+    #             "guidelines": "Test guidelines 2",
+    #         },
+    #     ],
+    # }
 
     # Test with actual TCFD questions (not mocked)
     question_set = report_analyzer.load_question_set("tcfd")
@@ -151,6 +155,7 @@ def test_load_question_set(report_analyzer, test_env):
     assert "tcfd_11" in question_set["questions"]
 
 
+# FIXME test usefull?
 @pytest.mark.asyncio
 async def test_analyze_document(report_analyzer, test_env):
     """Test document analysis flow"""

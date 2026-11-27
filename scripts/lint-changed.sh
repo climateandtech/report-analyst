@@ -21,11 +21,11 @@ collect_changed() {
   if [[ -z "$git_root" ]]; then return; fi
 
   if [[ -n "$base_ref" ]] && git -C "$git_root" rev-parse --verify "$base_ref" >/dev/null 2>&1; then
-    git -C "$git_root" diff --name-only "${base_ref}...HEAD" 2>/dev/null || true
+    git -C "$git_root" diff --name-only --diff-filter=ACMRTUXB "${base_ref}...HEAD" 2>/dev/null || true
   else
     {
-      git -C "$git_root" diff --name-only HEAD 2>/dev/null || true
-      git -C "$git_root" diff --cached --name-only 2>/dev/null || true
+      git -C "$git_root" diff --name-only --diff-filter=ACMRTUXB HEAD 2>/dev/null || true
+      git -C "$git_root" diff --cached --name-only --diff-filter=ACMRTUXB 2>/dev/null || true
       git -C "$git_root" ls-files --others --exclude-standard 2>/dev/null || true
     }
   fi | sort -u
