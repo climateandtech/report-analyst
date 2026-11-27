@@ -32,6 +32,9 @@ TAGS = [
 SOURCES = [
     {
         "id": "source-1",
+        "page": 1,
+        "span_start": 0,
+        "selected_text": "Prepared on a consolidated basis.",
         "tags": [
             {"id": "1", "text": "Prepared on a consolidated basis: true"},
             {"id": "2", "text": "Prepared on a consolidated basis: true"},
@@ -44,7 +47,7 @@ SOURCES = [
 def panel(tags, sources):
     from report_analyst.ui.xbrl_check import display_xbrl_check
 
-    display_xbrl_check(tags, sources)
+    display_xbrl_check(tags, sources, "report")
 
 
 @pytest.fixture
@@ -122,3 +125,33 @@ def test_panel_checks_the_known_tags_and_shows_the_result(check):
         "Arelle also noted problems in the ESRS taxonomy package itself (1). They are not about your tags."
     )
     assert app.caption[1].value == "Could not load nace-codes.xsd"
+
+
+def test_panel_checks_both_files(check):
+    submit(run_panel())
+
+    reports = [call.args[0] for call in check.call_args_list]
+    assert ["<ix:nonNumeric" in report for report in reports] == [True, False]
+
+
+def test_panel_shows_a_problem_found_in_both_files_once(check):
+    check.return_value = [XbrlProblem(None, "Could not load nace-codes.xsd")]
+
+    app = submit(run_panel())
+
+    assert "itself (1)" in app.caption[0].value
+
+
+def test_panel_lists_values_written_below_their_passage(check):
+    app = submit(run_panel())
+
+    # Both yes/no tags cover the whole passage, so the second one is written below it.
+    assert app.info[0].value == (
+        "Written below their passage, because the value is not in its text:\n- Prepared on a consolidated basis: true"
+    )
+
+
+def test_panel_offers_both_files(check):
+    app = submit(run_panel())
+
+    assert [button.proto.label for button in app.get("download_button")] == ["Download iXBRL", "Download XBRL"]

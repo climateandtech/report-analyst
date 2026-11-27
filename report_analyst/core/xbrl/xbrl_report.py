@@ -24,26 +24,56 @@ NAMESPACES = {
 def xbrl_report(tags: list[SourceTag], taxonomy: Taxonomy, lei: str, start: date, end: date) -> str:
     """An XBRL report with one fact per tag. Every tag must use a concept of the taxonomy."""
     concepts = {concept.name: concept for concept in taxonomy.concepts}
-    namespaces = " ".join(f"xmlns:{prefix}={quoteattr(uri)}" for prefix, uri in {**NAMESPACES, **taxonomy.namespaces}.items())
+    return (
+        f'<?xml version="1.0" encoding="UTF-8"?>\n<xbrli:xbrl {namespace_declarations(taxonomy)}>'
+        f"{schema_ref(taxonomy)}{contexts(lei, start, end)}{units(tags, concepts)}"
+        + "".join(_fact(tag, concepts[tag.concept], taxonomy.namespaces) for tag in tags)
+        + "</xbrli:xbrl>"
+    )
+
+
+def namespace_declarations(taxonomy: Taxonomy) -> str:
+    return " ".join(f"xmlns:{prefix}={quoteattr(uri)}" for prefix, uri in {**NAMESPACES, **taxonomy.namespaces}.items())
+
+
+def schema_ref(taxonomy: Taxonomy) -> str:
+    return f'<link:schemaRef xlink:type="simple" xlink:href={quoteattr(taxonomy.entry_point)}/>'
+
+
+def contexts(lei: str, start: date, end: date) -> str:
     entity = f"<xbrli:entity><xbrli:identifier scheme={quoteattr(LEI_SCHEME)}>{escape(lei)}</xbrli:identifier></xbrli:entity>"
     # Duration concepts report the whole period, instant concepts the state at its end.
     # Each context is named after its period type, so a fact refers to it by its concept's period type.
-    contexts = (
+    return (
         f'<xbrli:context id="duration">{entity}<xbrli:period><xbrli:startDate>{start.isoformat()}</xbrli:startDate>'
         f"<xbrli:endDate>{end.isoformat()}</xbrli:endDate></xbrli:period></xbrli:context>"
         f'<xbrli:context id="instant">{entity}<xbrli:period><xbrli:instant>{end.isoformat()}</xbrli:instant>'
         "</xbrli:period></xbrli:context>"
     )
-    units = {tag.unit: _measure(tag.unit, concepts[tag.concept]) for tag in tags if tag.unit}
-    return (
-        f'<?xml version="1.0" encoding="UTF-8"?>\n<xbrli:xbrl {namespaces}>'
-        f'<link:schemaRef xlink:type="simple" xlink:href={quoteattr(taxonomy.entry_point)}/>{contexts}'
-        + "".join(
-            f'<xbrli:unit id="{unit}"><xbrli:measure>{measure}</xbrli:measure></xbrli:unit>' for unit, measure in units.items()
-        )
-        + "".join(_fact(tag, concepts[tag.concept], taxonomy.namespaces) for tag in tags)
-        + "</xbrli:xbrl>"
+
+
+def units(tags: list[SourceTag], concepts: dict[str, TaxonomyConcept]) -> str:
+    measures = {tag.unit: _measure(tag.unit, concepts[tag.concept]) for tag in tags if tag.unit}
+    return "".join(
+        f'<xbrli:unit id="{unit}"><xbrli:measure>{measure}</xbrli:measure></xbrli:unit>' for unit, measure in measures.items()
     )
+
+
+def fact_attributes(tag: SourceTag, concept: TaxonomyConcept) -> str:
+    attributes = f'id="{FACT_ID}{tag.id}" contextRef="{concept.period_type}"'
+    if tag.unit:
+        attributes += f' unitRef="{tag.unit}" decimals="{tag.decimals}"'
+    return attributes
+
+
+def fact_value(tag: SourceTag, concept: TaxonomyConcept, namespaces: dict[str, str]) -> str:
+    """The value to write, not escaped. Menu options get their namespace, such as https://...#OwnWorkforceMember."""
+    return " ".join(_expanded(name, namespaces) for name in tag.value.split()) if concept.options else tag.value
+
+
+def is_escaped(tag: SourceTag, concept: TaxonomyConcept) -> bool:
+    """Whether the fact's value is HTML. ESEF's 2025 rules require it for text blocks and for any value with & or <."""
+    return concept.kind == "narrative" or any(character in tag.value for character in "&<")
 
 
 def _measure(unit: str, concept: TaxonomyConcept) -> str:
@@ -53,12 +83,11 @@ def _measure(unit: str, concept: TaxonomyConcept) -> str:
 
 
 def _fact(tag: SourceTag, concept: TaxonomyConcept, namespaces: dict[str, str]) -> str:
-    attributes = f'id="{FACT_ID}{tag.id}" contextRef="{concept.period_type}"'
-    if tag.unit:
-        attributes += f' unitRef="{tag.unit}" decimals="{tag.decimals}"'
-    # Menu options are written as their namespace and name, such as https://...#OwnWorkforceMember.
-    value = " ".join(_expanded(name, namespaces) for name in tag.value.split()) if concept.options else tag.value
-    return f"<{concept.name} {attributes}>{escape(value)}</{concept.name}>"
+    value = fact_value(tag, concept, namespaces)
+    # Written as HTML, the same value the iXBRL report gives, then escaped again for XML.
+    if is_escaped(tag, concept):
+        value = escape(value)
+    return f"<{concept.name} {fact_attributes(tag, concept)}>{escape(value)}</{concept.name}>"
 
 
 def _expanded(name: str, namespaces: dict[str, str]) -> str:
