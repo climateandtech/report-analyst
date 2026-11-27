@@ -23,10 +23,11 @@ async def publish_analysis_result(
     analysis_config: Optional[Dict[str, Any]] = None,
     owner_user_id: Optional[str] = None,
     duration_ms: Optional[int] = None,
+    nats_url: Optional[str] = None,
 ) -> str:
     """Publish analysis.result.{id} for platform to persist."""
     request_id = str(uuid.uuid4())
-    nats_url = os.getenv("NATS_URL", "nats://localhost:4222")
+    nats_url = nats_url or os.getenv("NATS_URL", "nats://localhost:4222")
     nats_token = os.getenv("NATS_TOKEN")
     if nats_token and "@" not in nats_url:
         protocol, rest = nats_url.split("://", 1)

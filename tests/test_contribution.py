@@ -48,6 +48,30 @@ async def test_publish_analysis_result_uses_analysis_result_subject_and_payload(
 
 
 @pytest.mark.asyncio
+async def test_publish_analysis_result_uses_explicit_nats_url(monkeypatch):
+    seen = {}
+
+    async def fake_connect(url, **kwargs):
+        seen["url"] = url
+        mock_nc = MagicMock()
+        mock_js = AsyncMock()
+        mock_nc.jetstream.return_value = mock_js
+        mock_nc.close = AsyncMock()
+        return mock_nc
+
+    monkeypatch.setenv("NATS_URL", "nats://should-not-use:4222")
+    monkeypatch.setattr("report_analyst_enterprise.contribution.nats.connect", fake_connect)
+
+    await publish_analysis_result(
+        resource_id="res-1",
+        results={"answers": ["a"]},
+        nats_url="nats://from-config:4222",
+    )
+
+    assert seen["url"] == "nats://from-config:4222"
+
+
+@pytest.mark.asyncio
 async def test_publish_analysis_result_falls_back_to_core_publish(monkeypatch):
     mock_nc = MagicMock()
     mock_js = AsyncMock()

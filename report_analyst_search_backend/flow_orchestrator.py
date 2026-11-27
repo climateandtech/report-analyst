@@ -18,6 +18,8 @@ from .config import BackendConfig
 
 logger = logging.getLogger(__name__)
 
+LOCAL_STUB_ANSWER_PREFIX = "Local analysis for:"
+
 # Add parent directory to path for question loader import
 current_dir = Path(__file__).parent
 parent_dir = current_dir.parent
@@ -247,7 +249,8 @@ class FlowOrchestrator:
             results={
                 "questions": questions,
                 "answers": [r["answer"] for r in results],
-                "method": "local",
+                "method": "local_stub",
+                "publishable": False,
             },
         )
 
@@ -257,48 +260,70 @@ class FlowOrchestrator:
         # Could be enhanced with centralized LLM or data lake storage
         return self._analyze_local(chunks, questions)
 
+    @staticmethod
+    def _analysis_results_publishable(results: Dict[str, Any]) -> bool:
+        """Platform ingest must not receive demo stub text as production answers."""
+        if results.get("publishable") is False:
+            return False
+        if results.get("method") in ("local", "local_stub"):
+            return False
+        answers = results.get("answers") or []
+        return not any(str(answer).startswith(LOCAL_STUB_ANSWER_PREFIX) for answer in answers)
+
     def _analyze_enhanced(self, chunks: List[Dict[str, Any]], questions: List[str]) -> AnalysisResult:
-        """Enhanced analysis with platform contribution publish when backend is enabled."""
+        """Enhanced integration: UI demo via local stub; publish only real analyzer output."""
         import asyncio
         import os
 
-        st.info("Enhanced analysis not fully implemented - using local analysis")
+        st.info("Enhanced analysis not fully implemented - using local analysis for display only")
         result = self._analyze_local(chunks, questions)
         if not (result.success and self.config.use_backend and result.results):
+            return result
+
+        if not self._analysis_results_publishable(result.results):
+            logger.info("Skipping platform publish — enhanced flow still uses non-publishable stub analysis")
+            st.warning(
+                "Results are not published to the platform until enhanced analysis "
+                "uses the real report analyzer pipeline."
+            )
+            return result
+
+        resource_id = chunks[0].get("resource_id") if chunks else None
+        if not resource_id:
+            logger.info("Skipping platform publish — chunks have no resource_id")
             return result
 
         try:
             from report_analyst_enterprise.contribution import publish_analysis_result
 
-            resource_id = chunks[0].get("resource_id") if chunks else None
-            if resource_id:
-                questions_list = result.results.get("questions", questions)
-                answers_list = result.results.get("answers", [])
-                asyncio.run(
-                    publish_analysis_result(
-                        resource_id=str(resource_id),
-                        results={
-                            "answers": answers_list,
-                            "questions": questions_list,
-                        },
-                        provenance={
-                            "model": os.getenv("OPENAI_API_MODEL", "local"),
-                            "provider": "report_analyst",
-                            "mode": (
-                                "byok_contribution"
-                                if os.getenv("USE_BYOK_CONTRIBUTION", "").lower() in ("1", "true", "yes")
-                                else "centralized"
-                            ),
-                        },
-                    )
+            questions_list = result.results.get("questions", questions)
+            answers_list = result.results.get("answers", [])
+            asyncio.run(
+                publish_analysis_result(
+                    resource_id=str(resource_id),
+                    results={
+                        "answers": answers_list,
+                        "questions": questions_list,
+                    },
+                    provenance={
+                        "model": os.getenv("OPENAI_API_MODEL", "local"),
+                        "provider": "report_analyst",
+                        "mode": (
+                            "byok_contribution"
+                            if os.getenv("USE_BYOK_CONTRIBUTION", "").lower() in ("1", "true", "yes")
+                            else "centralized"
+                        ),
+                    },
+                    owner_user_id=self.config.owner,
+                    nats_url=self.config.nats_url,
                 )
+            )
+            result.stored_in_backend = True
         except ImportError:
-            # Enterprise package not installed — contribution publish is optional.
-            pass
+            logger.info("Enterprise contribution module not installed — publish skipped")
         except Exception as exc:  # noqa: BLE001 — contribution publish must not fail analysis
             logger.warning("Could not publish analysis result to platform: %s", exc)
 
-        result.stored_in_backend = self.config.use_backend
         return result
 
     def _configure_question_set(self, default_question_set: str) -> str:
