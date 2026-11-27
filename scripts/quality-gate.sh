@@ -114,7 +114,8 @@ elif [[ "$SKIP_PYTEST" -eq 0 && ${#CHANGED[@]} -gt 0 ]]; then
   fi
 fi
 
-if [[ "$MODE" == "full" && "$FAILED" -eq 0 ]]; then
+# CI job runs full --skip-pytest (ruff only). Packaging pytest + slim deps live in test job / ci-parity.
+if [[ "$MODE" == "full" && "$FAILED" -eq 0 && "$SKIP_PYTEST" -eq 0 ]]; then
   log "=== report-analyst: ci-parity packaging (Dockerfile / schema) ==="
   _py="python3"
   [[ -x "$ROOT/venv/bin/python" ]] && _py="$ROOT/venv/bin/python"
