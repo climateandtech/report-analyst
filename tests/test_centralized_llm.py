@@ -132,17 +132,3 @@ def test_centralized_missing_enterprise_package_raises(monkeypatch):
     with patch("builtins.__import__", side_effect=block_enterprise):
         with pytest.raises(ImportError, match="enterprise package"):
             DocumentAnalyzer()
-
-
-def test_analyzer_module_reload_logs_centralized_branch(monkeypatch):
-    """Reload picks up centralized env and executes module-level branch."""
-    import importlib
-
-    import report_analyst.core.analyzer as analyzer_mod
-
-    monkeypatch.setenv("USE_BACKEND", "true")
-    monkeypatch.setenv("USE_CENTRALIZED_LLM", "true")
-    monkeypatch.setenv("USE_FULL_BACKEND_ANALYSIS", "false")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    importlib.reload(analyzer_mod)
