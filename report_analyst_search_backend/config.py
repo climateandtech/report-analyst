@@ -18,6 +18,11 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
+def nats_worker_enabled() -> bool:
+    """Start NATS analysis worker only when explicitly enabled (default off)."""
+    return _env_bool("USE_NATS_WORKER", False)
+
+
 @dataclass
 class BackendConfig:
     """Configuration for backend integration features"""

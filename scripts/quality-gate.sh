@@ -114,6 +114,29 @@ elif [[ "$SKIP_PYTEST" -eq 0 && ${#CHANGED[@]} -gt 0 ]]; then
   fi
 fi
 
+# CI job runs full --skip-pytest (ruff only). Packaging pytest + slim deps live in test job / ci-parity.
+if [[ "$MODE" == "full" && "$FAILED" -eq 0 && "$SKIP_PYTEST" -eq 0 ]]; then
+  log "=== report-analyst: ci-parity packaging (Dockerfile / schema) ==="
+  _py="python3"
+  [[ -x "$ROOT/venv/bin/python" ]] && _py="$ROOT/venv/bin/python"
+  PYTHONPATH="$ROOT" "$_py" -m pytest "$ROOT/tests/test_dockerfile_packaging.py" -q --tb=short || FAILED=1
+
+  _ci_deps=0
+  if [[ "${QG_CI_PARITY:-0}" == "1" ]]; then
+    _ci_deps=1
+  fi
+  for _p in "${CHANGED[@]}"; do
+    _rel="${_p#report-analyst/}"
+    if [[ "$_rel" == "Dockerfile" || "$_rel" == "requirements.txt" || "$_rel" =~ requirements\.txt$ ]]; then
+      _ci_deps=1
+    fi
+  done
+  if [[ "$FAILED" -eq 0 && "$_ci_deps" -eq 1 ]]; then
+    log "=== report-analyst: ci-parity deps (python:3.12-slim pip install) ==="
+    "$ROOT/scripts/ci-parity.sh" deps || FAILED=1
+  fi
+fi
+
 if [[ "$FAILED" -ne 0 ]]; then
   if [[ -n "$PATHS_FILE" ]]; then
     log "quality-gate: FAILED — fix ONLY your session paths above; ignore other agent sessions"
@@ -121,6 +144,9 @@ if [[ "$FAILED" -ne 0 ]]; then
     log "quality-gate: FAILED"
   fi
   exit 1
+fi
+if [[ "$MODE" == "full" ]]; then
+  log "before git push / Coolify: ./scripts/ci-parity.sh before-push (full pytest + slim deps)"
 fi
 log "quality-gate: OK ($MODE)"
 exit 0

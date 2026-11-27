@@ -15,9 +15,12 @@ cleanup() {
 trap cleanup EXIT TERM INT
 
 if [ "$RUNTIME" = "enterprise" ]; then
-  echo "Starting enterprise runtime (Streamlit + API + NATS worker)"
-  python report_analyst_jobs/nats_integration.py worker &
-  pids+=($!)
+  echo "Starting enterprise runtime (Streamlit + API)"
+  if python -c "from report_analyst_search_backend.config import nats_worker_enabled; raise SystemExit(0 if nats_worker_enabled() else 1)"; then
+    echo "Starting NATS worker (USE_NATS_WORKER=true)"
+    python report_analyst_jobs/nats_integration.py worker &
+    pids+=($!)
+  fi
   uvicorn report_analyst_api.main:app --host 0.0.0.0 --port 8001 &
   pids+=($!)
 else

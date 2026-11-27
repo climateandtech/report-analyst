@@ -67,6 +67,12 @@ app.add_middleware(
 async def startup_event():
     """Initialize the application. Analyzer is created on first /analyze or /analyze-async request."""
     logger.info("Starting Report Analyst API")
+    try:
+        from report_analyst_enterprise.api.questionsets_router import mount_if_enterprise
+
+        mount_if_enterprise(app)
+    except ImportError:
+        logger.debug("Enterprise question set admin API not available")
 
 
 @app.get("/health", response_model=HealthResponse, operation_id="health_check")

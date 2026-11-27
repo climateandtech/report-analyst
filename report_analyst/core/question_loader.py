@@ -27,83 +27,94 @@ class QuestionSet:
     questions: Dict[str, Dict[str, str]]  # question_id -> {text, guidelines}
 
 
+def bundled_questionsets_dir() -> Path:
+    return Path(__file__).parent.parent / "questionsets"
+
+
 class QuestionSetLoader:
-    """Centralized loader for question sets from YAML files"""
+    """Centralized loader for question sets from YAML files and installed DB rows."""
 
     def __init__(self):
         self._question_sets: Optional[Dict[str, QuestionSet]] = None
         self._questionsets_paths = self._get_questionsets_paths()
 
     def _get_questionsets_paths(self) -> List[Path]:
-        """Get possible paths for questionsets directory"""
-        # Check environment variable first
+        """Volume/custom paths; bundled image dir is always merged separately."""
         env_path = os.getenv("QUESTIONSETS_PATH")
         if env_path:
             return [Path(env_path)]
-
-        # Default search paths
         return [
-            Path(__file__).parent.parent / "questionsets",  # app/questionsets
-            Path(__file__).parent.parent.parent / "questionsets",  # project root
-            Path.cwd() / "questionsets",  # current working directory
+            Path(__file__).parent.parent / "questionsets",
+            Path(__file__).parent.parent.parent / "questionsets",
+            Path.cwd() / "questionsets",
         ]
 
-    def _load_question_sets(self) -> Dict[str, QuestionSet]:
-        """Load all question sets from YAML files"""
-        question_sets = {}
+    def _question_set_from_config(self, question_set_id: str, config: dict) -> QuestionSet:
+        questions = {}
+        for q in config.get("questions", []):
+            q_id = q.get("id", "")
+            if q_id:
+                questions[q_id] = {
+                    "text": q.get("text", ""),
+                    "guidelines": q.get("guidelines", ""),
+                }
+        return QuestionSet(
+            id=question_set_id,
+            name=config.get("name", f"{question_set_id.title()} Question Set"),
+            description=config.get("description", "") or "",
+            shortcut=config.get("shortcut", question_set_id),
+            questions=questions,
+        )
 
-        logger.info("[QUESTION_LOADER] Looking for question set files in:")
-        for path in self._questionsets_paths:
-            logger.info(f"[QUESTION_LOADER] - {path.resolve()}")
-
-        # Find all YAML files in the questionsets directories
-        yaml_files = []
-        for path in self._questionsets_paths:
-            if path.exists():
-                yaml_files.extend(path.glob("*_questions.yaml"))
-
-        logger.info(f"[QUESTION_LOADER] Found {len(yaml_files)} question set files")
-
-        for yaml_file in yaml_files:
-            try:
-                logger.info(f"[QUESTION_LOADER] Loading question set from: {yaml_file}")
-
-                with open(yaml_file, "r", encoding="utf-8") as f:
-                    config = yaml.safe_load(f)
-
-                # Extract question set ID from filename (e.g., "lucia_questions.yaml" -> "lucia")
-                question_set_id = yaml_file.stem.replace("_questions", "")
-
-                # Convert questions list to dictionary format
-                questions = {}
-                for q in config.get("questions", []):
-                    q_id = q.get("id", "")
-                    if q_id:
-                        questions[q_id] = {
-                            "text": q.get("text", ""),
-                            "guidelines": q.get("guidelines", ""),
-                        }
-                        logger.debug(f"[QUESTION_LOADER] Added question {q_id}")
-
-                question_set = QuestionSet(
-                    id=question_set_id,
-                    name=config.get("name", f"{question_set_id.title()} Question Set"),
-                    description=config.get("description", ""),
-                    shortcut=config.get("shortcut", question_set_id),
-                    questions=questions,
-                )
-
-                question_sets[question_set_id] = question_set
-
-                logger.info(f"[QUESTION_LOADER] ✓ Loaded {len(questions)} questions for {question_set_id}")
-
-            except (OSError, yaml.YAMLError, AttributeError, TypeError, ValueError, KeyError) as e:
-                logger.error(f"[QUESTION_LOADER] Error loading question set from {yaml_file}: {e!s}")
+    def _load_yaml_from_paths(self, paths: List[Path]) -> Dict[str, QuestionSet]:
+        question_sets: Dict[str, QuestionSet] = {}
+        for path in paths:
+            if not path.exists():
                 continue
+            for yaml_file in path.glob("*_questions.yaml"):
+                try:
+                    with open(yaml_file, "r", encoding="utf-8") as handle:
+                        config = yaml.safe_load(handle) or {}
+                    question_set_id = yaml_file.stem.replace("_questions", "")
+                    question_sets[question_set_id] = self._question_set_from_config(question_set_id, config)
+                except (OSError, yaml.YAMLError, AttributeError, TypeError, ValueError, KeyError) as e:
+                    logger.error(f"[QUESTION_LOADER] Error loading {yaml_file}: {e!s}")
+        return question_sets
 
-        if not question_sets:
-            logger.warning("[QUESTION_LOADER] No question sets loaded!")
+    def _load_bundled_yaml(self) -> Dict[str, QuestionSet]:
+        base = bundled_questionsets_dir()
+        if not base.is_dir():
+            return {}
+        return self._load_yaml_from_paths([base])
 
+    def _load_installed_db(self) -> Dict[str, QuestionSet]:
+        try:
+            from sqlalchemy.exc import SQLAlchemyError
+
+            from report_analyst.core.installed_questionsets import load_installed_question_sets
+
+            return load_installed_question_sets()
+        except (ImportError, OSError, SQLAlchemyError) as e:
+            logger.warning("[QUESTION_LOADER] Could not load installed question sets: %s", e)
+            return {}
+
+    def _load_question_sets(self) -> Dict[str, QuestionSet]:
+        """Bundled YAML, optional volume YAML, then DB (DB wins on same id)."""
+        question_sets = {}
+        question_sets.update(self._load_bundled_yaml())
+
+        env_only = os.getenv("QUESTIONSETS_PATH")
+        if env_only:
+            extra = self._load_yaml_from_paths([Path(env_only)])
+            question_sets.update(extra)
+        elif self._questionsets_paths != [bundled_questionsets_dir()]:
+            extra = self._load_yaml_from_paths(self._questionsets_paths)
+            for sid, qset in extra.items():
+                if sid not in question_sets:
+                    question_sets[sid] = qset
+
+        question_sets.update(self._load_installed_db())
+        logger.info("[QUESTION_LOADER] Loaded %d question set(s)", len(question_sets))
         return question_sets
 
     def get_question_sets(self) -> Dict[str, QuestionSet]:

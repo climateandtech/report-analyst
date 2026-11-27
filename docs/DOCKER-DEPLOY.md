@@ -5,7 +5,7 @@ One image from the **repository root**. Runtime mode is selected with `REPORT_AN
 | Mode | Env | Processes |
 |------|-----|-----------|
 | **core** (default) | `REPORT_ANALYST_RUNTIME=core` | Streamlit on `:8080` |
-| **enterprise** | `REPORT_ANALYST_RUNTIME=enterprise` | Streamlit `:8080`, FastAPI `:8001`, NATS worker |
+| **enterprise** | `REPORT_ANALYST_RUNTIME=enterprise` | Streamlit `:8080`, FastAPI `:8001`; NATS worker only if `USE_NATS_WORKER=true` |
 
 ```bash
 docker build -t report-analyst .
@@ -62,9 +62,12 @@ docker run -p 8080:8080 -p 8001:8001 \
   -e DATABASE_URL=postgresql://... \
   -e USE_BACKEND=true \
   -e USE_CENTRALIZED_LLM=true \
+  -e USE_NATS_WORKER=true \
   -e NATS_URL=nats://nats:4222 \
   report-analyst
 ```
+
+Question set install API (enterprise): see [`QUESTIONSET-ADMIN-API.md`](QUESTIONSET-ADMIN-API.md).
 
 - Streamlit health: `GET /_stcore/health`
 - API health: `GET /health` on port 8001

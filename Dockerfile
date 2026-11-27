@@ -39,6 +39,7 @@ COPY report_analyst_api/ report_analyst_api/
 COPY report_analyst_jobs/ report_analyst_jobs/
 COPY report_analyst_search_backend/ report_analyst_search_backend/
 COPY prompts/ prompts/
+COPY docs/contracts/ docs/contracts/
 COPY .streamlit/ .streamlit/
 COPY alembic.ini .
 COPY alembic/ alembic/
