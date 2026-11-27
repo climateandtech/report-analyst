@@ -70,7 +70,7 @@ def inline_report(
         "<head><title>Tagged facts</title></head><body>"
         # The taxonomy, contexts and units go in a header that is not shown.
         f'<div style="display:none"><ix:header><ix:references>{schema_ref(taxonomy)}</ix:references>'
-        f"<ix:resources>{contexts(lei, start, end)}{units(tags, concepts)}</ix:resources></ix:header></div>"
+        f"<ix:resources>{contexts(tags, concepts, lei, start, end)}{units(tags, concepts)}</ix:resources></ix:header></div>"
         + "".join(paragraphs)
         + "</body></html>"
     )

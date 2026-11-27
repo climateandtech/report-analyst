@@ -51,11 +51,13 @@ def create_tag(
     entered: Any,
     unit: str | None = None,
     decimals: int | None = None,
+    identifier: str | None = None,
 ) -> SourceTag:
     """Check the entered value and return the tag to save.
 
     The value is a str for text, numbers and menus without options, a bool for yes/no, an option name
     for a menu, a list of option names for a set menu, a date for a date and an int for a year.
+    The identifier is required for a concept that needs one, and dropped for any other.
     """
     if concept.kind == "number":
         value, unit, decimals = _number(concept, entered, unit, decimals)
@@ -69,7 +71,17 @@ def create_tag(
         value=value,
         unit=unit,
         decimals=decimals,
+        identifier=_identifier(concept, identifier),
     )
+
+
+def _identifier(concept: TaxonomyConcept, entered: str | None) -> str | None:
+    if concept.identifier is None:
+        return None
+    identifier = (entered or "").strip()
+    if not identifier:
+        raise InvalidTagError("Enter the identifier, for example P1.")
+    return identifier
 
 
 def _value(concept: TaxonomyConcept, entered: Any) -> str:

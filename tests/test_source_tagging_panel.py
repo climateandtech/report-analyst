@@ -2,12 +2,12 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from report_analyst.core.cache_manager import CacheManager
-from report_analyst.models.taxonomy import TaxonomyConcept, TaxonomyOption
+from report_analyst.models.taxonomy import TaxonomyConcept, TaxonomyIdentifier, TaxonomyOption
 
 SOURCE = {"id": "source-1", "document_id": "document-hash", "page": 14, "selected_text": "Scope 1 emissions were 1240 t"}
 
 
-def concept(kind, data_type, label, options=()):
+def concept(kind, data_type, label, options=(), identifier=None):
     return TaxonomyConcept(
         name=f"esrs:{label.replace(' ', '')}",
         label=label,
@@ -15,6 +15,7 @@ def concept(kind, data_type, label, options=()):
         data_type=data_type,
         period_type="duration",
         options=list(options),
+        identifier=identifier,
     )
 
 
@@ -29,6 +30,16 @@ GROUPS = concept(
         TaxonomyOption(name="esrs:OwnWorkforceMember", label="Own workforce"),
         TaxonomyOption(name="esrs:WorkersMember", label="Workers"),
     ],
+)
+POLICY_NAME = concept(
+    "text",
+    "xbrli:stringItemType",
+    "Name of policy(ies)",
+    identifier=TaxonomyIdentifier(
+        dimension="esrs:IdentifierOfPolicyIesTypedAxis",
+        label="Identifier of policy(ies) [typed axis]",
+        element="esrs:esrs_TYP",
+    ),
 )
 
 
@@ -122,6 +133,34 @@ def test_form_saves_several_options_of_a_set_menu(database):
 
     assert saved(database) == [("esrs:Stakeholdergroups", "esrs:OwnWorkforceMember esrs:WorkersMember", None, None)]
     assert "Stakeholder groups: Own workforce, Workers" in app.markdown[-1].value
+
+
+def test_form_asks_for_the_identifier_a_concept_needs(database):
+    app = run_form(POLICY_NAME, database)
+
+    app.text_input[0].input("Climate policy")
+    app.text_input[1].input("P1")
+    save(app)
+
+    assert app.text_input[1].label == "Identifier of policy(ies)"
+    assert [tag.identifier for tag in CacheManager(database).get_source_tags("document-hash")] == ["P1"]
+    assert "Name of policy(ies): Climate policy (P1)" in app.markdown[-1].value
+
+
+def test_form_needs_the_identifier(database):
+    app = run_form(POLICY_NAME, database)
+
+    app.text_input[0].input("Climate policy")
+    save(app)
+
+    assert app.error[0].value == "Enter the identifier, for example P1."
+    assert saved(database) == []
+
+
+def test_form_has_no_identifier_for_other_concepts(database):
+    app = run_form(EMISSIONS, database)
+
+    assert [text_input.label for text_input in app.text_input] == ["Value"]
 
 
 def test_form_lists_only_the_selected_sources_tags(database):

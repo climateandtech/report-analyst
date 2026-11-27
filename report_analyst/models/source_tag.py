@@ -15,6 +15,8 @@ class SourceTag(BaseModel):
     unit: str | None = None
     decimals: int | None = None
     created_at: datetime | None = None
+    # Which policy, action, metric or other item the fact is about, for the concepts that need it.
+    identifier: str | None = None
 
     @model_validator(mode="after")
     def validate_number(self) -> "SourceTag":
