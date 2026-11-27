@@ -1528,18 +1528,10 @@ async def run_analysis(analyzer, file_path, selected_questions, progress_text):
             result_data = result.get("result", result)
             all_results[question_id] = result_data
 
-        # After all questions are processed, get the complete results with chunks
-        final_results = analyzer.cache_manager.get_analysis(
-            file_path=file_path, config=config, question_ids=list(all_results.keys())
-        )
-
-        if not final_results:
-            # If no results from cache, use the ones we just processed
-            final_results = all_results
-
-        # When writing results to session state
+        # Use streamed results in memory; they already include chunks from each answer.
+        # Re-fetching cache here can drop chunks when DB rows lack embedded chunk payloads.
         logger.info(f"[ANALYSIS] Writing results to session state for file: {file_path}")
-        st.session_state.results = normalize_results_container(final_results)
+        st.session_state.results = normalize_results_container(all_results)
         logger.info(f"[ANALYSIS] Attempting to display results for file: {file_path}")
 
         successes, failures = split_analysis_results(session_answers_map(st.session_state.results))
