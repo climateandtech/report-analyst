@@ -137,6 +137,7 @@ source_tags = Table(
     Column("unit", Text),
     Column("decimals", Integer),
     Column("created_at", DateTime, default=datetime.now),
+    Column("identifier", Text),
 )
 
 # Indexes (defined separately for clarity)

@@ -123,6 +123,10 @@ def test_inline_problem_names_its_tag(package):
     assert any("boolean" in problem.message for problem in problems)
 
 
+# A concept that needs the identifier of its policy.
+POLICY_NAME = "esrs:NameOfPolicyIes"
+
+
 @pytest.mark.skipif(not os.getenv(TAXONOMY_PATH_ENV), reason=f"{TAXONOMY_PATH_ENV} is not set")
 def test_tags_on_the_2026_draft_make_valid_xbrl():
     taxonomy = load_esrs_taxonomy()
@@ -142,6 +146,9 @@ def test_tags_on_the_2026_draft_make_valid_xbrl():
             ]
         )
     ]
+    tags.append(
+        SourceTag(id="4", source_id="s", document_id="d", concept=POLICY_NAME, value="Climate policy", identifier="P1")
+    )
     xbrl = xbrl_report(tags, taxonomy, LEI, START, END)
 
     problems = check_xbrl(xbrl, os.environ[TAXONOMY_PATH_ENV])
@@ -179,7 +186,11 @@ def test_inline_tags_on_the_2026_draft_make_valid_xbrl():
     sources = [
         {"id": "a", "page": 3, "span_start": 0, "selected_text": emissions},
         {"id": "b", "page": 5, "span_start": 0, "selected_text": water},
+        {"id": "c", "page": 7, "span_start": 0, "selected_text": "Our Climate policy covers all sites."},
     ]
+    tags.append(
+        SourceTag(id="5", source_id="c", document_id="d", concept=POLICY_NAME, value="Climate policy", identifier="P1")
+    )
     inline, written_below = inline_report(tags, sources, load_esrs_taxonomy(), LEI, START, END)
 
     problems = check_xbrl(inline, os.environ[TAXONOMY_PATH_ENV])

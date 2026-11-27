@@ -160,6 +160,12 @@ def test_save_and_get_source_tags(temp_db):
     assert temp_db.get_source_tags("other-document") == []
 
 
+def test_a_tag_keeps_its_identifier(temp_db):
+    temp_db.save_source_tag(source_tag(identifier="P1"))
+
+    assert [tag.identifier for tag in temp_db.get_source_tags("document-hash")] == ["P1"]
+
+
 def test_deleting_a_source_deletes_only_its_tags(temp_db):
     temp_db.save_source_annotation(SOURCE_ANNOTATION)
     temp_db.save_source_annotation({**SOURCE_ANNOTATION, "id": "source-2"})
