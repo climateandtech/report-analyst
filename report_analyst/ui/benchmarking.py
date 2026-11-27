@@ -66,20 +66,21 @@ class BenchmarkingUI:
 
         # Expected file formats (expandable)
         with st.expander("Expected file formats (CSV, Excel, YAML, JSON)"):
+            st.markdown("**Supported files**")
             st.markdown(
-                "**CSV / Excel (ground truth or benchmark)** — For evaluation, the app expects "
-                "columns such as: `query_id` (or `question_id`), `chunk_id`, `position` (or `rank`), "
-                "`score` (or `relevance_score`). Ground truth alignment expects: `document`, `question`, "
-                "`context` or `relevant`, `relevance_label`. Benchmark alignment expects: `report`, "
-                "`question`, `paragraph`, and optionally `relevant_text`, `relevant_text_sim`. "
-                "Column names are case-insensitive; common variants are accepted. If your file does not "
-                "match, use **Dataset Alignment** (CSV/Excel only) to convert it."
+                "**CSV / Excel** — "
+                "Recommended for new evaluations."
+                "Your file should contain the information needed to identify `questions`, "
+                "`relevant text`, `labels`, or `model scores`. You can map the columns after upload."
+            )
+
+            st.markdown(
+                "**YAML / JSON** — " "Supported for existing benchmark datasets, but cannot be aligned in the wizard. "
             )
             st.markdown(
-                "**YAML / JSON** — Benchmark content schema: top-level `dataset_id`, `name`, "
-                "`description`, `version`, `question_set`, and `questions` (array of `question_id`, "
-                "`question_text`, `ground_truth_chunks` with `chunk_id`, `relevance_score`, `is_evidence`). "
-                "Alignment is not available for YAML/JSON; use CSV/Excel for alignment."
+                "**Tip:** "
+                "If you are unsure whether your file matches the expected structure, "
+                "upload a CSV or Excel file and use the alignment step."
             )
             st.caption("Full details: see EXPECTED_FILE_FORMATS.md in the project root.")
 
@@ -87,31 +88,45 @@ class BenchmarkingUI:
         if "uploaded_datasets" not in st.session_state:
             st.session_state.uploaded_datasets = {}
 
-        # Dataset upload section
+        # ------------------------------------------------------------------
+        # Flexible alignment wizard (experimental)
+        # ------------------------------------------------------------------
+
         if eval_mode == "Classification":
-            # In classification mode we conceptually work with a single dataset
-            # that already contains both ground-truth labels and model
-            # predictions/scores. Upload and alignment are handled exclusively
-            # via the **Flexible Dataset Alignment (Wizard)** below, so we only
-            # explain the workflow here instead of adding another uploader.
-            st.subheader("Upload Classification Dataset")
-            st.write(
-                "For classification mode, upload a **single CSV/Excel file** that "
-                "contains both ground-truth label columns (e.g. relevance/usefulness) "
-                "and one or more prediction/score columns from your models. "
-                "Use the **Flexible Dataset Alignment (Wizard)** section below to "
-                "align this file and register it for evaluation."
+            st.subheader(
+                "Upload & Align Dataset for Classification",
+                help=(
+                    "Classification requires one dataset containing both the expected labels "
+                    "and the model prediction or score columns."
+                ),
             )
+            st.caption(
+                "Upload one dataset containing both the expected labels and your model predictions. "
+                "Match the required columns, then continue to Evaluate."
+            )
+            # For classification we only need a single (results-style) dataset,
+            # so we reuse the benchmark wizard.
+            self._render_flexible_bm_wizard()
         else:
-            # For ranking / retrieval mode, all uploads and alignment are done
-            # via the Flexible Dataset Alignment (Wizard) section below.
-            st.subheader("Upload Ranking Datasets")
-            st.write(
-                "For ranking mode, use the **Flexible Dataset Alignment (Wizard)** "
-                "section below to upload and align your ground-truth and benchmark "
-                "CSV/Excel files. Direct YAML/JSON uploads are no longer supported "
-                "for new evaluations; convert them to CSV/Excel first if needed."
+            st.subheader(
+                "Upload & Align Datasets for Ranking",
+                help=(
+                    "Ranking requires two datasets: a ground-truth dataset with the expected "
+                    "relevance information and a benchmark dataset containing the model results."
+                ),
             )
+            st.caption(
+                "Upload your reference dataset first, then your benchmark results. "
+                "Match the required columns in each step. Once both datasets are ready, continue to Evaluate."
+            )
+
+            gt_wizard, bm_wizard = st.tabs(["1. Ground Truth", "2. Benchmark"])
+
+            with gt_wizard:
+                self._render_flexible_gt_wizard()
+
+            with bm_wizard:
+                self._render_flexible_bm_wizard()
 
         # Offer download of aligned datasets (when user previously aligned and used one)
         aligned_gt = st.session_state.get("aligned_csv_current_ground_truth")
@@ -188,39 +203,9 @@ class BenchmarkingUI:
                 if st.button("Delete Dataset", type="secondary"):
                     self._delete_dataset(selected_dataset)
 
-        # ------------------------------------------------------------------
-        # Flexible alignment wizard (experimental)
-        # ------------------------------------------------------------------
-        st.subheader("Flexible Dataset Alignment (Wizard)")
-        if eval_mode == "Classification":
-            st.caption(
-                "Use this wizard to upload **one CSV/Excel classification dataset** "
-                "that already contains both expert labels (e.g. relevance/usefulness) "
-                "and model prediction/score columns. The aligned dataset will be "
-                "available for the classification calibration panel."
-            )
-            # For classification we only need a single (results-style) dataset,
-            # so we reuse the benchmark wizard.
-            self._render_flexible_bm_wizard()
-        else:
-            st.caption(
-                "Use this wizard when you have custom CSV/Excel files with expert labels "
-                "and model predictions. It helps you define query IDs, chunk IDs, and "
-                "label/prediction columns in a consistent way for both ranking and "
-                "classification evaluation."
-            )
-
-            gt_wizard, bm_wizard = st.tabs(["Align Ground Truth (Wizard)", "Align Benchmark (Wizard)"])
-
-            with gt_wizard:
-                self._render_flexible_gt_wizard()
-
-            with bm_wizard:
-                self._render_flexible_bm_wizard()
-
     def render_benchmarking_interface(self):
         """Render benchmarking interface"""
-        st.subheader("Run Benchmark Evaluation")
+        st.subheader("Evaluate Benchmark")
 
         # Get datasets from both database and session state (uploaded files)
         db_datasets = []
@@ -256,7 +241,11 @@ class BenchmarkingUI:
 
         # Ranking / retrieval evaluation configuration
         if eval_mode in ("Ranking (retrieval)", "Both"):
-            st.subheader("Ranking evaluation (retrieval)")
+            st.subheader("Ranking Evaluation")
+
+            st.markdown(
+                "Compare your benchmark results against the ground-truth" " dataset and measure retrieval performance."
+            )
 
             col1, col2 = st.columns(2)
 
@@ -276,7 +265,7 @@ class BenchmarkingUI:
 
                 if reference_options:
                     selected_ref_label = st.selectbox(
-                        "Select Reference (Ground Truth) Dataset:",
+                        "Ground-truth dataset",
                         options=list(reference_options.keys()),
                     )
                     ref_source, ref_id = reference_options[selected_ref_label]
@@ -299,7 +288,7 @@ class BenchmarkingUI:
 
                 if benchmark_options:
                     selected_bench_label = st.selectbox(
-                        "Select Benchmark (Results) Dataset:",
+                        "Benchmark dataset",
                         options=list(benchmark_options.keys()),
                     )
                     bench_source, bench_id = benchmark_options[selected_bench_label]
@@ -309,7 +298,7 @@ class BenchmarkingUI:
 
             # Evaluation name
             evaluation_name = st.text_input(
-                "Evaluation Name:",
+                "Evaluation name:",
                 value=f"eval_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}",
             )
 
@@ -358,11 +347,11 @@ class BenchmarkingUI:
 
         # Classification evaluation configuration
         if eval_mode in ("Classification", "Both"):
-            st.subheader("Classification evaluation (per-chunk labels and scores)")
-            st.caption(
-                "Use this section when your dataset has ground-truth labels (e.g. relevance/usefulness) "
-                "and one or more numeric prediction/score columns."
-            )
+            # st.subheader("Classification evaluation (per-chunk labels and scores)")
+            # st.caption(
+            #     "Use this section when your dataset has ground-truth labels (e.g. relevance/usefulness) "
+            #     "and one or more numeric prediction/score columns."
+            # )
             # Reuse the classification calibration panel so you can configure and run it here
             self._render_classification_calibration_panel("evaluate")
 
@@ -541,7 +530,7 @@ class BenchmarkingUI:
         if not runs:
             st.info(
                 "Run classification calibration in the **Evaluate** tab (select multiple "
-                "prediction/score columns) to compare models here."
+                "prediction or score columns) to compare models here."
             )
             return
 
@@ -586,16 +575,14 @@ class BenchmarkingUI:
         if not candidates:
             return
 
-        st.subheader("Classification calibration")
-        st.caption(
-            "Analyze calibration and classification performance for any dataset with "
-            "a label column and one or more numeric prediction/score columns."
-        )
+        st.subheader("Classification Evaluation")
+        st.caption("Compare model predictions against ground-truth" " labels and evaluate classification performance.")
 
         # Dataset selector
         labels = [f"{ds.name} ({key})" for key, ds in candidates]
         selected_label = st.selectbox(
-            "Select dataset for calibration analysis:",
+            "Dataset",
+            help="Select the column containing the expected or expert-assigned label.",
             options=labels,
             key=f"{key_prefix}_calibration_dataset_select",
         )
@@ -639,7 +626,7 @@ class BenchmarkingUI:
                 break
 
         label_col = st.selectbox(
-            "Ground-truth label column (e.g. relevance or usefulness):",
+            "Ground-truth label",
             options=label_candidates,
             index=default_label_index,
             key=f"{key_prefix}calibration_label_select",
@@ -653,7 +640,8 @@ class BenchmarkingUI:
 
         # Let the user choose one or more prediction columns (models) to analyze.
         selected_score_cols = st.multiselect(
-            "Prediction / score columns (models):",
+            "Model predictions or scores:",
+            help="Select one or more columns containing your model's predictions or scores.",
             options=score_candidates,
             default=default_score_selection,
             key=f"{key_prefix}calibration_score_multiselect",
@@ -1123,7 +1111,7 @@ class BenchmarkingUI:
         cols_lower = {c.lower(): c for c in cols}
 
         # Query definition
-        st.markdown("**Step 1 - Identify the query (report + question)**")
+        st.markdown("**Step 1 - Identify the question**")
         doc_options = ["<none>", *cols]
         default_doc_idx = 0
         for cand in ("document", "report", "report_name", "doc_id"):
@@ -1131,7 +1119,7 @@ class BenchmarkingUI:
                 default_doc_idx = doc_options.index(cols_lower[cand])
                 break
         document_sel = st.selectbox(
-            "Report / company column (used to build query ID):",
+            "Report or document (used to build query ID):",
             options=doc_options,
             index=default_doc_idx,
             key="flex_gt_document_col",
@@ -1145,7 +1133,7 @@ class BenchmarkingUI:
                 default_q = cols_lower[cand]
                 break
         question_col = st.selectbox(
-            "Criteria / question text column:",
+            "Question:",
             options=cols,
             index=cols.index(default_q) if default_q in cols else 0,
             key="flex_gt_question_col",
@@ -1157,9 +1145,9 @@ class BenchmarkingUI:
                 default_chunk = cols_lower[cand]
                 break
         # Chunk & relevant part
-        st.markdown("**Step 2 - Ground-truth text: full chunk vs. relevant part**")
+        st.markdown("**Step 2 - Select the relevant text**")
         chunk_text_col = st.selectbox(
-            "Column with the full chunk / paragraph text (or the expert relevant text if no full chunk is stored):",
+            "Full text or paragraph (or the expert relevant text if no full chunk is stored):",
             options=cols,
             index=cols.index(default_chunk) if default_chunk in cols else 0,
             key="flex_gt_chunk_col",
@@ -1172,19 +1160,19 @@ class BenchmarkingUI:
                 default_rel_idx = rel_options.index(cols_lower[cand])
                 break
         rel_sel = st.selectbox(
-            (
-                "Column with the expert-labeled relevant span inside the chunk "
-                "(optional - if you only have relevant text, you can reuse the "
-                "same column as above):"
-            ),
+            "Relevant excerpt (optional):",
             options=rel_options,
             index=default_rel_idx,
             key="flex_gt_relevant_col",
+            help=(
+                "Select the column containing the expert-marked relevant excerpt. "
+                "If no separate excerpt exists, you can reuse the full-text column above."
+            ),
         )
         relevant_part_col = None if rel_sel == "<none>" else rel_sel
 
         # Label columns
-        st.markdown("**Step 3 - Ground-truth relevance labels**")
+        st.markdown("**Step 3 - Select the ground-truth label**")
         # Suggest numeric or name-based label columns
         df_sample = df_raw.head(50)
         numeric_cols = df_sample.select_dtypes(include=["number"]).columns.tolist()
@@ -1198,7 +1186,7 @@ class BenchmarkingUI:
         default_labels = sorted(label_suggestions)
 
         label_cols = st.multiselect(
-            "Select label column(s) with expert scores (e.g. relevance, usefulness):",
+            "Relevance label (e.g. relevance, usefulness):",
             options=cols,
             default=default_labels,
             key="flex_gt_label_cols",
@@ -1294,7 +1282,7 @@ class BenchmarkingUI:
             # Classification mode: query_id is not used for metrics, but we still
             # let the user label report and criteria columns for context and
             # for potential grouping in future analyses.
-            st.markdown("**Step 1 - Report and criteria (optional context)**")
+            st.markdown("**Step 1 - Add context (optional)**")
             doc_options = ["<none>", *cols]
             default_doc_idx = 0
             for cand in ("document", "report", "report_name", "doc_id", "company"):
@@ -1302,7 +1290,7 @@ class BenchmarkingUI:
                     default_doc_idx = doc_options.index(cols_lower[cand])
                     break
             document_sel = st.selectbox(
-                "Report / company column (optional):",
+                "Report or document:",
                 options=doc_options,
                 index=default_doc_idx,
                 key="flex_bm_document_col",
@@ -1315,7 +1303,7 @@ class BenchmarkingUI:
                     default_q = cols_lower[cand]
                     break
             question_col = st.selectbox(
-                "Criteria / question text column (optional):",
+                "Question or criteria:",
                 options=cols,
                 index=cols.index(default_q) if default_q in cols else 0,
                 key="flex_bm_question_col",
@@ -1324,13 +1312,13 @@ class BenchmarkingUI:
             # derive query_id from document/question as needed.
             qid_col = None
         else:
-            st.markdown("**Step 1 - Match this file to the ground-truth queries**")
+            st.markdown("**Step 1 - Identify the query**")
             query_id_options = ["<compute from document/question>", *cols]
             default_qid_idx = 0
             if has_query_id_col:
                 default_qid_idx = query_id_options.index(next(c for c in cols if c.lower() == "query_id"))
             query_id_sel = st.selectbox(
-                "How should the query ID be obtained for this file?",
+                "How should the query be identified?:",
                 options=query_id_options,
                 index=default_qid_idx,
                 key="flex_bm_query_id_strategy",
@@ -1345,7 +1333,8 @@ class BenchmarkingUI:
                         default_doc_idx = doc_options.index(cols_lower[cand])
                         break
                 document_sel = st.selectbox(
-                    "Report / company column (must match the ground-truth file):",
+                    "Report or document:",
+                    help=("must match the ground-truth file"),
                     options=doc_options,
                     index=default_doc_idx,
                     key="flex_bm_document_col",
@@ -1358,7 +1347,8 @@ class BenchmarkingUI:
                         default_q = cols_lower[cand]
                         break
                 question_col = st.selectbox(
-                    "Criteria / question text column (must match the ground-truth file):",
+                    "Question or criteria:",
+                    help=("must match the ground-truth file"),
                     options=cols,
                     index=cols.index(default_q) if default_q in cols else 0,
                     key="flex_bm_question_col",
@@ -1369,14 +1359,14 @@ class BenchmarkingUI:
                 question_col = None
 
         # Chunk & optional relevant part
-        st.markdown("**Step 2 - Retrieved chunk and (optional) relevant span**")
+        st.markdown("**Step 2 - Select the retrieved text**")
         default_chunk = cols[0]
         for cand in ("chunk_text", "paragraph", "context", "text"):
             if cand in cols_lower:
                 default_chunk = cols_lower[cand]
                 break
         chunk_text_col = st.selectbox(
-            "Column with the retrieved chunk / paragraph text:",
+            "Retrieved text or paragraph:",
             options=cols,
             index=cols.index(default_chunk) if default_chunk in cols else 0,
             key="flex_bm_chunk_col",
@@ -1389,11 +1379,10 @@ class BenchmarkingUI:
                 default_rel_idx = rel_options.index(cols_lower[cand])
                 break
         rel_sel = st.selectbox(
-            (
-                "Column with the text span that should match the ground-truth "
-                "relevant part (for datasets with expert spans like ClimRetrieve "
-                "this is strongly recommended; leave as <none> only if your "
-                "ground truth is chunk-level only):"
+            "Relevant text span (optional):",
+            help=(
+                "Select this when your benchmark contains the specific text span "
+                "that should match the relevant part in the ground-truth dataset."
             ),
             options=rel_options,
             index=default_rel_idx,
@@ -1408,7 +1397,7 @@ class BenchmarkingUI:
         is_classification_mode = st.session_state.get("evaluation_mode") == "Classification"
 
         # Prediction & similarity columns
-        st.markdown("**Step 3 - Model scores and ranking signal**")
+        # st.markdown("**Step 3 - Model scores and ranking signal**")
         df_sample = df_raw.head(50)
         numeric_cols = df_sample.select_dtypes(include=["number"]).columns.tolist()
         pred_suggestions = set()
@@ -1433,8 +1422,9 @@ class BenchmarkingUI:
         sorted(pred_suggestions)
 
         classification_label_col = None
+        ranking_score_col = None
         if is_classification_mode:
-            st.markdown("**Step 3a - Ground-truth label used for classification metrics**")
+            st.markdown("**Step 3 - Select the label and model predictions**")
             # Heuristic: prefer 'relevance' or 'usefulness' as label.
             default_label = cols[0]
             for cand in ("relevance", "usefulness", "label", "class"):
@@ -1446,28 +1436,42 @@ class BenchmarkingUI:
                     continue
                 break
             classification_label_col = st.selectbox(
-                "Column with expert labels (e.g. relevance or usefulness):",
+                "Ground-truth label:",
                 options=cols,
                 index=cols.index(default_label) if default_label in cols else 0,
                 key="flex_bm_classification_label_col",
+                help="Select the column containing the expected or expert-assigned label.",
             )
 
-        st.markdown("**Step 3b - Prediction / score columns from your models**")
-        prediction_cols = st.multiselect(
-            "Select model prediction / score column(s) (e.g. similarity, relevance_score_*):",
-            options=cols,
-            default=[],
-            key="flex_bm_prediction_cols",
-        )
-
-        ranking_score_col = None
-        if prediction_cols:
-            ranking_score_col = st.selectbox(
-                "Which score should be used to rank chunks and decide top-K relevance?",
-                options=prediction_cols,
-                index=0,
-                key="flex_bm_ranking_score_col",
+            prediction_cols = st.multiselect(
+                "Model prediction or score columns:",
+                options=cols,
+                default=[],
+                key="flex_bm_prediction_cols",
+                help="Select one or more columns containing model predictions or scores.",
             )
+        else:
+
+            st.markdown("**Step 3 - Select the ranking score**")
+            prediction_cols = st.multiselect(
+                "Model score columns:",
+                options=cols,
+                default=[],
+                key="flex_bm_prediction_cols",
+                help=(
+                    "Select one or more columns containing scores produced by your model, "
+                    "for example similarity or relevance scores."
+                ),
+            )
+
+            if prediction_cols:
+                ranking_score_col = st.selectbox(
+                    "Score used for ranking:",
+                    options=prediction_cols,
+                    index=0,
+                    key="flex_bm_ranking_score_col",
+                    help="This score determines the order of retrieved chunks.",
+                )
 
         if st.button(
             "Align benchmark (flexible) and use for evaluation",
