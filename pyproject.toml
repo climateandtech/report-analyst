@@ -7,7 +7,7 @@ name = "report-analyst"
 version = "0.8.0rc"
 description = "Open Sustainability Analyst - benchmark evaluation, error analysis, and dataset loading for retrieval evaluation"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "pandas",
     "numpy",

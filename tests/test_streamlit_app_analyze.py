@@ -13,16 +13,13 @@ from streamlit.testing.v1 import AppTest
 
 from report_analyst.streamlit_app import ReportAnalyzer
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
 
 @pytest.fixture
-def test_pdf_in_app_temp():
-    """Create a valid temporary PDF in the app's temp directory."""
-    app_temp = PROJECT_ROOT / "temp"
-    app_temp.mkdir(exist_ok=True)
+def test_pdf_in_app_temp(monkeypatch, tmp_path):
+    """Create a valid PDF in a per-test upload directory the app reads reports from."""
+    monkeypatch.setenv("REPORT_ANALYST_UPLOAD_DIR", str(tmp_path))
 
-    pdf_path = app_temp / "test_report.pdf"
+    pdf_path = tmp_path / "test_report.pdf"
 
     writer = PdfWriter()
     writer.add_blank_page(width=612, height=792)
@@ -30,10 +27,7 @@ def test_pdf_in_app_temp():
     with pdf_path.open("wb") as file:
         writer.write(file)
 
-    yield pdf_path
-
-    # Remove only the file created by this test.
-    pdf_path.unlink(missing_ok=True)
+    return pdf_path
 
 
 def test_process_document_with_all_keywords():
@@ -74,12 +68,12 @@ def test_process_document_with_all_keywords():
 #         os.environ["TEMP_DIR"] = str(temp_dir)
 
 
-def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp):
+def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_app_temp, streamlit_app_path):
     report_analyzer, calls = mocked_report_analyzer
 
     assert test_pdf_in_app_temp.exists()
 
-    at = AppTest.from_file(str(PROJECT_ROOT / "report_analyst/streamlit_app.py"))
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.session_state["analyzer"] = report_analyzer
 
@@ -107,12 +101,14 @@ def test_analyze_button_without_openai_call(mocked_report_analyzer, test_pdf_in_
     assert any(expander.label == "PDF Viewer with Chunks" for expander in at.expander)
 
 
-def test_reanalyze_button_forces_recompute_without_cache_lookup(mocked_report_analyzer, test_pdf_in_app_temp):
+def test_reanalyze_button_forces_recompute_without_cache_lookup(
+    mocked_report_analyzer, test_pdf_in_app_temp, streamlit_app_path
+):
     report_analyzer, calls = mocked_report_analyzer
 
     assert test_pdf_in_app_temp.exists()
 
-    at = AppTest.from_file(str(PROJECT_ROOT / "report_analyst/streamlit_app.py"))
+    at = AppTest.from_file(streamlit_app_path)
     at.session_state["nav_page"] = "Report Analyst"
     at.session_state["analyzer"] = report_analyzer
 
