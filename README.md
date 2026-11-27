@@ -310,6 +310,8 @@ Current core question sets (in `report_analyst/questionsets/`):
   Climate-related financial disclosure questions aligned with TCFD.
 - **ClimRetrieve** – `climretrieve_questions.yaml`  
   Climate-focused questions aligned with the [ClimRetrieve](https://arxiv.org/abs/2406.09818) benchmark (adaptation, scenarios, targets, risks, etc.). Use this set when evaluating retrieval or analysis against ClimRetrieve datasets.
+- **ESRS E1 Climate** – `esrs_e1_climate_questions.yaml` (examples variant: `esrs_e1_climate_examples_questions.yaml`)  
+  Canonical **mixed typed** framework: per-question `ANSWER type: classification` (yes/no labels) or `ANSWER type: quantity` (number + unit). Free-form sets (TCFD, Everest, Lucia, …) omit that line. Full comparison: [question sets — answer types](documentation/guides/question-sets.md#answer-types-read-this-first).
 - **Denali** – `denali_questions.yaml`  
   Deeper sustainability analysis for specific focus areas.
 - **Kilimanjaro** – `kilimanjaro_questions.yaml`  
@@ -509,6 +511,7 @@ For detailed deployment patterns (Docker, Kubernetes, NATS workers, etc.), see:
 - `scripts/README_CLIMRETRIEVE.md` – ClimRetrieve benchmark and generic CSV evaluation
 - `report_analyst_jobs/README.md` – Job processing and worker patterns
 - `docs/CI.md` – Continuous integration and testing
+- `docs/wireframes/` – Sketch screens of the Report Analyst UI ([GitHub-rendered gallery](docs/wireframes/README.md))
 
 ---
 
@@ -522,6 +525,7 @@ The repository uses a **module-based licensing model**:
 | `report_analyst_api/`              | FastAPI API module                           | **Climate+Tech Open License for Good**         |
 | `report_analyst_jobs/`             | Jobs, NATS, integration toolkit              | **Climate+Tech Open License for Good**         |
 | `report_analyst_search_backend/`   | Search/upload backend integration            | **Climate+Tech Open License for Good**         |
+| `report_analyst_enterprise/`       | Enterprise edition (Postgres/pgvector, deploy) | **Climate+Tech Open License for Good**         |
 
 The core analysis module `report_analyst/` is open source under the RPL (Reciprocal Public License). All other modules (API, jobs, search backend, etc.) are provided under the Climate+Tech Open License for Good, and can be dual-licensed for commercial or special use cases upon request.
 

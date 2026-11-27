@@ -312,7 +312,7 @@ class ReportAnalyzer:
 
 
 def save_uploaded_file(uploaded_file) -> Optional[str]:
-    """Save uploaded file to temp directory or PostgreSQL"""
+    """Save an uploaded PDF to the report upload folder, or to PostgreSQL when that mode is on."""
     try:
         if uploaded_file is None:
             logger.warning("No file was uploaded")
@@ -384,9 +384,10 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
             except Exception as e:
                 logger.warning(f"PostgreSQL file storage failed: {e!s}, falling back to local")
 
-        # Fallback to local file storage
-        file_path = Path("temp") / uploaded_file.name
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        # Same folder report history lists, so the PDF survives a container replace.
+        from report_analyst.core.service import get_report_upload_dir
+
+        file_path = get_report_upload_dir() / uploaded_file.name
         with open(file_path, "wb") as f:
             f.write(file_bytes)
         logger.info(f"Successfully saved file: {file_path}")
@@ -929,19 +930,23 @@ def display_pdf_viewer(
     questions: Dict[str, Dict],
     raw_chunks: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
-    chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in results.items()}
-    questions_data = {question_id: question.get("text", question_id) for question_id, question in questions.items()}
+    chunks_by_question = {question_id: data.get("chunks", []) for question_id, data in (results or {}).items()}
+    questions_data = {question_id: question.get("text", question_id) for question_id, question in (questions or {}).items()}
     viewer_key = Path(str(file_path)).stem or "analysis"
 
     with st.expander("PDF Viewer with Chunks", expanded=True):
-        pdf_viewer(
-            pdf_path=str(file_path),
-            chunks_data=chunks_by_question,
-            questions_data=questions_data,
-            unmapped_chunks=raw_chunks,
-            key=f"pdf_viewer_{viewer_key}",
-            height=800,
-        )
+        try:
+            pdf_viewer(
+                pdf_path=str(file_path),
+                chunks_data=chunks_by_question,
+                questions_data=questions_data,
+                unmapped_chunks=raw_chunks,
+                key=f"pdf_viewer_{viewer_key}",
+                height=800,
+            )
+        except Exception as e:
+            logger.error(f"Error rendering PDF viewer: {e!s}", exc_info=True)
+            st.error(f"Error rendering PDF viewer: {e!s}")
 
 
 def display_consolidated_results(analyzer, question_set, file_path=None, selected_config=None):
@@ -3162,10 +3167,10 @@ def main():
                 if use_postgres_storage:
                     st.info("📦 Files will be stored in PostgreSQL database")
                 else:
-                    st.caption("Files will be stored in local temp directory")
+                    st.caption("Files will be stored in the report upload folder")
             else:
                 st.info("PostgreSQL file storage requires a PostgreSQL database. Currently using SQLite.")
-                st.caption("Files are stored in local temp directory")
+                st.caption("Files are stored in the report upload folder")
 
         # Show page-specific content based on navigation
         if nav_page == "Report Analyst":
@@ -3927,28 +3932,32 @@ def main():
                                 )
                                 st.error(f"Error during analysis: {e!s}")
 
-                    viewer_results = fresh_viewer_results
-                    if not viewer_results:
-                        viewer_results = analyzer.analyzer.cache_manager.get_analysis(
-                            file_path=analysis_file_path,
-                            config=config,
+                    try:
+                        viewer_results = fresh_viewer_results
+                        if not viewer_results:
+                            viewer_results = analyzer.analyzer.cache_manager.get_analysis(
+                                file_path=analysis_file_path,
+                                config=config,
+                            )
+                        if viewer_results:
+                            raw_chunks = []
+                        elif is_backend:
+                            raw_chunks = st.session_state.get("backend_chunks") or []
+                        else:
+                            raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
+                                file_path=analysis_file_path,
+                                chunk_size=config["chunk_size"],
+                                chunk_overlap=config["chunk_overlap"],
+                            )
+                        display_pdf_viewer(
+                            str(analysis_file_path),
+                            viewer_results,
+                            questions,
+                            raw_chunks,
                         )
-                    if viewer_results:
-                        raw_chunks = []
-                    elif is_backend:
-                        raw_chunks = st.session_state.get("backend_chunks") or []
-                    else:
-                        raw_chunks = analyzer.analyzer.cache_manager.get_document_chunks(
-                            file_path=analysis_file_path,
-                            chunk_size=config["chunk_size"],
-                            chunk_overlap=config["chunk_overlap"],
-                        )
-                    display_pdf_viewer(
-                        str(analysis_file_path),
-                        viewer_results,
-                        questions,
-                        raw_chunks,
-                    )
+                    except Exception as e:
+                        logger.error(f"Error displaying PDF viewer: {e!s}", exc_info=True)
+                        st.error(f"Error displaying PDF viewer: {e!s}")
                 else:
                     # Show helpful error message
                     if file_path is None:
