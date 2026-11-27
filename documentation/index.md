@@ -6,7 +6,7 @@ Guides for the analyst, plus an API reference generated from the Python docstrin
 
 - [Report analysis](guides/report-analysis.md) — upload a PDF, pick a question set, and run Chunk through Answer.
 - [Parameters](guides/parameters.md) — chunk size, overlap, top K, model, and LLM scoring.
-- [Question sets](guides/question-sets.md) — the built-in frameworks and where their YAML lives.
+- [Question sets](guides/question-sets.md) — built-in frameworks, plus **free-form vs classification (yes/no) vs quantity (numerical)** answer types.
 - [Chunk highlighting](guides/chunk-highlighting.md) — open an evidence chunk on its PDF page.
 - [Benchmarking](guides/benchmarking.md) — score retrieval against an expert reference, including ClimRetrieve.
 
