@@ -137,7 +137,9 @@ class NATSLLMChatAdapter:
         await self._ensure_connected()
         request_id = str(uuid.uuid4())
         reply_subject = f"llm.response.{request_id}"
+        # Platform llm_consumer accepts request_id or id; reply_subject routes the response.
         payload = {
+            "id": request_id,
             "request_id": request_id,
             "request_type": request_type,
             "prompt": prompt,
