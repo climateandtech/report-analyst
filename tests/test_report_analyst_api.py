@@ -9,16 +9,15 @@ import sys
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 # Ensure report_analyst and report_analyst_api are importable (run from report-analyst repo root)
 _repo_root = Path(__file__).resolve().parent.parent
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
-from fastapi.testclient import TestClient
-
 # Import app after path is set; this loads service layer (question_loader only, no analyzer)
-from report_analyst_api.main import app
+from report_analyst_api.main import app  # noqa: E402
 
 client = TestClient(app)
 
@@ -124,7 +123,7 @@ def test_reports_can_filter_by_question_set_param():
 
 
 def test_analysis_keys_returns_full_list():
-    """GET /analysis-keys returns full report × question_set pair list."""
+    """GET /analysis-keys returns full report x question_set pair list."""
     keys_response = client.get("/analysis-keys")
     reports_response = client.get("/reports")
     sets_response = client.get("/question-sets")
