@@ -73,3 +73,6 @@ node_modules
 Agents.md
 report-analyst.code-workspace
 .vscode/launch.json
+
+# Dependabot alert exports
+/data/dependabot_alerts/
