@@ -22,6 +22,7 @@ from report_analyst.models.taxonomy import Taxonomy, TaxonomyConcept
 
 XHTML = "http://www.w3.org/1999/xhtml"
 IX = "http://www.xbrl.org/2013/inlineXBRL"
+# Transformation Registry 5. Its formats read a value as the report shows it, such as 1,240.
 IXT = "http://www.xbrl.org/inlineXBRL/transformation/2022-02-16"
 # How reports write numbers, by the iXBRL format that reads them: the thousands separators, then the decimal mark.
 NUMBER_FORMATS = {
