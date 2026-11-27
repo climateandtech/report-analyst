@@ -48,14 +48,10 @@ logger.info(
     use_full_backend_analysis,
 )
 
-# If using backend for LLM, don't require local API keys
-if use_backend and (use_centralized_llm or use_full_backend_analysis):
-    logger.info("Using backend for LLM functionality - local API keys not required")
-    # Set placeholder values for compatibility
-    if not openai_key:
-        openai_key = "backend-handles-llm"
-    if not gemini_key:
-        gemini_key = "backend-handles-llm"
+# Centralized LLM: platform handles inference via NATS — never use placeholder OpenAI keys
+_centralized_llm_active = use_backend and (use_centralized_llm or use_full_backend_analysis)
+if _centralized_llm_active:
+    logger.info("Centralized LLM mode — inference via platform/NATS (no local OpenAI/Gemini)")
 else:
     # Only check for API keys if not using backend LLM
     # Check if we need to force the default model based on available keys
@@ -140,13 +136,28 @@ class DocumentAnalyzer:
         self.default_model = self._select_default_model(default_model)
         log_analysis_step(f"Using default model from env: {self.default_model}")
 
-        # Check if we should use backend for all LLM functionality
-        self.use_backend_llm = use_backend and (use_centralized_llm or use_full_backend_analysis)
+        # Check if we should use backend for all LLM functionality (read env per instance for tests/deploy)
+        backend_flag = os.getenv("USE_BACKEND", "false").lower() == "true"
+        centralized_flag = os.getenv("USE_CENTRALIZED_LLM", "false").lower() == "true"
+        full_backend_flag = os.getenv("USE_FULL_BACKEND_ANALYSIS", "false").lower() == "true"
+        self.use_backend_llm = backend_flag and (centralized_flag or full_backend_flag)
 
         if self.use_backend_llm:
-            # Set minimal placeholders for compatibility
-            self.llm = None
-            self.embeddings = None
+            log_analysis_step(
+                "Initializing NATS-backed LLM (platform centralized)",
+                "info",
+            )
+            try:
+                from report_analyst_enterprise.nats_llm_adapter import NATSLLMChatAdapter
+            except ImportError as exc:
+                raise ImportError(
+                    "Centralized LLM requires the enterprise package "
+                    "(report_analyst_enterprise.nats_llm_adapter). "
+                    "Install enterprise extras or disable USE_CENTRALIZED_LLM."
+                ) from exc
+
+            self.llm = NATSLLMChatAdapter(model=os.getenv("PLATFORM_CHAT_MODEL", "gemma3-4b"))
+            self._initialize_embeddings_client()
         else:
             self._initialize_llm_clients()
 
@@ -190,6 +201,24 @@ class DocumentAnalyzer:
             return "gemini-1.5-flash"
         return requested_model
 
+    def _initialize_embeddings_client(self) -> None:
+        """Local OpenAI embeddings for retrieval when chat goes through platform NATS."""
+        self.embeddings = None
+        current_openai_key = os.getenv("OPENAI_API_KEY")
+        if not APIKeyManager.is_configured_key(current_openai_key):
+            logger.warning(
+                "Centralized LLM active but no OpenAI embedding key — "
+                "similarity retrieval will be empty until OPENAI_API_KEY is set"
+            )
+            return
+        self.embeddings = OpenAIEmbedding(
+            api_key=current_openai_key,
+            api_base=os.getenv("OPENAI_API_BASE"),
+            model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
+            embed_batch_size=100,
+        )
+        Settings.embed_model = self.embeddings
+
     def _initialize_llm_clients(self) -> None:
         """Initialize LLM clients only when the needed key exists."""
         self.llm = None
@@ -204,18 +233,7 @@ class DocumentAnalyzer:
                 model_name=self.default_model,
                 cache_dir=str(self.llm_cache_path),
             )
-
-            current_openai_key = os.getenv("OPENAI_API_KEY")
-            if APIKeyManager.is_configured_key(current_openai_key):
-                self.embeddings = OpenAIEmbedding(
-                    api_key=current_openai_key,
-                    api_base=os.getenv("OPENAI_API_BASE"),
-                    model_name=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
-                    embed_batch_size=100,
-                )
-                Settings.embed_model = self.embeddings
-            else:
-                logger.warning("No OpenAI API key - embedding functionality will be limited")
+            self._initialize_embeddings_client()
         except ValueError as e:
             log_analysis_step(f"LLM initialization deferred: {e!s}", "warning")
             self.llm = None
