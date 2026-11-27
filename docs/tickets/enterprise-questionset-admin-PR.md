@@ -26,7 +26,7 @@ Closes #203.
 QG_CI_PARITY=1 ./scripts/quality-gate.sh full
 ```
 
-Why: QG affected-pytest and CI’s `quality-gate` job did not run slim Docker `pip install` or validate Dockerfile `COPY` paths (Actwyser failures: pillow resolver, missing schema in image).
+Why: QG only ran ruff (not **black**), used affected pytest (not `tests/test_linting.py`), and did not run slim Docker `pip install` or validate Dockerfile `COPY` paths.
 
 ## Test plan
 
